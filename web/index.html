@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>River Bankers</title>
+<style>
+  :root {
+    --water-deep:   #1d4e6b;
+    --water-mid:    #3a8fb7;
+    --water-light:  #87c0d8;
+    --bank:         #6b5436;
+    --bank-light:   #a0825a;
+    --shore:        #d4b97a;
+    --shore-light:  #ecd9a8;
+    --forest:       #2f5d3a;
+    --forest-light: #4a8056;
+    --reed-green:   #6ba14a;
+    --paper:        #faf3e3;
+    --ink:          #2c1f15;
+    --ink-soft:     #5a4a36;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+    background:
+      radial-gradient(ellipse at top, #c9dde6 0%, #a3c1cf 40%, #87a8b8 100%);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 12px;
+  }
+  h1 {
+    text-align: center;
+    margin: 0 0 12px;
+    font-size: 30px;
+    color: var(--water-deep);
+    letter-spacing: 2px;
+    text-shadow: 1px 1px 0 #fff;
+  }
+  h2 { margin: 0 0 6px; font-size: 16px; color: var(--water-deep); }
+  h3 { margin: 0 0 4px; font-size: 14px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 13px;
+    border: 2px solid var(--water-deep);
+    background: var(--water-mid);
+    color: #fff;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:hover:not(:disabled) { background: var(--water-deep); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  button.primary { background: var(--forest); border-color: #1a3a20; }
+  button.primary:hover:not(:disabled) { background: #1a3a20; }
+  button.secondary { background: var(--bank); border-color: #4a3922; }
+  button.secondary:hover:not(:disabled) { background: #4a3922; }
+  button.ghost { background: transparent; color: var(--water-deep); }
+  input[type=number] {
+    font-family: inherit;
+    font-size: 16px;
+    padding: 4px 6px;
+    width: 60px;
+    border: 2px solid var(--water-deep);
+    border-radius: 4px;
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; }
+
+  /* ================= TIME TRACK ================= */
+  .time-track-wrap {
+    background: var(--paper);
+    border: 2px solid var(--bank);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+  .time-track-label {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 4px;
+  }
+  .time-track {
+    display: flex;
+    overflow-x: auto;
+    background: linear-gradient(180deg, #e8d6a0 0%, #d4b97a 100%);
+    border-radius: 4px;
+    padding: 6px 4px 4px;
+    gap: 1px;
+    border: 1px solid var(--bank);
+  }
+  .time-cell {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 44px;
+    border-right: 1px dashed rgba(0,0,0,0.15);
+    text-align: center;
+    font-size: 9px;
+    color: var(--ink-soft);
+    position: relative;
+    padding-top: 2px;
+  }
+  .time-cell .pawn-stack {
+    position: absolute;
+    bottom: 2px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column-reverse;
+    gap: 1px;
+    align-items: center;
+  }
+  .pawn {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 2px solid #000;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  .pawn.next-up { animation: pulse 1.2s infinite; }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,200,0,0.7); }
+    50%     { box-shadow: 0 0 0 6px rgba(255,200,0,0); }
+  }
+
+  /* ================= RIVER ================= */
+  .river-wrap {
+    background: linear-gradient(180deg, var(--water-light) 0%, var(--water-mid) 50%, var(--water-deep) 100%);
+    border: 3px solid var(--bank);
+    border-radius: 10px;
+    padding: 8px;
+    margin-bottom: 10px;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.2);
+  }
+  .river-header {
+    display: flex; justify-content: space-between; align-items: center;
+    color: #fff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+    margin-bottom: 6px;
+    font-size: 12px;
+    padding: 0 4px;
+  }
+  .river-flow {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr) 16px minmax(180px, 1fr);
+    gap: 6px;
+    align-items: stretch;
+  }
+  .divider {
+    background: repeating-linear-gradient(
+      45deg,
+      var(--shore) 0 6px,
+      var(--shore-light) 6px 12px
+    );
+    border-radius: 3px;
+    border: 1px solid var(--bank);
+  }
+  .river-slot {
+    background: rgba(255,255,255,0.08);
+    border: 2px dashed rgba(255,255,255,0.4);
+    border-radius: 6px;
+    min-height: 200px;
+    padding: 4px;
+    display: flex; flex-direction: column;
+  }
+  .slot-cards {
+    display: flex; flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .river-slot.selectable { cursor: pointer; }
+  .river-slot.selectable:hover { background: rgba(255,255,0,0.15); border-color: yellow; }
+  .river-slot-label {
+    color: rgba(255,255,255,0.85);
+    font-size: 10px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .shoreline-area {
+    background: linear-gradient(180deg, var(--shore-light) 0%, var(--shore) 100%);
+    border: 2px solid var(--bank);
+    border-radius: 6px;
+    min-height: 200px;
+    padding: 4px;
+    display: flex; flex-direction: column;
+  }
+  .shoreline-label {
+    color: var(--bank);
+    font-size: 10px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    font-weight: 700;
+  }
+  .shoreline-cards {
+    display: flex; flex-direction: column; gap: 4px;
+    overflow-y: auto;
+  }
+
+  /* ================= MATERIAL CARD ================= */
+  .mat-card {
+    background: var(--paper);
+    border: 2px solid var(--bank);
+    border-radius: 5px;
+    padding: 4px 5px;
+    font-size: 11px;
+    flex: 1;
+    display: flex; flex-direction: column;
+    gap: 2px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .mat-card.selectable { cursor: pointer; }
+  .mat-card.selectable:hover { transform: translateY(-2px); box-shadow: 0 3px 6px rgba(0,0,0,0.4); }
+  .mat-card.selected { outline: 3px solid yellow; outline-offset: 1px; }
+  .mat-card.dimmed { opacity: 0.5; }
+  .mat-card .mat-head {
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .mat-card .mat-name { font-size: 12px; }
+  .mat-card .mat-cost {
+    background: var(--water-deep);
+    color: #fff;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 11px;
+  }
+  .mat-card .mat-shore-tag {
+    background: var(--bank);
+    color: #fff;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .mat-card .icons-row {
+    display: flex; flex-wrap: wrap; gap: 2px;
+    padding: 4px 0;
+    justify-content: center;
+    background: rgba(0,0,0,0.04);
+    border-radius: 3px;
+    min-height: 32px;
+    align-items: center;
+  }
+  .icon-slot {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--bank);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    background: #fff;
+  }
+  .icon-slot.icon-open { background: #fff; }
+  .icon-slot.icon-blank {
+    background: #ccc;
+    color: #888;
+    border-style: dashed;
+  }
+  .icon-slot.icon-worker { color: #fff; font-weight: 700; }
+  .mat-card .mat-foot {
+    font-size: 10px;
+    color: var(--ink-soft);
+    text-align: center;
+  }
+
+  /* ================= PLAYERS ================= */
+  .players-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .player-panel {
+    background: var(--paper);
+    border: 2px solid var(--bank);
+    border-radius: 8px;
+    padding: 8px 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .player-panel.active {
+    border-color: var(--forest);
+    border-width: 3px;
+    box-shadow: 0 0 12px rgba(74,128,86,0.4);
+  }
+  .player-panel.human {
+    background: linear-gradient(180deg, #fffbe8 0%, var(--paper) 100%);
+  }
+  .player-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 4px;
+  }
+  .player-title { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .player-pawn-mini {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid #000;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .player-stats {
+    font-size: 12px;
+    color: var(--ink-soft);
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .player-stats span b { color: var(--ink); }
+  .built-list {
+    margin-top: 4px;
+    display: flex; flex-wrap: wrap; gap: 3px;
+    max-height: 48px;
+    overflow-y: auto;
+  }
+  .built-chip {
+    background: var(--forest);
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 5px;
+    border-radius: 3px;
+  }
+
+  /* ================= HAND ================= */
+  .hand-area {
+    background: var(--paper);
+    border: 2px solid var(--bank);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .hand-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .struct-card {
+    background: linear-gradient(180deg, #f7e8c5 0%, #e8d2a0 100%);
+    border: 2px solid var(--bank);
+    border-radius: 5px;
+    padding: 6px 8px;
+    font-size: 12px;
+    position: relative;
+  }
+  .struct-card.selectable { cursor: pointer; }
+  .struct-card.selectable:hover { transform: translateY(-2px); box-shadow: 0 3px 6px rgba(0,0,0,0.3); }
+  .struct-card.buildable { border-color: var(--forest); border-width: 3px; }
+  .struct-card.selected { outline: 3px solid yellow; }
+  .struct-card.keep-selected {
+    outline: 3px solid var(--forest);
+    box-shadow: 0 0 8px rgba(74,128,86,0.5);
+    background: linear-gradient(180deg, #ddf0dd 0%, #c5e3c5 100%);
+  }
+  .struct-card.keep-selected::before {
+    content: '✓ KEEP';
+    position: absolute;
+    top: 4px; right: 4px;
+    background: var(--forest);
+    color: #fff;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+  .struct-card.will-discard {
+    opacity: 0.45;
+    filter: grayscale(0.4);
+  }
+  .struct-card .name { font-weight: 700; font-size: 13px; color: var(--ink); }
+  .struct-card .reqs { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+  .req-pill {
+    background: rgba(0,0,0,0.07);
+    border: 1px solid var(--bank);
+    padding: 1px 5px;
+    border-radius: 8px;
+    font-size: 11px;
+    display: inline-flex; align-items: center; gap: 2px;
+  }
+  .req-pill.satisfied { background: #c9e4c9; border-color: var(--forest); }
+  .struct-card .footer {
+    display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-soft);
+  }
+  .struct-card .vp { color: var(--forest); font-weight: 700; }
+
+  /* ================= ACTION PANEL ================= */
+  .action-panel {
+    background: var(--paper);
+    border: 3px solid var(--forest);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .action-panel-title {
+    font-weight: 700;
+    color: var(--forest);
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .action-buttons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .action-hint { font-size: 12px; color: var(--ink-soft); margin-top: 6px; font-style: italic; }
+
+  /* ================= MODAL ================= */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .modal {
+    background: var(--paper);
+    border: 3px solid var(--bank);
+    border-radius: 10px;
+    padding: 16px 18px;
+    max-width: 580px;
+    width: 100%;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .modal h2 { margin-bottom: 8px; }
+  .auction-bidders {
+    display: flex; flex-direction: column; gap: 4px;
+    margin: 8px 0;
+  }
+  .bidder-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 8px;
+    background: rgba(0,0,0,0.04);
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .bidder-name { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+  .bid-preview {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: #fef6e7;
+    border-left: 4px solid var(--bank);
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .result-box {
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .result-box p { margin: 4px 0; }
+  .result-box code { background: rgba(0,0,0,0.07); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .result-box.plenty { background: #e8f5e8; border-left: 4px solid var(--forest); }
+  .result-box.jam    { background: #fde8d3; border-left: 4px solid #b85a1a; }
+  .result-box.info   { background: #e8eef5; border-left: 4px solid var(--water-deep); }
+
+  /* ================= LOG ================= */
+  .log-area {
+    background: var(--paper);
+    border: 2px solid var(--bank);
+    border-radius: 8px;
+    padding: 8px 10px;
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .log-line {
+    padding: 2px 0;
+    border-bottom: 1px dotted rgba(0,0,0,0.1);
+  }
+  .log-line:last-child { border-bottom: none; }
+  .log-line.recent { background: rgba(255,255,180,0.4); }
+
+  /* ================= SETUP / GAME OVER ================= */
+  .setup-screen, .gameover-screen {
+    max-width: 480px;
+    margin: 60px auto;
+    background: var(--paper);
+    border: 3px solid var(--bank);
+    border-radius: 10px;
+    padding: 20px 24px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  .setup-row { margin: 10px 0; display: flex; align-items: center; gap: 10px; }
+  .setup-row label { font-weight: 600; }
+  .scoreboard { margin-top: 10px; }
+  .score-row {
+    display: flex; justify-content: space-between;
+    padding: 6px 10px;
+    background: rgba(0,0,0,0.05);
+    border-radius: 4px;
+    margin: 4px 0;
+  }
+  .score-row.winner { background: #d4ecd4; font-weight: 700; }
+
+  .small-note { font-size: 11px; color: var(--ink-soft); }
+  .hidden { display: none !important; }
+  .icon-emoji { font-style: normal; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>~ River Bankers ~</h1>
+
+<!-- ============================================ SETUP ============================================ -->
+<div id="setup-screen" class="setup-screen">
+  <h2>New game</h2>
+  <div class="setup-row">
+    <label>Players:</label>
+    <select id="num-players">
+      <option value="2">2</option>
+      <option value="3" selected>3</option>
+      <option value="4">4</option>
+    </select>
+  </div>
+  <div class="setup-row">
+    <label><input type="checkbox" id="human-plays" checked> I'm playing</label>
+  </div>
+  <div class="setup-row" id="species-row">
+    <label>I play as:</label>
+    <select id="human-species">
+      <option value="0">🦫 Beaver</option>
+      <option value="1">🦦 Sea Otter</option>
+      <option value="2">🐭 Muskrat</option>
+      <option value="3">🦡 Mink</option>
+    </select>
+  </div>
+  <div class="setup-row">
+    <button class="primary" onclick="startGame()">Start</button>
+  </div>
+  <p class="small-note">2–4 players. Up to one human; the rest are AI. Bid workers on materials drifting downstream and build structures along the bank.</p>
+</div>
+
+<!-- ============================================ GAME ============================================ -->
+<div id="game-screen" class="hidden">
+  <div class="time-track-wrap">
+    <div class="time-track-label">
+      <h2>⏱ Time Track</h2>
+      <span class="small-note">Pawn farthest back acts next; ties broken by stack (top first).</span>
+    </div>
+    <div id="time-track" class="time-track"></div>
+  </div>
+
+  <div class="river-wrap">
+    <div class="river-header">
+      <span>← Upriver</span>
+      <span><span id="deck-count">0</span> material cards left in deck · <span id="struct-count">0</span> structures</span>
+      <span>Downriver → Shoreline</span>
+    </div>
+    <div id="river-flow" class="river-flow"></div>
+  </div>
+
+  <div id="players-row" class="players-row"></div>
+
+  <div id="hand-area" class="hand-area hidden">
+    <h2>🃏 Your structures</h2>
+    <div id="hand-cards" class="hand-cards"></div>
+  </div>
+
+  <div id="action-panel" class="action-panel hidden"></div>
+
+  <div>
+    <h3>Game log</h3>
+    <div id="log-area" class="log-area"></div>
+  </div>
+</div>
+
+<!-- ============================================ MODAL ============================================ -->
+<div id="modal-root"></div>
+
+<!-- ============================================ GAME OVER ============================================ -->
+<div id="gameover-screen" class="gameover-screen hidden">
+  <h2>🏞 Game Over</h2>
+  <div id="scoreboard" class="scoreboard"></div>
+  <div class="setup-row">
+    <button class="primary" onclick="location.reload()">Play again</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+const SPECIES = [
+  { id: 'beaver',  name: 'Beaver',    emoji: '🦫', color: '#8b4513' },
+  { id: 'otter',   name: 'Sea Otter', emoji: '🦦', color: '#2a6b8f' },
+  { id: 'muskrat', name: 'Muskrat',   emoji: '🐭', color: '#6b6b5a' },
+  { id: 'mink',    name: 'Mink',      emoji: '🦡', color: '#4b2a5b' },
+];
+
+const MATERIALS = {
+  logs:   { name: 'Logs',   color: '#8b5a2b', emoji: '🪵' },
+  stones: { name: 'Stones', color: '#6e6e6e', emoji: '🪨' },
+  reeds:  { name: 'Reeds',  color: '#5a8e3a', emoji: '🌾' },
+  mud:    { name: 'Mud',    color: '#5c3a1f', emoji: '🟫' },
+  fish:   { name: 'Fish',   color: '#3a8fb7', emoji: '🐟' },
+};
+const MAT_KEYS = Object.keys(MATERIALS);
+
+// 8 cards per material; mix of icon counts (3..7) and costs (1..3)
+function buildMaterialDeck() {
+  const tmpl = [
+    { icons: 3, cost: 1 },
+    { icons: 4, cost: 1 },
+    { icons: 4, cost: 2 },
+    { icons: 5, cost: 1 },
+    { icons: 5, cost: 2 },
+    { icons: 6, cost: 2 },
+    { icons: 6, cost: 3 },
+    { icons: 7, cost: 3 },
+  ];
+  const deck = [];
+  let id = 0;
+  for (const m of MAT_KEYS) {
+    for (const t of tmpl) {
+      deck.push({
+        id: 'm' + (id++),
+        material: m,
+        totalIcons: t.icons,
+        baseCost: t.cost,
+        currentCost: t.cost,
+        slot: null,         // 0..3 in river, 'shore', or null in deck
+        workers: {},        // playerIdx -> count
+        blanks: 0,
+      });
+    }
+  }
+  return shuffle(deck);
+}
+
+const STRUCTURE_TEMPLATES = [
+  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6 },
+  { name: 'Lodge',          cost: { logs: 3, reeds: 1 },             time: 2, vp: 4 },
+  { name: 'Fish Trap',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3 },
+  { name: 'Stone Bridge',   cost: { stones: 4, logs: 2 },            time: 4, vp: 8 },
+  { name: 'Reed Hut',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4 },
+  { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5 },
+  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2 },
+  { name: 'Mink Burrow',    cost: { mud: 2, reeds: 2 },              time: 2, vp: 4 },
+  { name: 'Spawning Pool',  cost: { fish: 3, reeds: 2 },             time: 3, vp: 5 },
+  { name: 'Smokehouse',     cost: { fish: 4, logs: 2 },              time: 3, vp: 7 },
+  { name: 'Watchtower',     cost: { logs: 5, stones: 2 },            time: 4, vp: 8 },
+  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 5 },
+  { name: 'Cattail Patch',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6 },
+  { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 5 },
+  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3 },
+  { name: 'Heron Roost',    cost: { reeds: 3, fish: 2 },             time: 3, vp: 5 },
+  { name: 'Boat Dock',      cost: { logs: 4, reeds: 1 },             time: 3, vp: 5 },
+  { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7 },
+  { name: 'Tide Pool',      cost: { stones: 3, fish: 2 },            time: 3, vp: 5 },
+  { name: 'River Bend',     cost: { mud: 4, reeds: 1 },              time: 3, vp: 5 },
+  { name: 'Granary',        cost: { reeds: 4, stones: 1 },           time: 3, vp: 5 },
+  { name: 'Treaty Stone',   cost: { stones: 6 },                     time: 4, vp: 7 },
+  { name: 'Royal Lodge',    cost: { logs: 6, reeds: 2 },             time: 5, vp: 10 },
+  { name: 'Otter Den',      cost: { mud: 3, fish: 1 },               time: 2, vp: 4 },
+  { name: 'Floodgate',      cost: { mud: 4, stones: 3 },             time: 4, vp: 8 },
+  { name: 'Trout Run',      cost: { fish: 3, mud: 1 },               time: 2, vp: 4 },
+  { name: 'Sap Drip',       cost: { logs: 2, reeds: 2 },             time: 2, vp: 3 },
+  { name: 'Granite Spire',  cost: { stones: 4, mud: 1 },             time: 3, vp: 5 },
+  { name: 'Salmon Ladder',  cost: { fish: 4, stones: 2 },            time: 4, vp: 7 },
+  { name: 'Twig Bridge',    cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5 },
+  { name: 'Stone Hearth',   cost: { stones: 3, logs: 2, fish: 1 },   time: 3, vp: 6 },
+  { name: 'Pearl Cache',    cost: { fish: 2, stones: 2, mud: 2 },    time: 3, vp: 6 },
+];
+
+function buildStructureDeck() {
+  let id = 0;
+  return shuffle(STRUCTURE_TEMPLATES.map(s => ({ ...s, id: 's' + (id++), cost: { ...s.cost } })));
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function uncoveredIcons(card) {
+  let workers = 0;
+  for (const k in card.workers) workers += card.workers[k];
+  return card.totalIcons - workers - card.blanks;
+}
+
+function workersOnCard(card, playerIdx) {
+  return card.workers[playerIdx] || 0;
+}
+
+function totalWorkersOf(card, playerIdx) {
+  return workersOnCard(card, playerIdx);
+}
+
+function playerWorkersByMaterial(state, playerIdx) {
+  // sum workers across all river+shoreline cards by material
+  const out = {};
+  for (const m of MAT_KEYS) out[m] = 0;
+  for (const c of state.riverCards) out[c.material] += workersOnCard(c, playerIdx);
+  for (const c of state.shorelineCards) out[c.material] += workersOnCard(c, playerIdx);
+  return out;
+}
+
+function canBuild(structure, workersByMat) {
+  for (const m in structure.cost) {
+    if ((workersByMat[m] || 0) < structure.cost[m]) return false;
+  }
+  return true;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// =============================================================================
+// STATE
+// =============================================================================
+let state = null;
+
+function startGame() {
+  const numPlayers = parseInt(document.getElementById('num-players').value);
+  const humanPlays = document.getElementById('human-plays').checked;
+  const humanIdx = humanPlays ? parseInt(document.getElementById('human-species').value) : -1;
+  if (humanPlays && humanIdx >= numPlayers) {
+    alert('Pick a species number ≤ number of players.');
+    return;
+  }
+
+  const players = [];
+  for (let i = 0; i < numPlayers; i++) {
+    players.push({
+      idx: i,
+      species: SPECIES[i],
+      isHuman: i === humanIdx,
+      supply: 8,
+      timePos: 0,
+      hand: [],
+      built: [],
+    });
+  }
+
+  const matDeck = buildMaterialDeck();
+  const structDeck = buildStructureDeck();
+
+  // Initial hands: 3 each
+  for (const p of players) {
+    for (let i = 0; i < 3; i++) p.hand.push(structDeck.pop());
+  }
+
+  // 3 starting river cards — all enter at the upriver end (slot 0).
+  const riverCards = [];
+  for (let i = 0; i < 3; i++) {
+    const c = matDeck.pop();
+    c.slot = 0;
+    riverCards.push(c);
+  }
+
+  state = {
+    players,
+    riverCards,
+    shorelineCards: [],
+    matDeck,
+    structDeck,
+    structDiscard: [],
+    log: [],
+    // turn-order stack: list of player indices, top of stack acts first when tied
+    // We model "stacked at space 0 with first player on top": stackOrder = [0,1,2,..]
+    stackOrder: players.map((_, i) => i),
+    currentPlayer: 0,
+    gameOver: false,
+    phase: 'idle',
+  };
+
+  // Pick first player: top of stack at lowest space
+  state.currentPlayer = pickNextPlayer();
+
+  document.getElementById('setup-screen').classList.add('hidden');
+  document.getElementById('game-screen').classList.remove('hidden');
+  log(`Game starts. ${players.length} players. ${humanPlays ? 'You are ' + SPECIES[humanIdx].name + '.' : 'All AI.'}`);
+
+  render();
+  scheduleTurn();
+}
+
+// =============================================================================
+// TURN ORDER: pick the player whose pawn is on the lowest space; tie → top of stack
+// =============================================================================
+function pickNextPlayer() {
+  let lowest = Infinity;
+  for (const p of state.players) lowest = Math.min(lowest, p.timePos);
+  // among players at lowest position, find earliest in stackOrder
+  for (const idx of state.stackOrder) {
+    if (state.players[idx].timePos === lowest) return idx;
+  }
+  return state.stackOrder[0];
+}
+
+function advancePlayer(playerIdx, byTime) {
+  const p = state.players[playerIdx];
+  p.timePos += byTime;
+  // Removing from old stack position. The pawn is leaving its current space.
+  // Stack-order rule applies per-space ties; we maintain a global stackOrder and
+  // when a pawn lands on a space, it goes to top — so move idx to front of stackOrder.
+  state.stackOrder = state.stackOrder.filter(i => i !== playerIdx);
+  state.stackOrder.unshift(playerIdx);
+}
+
+// =============================================================================
+// LOG
+// =============================================================================
+function log(msg) {
+  state.log.push({ msg, t: Date.now() });
+  if (state.log.length > 200) state.log.shift();
+  renderLog();
+}
+
+function speciesLabel(p) {
+  return `${p.species.emoji} ${p.species.name}${p.isHuman ? ' (you)' : ''}`;
+}
+
+// =============================================================================
+// RENDERING
+// =============================================================================
+function render() {
+  renderTimeTrack();
+  renderRiver();
+  renderPlayers();
+  renderHand();
+  renderActionPanel();
+  document.getElementById('deck-count').textContent = state.matDeck.length;
+  document.getElementById('struct-count').textContent = state.structDeck.length;
+}
+
+function renderTimeTrack() {
+  const wrap = document.getElementById('time-track');
+  const maxPos = Math.max(20, ...state.players.map(p => p.timePos)) + 4;
+  let html = '';
+  for (let i = 0; i <= maxPos; i++) {
+    const occupants = state.stackOrder.filter(idx => state.players[idx].timePos === i);
+    let pawns = '';
+    for (const idx of occupants) {
+      const p = state.players[idx];
+      const isNext = idx === state.currentPlayer && !state.gameOver;
+      pawns += `<div class="pawn ${isNext ? 'next-up' : ''}" style="background:${p.species.color}" title="${p.species.name}">${p.species.emoji}</div>`;
+    }
+    html += `<div class="time-cell"><div class="cell-num">${i}</div><div class="pawn-stack">${pawns}</div></div>`;
+  }
+  wrap.innerHTML = html;
+}
+
+// Scroll the time track so the leftmost pawn (smallest timePos) sits near the left edge.
+// Called at the start of each turn — not on every render — so the user can watch pawns
+// advance during a turn without the view jumping.
+function scrollTimeTrackToLeftmost() {
+  const wrap = document.getElementById('time-track');
+  if (!wrap || !state) return;
+  const minPos = Math.min(...state.players.map(p => p.timePos));
+  const CELL_WIDTH = 33;   // 32px cell + 1px gap
+  const LEFT_PADDING = 16; // small inset so the pawn isn't flush with the edge
+  setTimeout(() => {
+    wrap.scrollLeft = Math.max(0, minPos * CELL_WIDTH - LEFT_PADDING);
+  }, 0);
+}
+
+function renderMatCard(card, opts = {}) {
+  const m = MATERIALS[card.material];
+  const isShore = card.slot === 'shore';
+  let icons = '';
+  let painted = 0;
+  let totalWorkers = 0;
+  // Worker icons (always shown — workers can still be spent on builds, even from shoreline)
+  for (const pIdx in card.workers) {
+    const cnt = card.workers[pIdx];
+    const sp = state.players[pIdx].species;
+    totalWorkers += cnt;
+    for (let i = 0; i < cnt; i++) {
+      icons += `<div class="icon-slot icon-worker" style="background:${sp.color}" title="${sp.name}'s worker">${sp.emoji}</div>`;
+      painted++;
+    }
+  }
+  // Blanks (river only — shoreline cards never carry blanks)
+  for (let i = 0; i < card.blanks; i++) {
+    icons += `<div class="icon-slot icon-blank" title="sold">·</div>`;
+    painted++;
+  }
+  // Open icons — only relevant on the river. Shoreline cards' open counts no longer matter.
+  const open = card.totalIcons - painted;
+  if (!isShore) {
+    for (let i = 0; i < open; i++) {
+      icons += `<div class="icon-slot icon-open" style="background:${m.color}26;border-color:${m.color}" title="open"><span class="icon-emoji">${m.emoji}</span></div>`;
+    }
+  }
+  const cls = ['mat-card'];
+  if (opts.selectable) cls.push('selectable');
+  if (opts.selected)   cls.push('selected');
+  if (opts.dimmed)     cls.push('dimmed');
+  const onclick = opts.onClick ? `onclick="${opts.onClick}"` : '';
+  // Cost badge: irrelevant on the shoreline (cards there can't be auctioned)
+  const head = isShore
+    ? `<span class="mat-name" style="color:${m.color}">${m.emoji} ${m.name}</span><span class="mat-shore-tag">shoreline</span>`
+    : `<span class="mat-name" style="color:${m.color}">${m.emoji} ${m.name}</span><span class="mat-cost" title="time per worker">${card.currentCost}t</span>`;
+  // Footer: shoreline shows worker count only; river shows open/total icons.
+  const foot = isShore
+    ? `${totalWorkers} worker${totalWorkers === 1 ? '' : 's'} on it`
+    : `${open} open · ${card.totalIcons} total${opts.note ? ' · ' + opts.note : ''}`;
+  return `<div class="${cls.join(' ')}" ${onclick}>
+    <div class="mat-head">${head}</div>
+    <div class="icons-row">${icons}</div>
+    <div class="mat-foot">${foot}</div>
+  </div>`;
+}
+
+function renderRiver() {
+  const wrap = document.getElementById('river-flow');
+  let html = '';
+  for (let slot = 0; slot < 4; slot++) {
+    const cards = state.riverCards.filter(c => c.slot === slot);
+    let inner = `<div class="river-slot-label">River ${slot + 1}${cards.length > 1 ? ' · ' + cards.length : ''}</div>`;
+    if (cards.length === 0) {
+      inner += `<div style="color:rgba(255,255,255,0.5);text-align:center;font-style:italic;font-size:11px;margin-top:60px;">—</div>`;
+    } else {
+      inner += `<div class="slot-cards">${cards.map(c => renderMatCard(c, riverCardClickOpts(c))).join('')}</div>`;
+    }
+    html += `<div class="river-slot">${inner}</div>`;
+  }
+  // divider
+  html += `<div class="divider" title="bank"></div>`;
+  // shoreline
+  let shoreInner = `<div class="shoreline-label">⛱ Shoreline</div><div class="shoreline-cards">`;
+  if (state.shorelineCards.length === 0) {
+    shoreInner += `<div style="color:var(--bank);font-style:italic;font-size:11px;text-align:center;margin-top:60px;">(empty)</div>`;
+  } else {
+    for (const c of state.shorelineCards) {
+      shoreInner += renderMatCard(c, { note: 'shoreline' });
+    }
+  }
+  shoreInner += `</div>`;
+  html += `<div class="shoreline-area">${shoreInner}</div>`;
+  wrap.innerHTML = html;
+}
+
+function riverCardClickOpts(card) {
+  const opts = {};
+  if (uncoveredIcons(card) === 0) return opts;
+  const human = state.players.find(p => p.isHuman);
+  const isHumanTurn = human && state.currentPlayer === human.idx;
+  // Click is a shortcut for "Auction river card" — works both during the explicit
+  // select-auction-card phase and directly from choose-action (skipping the button).
+  if (state.phase === 'select-auction-card'
+      || (state.phase === 'choose-action' && isHumanTurn && human.supply > 0)) {
+    opts.selectable = true;
+    opts.onClick = `humanSelectAuctionCard('${card.id}')`;
+  }
+  return opts;
+}
+
+function riverSlotSelectable(card) {
+  return card && state.phase === 'select-auction-card' && uncoveredIcons(card) > 0;
+}
+
+function renderPlayers() {
+  const wrap = document.getElementById('players-row');
+  let html = '';
+  for (const p of state.players) {
+    const cls = ['player-panel'];
+    if (p.idx === state.currentPlayer && !state.gameOver) cls.push('active');
+    if (p.isHuman) cls.push('human');
+    const wbm = playerWorkersByMaterial(state, p.idx);
+    const placed = MAT_KEYS.reduce((s, m) => s + wbm[m], 0);
+    const matSummary = MAT_KEYS
+      .filter(m => wbm[m] > 0)
+      .map(m => `<span title="${MATERIALS[m].name}">${MATERIALS[m].emoji}${wbm[m]}</span>`)
+      .join(' ') || '<span class="small-note">none</span>';
+    const totalVP = p.built.reduce((s, b) => s + b.vp, 0);
+    let builtList = '';
+    if (p.built.length > 0) {
+      builtList = `<div class="built-list">${p.built.map(b => `<span class="built-chip" title="${b.name} – ${b.vp}vp">${b.name} ${b.vp}★</span>`).join('')}</div>`;
+    }
+    html += `<div class="${cls.join(' ')}">
+      <div class="player-head">
+        <div class="player-title">
+          <span class="player-pawn-mini" style="background:${p.species.color}">${p.species.emoji}</span>
+          ${p.species.name}${p.isHuman ? ' (you)' : ''}
+        </div>
+        <div class="vp" style="color:var(--forest);font-weight:700;">${totalVP}★</div>
+      </div>
+      <div class="player-stats">
+        <span>Workers: <b>${p.supply}</b> in supply · <b>${placed}</b> placed</span>
+        <span>time: <b>${p.timePos}</b></span>
+        <span>hand: <b>${p.hand.length}</b></span>
+      </div>
+      <div class="player-stats" style="margin-top:4px;">${matSummary}</div>
+      ${builtList}
+    </div>`;
+  }
+  wrap.innerHTML = html;
+}
+
+function renderHand() {
+  const wrap = document.getElementById('hand-area');
+  const human = state.players.find(p => p.isHuman);
+  if (!human) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  const div = document.getElementById('hand-cards');
+  if (human.hand.length === 0) {
+    div.innerHTML = '<span class="small-note">(empty hand)</span>';
+    return;
+  }
+  const wbm = playerWorkersByMaterial(state, human.idx);
+  let html = '';
+  human.hand.forEach((s, i) => {
+    const buildable = canBuild(s, wbm);
+    const reqs = Object.entries(s.cost).map(([m, n]) => {
+      const have = wbm[m] || 0;
+      const ok = have >= n;
+      return `<span class="req-pill ${ok ? 'satisfied' : ''}">${MATERIALS[m].emoji}${have}/${n}</span>`;
+    }).join('');
+    const cls = ['struct-card'];
+    if (buildable) cls.push('buildable');
+    const isHumanTurn = state.currentPlayer === human.idx;
+    // Click on a buildable structure builds it directly — works in both the explicit
+    // select-build phase and as a shortcut from choose-action.
+    const buildClickable = buildable && (
+      state.phase === 'select-build'
+      || (state.phase === 'choose-action' && isHumanTurn)
+    );
+    if (buildClickable) cls.push('selectable');
+    if (state.phase === 'browse-keep') {
+      cls.push('selectable');
+      const isKeep = state.browseSelected && state.browseSelected.has('h' + i);
+      cls.push(isKeep ? 'keep-selected' : 'will-discard');
+    }
+    let onClick = '';
+    if (buildClickable) onClick = `onclick="humanSelectBuild(${i})"`;
+    if (state.phase === 'browse-keep') onClick = `onclick="toggleBrowseSelect('h${i}')"`;
+    html += `<div class="${cls.join(' ')}" ${onClick}>
+      <div class="name">${s.name}</div>
+      <div class="reqs">${reqs}</div>
+      <div class="footer"><span>⏱ ${s.time}t</span><span class="vp">${s.vp}★</span></div>
+    </div>`;
+  });
+  // Browse drawn cards (each with same keep/discard styling)
+  if (state.phase === 'browse-keep' && state.browseDrawn) {
+    state.browseDrawn.forEach((s, i) => {
+      const reqs = Object.entries(s.cost).map(([m, n]) =>
+        `<span class="req-pill">${MATERIALS[m].emoji}${n}</span>`).join('');
+      const cls = ['struct-card', 'selectable'];
+      const isKeep = state.browseSelected && state.browseSelected.has('d' + i);
+      cls.push(isKeep ? 'keep-selected' : 'will-discard');
+      html += `<div class="${cls.join(' ')}" onclick="toggleBrowseSelect('d${i}')" style="border-style:dashed;">
+        <div class="name">${s.name} <span class="small-note">(new)</span></div>
+        <div class="reqs">${reqs}</div>
+        <div class="footer"><span>⏱ ${s.time}t</span><span class="vp">${s.vp}★</span></div>
+      </div>`;
+    });
+  }
+  div.innerHTML = html;
+}
+
+function renderActionPanel() {
+  const panel = document.getElementById('action-panel');
+  const cur = state.players[state.currentPlayer];
+  if (state.gameOver || !cur || !cur.isHuman || state.phase === 'idle') {
+    panel.classList.add('hidden');
+    panel.innerHTML = '';
+    return;
+  }
+  panel.classList.remove('hidden');
+  let html = '';
+  if (state.phase === 'choose-action') {
+    const placed = MAT_KEYS.reduce((s, m) => s + playerWorkersByMaterial(state, cur.idx)[m], 0);
+    html = `<div class="action-panel-title">Your turn — choose an action</div>
+      <div class="action-buttons">
+        <button class="secondary" onclick="humanCallHome()" ${placed === 0 ? 'disabled' : ''}>Call workers home (${placed} out)</button>
+        <button onclick="humanChooseAction('auction')" ${(cur.supply > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>1. Auction river card (1t)</button>
+        <button onclick="humanChooseAction('rollout')" ${state.matDeck.length > 0 ? '' : 'disabled'}>2. Roll out new card (2t)</button>
+        <button onclick="humanChooseAction('browse')" ${state.structDeck.length > 0 ? '' : 'disabled'}>3. Browse N (Nt)</button>
+        <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx))) ? '' : 'disabled'}>4. Build a structure</button>
+      </div>
+      <div class="action-hint">Tip: click any river card to auction it, or any buildable structure in your hand to build it.</div>`;
+  } else if (state.phase === 'select-auction-card') {
+    html = `<div class="action-panel-title">Pick a river card to auction</div>
+      <div class="action-buttons">
+        <span class="action-hint">Click a card with open icons.</span>
+        <button class="ghost" onclick="humanCancelAction()">Cancel</button>
+      </div>`;
+  } else if (state.phase === 'select-build') {
+    html = `<div class="action-panel-title">Pick a structure to build</div>
+      <div class="action-buttons">
+        <span class="action-hint">Click a green-bordered card in your hand.</span>
+        <button class="ghost" onclick="humanCancelAction()">Cancel</button>
+      </div>`;
+  } else if (state.phase === 'browse-N') {
+    html = `<div class="action-panel-title">Browse — how many cards?</div>
+      <div class="action-buttons">
+        <span>N: <input id="browse-n" type="number" value="1" min="1" max="6"></span>
+        <button class="primary" onclick="humanConfirmBrowseN()">Draw N, then discard N</button>
+        <button class="ghost" onclick="humanCancelAction()">Cancel</button>
+        <span class="action-hint">Costs N time. You'll discard the same number you drew.</span>
+      </div>`;
+  } else if (state.phase === 'browse-keep') {
+    const keep = state.browseKeepCount;
+    const have = state.browseSelected.size;
+    const total = (state.browseDrawn ? state.browseDrawn.length : 0) + (state.players.find(p => p.isHuman).hand.length);
+    const willDiscard = total - have;
+    html = `<div class="action-panel-title">Pick ${keep} card${keep === 1 ? '' : 's'} to <u>keep</u> (selected: ${have}/${keep})</div>
+      <div class="action-buttons">
+        <span class="action-hint">Click cards (existing hand + new draws) to keep them. Unselected cards (${willDiscard} so far) will be discarded.</span>
+        <button class="primary" onclick="humanConfirmBrowseKeep()" ${have === keep ? '' : 'disabled'}>Confirm</button>
+      </div>`;
+  } else if (state.phase === 'human-bidding') {
+    // Modal handles bid input
+    html = `<div class="action-panel-title">Auction in progress…</div><div class="action-hint">Submit your bid in the popup.</div>`;
+  }
+  panel.innerHTML = html;
+}
+
+function renderLog() {
+  const wrap = document.getElementById('log-area');
+  if (!wrap) return;
+  const last = state.log.slice(-50).reverse();
+  wrap.innerHTML = last.map((l, i) => `<div class="log-line ${i === 0 ? 'recent' : ''}">${l.msg}</div>`).join('');
+}
+
+// =============================================================================
+// RIVER MANAGEMENT
+// =============================================================================
+function moveCardToShoreline(card) {
+  // Remove blanks (return to pool, abstract)
+  card.blanks = 0;
+  // Remove from river
+  state.riverCards = state.riverCards.filter(c => c !== card);
+  card.slot = 'shore';
+  state.shorelineCards.push(card);
+  log(`📍 ${MATERIALS[card.material].emoji} ${MATERIALS[card.material].name} card drifts to the shoreline.`);
+}
+
+function jamCardDownriver(card) {
+  // Only an auctioned card moves; +1 cost. Multiple cards may share a slot.
+  card.currentCost += 1;
+  const newSlot = card.slot + 1;
+  if (newSlot > 3) {
+    moveCardToShoreline(card);
+    return;
+  }
+  card.slot = newSlot;
+  log(`💨 ${MATERIALS[card.material].emoji} ${MATERIALS[card.material].name} jams to slot ${newSlot + 1} (now ${card.currentCost}t/worker).`);
+}
+
+function dropNewCardUpriver() {
+  if (state.matDeck.length === 0) return null;
+  const card = state.matDeck.pop();
+  // New cards just enter at slot 0; they never push other cards.
+  card.slot = 0;
+  state.riverCards.push(card);
+  log(`⬇ ${MATERIALS[card.material].emoji} new ${MATERIALS[card.material].name} card enters at upriver (cost ${card.currentCost}t).`);
+  return card;
+}
+
+// Cleanup shoreline cards that have no workers
+function cleanupShoreline() {
+  state.shorelineCards = state.shorelineCards.filter(c => {
+    const totalWorkers = Object.values(c.workers).reduce((s, n) => s + n, 0);
+    if (totalWorkers === 0) {
+      log(`🌊 empty ${MATERIALS[c.material].name} card removed from shoreline.`);
+      return false;
+    }
+    return true;
+  });
+}
+
+// =============================================================================
+// CALL WORKERS HOME
+// =============================================================================
+function callWorkersHome(playerIdx, recallSpec) {
+  // recallSpec: array of {cardId, count}
+  const p = state.players[playerIdx];
+  let total = 0;
+  for (const r of recallSpec) {
+    const card = state.riverCards.find(c => c.id === r.cardId) || state.shorelineCards.find(c => c.id === r.cardId);
+    if (!card) continue;
+    const have = workersOnCard(card, playerIdx);
+    const take = Math.min(have, r.count);
+    if (take === 0) continue;
+    card.workers[playerIdx] = have - take;
+    if (card.workers[playerIdx] === 0) delete card.workers[playerIdx];
+    // For river cards: drop a blank on each uncovered icon; for shoreline: no blank.
+    if (typeof card.slot === 'number') card.blanks += take;
+    p.supply += take;
+    total += take;
+  }
+  if (total > 0) {
+    log(`🏠 ${speciesLabel(p)} calls ${total} worker${total === 1 ? '' : 's'} home.`);
+  }
+  cleanupShoreline();
+}
+
+// =============================================================================
+// AUCTION
+// =============================================================================
+async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
+  // Collect bids: AIs decide privately; human inputs via modal.
+  state.phase = 'auction-bidding';
+  const m = MATERIALS[card.material];
+  log(`🎲 Auction begins on ${m.emoji} ${m.name} (cost ${card.currentCost}t/worker, ${uncoveredIcons(card)} icons open).`);
+
+  const bids = {};
+  for (const p of state.players) {
+    if (p.isHuman) continue;
+    const minBid = (p.idx === triggerPlayerIdx) ? minBidTrigger : 0;
+    bids[p.idx] = aiDecideBid(p.idx, card, minBid);
+  }
+  const human = state.players.find(p => p.isHuman);
+  if (human) {
+    const minBid = (human.idx === triggerPlayerIdx) ? minBidTrigger : 0;
+    bids[human.idx] = await humanBidForAuction(card, human, minBid);
+  }
+
+  // Compact bid summary for the log
+  const summary = state.players.filter(p => p.idx in bids)
+    .map(p => `${p.species.emoji}${bids[p.idx]}`).join(' ');
+  log(`🤐 Bids: ${summary}`);
+
+  const result = resolveAuction(card, bids);
+  // Re-render so the modal can sit on top of an updated board state
+  render();
+  await showAuctionResult(result);
+  state.phase = 'idle';
+  render();
+}
+
+function resolveAuction(card, bids) {
+  const m = MATERIALS[card.material];
+  const open = uncoveredIcons(card);
+  const totalBid = Object.values(bids).reduce((s, n) => s + n, 0);
+
+  const result = {
+    cardMaterial: card.material,
+    costAtAuction: card.currentCost,
+    openBefore: open,
+    totalBid,
+    bids: { ...bids },         // playerIdx -> bid
+    takings: {},               // playerIdx -> won
+    timeAdvances: {},          // playerIdx -> +time
+    outcome: 'no-bids',        // 'no-bids' | 'plenty' | 'jam'
+    leftover: 0,
+    cardFate: 'stays',         // 'stays' | 'shoreline-from-plenty' | 'shoreline-graduated' | 'jammed'
+    cardNewSlot: null,
+    cardNewCost: null,
+  };
+  for (const idxStr in bids) result.takings[parseInt(idxStr)] = 0;
+
+  if (totalBid === 0) {
+    log(`💤 No bids — ${m.name} card stays put.`);
+    return result;
+  }
+
+  const playerBidPairs = Object.entries(bids)
+    .filter(([_, b]) => b > 0)
+    .map(([idx, b]) => ({ idx: parseInt(idx), bid: b }));
+
+  if (totalBid <= open) {
+    result.outcome = 'plenty';
+    for (const { idx, bid } of playerBidPairs) {
+      const p = state.players[idx];
+      p.supply -= bid;
+      card.workers[idx] = (card.workers[idx] || 0) + bid;
+      const timeAdvance = bid * card.currentCost;
+      advancePlayer(idx, timeAdvance);
+      result.takings[idx] = bid;
+      result.timeAdvances[idx] = timeAdvance;
+      log(`✅ ${speciesLabel(p)} wins ${bid} icon${bid === 1 ? '' : 's'} (advance ${timeAdvance}t).`);
+    }
+    result.leftover = open - totalBid;
+    if (result.leftover > 0) {
+      log(`🌊 ${result.leftover} icon${result.leftover === 1 ? '' : 's'} unbid — card washes to shoreline.`);
+    }
+    moveCardToShoreline(card);
+    result.cardFate = 'shoreline-from-plenty';
+  } else {
+    result.outcome = 'jam';
+    let totalTaken = 0;
+    for (const { idx, bid } of playerBidPairs) {
+      const p = state.players[idx];
+      const others = totalBid - bid;
+      const got = Math.max(0, Math.min(bid, open - others));
+      if (got > 0) {
+        p.supply -= got;
+        card.workers[idx] = (card.workers[idx] || 0) + got;
+        const timeAdvance = got * card.currentCost;
+        advancePlayer(idx, timeAdvance);
+        result.takings[idx] = got;
+        result.timeAdvances[idx] = timeAdvance;
+        log(`✅ ${speciesLabel(p)} bid ${bid}, took ${got} (advance ${timeAdvance}t).`);
+        totalTaken += got;
+      } else {
+        log(`✗ ${speciesLabel(p)} bid ${bid} but took none.`);
+      }
+    }
+    result.leftover = open - totalTaken;
+    const wasOnLastSlot = card.slot === 3;
+    jamCardDownriver(card);
+    if (card.slot === 'shore' || wasOnLastSlot) {
+      result.cardFate = 'shoreline-graduated';
+    } else {
+      result.cardFate = 'jammed';
+      result.cardNewSlot = card.slot;
+      result.cardNewCost = card.currentCost;
+    }
+  }
+  return result;
+}
+
+async function showAuctionResult(result) {
+  // No human present → skip the modal.
+  if (!state.players.some(p => p.isHuman)) return;
+  const m = MATERIALS[result.cardMaterial];
+
+  // Bid/take rows for every player who participated
+  let rows = '';
+  for (const p of state.players) {
+    if (!(p.idx in result.bids)) continue;
+    const bid = result.bids[p.idx];
+    const took = result.takings[p.idx] || 0;
+    const time = result.timeAdvances[p.idx] || 0;
+    const dim = bid === 0 ? ' style="opacity:0.5"' : '';
+    let outcomeStr;
+    if (bid === 0) outcomeStr = `<span class="small-note">passed</span>`;
+    else if (took === 0) outcomeStr = `bid <b>${bid}</b> → <span style="color:#a33">won 0</span>`;
+    else if (took === bid) outcomeStr = `bid <b>${bid}</b> → <span style="color:var(--forest)">won <b>${took}</b></span> (+${time}t)`;
+    else outcomeStr = `bid <b>${bid}</b> → won <b>${took}</b> (+${time}t)`;
+    rows += `<div class="bidder-row"${dim}>
+      <span class="bidder-name">
+        <span class="player-pawn-mini" style="background:${p.species.color}">${p.species.emoji}</span>
+        ${p.species.name}${p.isHuman ? ' (you)' : ''}
+      </span>
+      <span>${outcomeStr}</span>
+    </div>`;
+  }
+
+  // Outcome explanation
+  let outcomeBox = '';
+  if (result.outcome === 'no-bids') {
+    outcomeBox = `<div class="result-box info">
+      <p><b>No one bid.</b> The card stays where it was — nothing moves.</p>
+    </div>`;
+  } else if (result.outcome === 'plenty') {
+    const leftover = result.leftover;
+    outcomeBox = `<div class="result-box plenty">
+      <p><b>🌟 Plenty to go around.</b> Total bid ${result.totalBid} ≤ ${result.openBefore} open icons, so every bidder took exactly what they bid.</p>
+      ${leftover > 0
+        ? `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid and wash${leftover === 1 ? 'es' : ''} away — the card <b>drifts to the shoreline</b> (taking any workers on it).</p>`
+        : `<p>Every open icon was claimed — the card still <b>drifts to the shoreline</b> (any further bids would find it empty anyway).</p>`}
+    </div>`;
+  } else { // jam
+    let fateLine;
+    if (result.cardFate === 'shoreline-graduated') {
+      fateLine = `<p>The card was already on the last river space, so it <b>graduates to the shoreline</b> with its workers. ${result.leftover} unclaimed icon${result.leftover === 1 ? '' : 's'} no longer matter — shoreline cards can't be auctioned.</p>`;
+    } else {
+      fateLine = `<p>${result.leftover} icon${result.leftover === 1 ? '' : 's'} stay${result.leftover === 1 ? 's' : ''} uncovered. The card <b>slides to slot ${result.cardNewSlot + 1}</b>, and its cost rises to <b>${result.cardNewCost}t per worker</b>.</p>`;
+    }
+    outcomeBox = `<div class="result-box jam">
+      <p><b>🌊 River jams.</b> Total bid (${result.totalBid}) exceeded ${result.openBefore} open icons. Each bidder took <code>max(0, ${result.openBefore} − others' bids)</code>, capped at their own bid.</p>
+      ${fateLine}
+    </div>`;
+  }
+
+  return new Promise(resolve => {
+    showModal({
+      title: `🎲 ${m.emoji} ${m.name} — auction result`,
+      body: () => `
+        <p class="small-note">${result.openBefore} open icon${result.openBefore === 1 ? '' : 's'} going in · ${result.costAtAuction}t per worker</p>
+        <div class="auction-bidders">${rows}</div>
+        ${outcomeBox}
+      `,
+      actions: [
+        { label: 'Continue', primary: true, onClick: () => { closeModal(); resolve(); } },
+      ],
+    });
+  });
+}
+
+// =============================================================================
+// AI: BIDDING
+// =============================================================================
+function aiDecideBid(playerIdx, card, minBid) {
+  const p = state.players[playerIdx];
+  if (p.supply === 0) return Math.min(0, minBid);
+
+  const open = uncoveredIcons(card);
+  if (open === 0) return Math.min(p.supply, minBid);
+
+  // How many of this material does the AI need overall (across hand structures)?
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  let need = 0;
+  for (const s of p.hand) {
+    const want = s.cost[card.material] || 0;
+    const have = wbm[card.material] || 0;
+    if (want > have) need += (want - have);
+  }
+  // Some materials show up across multiple structures; cap at "pick the most useful structure"
+  const maxNeed = Math.max(0, ...p.hand.map(s => Math.max(0, (s.cost[card.material] || 0) - (wbm[card.material] || 0))));
+  // Blend of total-need and best-single-need
+  let target = Math.round((need + maxNeed) / 2);
+
+  // Don't bid more than supply, more than open (no point), or more than 4
+  target = Math.min(target, p.supply, open, 4);
+
+  // Cost penalty: if currentCost is high, scale back
+  if (card.currentCost >= 3 && target > 1) target = Math.max(1, target - 1);
+
+  // Random tweak for unpredictability
+  const r = Math.random();
+  if (r < 0.15 && target > 0) target -= 1;
+  else if (r > 0.85 && target < p.supply && target < open) target += 1;
+
+  // Respect minBid
+  target = Math.max(target, minBid);
+  target = Math.min(target, p.supply);
+
+  if (target < 0) target = 0;
+  return target;
+}
+
+// =============================================================================
+// AI: TURN DECISIONS
+// =============================================================================
+function aiChooseAction(playerIdx) {
+  const p = state.players[playerIdx];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+
+  // 1) Buildable structure: pick highest VP per time
+  const buildables = p.hand
+    .map((s, i) => ({ s, i, score: s.vp / Math.max(1, s.time), vp: s.vp }))
+    .filter(o => canBuild(o.s, wbm))
+    .sort((a, b) => b.vp - a.vp);
+  if (buildables.length > 0) {
+    return { type: 'build', handIdx: buildables[0].i };
+  }
+
+  // Compute material needs across hand
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  for (const s of p.hand) {
+    for (const m in s.cost) {
+      const deficit = Math.max(0, s.cost[m] - (wbm[m] || 0));
+      needs[m] = Math.max(needs[m], deficit);
+    }
+  }
+  const totalNeed = MAT_KEYS.reduce((sum, m) => sum + needs[m], 0);
+
+  // 2) Auction the river card whose material is most needed and has open icons & moderate cost
+  let bestCard = null, bestScore = -1;
+  for (const c of state.riverCards) {
+    if (uncoveredIcons(c) === 0) continue;
+    const need = needs[c.material];
+    if (need === 0) continue;
+    const score = need * Math.min(uncoveredIcons(c), p.supply) - c.currentCost * 0.5;
+    if (score > bestScore) { bestScore = score; bestCard = c; }
+  }
+  if (bestCard && p.supply > 0) {
+    return { type: 'auction', cardId: bestCard.id };
+  }
+
+  // 3) If hand has no needs at all (can't make progress) → browse
+  if (totalNeed === 0 || p.hand.length === 0) {
+    if (state.structDeck.length > 0) {
+      const N = Math.min(2, state.structDeck.length);
+      return { type: 'browse', n: N };
+    }
+  }
+
+  // 4) Try to roll out a new card (action 2 allows bidding 0, so 0-supply is fine)
+  if (state.matDeck.length > 0) {
+    return { type: 'rollout' };
+  }
+
+  // 5) Last resort: browse if possible
+  if (state.structDeck.length > 0) {
+    const N = Math.min(1, state.structDeck.length);
+    return { type: 'browse', n: N };
+  }
+
+  // 6) If hand has anything to call home, call home & try again next loop
+  return { type: 'pass' };
+}
+
+function aiCallHomeIfNeeded(playerIdx) {
+  const p = state.players[playerIdx];
+  if (p.supply >= 3) return;
+  // A material is "useful" if ANY hand structure references it — even if currently satisfied,
+  // because those workers will be spent when the structure is built. Only workers on totally
+  // unrelated materials should be recalled.
+  const useful = new Set();
+  for (const s of p.hand) {
+    for (const m in s.cost) useful.add(m);
+  }
+  // Per-material caps: each material's max-need across hand structures. Workers on a material
+  // beyond that cap are surplus and safe to recall.
+  const cap = {};
+  for (const m of MAT_KEYS) cap[m] = 0;
+  for (const s of p.hand) {
+    for (const m in s.cost) cap[m] = Math.max(cap[m], s.cost[m]);
+  }
+  // How many workers we currently have on each material (will be decremented as we plan recalls)
+  const placed = playerWorkersByMaterial(state, playerIdx);
+  const recallSpec = [];
+  // Pull from shoreline first (no blank cost), then river by highest cost (recalling from a
+  // pricey card is least likely to hurt — we'd want to re-bid on cheap cards if anything).
+  const cards = [
+    ...state.shorelineCards.map(c => ({ c, river: false })),
+    ...state.riverCards.slice().sort((a, b) => b.currentCost - a.currentCost).map(c => ({ c, river: true })),
+  ];
+  for (const { c } of cards) {
+    const w = workersOnCard(c, playerIdx);
+    if (w === 0) continue;
+    let canRecall;
+    if (!useful.has(c.material)) {
+      canRecall = w;  // material is irrelevant — recall everything
+    } else {
+      // Surplus only: keep up to cap[m] across this material's cards.
+      const surplus = Math.max(0, placed[c.material] - cap[c.material]);
+      canRecall = Math.min(w, surplus);
+    }
+    if (canRecall > 0) {
+      recallSpec.push({ cardId: c.id, count: canRecall });
+      placed[c.material] -= canRecall;
+    }
+  }
+  if (recallSpec.length > 0) callWorkersHome(playerIdx, recallSpec);
+}
+
+function aiForceRecallIfStuck(playerIdx) {
+  // If supply is 0 and player has any workers placed, recall enough to act.
+  const p = state.players[playerIdx];
+  if (p.supply > 0) return;
+  // Recall up to 2 workers, preferring shoreline (no blank cost), then cheapest river card.
+  const candidates = [];
+  for (const c of state.shorelineCards) {
+    const w = workersOnCard(c, playerIdx);
+    if (w > 0) candidates.push({ card: c, w, score: 0 });
+  }
+  for (const c of state.riverCards) {
+    const w = workersOnCard(c, playerIdx);
+    if (w > 0) candidates.push({ card: c, w, score: 1 + c.currentCost });
+  }
+  candidates.sort((a, b) => a.score - b.score);
+  let toRecall = 2;
+  const spec = [];
+  for (const cand of candidates) {
+    if (toRecall <= 0) break;
+    const take = Math.min(cand.w, toRecall);
+    spec.push({ cardId: cand.card.id, count: take });
+    toRecall -= take;
+  }
+  if (spec.length > 0) callWorkersHome(playerIdx, spec);
+}
+
+function aiBrowseDiscardChoice(playerIdx, drawn) {
+  const p = state.players[playerIdx];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const all = [
+    ...p.hand.map((s, i) => ({ s, key: 'h' + i })),
+    ...drawn.map((s, i) => ({ s, key: 'd' + i })),
+  ];
+  // Score each by buildability + VP
+  function score(s) {
+    let deficit = 0;
+    for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
+    return s.vp - deficit * 1.5;
+  }
+  all.sort((a, b) => score(a.s) - score(b.s));   // ascending so worst first
+  // Discard the worst N
+  const N = drawn.length;
+  return new Set(all.slice(0, N).map(o => o.key));
+}
+
+// =============================================================================
+// HUMAN INTERACTION
+// =============================================================================
+let humanResolver = null;
+
+function awaitHuman() {
+  return new Promise(r => { humanResolver = r; });
+}
+
+function humanCallHome() {
+  const human = state.players.find(p => p.isHuman);
+  // Show a recall modal listing each card with workers
+  const cards = [...state.riverCards, ...state.shorelineCards].filter(c => workersOnCard(c, human.idx) > 0);
+  if (cards.length === 0) return;
+  showModal({
+    title: '🏠 Call workers home',
+    body: () => {
+      let html = `<p class="small-note">Pick how many to recall from each card. (Free; not an action.)</p>`;
+      for (const c of cards) {
+        const w = workersOnCard(c, human.idx);
+        const slotLbl = typeof c.slot === 'number' ? `River ${c.slot + 1}` : 'Shoreline';
+        html += `<div class="bidder-row">
+          <span class="bidder-name">${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} <span class="small-note">(${slotLbl})</span></span>
+          <span><input type="number" id="recall-${c.id}" min="0" max="${w}" value="0"> / ${w}</span>
+        </div>`;
+      }
+      return html;
+    },
+    actions: [
+      { label: 'Recall', primary: true, onClick: () => {
+        const spec = [];
+        for (const c of cards) {
+          const v = parseInt(document.getElementById('recall-' + c.id).value) || 0;
+          if (v > 0) spec.push({ cardId: c.id, count: v });
+        }
+        closeModal();
+        callWorkersHome(human.idx, spec);
+        render();
+      }},
+      { label: 'Cancel', onClick: closeModal },
+    ],
+  });
+}
+
+function humanChooseAction(type) {
+  const human = state.players.find(p => p.isHuman);
+  if (type === 'auction') {
+    state.phase = 'select-auction-card';
+    render();
+  } else if (type === 'rollout') {
+    advancePlayer(human.idx, 2);
+    log(`🎬 ${speciesLabel(human)} rolls out a new card (2t).`);
+    const newCard = dropNewCardUpriver();
+    if (newCard) {
+      state.phase = 'idle';
+      render();
+      runAuction(newCard, human.idx, 0).then(() => humanResolver && humanResolver());
+    } else {
+      humanResolver && humanResolver();
+    }
+  } else if (type === 'browse') {
+    state.phase = 'browse-N';
+    render();
+  } else if (type === 'build') {
+    state.phase = 'select-build';
+    render();
+  }
+}
+
+function humanCancelAction() {
+  state.phase = 'choose-action';
+  state.browseDrawn = null;
+  state.browseSelected = null;
+  render();
+}
+
+function humanSelectAuctionCard(cardId) {
+  const card = state.riverCards.find(c => c.id === cardId);
+  if (!card || uncoveredIcons(card) === 0) return;
+  const human = state.players.find(p => p.isHuman);
+  advancePlayer(human.idx, 1);
+  log(`🎬 ${speciesLabel(human)} auctions ${MATERIALS[card.material].name} (1t).`);
+  state.phase = 'idle';
+  render();
+  runAuction(card, human.idx, 1).then(() => humanResolver && humanResolver());
+}
+
+function humanConfirmBrowseN() {
+  const N = parseInt(document.getElementById('browse-n').value) || 1;
+  if (N < 1) return;
+  const human = state.players.find(p => p.isHuman);
+  const drawCount = Math.min(N, state.structDeck.length);
+  const drawn = [];
+  for (let i = 0; i < drawCount; i++) drawn.push(state.structDeck.pop());
+  advancePlayer(human.idx, drawCount);
+  log(`📚 ${speciesLabel(human)} browses ${drawCount} cards (${drawCount}t).`);
+  state.browseDrawn = drawn;
+  state.browseSelected = new Set();
+  // Capture target keep count: ending hand size = original hand size (drew N, will discard N).
+  state.browseKeepCount = human.hand.length;
+  state.phase = 'browse-keep';
+  render();
+}
+
+function toggleBrowseSelect(key) {
+  if (!state.browseSelected) return;
+  if (state.browseSelected.has(key)) state.browseSelected.delete(key);
+  else state.browseSelected.add(key);
+  render();
+}
+
+function humanConfirmBrowseKeep() {
+  if (state.browseSelected.size !== state.browseKeepCount) return;
+  const human = state.players.find(p => p.isHuman);
+  // Selected = cards to KEEP. Unselected = discarded.
+  const newHand = [];
+  const discarded = [];
+  human.hand.forEach((s, i) => {
+    if (state.browseSelected.has('h' + i)) newHand.push(s);
+    else discarded.push(s);
+  });
+  state.browseDrawn.forEach((s, i) => {
+    if (state.browseSelected.has('d' + i)) newHand.push(s);
+    else discarded.push(s);
+  });
+  for (const d of discarded) state.structDiscard.push(d);
+  human.hand = newHand;
+  state.browseDrawn = null;
+  state.browseSelected = null;
+  state.browseKeepCount = null;
+  state.phase = 'idle';
+  render();
+  humanResolver && humanResolver();
+}
+
+function humanSelectBuild(handIdx) {
+  const human = state.players.find(p => p.isHuman);
+  const struct = human.hand[handIdx];
+  const wbm = playerWorkersByMaterial(state, human.idx);
+  if (!canBuild(struct, wbm)) return;
+  // Auto-recall: prefer shoreline first, then river by lowest cost
+  performBuild(human.idx, handIdx);
+  state.phase = 'idle';
+  render();
+  humanResolver && humanResolver();
+}
+
+function performBuild(playerIdx, handIdx) {
+  const p = state.players[playerIdx];
+  const struct = p.hand[handIdx];
+  // For each material, recall workers
+  for (const m in struct.cost) {
+    let need = struct.cost[m];
+    // Shoreline first
+    for (const c of state.shorelineCards) {
+      if (need === 0) break;
+      if (c.material !== m) continue;
+      const have = workersOnCard(c, playerIdx);
+      if (have === 0) continue;
+      const take = Math.min(have, need);
+      c.workers[playerIdx] = have - take;
+      if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
+      need -= take;
+    }
+    // River: prefer cheapest first
+    const riverByCost = state.riverCards.filter(c => c.material === m && workersOnCard(c, playerIdx) > 0)
+      .sort((a, b) => a.currentCost - b.currentCost);
+    for (const c of riverByCost) {
+      if (need === 0) break;
+      const have = workersOnCard(c, playerIdx);
+      const take = Math.min(have, need);
+      c.workers[playerIdx] = have - take;
+      if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
+      c.blanks += take;
+      need -= take;
+    }
+  }
+  p.supply += Object.values(struct.cost).reduce((s, n) => s + n, 0);
+  // Build cost in time
+  advancePlayer(playerIdx, struct.time);
+  // Move card from hand to built
+  p.hand.splice(handIdx, 1);
+  p.built.push(struct);
+  log(`🏗 ${speciesLabel(p)} builds <b>${struct.name}</b> (${struct.time}t, ${struct.vp}★).`);
+  // Draw replacement
+  if (state.structDeck.length > 0) {
+    p.hand.push(state.structDeck.pop());
+  }
+  cleanupShoreline();
+}
+
+// =============================================================================
+// MODAL
+// =============================================================================
+function showModal({ title, body, actions }) {
+  const root = document.getElementById('modal-root');
+  let actionsHtml = '';
+  actions.forEach((a, i) => {
+    const cls = a.primary ? 'primary' : (a.ghost ? 'ghost' : '');
+    actionsHtml += `<button class="${cls}" id="modal-btn-${i}">${a.label}</button>`;
+  });
+  const bodyHtml = typeof body === 'function' ? body() : body;
+  root.innerHTML = `<div class="modal-backdrop"><div class="modal">
+    <h2>${title}</h2>
+    <div>${bodyHtml}</div>
+    <div class="action-buttons" style="margin-top:10px;">${actionsHtml}</div>
+  </div></div>`;
+  actions.forEach((a, i) => {
+    document.getElementById('modal-btn-' + i).onclick = a.onClick;
+  });
+}
+
+function closeModal() {
+  document.getElementById('modal-root').innerHTML = '';
+}
+
+function updateBidPreview(cost, max) {
+  const input = document.getElementById('human-bid');
+  const out = document.getElementById('bid-preview');
+  if (!input || !out) return;
+  let v = parseInt(input.value);
+  if (isNaN(v)) v = 0;
+  if (v === 0) {
+    out.innerHTML = `<span class="small-note">Bidding 0 — you pass and add no time.</span>`;
+  } else {
+    const t = v * cost;
+    out.innerHTML = `If you clinch all <b>${v}</b> worker${v === 1 ? '' : 's'}: <b>+${t} time</b> (${v} × ${cost}t). You'll add less if the river jams and you take fewer.`;
+  }
+}
+
+async function humanBidForAuction(card, human, minBid) {
+  // No workers left → auto-pass without prompting.
+  // (Action 1 requires supply > 0 to trigger, so minBid is 0 here.)
+  if (human.supply === 0) {
+    log(`💤 ${speciesLabel(human)} has no workers left — auto-passes (bid 0).`);
+    return 0;
+  }
+  return new Promise(resolve => {
+    const m = MATERIALS[card.material];
+    const open = uncoveredIcons(card);
+    const cost = card.currentCost;
+    // Cap bids at the smaller of your supply and the open icons. Bidding more than the
+    // open count never gets you more — you can only ever take open items at most.
+    const maxBid = Math.min(human.supply, open);
+    const initVal = Math.min(minBid, maxBid);
+    const supplyLimited = human.supply <= open;
+    showModal({
+      title: `🎲 Auction: ${m.emoji} ${m.name}`,
+      body: () => `
+        <p>${open} icon${open === 1 ? '' : 's'} open · cost ${cost}t per worker · you have <b>${human.supply}</b> worker${human.supply === 1 ? '' : 's'} remaining in your supply.</p>
+        <p>Minimum bid: <b>${minBid}</b>${minBid > 0 ? ' (you triggered the auction)' : ''} · maximum bid: <b>${maxBid}</b> ${supplyLimited ? '(your supply)' : '(open icons)'}.</p>
+        <div class="setup-row">
+          <label>Your bid:</label>
+          <input id="human-bid" type="number" min="${minBid}" max="${maxBid}" value="${initVal}" oninput="updateBidPreview(${cost}, ${maxBid})">
+        </div>
+        <p id="bid-preview" class="bid-preview"></p>
+      `,
+      actions: [
+        { label: 'Submit bid', primary: true, onClick: () => {
+          const v = parseInt(document.getElementById('human-bid').value);
+          if (isNaN(v) || v < minBid || v > maxBid) {
+            alert(`Bid must be between ${minBid} and ${maxBid}.`);
+            return;
+          }
+          closeModal();
+          resolve(v);
+        }},
+      ],
+    });
+    // Initial preview
+    setTimeout(() => updateBidPreview(cost, maxBid), 0);
+  });
+}
+
+// =============================================================================
+// TURN LOOP
+// =============================================================================
+let turnPending = false;
+function scheduleTurn() {
+  if (turnPending) return;
+  turnPending = true;
+  setTimeout(async () => {
+    turnPending = false;
+    await runOneTurn();
+  }, 300);
+}
+
+async function runOneTurn() {
+  if (state.gameOver) return;
+  state.currentPlayer = pickNextPlayer();
+  const p = state.players[state.currentPlayer];
+  const space = p.timePos;
+  log(`— ${speciesLabel(p)} steps up at time ${space}.`);
+  render();
+  scrollTimeTrackToLeftmost();
+
+  if (p.isHuman) {
+    state.phase = 'choose-action';
+    render();
+    await awaitHuman();
+  } else {
+    // Decide first. If a build is possible, that's the action — DON'T recall first
+    // (call-home would steal the very workers we're about to spend on the build).
+    let action = aiChooseAction(p.idx);
+    if (action.type !== 'build') {
+      aiCallHomeIfNeeded(p.idx);
+      aiForceRecallIfStuck(p.idx);
+      // Re-pick after recall (the action might be the same, but supply is now different).
+      action = aiChooseAction(p.idx);
+    }
+    render();
+    await sleep(500);
+    await executeAIAction(p.idx, action);
+  }
+
+  cleanupShoreline();
+  state.phase = 'idle';
+  render();
+
+  // Check game end
+  if (checkGameEnd()) {
+    showGameOver();
+    return;
+  }
+
+  // Check if same player keeps going (still on top of lowest space)
+  const next = pickNextPlayer();
+  if (next === p.idx) {
+    log(`↩ ${speciesLabel(p)} still on top of the lowest space — takes another turn.`);
+  }
+  scheduleTurn();
+}
+
+async function executeAIAction(playerIdx, action) {
+  const p = state.players[playerIdx];
+  if (action.type === 'pass') {
+    // Pass: advance 1 to break tie. Or call home. We'll just no-op-ish: try a roll out fallback.
+    log(`💤 ${speciesLabel(p)} can't act — passes (advances 1t).`);
+    advancePlayer(playerIdx, 1);
+    return;
+  }
+  if (action.type === 'build') {
+    performBuild(playerIdx, action.handIdx);
+    render();
+    return;
+  }
+  if (action.type === 'auction') {
+    advancePlayer(playerIdx, 1);
+    log(`🎬 ${speciesLabel(p)} auctions ${MATERIALS[state.riverCards.find(c => c.id === action.cardId).material].name} (1t).`);
+    render();
+    await sleep(300);
+    const card = state.riverCards.find(c => c.id === action.cardId);
+    if (card) await runAuction(card, playerIdx, 1);
+    return;
+  }
+  if (action.type === 'rollout') {
+    advancePlayer(playerIdx, 2);
+    log(`🎬 ${speciesLabel(p)} rolls out a new card (2t).`);
+    render();
+    await sleep(300);
+    const newCard = dropNewCardUpriver();
+    if (newCard) await runAuction(newCard, playerIdx, 0);
+    return;
+  }
+  if (action.type === 'browse') {
+    const N = action.n;
+    const drawCount = Math.min(N, state.structDeck.length);
+    const drawn = [];
+    for (let i = 0; i < drawCount; i++) drawn.push(state.structDeck.pop());
+    advancePlayer(playerIdx, drawCount);
+    log(`📚 ${speciesLabel(p)} browses ${drawCount} cards (${drawCount}t).`);
+    const sel = aiBrowseDiscardChoice(playerIdx, drawn);
+    const newHand = [];
+    p.hand.forEach((s, i) => { if (!sel.has('h' + i)) newHand.push(s); });
+    drawn.forEach((s, i) => { if (!sel.has('d' + i)) newHand.push(s); });
+    const discarded = [];
+    p.hand.forEach((s, i) => { if (sel.has('h' + i)) discarded.push(s); });
+    drawn.forEach((s, i) => { if (sel.has('d' + i)) discarded.push(s); });
+    for (const d of discarded) state.structDiscard.push(d);
+    p.hand = newHand;
+    render();
+    await sleep(300);
+    return;
+  }
+}
+
+// =============================================================================
+// GAME END
+// =============================================================================
+function checkGameEnd() {
+  if (state.matDeck.length > 0) return false;
+  if (state.riverCards.some(c => uncoveredIcons(c) > 0)) return false;
+  // No player has a buildable structure
+  for (const p of state.players) {
+    const wbm = playerWorkersByMaterial(state, p.idx);
+    for (const s of p.hand) {
+      if (canBuild(s, wbm)) return false;
+    }
+  }
+  return true;
+}
+
+function showGameOver() {
+  state.gameOver = true;
+  const ranked = state.players.slice().sort((a, b) => {
+    const va = a.built.reduce((s, x) => s + x.vp, 0);
+    const vb = b.built.reduce((s, x) => s + x.vp, 0);
+    if (va !== vb) return vb - va;
+    return a.timePos - b.timePos;
+  });
+  const winner = ranked[0];
+  log(`🏆 GAME OVER. Winner: ${speciesLabel(winner)} with ${winner.built.reduce((s, x) => s + x.vp, 0)}★.`);
+  let html = '';
+  ranked.forEach((p, i) => {
+    const vp = p.built.reduce((s, x) => s + x.vp, 0);
+    html += `<div class="score-row ${i === 0 ? 'winner' : ''}">
+      <span>${i + 1}. ${p.species.emoji} ${p.species.name}${p.isHuman ? ' (you)' : ''}</span>
+      <span><b>${vp}★</b> · time ${p.timePos} · ${p.built.length} structure${p.built.length === 1 ? '' : 's'}</span>
+    </div>`;
+  });
+  document.getElementById('scoreboard').innerHTML = html;
+  document.getElementById('gameover-screen').classList.remove('hidden');
+  render();
+}
+
+// =============================================================================
+// INIT
+// =============================================================================
+document.getElementById('human-plays').addEventListener('change', e => {
+  document.getElementById('species-row').style.display = e.target.checked ? '' : 'none';
+});
+document.getElementById('num-players').addEventListener('change', () => {
+  // Clamp species choice if needed
+  const n = parseInt(document.getElementById('num-players').value);
+  const sel = document.getElementById('human-species');
+  for (const opt of sel.options) opt.disabled = parseInt(opt.value) >= n;
+  if (parseInt(sel.value) >= n) sel.value = '0';
+});
+</script>
+</body>
+</html>
