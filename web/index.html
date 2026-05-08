@@ -930,7 +930,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along).' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 4, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a pre-river card to River 1 for free; an auction immediately runs on it at 1🐟/item.' },
-  { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 8, effect: 'End game: +1 VP per shoreline card on the table.' },
+  { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 2, effect: 'End game: +1 VP per shoreline card on the table.' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
   { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 1 fewer fish (min 1).' },
@@ -938,9 +938,9 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built, draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top card of the material deck at any time.' },
-  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 5, effect: 'End game: +1 VP per shoreline card with at least one of your workers.' },
+  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 2, effect: 'End game: +1 VP per shoreline card with at least one of your workers.' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
-  { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 5, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
+  { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 1, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5, effect: 'At the start of your turn you may pay 1🐟 to replace a pre-river card with the top of the material deck.' },
   { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 5, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
@@ -955,10 +955,10 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
   { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 5, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
-  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 7, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
+  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 4, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5, effect: 'At the start of your turn you may pay 1🐟 to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
-  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 6, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
+  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
 ];
 
 // Ablation toggle: set STRUCTURE_EFFECT_DISABLED['Pier'] = true to ignore that

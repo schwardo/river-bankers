@@ -24,7 +24,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along).' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 4, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a pre-river card to River 1 for free; an auction immediately runs on it at 1 fish/item.' },
-  { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 8, effect: 'End game: +1 VP per shoreline card on the table.' },
+  { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 2, effect: 'End game: +1 VP per shoreline card on the table.' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
   { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 1 fewer fish (min 1).' },
@@ -32,9 +32,9 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built, draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top card of the material deck at any time.' },
-  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 5, effect: 'End game: +1 VP per shoreline card with at least one of your workers.' },
+  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 2, effect: 'End game: +1 VP per shoreline card with at least one of your workers.' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
-  { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 5, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
+  { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 1, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1 fish.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5, effect: 'At the start of your turn you may pay 1 fish to replace a pre-river card with the top of the material deck.' },
   { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 5, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
@@ -49,10 +49,10 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
   { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 5, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
-  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 7, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
+  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 4, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5, effect: 'At the start of your turn you may pay 1 fish to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
-  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 6, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
+  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
 ];
 
 // Ablation toggle: set STRUCTURE_EFFECT_DISABLED['Pier'] = true to ignore that
@@ -1490,11 +1490,125 @@ function sweepRule() {
   console.log('  (other columns same as `node sim.js spec`)\n');
 }
 
+// =============================================================================
+// PER-CARD EFFECT ABLATION
+// =============================================================================
+// For each card with an effect, compute the average VP a player gains when they
+// BUILD that card with the effect on vs. off. The diff is the effect's average
+// VP contribution to the builder's score — useful for tuning printed VP values.
+//
+// Methodology:
+//   baseline: all effects on
+//   ablation_X: all effects on EXCEPT card X
+//   diff = avg(totalVP | built X, all on) − avg(totalVP | built X, X off)
+function sweepAblation(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || 8;
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      let action = aiChooseAction(state, p.idx);
+      if (action.type !== 'build') {
+        aiCallHomeIfNeeded(state, p.idx);
+        aiForceRecallIfStuck(state, p.idx);
+        action = aiChooseAction(state, p.idx);
+      }
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
+        const passed = action.type === 'pass';
+        if (reachedEnd || passed) p.out = true;
+      }
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  function collectResults(disabledNames) {
+    Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+    for (const n of disabledNames) STRUCTURE_EFFECT_DISABLED[n] = true;
+    const results = []; // [{builtNames: Set, totalVP: number}, ...]
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      for (const p of state.players) {
+        const builtNames = new Set(p.built.map(s => s.name));
+        results.push({ builtNames, totalVP: totalVP(p, state) });
+      }
+    }
+    return results;
+  }
+
+  const effectCards = STRUCTURE_TEMPLATES.filter(s => s.effect).map(s => s.name);
+
+  console.log(`\nRiver Bankers per-card ablation`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games per variant.`);
+  console.log(`Comparing avg totalVP for players who BUILT each card, with the card's effect on vs. off.\n`);
+
+  const t0 = Date.now();
+  console.log('Running baseline (all effects on)...');
+  const baseline = collectResults([]);
+
+  const rows = [];
+  for (let i = 0; i < effectCards.length; i++) {
+    const cardName = effectCards[i];
+    process.stderr.write(`\rAblating [${i + 1}/${effectCards.length}] ${cardName.padEnd(22)} `);
+    const ablated = collectResults([cardName]);
+    const baseB = baseline.filter(r => r.builtNames.has(cardName));
+    const ablB = ablated.filter(r => r.builtNames.has(cardName));
+    const avgBase = baseB.length ? baseB.reduce((s, r) => s + r.totalVP, 0) / baseB.length : NaN;
+    const avgAbl = ablB.length ? ablB.reduce((s, r) => s + r.totalVP, 0) / ablB.length : NaN;
+    rows.push({
+      name: cardName,
+      baseN: baseB.length,
+      ablN: ablB.length,
+      avgBase, avgAbl,
+      diff: avgBase - avgAbl,
+    });
+  }
+  process.stderr.write('\r' + ' '.repeat(60) + '\r');
+  Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+
+  rows.sort((a, b) => (b.diff || 0) - (a.diff || 0));
+  console.log(
+    pad('Card', 22) + padL('builds(B)', 11) + padL('builds(A)', 11) +
+    padL('avgVP(B)', 10) + padL('avgVP(A)', 10) + padL('Δ VP', 8)
+  );
+  console.log('-'.repeat(22 + 11 + 11 + 10 + 10 + 8));
+  for (const r of rows) {
+    const baseStr = isNaN(r.avgBase) ? '-' : r.avgBase.toFixed(2);
+    const ablStr = isNaN(r.avgAbl) ? '-' : r.avgAbl.toFixed(2);
+    const diffStr = isNaN(r.diff) ? '-' : (r.diff >= 0 ? '+' : '') + r.diff.toFixed(2);
+    console.log(
+      pad(r.name, 22) + padL(r.baseN, 11) + padL(r.ablN, 11) +
+      padL(baseStr, 10) + padL(ablStr, 10) + padL(diffStr, 8)
+    );
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  builds(B/A) = number of builder-instances in baseline / ablation runs');
+  console.log('  avgVP(B/A)  = average final totalVP for those builders');
+  console.log('  Δ VP        = avgVP(B) − avgVP(A) — the effect\'s average VP contribution');
+  console.log('  Lookout Tree, Salt Lick are intentional sim no-ops → expect Δ ≈ 0.\n');
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
   else if (mode === 'rule') sweepRule();
   else if (mode === 'deck') sweepDeck(process.argv[3]);
   else if (mode === 'uniform') sweepUniform();
+  else if (mode === 'ablation') sweepAblation(process.argv[3], process.argv[4], process.argv[5]);
   else sweep();
 }
