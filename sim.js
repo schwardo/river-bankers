@@ -99,10 +99,16 @@ const MAX_TURNS = 2000; // safety net
 let SPECULATIVE_BID_PROB = 0;
 function setSpeculativeBidProb(p) { SPECULATIVE_BID_PROB = p; }
 
-// When a pre-river auction resolves as plenty-to-go-around AND has at least
-// one leftover icon, the card slides to River 1 instead of the shoreline.
-// Keeps upstream cards flowing through the river. Toggle off only for
-// historical / rule-comparison sweeps.
+// Live rule: ANY plenty-to-go-around with leftover icons slides the card one
+// slot downstream (pre→R1, R1→R2, ..., R4→shore) instead of graduating it to
+// the shoreline directly. Cards only go to the shoreline when no icons remain
+// to be auctioned. (Toggle off only for historical / rule-comparison sweeps.)
+let ALL_PLENTY_SLIDES = true;
+function setAllPlentySlides(b) { ALL_PLENTY_SLIDES = b; }
+
+// Legacy / sweep-only flag: when ALL_PLENTY_SLIDES is off, this still lets
+// pre-river plenty (with leftovers) slide to River 1 — used by the rule-(b)
+// vs rule-(c) comparison sweep.
 let PRERIV_PLENTY_SLIDES_TO_RIVER = true;
 function setPrerivPlentySlides(b) { PRERIV_PLENTY_SLIDES_TO_RIVER = b; }
 
@@ -144,12 +150,12 @@ function canBuild(structure, workersByMat) {
   return true;
 }
 
-// Per-material tiers (shift deck — tuned via sweepDeck under rule (b)):
-//   "always"  → in deck for any player count   (3 cards/mat: [5,6,7] icons)
+// Per-material tiers (shift-2 deck — tuned via sweepDeck under rule (c)):
+//   "always"  → in deck for any player count   (2 cards/mat: [5,7] icons)
 //   "3+"      → only included when numPlayers >= 3 (1 card/mat: [4] icons)
 //   "4+"      → only included when numPlayers >= 4 (1 card/mat: [8] icons)
-// Counts: 2P=18, 3P=24, 4P=30 cards.
-let ALWAYS_ICONS = [5, 6, 7];
+// Counts: 2P=12, 3P=18, 4P=24 cards.
+let ALWAYS_ICONS = [5, 7];
 let TIER_3PLUS_ICONS = [4];
 let TIER_4PLUS_ICONS = [8];
 let PREMIUM_4P = [];
@@ -249,6 +255,7 @@ function newGame(numPlayers, workersPerPlayer = 8) {
       preToShoreCards: 0,         // cards that went pre-river → shoreline (skipped river entirely)
       preToRiverCards: 0,         // cards that entered River 1 via a pre-river jam (or rule-(b) plenty slide)
       preToRiverFromPlenty: 0,    // subset of preToRiverCards: entered via rule-(b) plenty slide (leftovers)
+      riverPlentySlides: 0,       // river-card plenty auctions (with leftovers) that slid downstream under rule (c)
       nonZeroBidders: 0,          // count of (auction, bidder) pairs with bid > 0
       zeroClinchBidders: 0,       // of those, bidders that clinched 0 icons (only possible in jams)
       zeroClinchAuctions: 0,      // auctions where total bids > 0 but total clinched = 0
@@ -413,9 +420,14 @@ function resolveAuction(state, card, bids) {
       // got === bid > 0 in plenty case, so no zero-clinch increment.
     }
     const leftover = open - totalBid;
-    if (PRERIV_PLENTY_SLIDES_TO_RIVER && card.slot === 'pre' && leftover > 0) {
-      // Variant (b): pre-river plenty with leftovers slides to River 1.
-      state.metrics.preToRiverFromPlenty++;
+    const slidesNow =
+      leftover > 0 && (
+        ALL_PLENTY_SLIDES ||
+        (PRERIV_PLENTY_SLIDES_TO_RIVER && card.slot === 'pre')
+      );
+    if (slidesNow) {
+      if (card.slot === 'pre') state.metrics.preToRiverFromPlenty++;
+      else state.metrics.riverPlentySlides++;
       jamCardDownriver(state, card);
     } else {
       moveCardToShoreline(state, card);
@@ -944,10 +956,12 @@ function sweepSpec() {
   console.log('  winVP    = avg VP of the winner\n');
 }
 
-function sweepDeck() {
-  // Under rule (b), sweep deck-size shrinkage to find a play-time sweet spot.
+function sweepDeck(ruleArg) {
+  // Sweep deck-size shrinkage to find a play-time sweet spot.
   // Drops successively-larger cards from the always tier (and the 3+ / premium
   // tiers when relevant) so each row reduces total icons monotonically.
+  // ruleArg: 'b' (default) or 'c' (uniform-slide rule).
+  const ruleC = ruleArg === 'c';
   const numMats = 6;
   const workers = 8;
   const N = 1500;
@@ -966,9 +980,14 @@ function sweepDeck() {
     { label: 'tight',  always: [5,6,7],   tier3: [],  tier4: [], premium: [] },
     { label: 'tighter',always: [5,6],     tier3: [],  tier4: [], premium: [] },
     { label: 'shift',  always: [5,6,7],   tier3: [4], tier4: [8], premium: [] },
+    // Smaller variants worth testing under rule (c) where games run longer
+    // because the river hangs onto leftover-bearing cards.
+    { label: 'shift-1',always: [5,6],     tier3: [4], tier4: [8], premium: [] }, // 12/18/24
+    { label: 'shift-2',always: [5,7],     tier3: [4], tier4: [8], premium: [] }, // 12/18/24, larger avg icons
+    { label: 'shift-x',always: [6],       tier3: [5], tier4: [4,7], premium: [] }, // 6/12/24
   ];
 
-  console.log(`\nDeck-size sweep under rule (b)`);
+  console.log(`\nDeck-size sweep under rule (${ruleC ? 'c — uniform slide' : 'b — pre-river only'})`);
   console.log(`Setting: ${workers} workers/player, ${numMats} materials, ${N} games per row.\n`);
   console.log(
     pad('numP', 5) + pad('deck', 9) + padL('cards', 6) +
@@ -982,6 +1001,7 @@ function sweepDeck() {
 
   setSpeculativeBidProb(0);
   setPrerivPlentySlides(true);
+  setAllPlentySlides(ruleC);
   for (const numP of [2, 3, 4]) {
     for (const d of decks) {
       setDeckTuning({ always: d.always, tier3: d.tier3, tier4: d.tier4, premium: d.premium });
@@ -1021,17 +1041,89 @@ function sweepDeck() {
     }
     console.log();
   }
-  // Restore baseline.
-  setDeckTuning({ always: [4,5,6,7], tier3: [8], tier4: [], premium: baselinePremium });
-  setPrerivPlentySlides(false);
+  // Restore live defaults.
+  setDeckTuning({ always: [5,7], tier3: [4], tier4: [8], premium: [] });
+  setAllPlentySlides(true);
   console.log('Legend (deck variants):');
   console.log('  old      = pre-shift tiered deck: 4 cards/mat [4-7], +1 [8] at 3+, + 4 premium 4P-only');
   console.log('  no-pre   = drop the 4P premium cards');
   console.log('  no-3+    = also drop the [8]-icon cards added at 3+');
   console.log('  tight    = also drop the [4]-icon card → 3 cards/mat [5,6,7]');
   console.log('  tighter  = also drop the [7]-icon card → 2 cards/mat [5,6]');
-  console.log('  shift    = LIVE DEFAULT: always [5,6,7], +1 [4] at 3+, +1 [8] at 4+ → 18/24/30 cards by numP');
+  console.log('  shift    = always [5,6,7], +1 [4] at 3+, +1 [8] at 4+ → 18/24/30 cards by numP');
+  console.log('  shift-1  = always [5,6], +1 [4] at 3+, +1 [8] at 4+ → 12/18/24 cards by numP');
+  console.log('  shift-2  = LIVE DEFAULT: always [5,7], +1 [4] at 3+, +1 [8] at 4+ → 12/18/24 cards by numP');
+  console.log('  shift-x  = always [6], +1 [5] at 3+, +2 [4,7] at 4+ → 6/12/24 cards by numP (4P-rich, 2P-thin)');
   console.log('  cards    = total material cards in the deck for that player count\n');
+}
+
+function sweepUniform() {
+  // Compare current rule (b: pre-river plenty with leftovers slides to River 1)
+  // vs rule (c: ANY plenty with leftovers slides one slot downstream).
+  // Run on the live (shift) deck so the comparison reflects the actual game.
+  const numMats = 6;
+  const workers = 8;
+  const N = 1500;
+
+  console.log(`\nUniform-slide rule comparison (rule b vs rule c)`);
+  console.log(`Setting: ${workers} workers/player, ${numMats} materials, shift deck (18/24/30 cards), ${N} games per row.\n`);
+  console.log(
+    pad('numP', 5) + pad('rule', 6) +
+    padL('turns', 6) + padL('t/p', 5) + padL('~min', 6) +
+    padL('aucs', 6) + padL('jam%', 6) +
+    padL('skip%', 7) + padL('exitR', 7) + padL('past1%', 8) + padL('past2%', 8) +
+    padL('zcAuc%', 8) + padL('zcBid%', 8) +
+    padL('wst%', 7) + padL('built/p', 8) + padL('winVP', 7)
+  );
+  console.log('-'.repeat(5+6+6+5+6+6+6+7+7+8+8+8+8+7+8+7));
+
+  setSpeculativeBidProb(0);
+  for (const numP of [2, 3, 4]) {
+    for (const variant of ['b', 'c']) {
+      setPrerivPlentySlides(true);
+      setAllPlentySlides(variant === 'c');
+      const trials = [];
+      for (let t = 0; t < N; t++) trials.push(runGame(numP, numMats, workers));
+      const turns = avg(trials.map(m => m.turns));
+      const auctions = avg(trials.map(m => m.auctions));
+      const jamPct = avg(trials.map(m => pct(m.jamAuctions, m.auctions)));
+      const skipPct = avg(trials.map(m => pct(m.preToShoreCards, m.preToShoreCards + m.preToRiverCards)));
+      const allExits = [].concat(...trials.map(m => m.riverExitSlots));
+      const exitMean = allExits.length ? (allExits.reduce((s, x) => s + x, 0) / allExits.length) + 1 : 0;
+      const past1Pct = allExits.length ? (allExits.filter(s => s >= 1).length / allExits.length) * 100 : 0;
+      const past2Pct = allExits.length ? (allExits.filter(s => s >= 2).length / allExits.length) * 100 : 0;
+      const zcAucPct = avg(trials.map(m => pct(m.zeroClinchAuctions, m.auctions)));
+      const zcBidPct = avg(trials.map(m => pct(m.zeroClinchBidders, m.nonZeroBidders)));
+      const wstPct = avg(trials.map(m => pct(m.iconsWastedToShore, m.iconsSpawned)));
+      const built = avg(trials.map(m => m.cardsBuilt));
+      const winVP = avg(trials.map(m => m.winnerVP));
+      const estMin = (turns * 30) / 60;
+      console.log(
+        pad(numP, 5) + pad(variant, 6) +
+        padL(turns.toFixed(0), 6) +
+        padL((turns / numP).toFixed(0), 5) +
+        padL(estMin.toFixed(1), 6) +
+        padL(auctions.toFixed(1), 6) +
+        padL(jamPct.toFixed(1), 6) +
+        padL(skipPct.toFixed(1) + '%', 7) +
+        padL(exitMean.toFixed(2), 7) +
+        padL(past1Pct.toFixed(1) + '%', 8) +
+        padL(past2Pct.toFixed(1) + '%', 8) +
+        padL(zcAucPct.toFixed(2) + '%', 8) +
+        padL(zcBidPct.toFixed(2) + '%', 8) +
+        padL(wstPct.toFixed(1) + '%', 7) +
+        padL((built / numP).toFixed(1), 8) +
+        padL(winVP.toFixed(1), 7)
+      );
+    }
+    console.log();
+  }
+  // Restore live defaults.
+  setPrerivPlentySlides(true);
+  setAllPlentySlides(true);
+  console.log('Legend:');
+  console.log('  rule b   = pre-river plenty with leftovers → River 1 (no slide on river-card plenty)');
+  console.log('  rule c   = LIVE: ANY plenty with leftovers slides one slot downstream (uniform rule)\n');
 }
 
 function sweepRule() {
@@ -1054,6 +1146,7 @@ function sweepRule() {
   console.log('-'.repeat(5+8+6+5+6+6+6+7+7+8+8+8+8+7+8+7));
 
   setSpeculativeBidProb(0);
+  setAllPlentySlides(false); // disable rule (c) for this comparison
   for (const numP of [2, 3, 4]) {
     for (const useB of [false, true]) {
       setPrerivPlentySlides(useB);
@@ -1095,9 +1188,11 @@ function sweepRule() {
     }
     console.log();
   }
-  setPrerivPlentySlides(false);
+  // Restore live defaults.
+  setPrerivPlentySlides(true);
+  setAllPlentySlides(true);
   console.log('Legend:');
-  console.log('  rule     = base (current rules) vs (b) (pre-river plenty with leftovers → River 1)');
+  console.log('  rule     = base (no slide) vs (b) (pre-river plenty with leftovers → River 1)');
   console.log('  past2%   = % of cards that entered the river and reached River 3 or deeper before exiting');
   console.log('  (other columns same as `node sim.js spec`)\n');
 }
@@ -1106,6 +1201,7 @@ if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
   else if (mode === 'rule') sweepRule();
-  else if (mode === 'deck') sweepDeck();
+  else if (mode === 'deck') sweepDeck(process.argv[3]);
+  else if (mode === 'uniform') sweepUniform();
   else sweep();
 }

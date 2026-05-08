@@ -872,12 +872,12 @@ const MATERIALS = {
 };
 const MAT_KEYS = Object.keys(MATERIALS);
 
-// Per-material tiered deck (tuned via sim.js):
-//   "always"  — in deck for any player count   (3 cards/mat: [5,6,7] icons)
+// Per-material tiered deck (tuned via sim.js sweepDeck under rule c):
+//   "always"  — in deck for any player count   (2 cards/mat: [5,7] icons)
 //   "3+"      — added when numPlayers >= 3     (1 card/mat: [4] icons)
 //   "4+"      — added when numPlayers === 4    (1 card/mat: [8] icons)
-// Counts: 2P=18 cards, 3P=24 cards, 4P=30 cards.
-const ALWAYS_ICONS = [5, 6, 7];
+// Counts: 2P=12 cards, 3P=18 cards, 4P=24 cards.
+const ALWAYS_ICONS = [5, 7];
 const TIER_3PLUS_ICONS = [4];
 const TIER_4PLUS_ICONS = [8];
 
@@ -1814,7 +1814,7 @@ function resolveAuction(card, bids) {
     timeAdvances: {},          // playerIdx -> +time
     outcome: 'no-bids',        // 'no-bids' | 'plenty' | 'jam'
     leftover: 0,
-    cardFate: 'stays',         // 'stays' | 'shoreline-from-plenty' | 'shoreline-graduated' | 'jammed' | 'pre-slid-from-plenty'
+    cardFate: 'stays',         // 'stays' | 'shoreline-from-plenty' | 'shoreline-graduated' | 'jammed' | 'plenty-slid'
     cardNewSlot: null,
     cardNewCost: null,
   };
@@ -1842,23 +1842,22 @@ function resolveAuction(card, bids) {
       log(`✅ ${speciesLabel(p)} wins ${bid} icon${bid === 1 ? '' : 's'} (advance ${timeAdvance}🐟).`);
     }
     result.leftover = open - totalBid;
-    if (card.slot === 'pre' && result.leftover > 0) {
-      // Pre-river plenty with leftovers: card slides into River 1 with its
-      // leftover icons (instead of washing to shoreline). Keeps upstream
-      // cards flowing through the river.
+    if (result.leftover > 0) {
+      // Any plenty-with-leftovers slides one slot downriver (uniform rule).
+      // Pre→R1, R1→R2, R2→R3, R3→R4, R4→shoreline.
       const m = MATERIALS[card.material];
-      const idx = prerivIndexOf(card);
-      card.slot = 0;
-      state.riverCards.push(card);
-      if (idx !== -1) refillPreriv(idx);
-      log(`💨 ${result.leftover} icon${result.leftover === 1 ? '' : 's'} unbid — ${m.emoji} ${m.name} card drifts into River 1 (${riverSlotCost(0)}🐟/item).`);
-      result.cardFate = 'pre-slid-from-plenty';
-      result.cardNewSlot = card.slot;
-      result.cardNewCost = cardCost(card);
-    } else {
-      if (result.leftover > 0) {
-        log(`🌊 ${result.leftover} icon${result.leftover === 1 ? '' : 's'} unbid — card washes to shoreline.`);
+      const wasOnLastSlot = card.slot === 3;
+      jamCardDownriver(card);
+      if (card.slot === 'shore' || wasOnLastSlot) {
+        log(`🌊 ${result.leftover} icon${result.leftover === 1 ? '' : 's'} unbid — ${m.emoji} ${m.name} card graduates to the shoreline.`);
+        result.cardFate = 'shoreline-graduated';
+      } else {
+        result.cardFate = 'plenty-slid';
+        result.cardNewSlot = card.slot;
+        result.cardNewCost = cardCost(card);
       }
+    } else {
+      // Every icon claimed — card has nothing left to auction.
       moveCardToShoreline(card);
       result.cardFate = 'shoreline-from-plenty';
     }
@@ -1936,12 +1935,12 @@ async function showAuctionResult(result) {
   } else if (result.outcome === 'plenty') {
     const leftover = result.leftover;
     let fateLine;
-    if (result.cardFate === 'pre-slid-from-plenty') {
-      fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The pre-river card <b>drifts into River ${result.cardNewSlot + 1}</b>, where it can be auctioned again at <b>${result.cardNewCost}🐟</b> per item.</p>`;
-    } else if (leftover > 0) {
-      fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid and wash${leftover === 1 ? 'es' : ''} away — the card <b>drifts to the shoreline</b> (taking any workers on it).</p>`;
+    if (result.cardFate === 'plenty-slid') {
+      fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The card <b>drifts into River ${result.cardNewSlot + 1}</b> with its leftover icons, where it can be auctioned again at <b>${result.cardNewCost}🐟</b> per item.</p>`;
+    } else if (result.cardFate === 'shoreline-graduated') {
+      fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The card was already on the last river space, so it <b>graduates to the shoreline</b> with its workers.</p>`;
     } else {
-      fateLine = `<p>Every open icon was claimed — the card still <b>drifts to the shoreline</b> (any further bids would find it empty anyway).</p>`;
+      fateLine = `<p>Every open icon was claimed — the card has nothing left to auction and <b>drifts to the shoreline</b>.</p>`;
     }
     outcomeBox = `<div class="result-box plenty">
       <p><b>🌟 Plenty to go around.</b> Total bid ${result.totalBid} ≤ ${result.openBefore} open icons, so every bidder took exactly what they bid.</p>
