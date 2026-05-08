@@ -922,6 +922,10 @@ function buildMaterialDeck(numPlayers) {
 // Cards with implemented effects carry an `effect` description (shown in UI).
 // The actual hook is keyed off the structure's name in helpers below.
 // Effects can be toggled off for ablation via STRUCTURE_EFFECT_DISABLED.
+//
+// TODO(human-ui): Lookout Tree currently has NO live effect — peek-deck-top is purely
+//   decorative. For human play, add a small persistent peek widget (e.g., a "🔭 Top of deck:
+//   <material> <icons>" indicator) that's visible whenever the human has Lookout Tree built.
 const STRUCTURE_TEMPLATES = [
   { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along).' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 4, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
@@ -1117,6 +1121,9 @@ function effectiveBuildCost(struct, p, wbm) {
     }
   }
   // Granary: once-per-game, drop 1 from a remaining deficient material.
+  // TODO(human-ui): Granary auto-fires the moment it would help a build. A human owner
+  //   should be asked first ("Use Granary to save 1 worker?") and pick which material
+  //   to discount when there are multiple deficits or even ties.
   let granaryUsed = false;
   if (hasEffect(p, 'Granary') && !p.granaryUsed) {
     for (const m of Object.keys(eff)) {
@@ -1931,8 +1938,12 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   log(`🎲 Auction begins on ${m.emoji} ${m.name} at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
 
   // Spy Mound: if any AI has it available, defer their bid until after others reveal.
-  // (Spy Mound for the human player isn't auto-triggered here — Phase 3 leaves human
-  //  control of Spy Mound as a future UI improvement.)
+  // TODO(human-ui): a human owner of Spy Mound currently can't elect to defer. Add a
+  //   "Use Spy Mound (defer bid)" toggle on the human bid modal — when set, capture
+  //   their bid AFTER showing other reveals, then re-render results.
+  // TODO(human-ui): Floodgate also auto-fires above for the triggerer. The human owner
+  //   should be prompted ("Slide upstream for free?") rather than auto-using the
+  //   once-per-game charge on the first eligible auction.
   let deferredAi = -1;
   for (const p of state.players) {
     if (p.isHuman) continue;
@@ -2308,8 +2319,12 @@ function aiChooseAction(playerIdx) {
 }
 
 // Heron Roost / Driftwood Snag: optional start-of-turn abilities. Auto-fire for AI.
-// Each costs 1 fish. Human builders won't see these auto-fired (they'd need UI to use,
-// not implemented in Phase 3 — flagged in fireOnBuildEffect docs).
+// Each costs 1 fish.
+//
+// TODO(human-ui): a human owner of Heron Roost or Driftwood Snag currently has NO way to
+// trigger these — this helper only runs in the AI branch. Add start-of-turn prompt buttons
+// (e.g., "Use Heron Roost to replace Upstream X for 1🐟?") so the human can choose target
+// + whether to fire.
 function aiStartOfTurnAbilities(playerIdx) {
   const p = state.players[playerIdx];
   if (hasEffect(p, 'Heron Roost') && state.matDeck.length > 0 && p.timePos < ENDGAME_TRACK_END - 1) {
@@ -2689,6 +2704,15 @@ async function performBuild(playerIdx, handIdx) {
 
 // One-time on-build effects fire here (web). Each card's effect is triggered by name.
 // async because Snag Pile triggers an auction (which awaits human bid modal).
+//
+// TODO(human-ui): Several effects auto-resolve their target picks for both AI and human:
+//   - Sap Drip   → human should pick which river card to land 2 free workers on
+//   - Mud Levee  → human should pick which uncovered icons to blank (currently auto-greedy)
+//   - Snag Pile  → human should pick which pre-river slot to pull
+//   - Vine Lattice → human should pick which 1 of the 3 drawn to keep
+//   - Stone Pool → human should rearrange the top 5 (currently auto-sorted by icon count)
+//   - Flush Channel → currently skips the post-flush auction step entirely; should let human
+//                     pick a target and run the auction at upstream rate
 async function fireOnBuildEffect(playerIdx, struct) {
   const p = state.players[playerIdx];
   if (!effectActive(struct.name)) return;
