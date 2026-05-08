@@ -17,40 +17,90 @@ const ORIG_MATERIALS = ['logs', 'stones', 'reeds', 'mud', 'vines', 'clay'];
 const EXTRA_MATERIALS = ['silt', 'bone', 'shells'];
 let MAT_KEYS = ORIG_MATERIALS.slice();
 
+// Cards with implemented effects carry an `effect` description (mirrors web/index.html).
+// Hooks are keyed off the structure name in helpers below.
+// Disable a single card's effect for ablation via setStructureEffectDisabled.
 const BASE_STRUCTURE_TEMPLATES = [
-  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6 },
+  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along).' },
   { name: 'Lodge',          cost: { logs: 3, reeds: 1 },             time: 2, vp: 4 },
   { name: 'Reed Snare',     cost: { reeds: 2, stones: 1 },           time: 2, vp: 3 },
-  { name: 'Stone Bridge',   cost: { stones: 4, logs: 2 },            time: 4, vp: 8 },
-  { name: 'Reed Hut',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4 },
-  { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5 },
-  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2 },
-  { name: 'Mink Burrow',    cost: { mud: 2, reeds: 2 },              time: 2, vp: 4 },
+  { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 8, effect: 'End game: +1 VP per shoreline card on the table.' },
+  { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
+  { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
+  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 1 fewer fish (min 1).' },
+  { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5 },
-  { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7 },
+  { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
   { name: 'Watchtower',     cost: { logs: 5, stones: 2 },            time: 4, vp: 8 },
-  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 5 },
-  { name: 'Cattail Patch',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6 },
-  { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 5 },
+  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 5, effect: 'End game: +1 VP per shoreline card with at least one of your workers.' },
+  { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
+  { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 5, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3 },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5 },
   { name: 'Boat Dock',      cost: { logs: 4, reeds: 1 },             time: 3, vp: 5 },
-  { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7 },
+  { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7, effect: 'When you would pass 0 on the fish track, stop at space 1 instead.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5 },
-  { name: 'River Bend',     cost: { mud: 4, reeds: 1 },              time: 3, vp: 5 },
+  { name: 'Flush Channel',  cost: { mud: 4, reeds: 1 },              time: 3, vp: 5, effect: 'When built, trigger a free upstream-flush (no 5 fish cost).' },
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5 },
   { name: 'Treaty Stone',   cost: { stones: 6 },                     time: 4, vp: 7 },
-  { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10 },
-  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4 },
+  { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built, take an immediate extra turn.' },
+  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you call workers home, slide back 1 fish per worker recalled.' },
   { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8 },
-  { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 2, vp: 4 },
-  { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3 },
+  { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
+  { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
   { name: 'Granite Spire',  cost: { stones: 4, clay: 1 },            time: 3, vp: 5 },
-  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 7 },
+  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 7, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
   { name: 'Twig Bridge',    cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5 },
   { name: 'Stone Hearth',   cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6 },
-  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 6 },
+  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 6, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
 ];
+
+// Ablation toggle: set STRUCTURE_EFFECT_DISABLED['Pier'] = true to ignore that
+// card's effect (still in deck, still scores its printed VP — only the bonus is suppressed).
+const STRUCTURE_EFFECT_DISABLED = {};
+function setStructureEffectDisabled(name, disabled) {
+  if (disabled) STRUCTURE_EFFECT_DISABLED[name] = true;
+  else delete STRUCTURE_EFFECT_DISABLED[name];
+}
+function effectActive(name) { return STRUCTURE_EFFECT_DISABLED[name] !== true; }
+function hasEffect(p, name) { return effectActive(name) && p.built.some(s => s.name === name); }
+function maxHandSize(p) { return 3 + (hasEffect(p, 'Cache Burrow') ? 1 : 0); }
+function totalVP(p, state) {
+  let v = p.built.reduce((s, b) => s + b.vp, 0);
+  if (hasEffect(p, 'Pier')) {
+    v += state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length;
+  }
+  if (hasEffect(p, 'Stone Cairn')) {
+    const mats = new Set();
+    for (const b of p.built) for (const m in b.cost) mats.add(m);
+    v += Math.min(5, mats.size);
+  }
+  if (hasEffect(p, 'Vine Ladder')) {
+    v += 2 * p.built.filter(b => (b.cost.vines || 0) > 0).length;
+  }
+  if (hasEffect(p, 'Hidden Cache')) {
+    const mats = new Set();
+    for (const b of p.built) for (const m in b.cost) mats.add(m);
+    v += MAT_KEYS.every(m => mats.has(m)) ? 5 : 2;
+  }
+  if (hasEffect(p, 'Heron Watch')) {
+    v += state.shorelineCards.length;
+  }
+  return v;
+}
+
+// Reed Bed: per-item cost is 1 less for the player on Reed material cards (min 1).
+function playerCardCost(state, card, playerIdx) {
+  const base = cardCost(card);
+  const p = state.players[playerIdx];
+  if (card.material === 'reeds' && hasEffect(p, 'Reed Bed')) return Math.max(1, base - 1);
+  return base;
+}
+
+// Pass-0 freebies — Phase 2 implements Wood Pile / Hollowed-out Log here.
+function firePassZeroEffects(state, playerIdx, count) {
+  // Placeholder.
+}
 
 let STRUCTURE_TEMPLATES = BASE_STRUCTURE_TEMPLATES.slice();
 
@@ -143,11 +193,41 @@ function playerWorkersByMaterial(state, playerIdx) {
   for (const c of state.shorelineCards) out[c.material] += workersOnCard(c, playerIdx);
   return out;
 }
-function canBuild(structure, workersByMat) {
+function canBuild(structure, workersByMat, p = null) {
+  const reedMult = (p && hasEffect(p, 'Cattail Marsh')) ? 2 : 1;
+  let deficit = 0;
   for (const m in structure.cost) {
-    if ((workersByMat[m] || 0) < structure.cost[m]) return false;
+    const have = (workersByMat[m] || 0) * (m === 'reeds' ? reedMult : 1);
+    if (have < structure.cost[m]) deficit += structure.cost[m] - have;
   }
-  return true;
+  if (deficit === 0) return true;
+  if (p && hasEffect(p, 'Charcoal Pit') && deficit <= 1) {
+    const claySlack = (workersByMat.clay || 0) - (structure.cost.clay || 0);
+    if (claySlack >= 1) return true;
+  }
+  return false;
+}
+
+function effectiveBuildCost(struct, p, wbm) {
+  const eff = {};
+  for (const m in struct.cost) eff[m] = struct.cost[m];
+  if (hasEffect(p, 'Cattail Marsh') && eff.reeds) {
+    eff.reeds = Math.ceil(eff.reeds / 2);
+  }
+  if (hasEffect(p, 'Charcoal Pit')) {
+    const claySlack = (wbm.clay || 0) - (eff.clay || 0);
+    if (claySlack >= 1) {
+      for (const m of Object.keys(struct.cost)) {
+        if (m === 'clay') continue;
+        if ((wbm[m] || 0) < eff[m]) {
+          eff[m] -= 1;
+          eff.clay = (eff.clay || 0) + 1;
+          break;
+        }
+      }
+    }
+  }
+  return eff;
 }
 
 // Per-material tiers (shift-2 deck — tuned via sweepDeck under rule (c)):
@@ -264,6 +344,11 @@ function newGame(numPlayers, workersPerPlayer = 8) {
 }
 
 function pickNextPlayer(state) {
+  if (state.bonusTurnPlayer != null) {
+    const idx = state.bonusTurnPlayer;
+    state.bonusTurnPlayer = null;
+    if (!state.players[idx].out && !state.players[idx].exhausted) return idx;
+  }
   let lowest = Infinity;
   for (const p of state.players) {
     if (p.exhausted || p.out) continue;
@@ -296,6 +381,14 @@ function advancePlayer(state, playerIdx, byTime) {
   const p = state.players[playerIdx];
   const prev = p.timePos;
   p.timePos += byTime;
+  // Mill Wheel: clamp to (boundary + 1) on lap-loop crossing.
+  const prevLapBoundary = Math.floor(prev / LAP_LENGTH);
+  const newLapBoundary  = Math.floor(p.timePos / LAP_LENGTH);
+  const passZeroCount = Math.max(0, newLapBoundary - prevLapBoundary);
+  if (passZeroCount > 0 && hasEffect(p, 'Mill Wheel')) {
+    p.timePos = (prevLapBoundary + 1) * LAP_LENGTH + 1;
+  }
+  if (passZeroCount > 0) firePassZeroEffects(state, playerIdx, passZeroCount);
   state.stackOrder = state.stackOrder.filter(i => i !== playerIdx);
   state.stackOrder.unshift(playerIdx);
   for (const other of state.players) {
@@ -369,6 +462,7 @@ function cleanupShoreline(state) {
 }
 function callWorkersHome(state, playerIdx, recallSpec) {
   const p = state.players[playerIdx];
+  let total = 0;
   for (const r of recallSpec) {
     const card = state.riverCards.find(c => c.id === r.cardId) || state.shorelineCards.find(c => c.id === r.cardId);
     if (!card) continue;
@@ -379,6 +473,11 @@ function callWorkersHome(state, playerIdx, recallSpec) {
     if (card.workers[playerIdx] === 0) delete card.workers[playerIdx];
     if (typeof card.slot === 'number') card.blanks += take;
     p.supply += take;
+    total += take;
+  }
+  // Otter Den: slide back 1 fish per worker recalled.
+  if (total > 0 && hasEffect(p, 'Otter Den')) {
+    p.timePos = Math.max(0, p.timePos - total);
   }
   cleanupShoreline(state);
 }
@@ -413,7 +512,7 @@ function resolveAuction(state, card, bids) {
       const p = state.players[idx];
       p.supply -= bid;
       card.workers[idx] = (card.workers[idx] || 0) + bid;
-      const timeAdvance = bid * cardCost(card);
+      const timeAdvance = bid * playerCardCost(state, card, idx);
       advancePlayer(state, idx, timeAdvance);
       state.metrics.iconsClaimed += bid;
       state.metrics.nonZeroBidders++;
@@ -443,7 +542,7 @@ function resolveAuction(state, card, bids) {
         p.supply -= got;
         card.workers[idx] = (card.workers[idx] || 0) + got;
       }
-      const timeAdvance = bid * cardCost(card);
+      const timeAdvance = bid * playerCardCost(state, card, idx);
       advancePlayer(state, idx, timeAdvance);
       state.metrics.iconsClaimed += got;
       state.metrics.nonZeroBidders++;
@@ -503,7 +602,7 @@ function aiChooseAction(state, playerIdx) {
   const wbm = playerWorkersByMaterial(state, playerIdx);
   const buildables = p.hand
     .map((s, i) => ({ s, i, score: s.vp / Math.max(1, s.time), vp: s.vp }))
-    .filter(o => canBuild(o.s, wbm))
+    .filter(o => canBuild(o.s, wbm, p))
     .sort((a, b) => b.vp - a.vp);
   if (buildables.length > 0) return { type: 'build', handIdx: buildables[0].i };
 
@@ -655,8 +754,10 @@ function aiChooseFlushTarget(state, playerIdx) {
 function performBuild(state, playerIdx, handIdx) {
   const p = state.players[playerIdx];
   const struct = p.hand[handIdx];
-  for (const m in struct.cost) {
-    let need = struct.cost[m];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const effCost = effectiveBuildCost(struct, p, wbm);
+  for (const m in effCost) {
+    let need = effCost[m];
     for (const c of state.shorelineCards) {
       if (need === 0) break;
       if (c.material !== m) continue;
@@ -679,13 +780,72 @@ function performBuild(state, playerIdx, handIdx) {
       need -= take;
     }
   }
-  p.supply += Object.values(struct.cost).reduce((s, n) => s + n, 0);
-  advancePlayer(state, playerIdx, struct.time);
+  p.supply += Object.values(effCost).reduce((s, n) => s + n, 0);
+  // Otter Slide: build advances 1 fewer fish (min 1). Cards with printed time 0 stay 0.
+  const slideDiscount = hasEffect(p, 'Otter Slide') ? 1 : 0;
+  const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount);
+  advancePlayer(state, playerIdx, timeCost);
   p.hand.splice(handIdx, 1);
   p.built.push(struct);
   state.metrics.cardsBuilt++;
-  if (state.structDeck.length > 0) p.hand.push(state.structDeck.pop());
+  fireOnBuildEffect(state, playerIdx, struct);
+  // Replace from deck up to maxHandSize (Cache Burrow → 4).
+  while (p.hand.length < maxHandSize(p) && state.structDeck.length > 0) {
+    p.hand.push(state.structDeck.pop());
+  }
   cleanupShoreline(state);
+}
+
+function fireOnBuildEffect(state, playerIdx, struct) {
+  const p = state.players[playerIdx];
+  if (!effectActive(struct.name)) return;
+  if (struct.name === 'Burrow Run') {
+    p.timePos = Math.max(0, p.timePos - 5);
+    return;
+  }
+  if (struct.name === 'Royal Lodge') {
+    state.bonusTurnPlayer = playerIdx;
+    return;
+  }
+  if (struct.name === 'Beaver Dam') {
+    const r1 = state.riverCards.filter(c => c.slot === 0);
+    for (const c of r1) moveCardToShoreline(state, c);
+    return;
+  }
+  if (struct.name === 'Mud Levee') {
+    let dropped = 0;
+    const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
+      .filter(c => uncoveredIcons(c) > 0)
+      .sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
+    for (const c of cands) {
+      while (dropped < 2 && uncoveredIcons(c) > 0) { c.blanks++; dropped++; }
+      if (dropped >= 2) break;
+    }
+    return;
+  }
+  if (struct.name === 'Flush Channel') {
+    for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
+    for (let i = 0; i < state.prerivCards.length; i++) {
+      if (state.matDeck.length === 0) break;
+      const c = state.matDeck.pop();
+      c.slot = 'pre';
+      state.prerivCards[i] = c;
+      state.metrics.iconsSpawned += c.totalIcons;
+    }
+    return;
+  }
+  if (struct.name === 'Sap Drip') {
+    const cands = state.riverCards.filter(c => uncoveredIcons(c) > 0)
+      .sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
+    if (cands.length === 0 || p.supply === 0) return;
+    const target = cands[0];
+    const place = Math.min(2, p.supply, uncoveredIcons(target));
+    if (place > 0) {
+      p.supply -= place;
+      target.workers[playerIdx] = (target.workers[playerIdx] || 0) + place;
+    }
+    return;
+  }
 }
 
 function executeAction(state, playerIdx, action) {
@@ -752,7 +912,7 @@ function checkGameEnd(state) {
   if (state.riverCards.some(c => uncoveredIcons(c) > 0)) return false;
   for (const p of state.players) {
     const wbm = playerWorkersByMaterial(state, p.idx);
-    for (const s of p.hand) if (canBuild(s, wbm)) return false;
+    for (const s of p.hand) if (canBuild(s, wbm, p)) return false;
   }
   return true;
 }
@@ -792,8 +952,8 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
     if (state.endgame && state.players.every(pp => pp.out)) break;
     if (checkGameEnd(state)) break;
   }
-  // Final per-player VP tally
-  const vps = state.players.map(p => p.built.reduce((s, x) => s + x.vp, 0));
+  // Final per-player VP tally (includes effect bonuses; ablation toggles via STRUCTURE_EFFECT_DISABLED).
+  const vps = state.players.map(p => totalVP(p, state));
   vps.sort((a, b) => b - a);
   state.metrics.winnerVP = vps[0];
   state.metrics.runnerUpVP = vps.length > 1 ? vps[1] : 0;
