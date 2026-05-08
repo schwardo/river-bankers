@@ -85,7 +85,30 @@
   }
   .time-track-label {
     display: flex; justify-content: space-between; align-items: center;
+    gap: 10px;
     margin-bottom: 4px;
+  }
+  .sim-time {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    background: var(--water-deep);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .sim-time.live {
+    background: var(--forest);
+    box-shadow: 0 0 0 2px var(--forest-light);
+  }
+  .sim-time-label {
+    font-size: 10px;
+    opacity: 0.75;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-right: 4px;
   }
   .time-track {
     display: flex;
@@ -788,6 +811,7 @@
     <div class="time-track-label">
       <h2>⏱ Time Track</h2>
       <span class="small-note">Pawn farthest back acts next; ties broken by stack (top first).</span>
+      <span id="sim-time" class="sim-time" title="Simulated game time. Counts real wall-clock time during your input; AI turns add a hardcoded amount."><span class="sim-time-label">Sim</span><span id="sim-time-value">0:00</span></span>
     </div>
     <div id="time-track" class="time-track"></div>
   </div>
@@ -968,6 +992,65 @@ function canBuild(structure, workersByMat) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // =============================================================================
+// SIMULATED GAME TIME
+// =============================================================================
+// Real wall-clock time accrues while the human is making a decision (own turn or
+// reacting to an auction). AI turns add a hardcoded chunk per turn — refine
+// AI_TURN_FAKE_MS later from observed per-turn human times.
+const AI_TURN_FAKE_MS = 30000;
+
+function startHumanTimer() {
+  if (!state) return;
+  if (state._humanTimerDepth === 0) state._humanTimerStart = Date.now();
+  state._humanTimerDepth++;
+}
+function stopHumanTimer() {
+  if (!state || state._humanTimerDepth === 0) return;
+  state._humanTimerDepth--;
+  if (state._humanTimerDepth === 0 && state._humanTimerStart != null) {
+    const elapsed = Date.now() - state._humanTimerStart;
+    state.humanTimeMs += elapsed;
+    state.simGameTimeMs += elapsed;
+    state._humanTimerStart = null;
+    renderSimTime();
+  }
+}
+function addAiTurnTime() {
+  if (!state) return;
+  state.simGameTimeMs += AI_TURN_FAKE_MS;
+  renderSimTime();
+}
+function getCurrentSimTimeMs() {
+  if (!state) return 0;
+  let t = state.simGameTimeMs;
+  if (state._humanTimerStart != null) t += Date.now() - state._humanTimerStart;
+  return t;
+}
+function formatSimTime(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+function renderSimTime() {
+  if (!state) return;
+  const v = document.getElementById('sim-time-value');
+  const w = document.getElementById('sim-time');
+  if (!v || !w) return;
+  v.textContent = formatSimTime(getCurrentSimTimeMs());
+  w.classList.toggle('live', state._humanTimerStart != null);
+}
+let _simTimeTickInterval = null;
+function startSimTimeTicker() {
+  if (_simTimeTickInterval != null) return;
+  _simTimeTickInterval = setInterval(() => {
+    if (state && state._humanTimerStart != null) renderSimTime();
+  }, 250);
+}
+
+// =============================================================================
 // STATE
 // =============================================================================
 let state = null;
@@ -1035,6 +1118,11 @@ function startGame() {
     phase: 'idle',
     shadowedBy: {},
     endgame: false,
+    simGameTimeMs: 0,
+    humanTimeMs: 0,
+    humanTurnCount: 0,
+    _humanTimerStart: null,
+    _humanTimerDepth: 0,
   };
 
   // Pick first player: top of stack at lowest space
@@ -1046,6 +1134,7 @@ function startGame() {
   log(`Game starts. ${players.length} players. ${humanPlays ? 'You are ' + SPECIES[humanIdx].name + '.' : 'All AI.'}`);
 
   render();
+  startSimTimeTicker();
   scheduleTurn();
 }
 
@@ -1142,6 +1231,7 @@ function render() {
   renderHand();
   renderActionPanel();
   renderDeckProgress();
+  renderSimTime();
 }
 
 function renderDeckProgress() {
@@ -1667,7 +1757,12 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
       log(`💤 ${speciesLabel(human)} is exhausted — auto-passes (bid 0).`);
     } else {
       const minBid = (human.idx === triggerPlayerIdx) ? minBidTrigger : 0;
-      bids[human.idx] = await humanBidForAuction(card, human, minBid);
+      startHumanTimer();
+      try {
+        bids[human.idx] = await humanBidForAuction(card, human, minBid);
+      } finally {
+        stopHumanTimer();
+      }
     }
   }
 
@@ -1679,7 +1774,16 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   const result = resolveAuction(card, bids);
   // Re-render so the modal can sit on top of an updated board state
   render();
-  await showAuctionResult(result);
+  if (state.players.some(p => p.isHuman)) {
+    startHumanTimer();
+    try {
+      await showAuctionResult(result);
+    } finally {
+      stopHumanTimer();
+    }
+  } else {
+    await showAuctionResult(result);
+  }
   state.phase = 'idle';
   render();
 }
@@ -2451,10 +2555,16 @@ async function runOneTurn() {
 
   let actionType = null;
   if (p.isHuman) {
+    state.humanTurnCount++;
     state.phase = 'choose-action';
     state.lastHumanActionType = null;
     render();
-    await awaitHuman();
+    startHumanTimer();
+    try {
+      await awaitHuman();
+    } finally {
+      stopHumanTimer();
+    }
     actionType = state.lastHumanActionType;
   } else {
     let action = aiChooseAction(p.idx);
@@ -2466,6 +2576,7 @@ async function runOneTurn() {
     render();
     await sleep(500);
     await executeAIAction(p.idx, action);
+    addAiTurnTime();
     actionType = action.type;
   }
 
@@ -2631,9 +2742,14 @@ function showGameOver() {
       <span><b>${vp}★</b> · time ${p.timePos} · ${p.built.length} structure${p.built.length === 1 ? '' : 's'}</span>
     </div>`;
   });
+  let humanStat = '';
+  if (state.humanTurnCount > 0) {
+    const perTurnSec = (state.humanTimeMs / state.humanTurnCount) / 1000;
+    humanStat = `<p class="small-note" style="margin-top:8px;">⏱ Your average decision time: <b>${perTurnSec.toFixed(1)}s/turn</b> over ${state.humanTurnCount} turn${state.humanTurnCount === 1 ? '' : 's'}.</p>`;
+  }
   showModal({
     title: '🏞 Game Over',
-    body: () => `<div class="scoreboard">${rows}</div>`,
+    body: () => `<div class="scoreboard">${rows}</div>${humanStat}`,
     actions: [
       { label: 'Play again', primary: true, onClick: () => location.reload() },
     ],
