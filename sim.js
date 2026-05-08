@@ -636,8 +636,10 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   const maxNeed = Math.max(0, ...p.hand.map(s => Math.max(0, (s.cost[card.material] || 0) - (wbm[card.material] || 0))));
   let target = Math.round((need + maxNeed) / 2);
   target = Math.min(target, p.supply, open, 4);
-  if (cardCost(card) >= 3 && target > 1) target = Math.max(1, target - 1);
-  if (cardCost(card) >= 4 && target > 1) target = Math.max(1, target - 1);
+  // Use the player-specific per-item cost so Reed Bed makes reed auctions more attractive.
+  const myCost = playerCardCost(state, card, playerIdx);
+  if (myCost >= 3 && target > 1) target = Math.max(1, target - 1);
+  if (myCost >= 4 && target > 1) target = Math.max(1, target - 1);
   const r = Math.random();
   if (r < 0.15 && target > 0) target -= 1;
   else if (r > 0.85 && target < p.supply && target < open) target += 1;
@@ -645,7 +647,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // that uses this material may bid 1 worker on a cheap slot to add contention.
   if (
     target === 0 && minBid === 0 && SPECULATIVE_BID_PROB > 0 &&
-    cardCost(card) <= 2 && p.supply > 0 &&
+    myCost <= 2 && p.supply > 0 &&
     p.hand.some(s => (s.cost[card.material] || 0) > 0) &&
     Math.random() < SPECULATIVE_BID_PROB
   ) {
@@ -658,13 +660,94 @@ function aiDecideBid(state, playerIdx, card, minBid) {
 }
 
 // =============================================================================
+// AI: EFFECT VALUATION
+// =============================================================================
+// Approximate VP value of a card's effect from the builder's perspective.
+// Used by AI scoring so high-effect cards rank above plain VP cards. Endgame
+// VP cards are state-aware; constants/one-times are coarse fixed estimates.
+// Values are the AI's beliefs — not necessarily what the effect actually
+// realizes (which is what the ablation measures). Calibrate from ablation Δs
+// by hand; don't auto-feed to avoid circular tuning.
+const EFFECT_VP_FIXED = {
+  // Constants
+  'Granary': 3,
+  'Charcoal Pit': 2,
+  'Cattail Marsh': 1,
+  'Otter Raft': 1,
+  'Cache Burrow': 1,
+  // Mid-low constants
+  'Reed Bed': 0.5,
+  'Otter Slide': 0.5,
+  'Mill Wheel': 0.5,
+  // One-time
+  'Royal Lodge': 1,
+  'Burrow Run': 1,
+  'Sap Drip': 1,
+  'Snag Pile': 1,
+  'Vine Lattice': 0.5,
+  'Beaver Dam': 0.5,
+  'Mud Levee': 0.5,
+  // ~0
+  'Wood Pile': 0,
+  'Hollowed-out Log': 0,
+  'Otter Den': 0,
+  'Heron Roost': 0,
+  'Driftwood Snag': 0,
+  'Floodgate': 0,
+  'Spy Mound': 0,
+  'Stone Pool': 0,
+  'Flush Channel': 0,
+  // Sim no-ops (would be > 0 with smarter AI)
+  'Salt Lick': 0,
+  'Lookout Tree': 0,
+};
+function aiEffectValue(struct, p, state) {
+  if (!effectActive(struct.name)) return 0;
+  // Once-per-game effects yield 0 if the slot is already burned.
+  if (struct.name === 'Granary' && p.granaryUsed) return 0;
+  if (struct.name === 'Floodgate' && p.floodgateUsed) return 0;
+  if (struct.name === 'Spy Mound' && p.spyMoundUsed) return 0;
+  // Endgame VP — state-dependent projections.
+  if (struct.name === 'Pier') {
+    const placed = state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length;
+    const remaining = state.matDeck.length + state.riverCards.length;
+    return placed + Math.min(5, Math.floor(remaining * 0.25));
+  }
+  if (struct.name === 'Stone Cairn') {
+    const mats = new Set();
+    for (const b of p.built) for (const m in b.cost) mats.add(m);
+    return Math.min(5, mats.size + 2);
+  }
+  if (struct.name === 'Vine Ladder') {
+    const builtVine = p.built.filter(b => (b.cost.vines || 0) > 0).length;
+    const handVine = p.hand.filter(s => (s.cost.vines || 0) > 0).length;
+    return 2 * (builtVine + Math.min(handVine, 2));
+  }
+  if (struct.name === 'Hidden Cache') {
+    const mats = new Set();
+    for (const b of p.built) for (const m in b.cost) mats.add(m);
+    // Optimistic: expect to fill out remaining materials over the game.
+    return mats.size >= MAT_KEYS.length - 1 ? 5 : 3;
+  }
+  if (struct.name === 'Heron Watch') {
+    const remaining = state.matDeck.length + state.riverCards.length;
+    return state.shorelineCards.length + Math.floor(remaining * 0.5);
+  }
+  return EFFECT_VP_FIXED[struct.name] || 0;
+}
+
+// =============================================================================
 // AI: TURN DECISIONS
 // =============================================================================
 function aiChooseAction(state, playerIdx) {
   const p = state.players[playerIdx];
   const wbm = playerWorkersByMaterial(state, playerIdx);
   const buildables = p.hand
-    .map((s, i) => ({ s, i, score: s.vp / Math.max(1, s.time), vp: s.vp }))
+    .map((s, i) => {
+      const effVp = aiEffectValue(s, p, state);
+      const totalVp = s.vp + effVp;
+      return { s, i, score: totalVp / Math.max(1, s.time), vp: totalVp };
+    })
     .filter(o => canBuild(o.s, wbm, p))
     .sort((a, b) => b.vp - a.vp);
   if (buildables.length > 0) return { type: 'build', handIdx: buildables[0].i };
@@ -685,7 +768,8 @@ function aiChooseAction(state, playerIdx) {
     const need = needs[c.material];
     if (need === 0) continue;
     const got = Math.min(uncoveredIcons(c), p.supply, need);
-    const score = need * got - cardCost(c) * got * 0.4;
+    // playerCardCost picks up Reed Bed's per-item discount when scoring auction targets.
+    const score = need * got - playerCardCost(state, c, playerIdx) * got * 0.4;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'river'; }
   }
   for (let i = 0; i < state.prerivCards.length; i++) {
@@ -931,10 +1015,19 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     return;
   }
   if (struct.name === 'Sap Drip') {
-    const cands = state.riverCards.filter(c => uncoveredIcons(c) > 0)
-      .sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
-    if (cands.length === 0 || p.supply === 0) return;
-    const target = cands[0];
+    // Place 2 free workers on a river card whose material we actually need. Fall
+    // back to max-uncovered-icons if nothing is needed.
+    const wbm = playerWorkersByMaterial(state, playerIdx);
+    const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
+    const candsAll = state.riverCards.filter(c => uncoveredIcons(c) > 0);
+    if (candsAll.length === 0 || p.supply === 0) return;
+    candsAll.sort((a, b) => {
+      const aScore = Math.min(2, need(a.material), uncoveredIcons(a));
+      const bScore = Math.min(2, need(b.material), uncoveredIcons(b));
+      if (aScore !== bScore) return bScore - aScore;
+      return uncoveredIcons(b) - uncoveredIcons(a);
+    });
+    const target = candsAll[0];
     const place = Math.min(2, p.supply, uncoveredIcons(target));
     if (place > 0) {
       p.supply -= place;
@@ -967,9 +1060,23 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     return;
   }
   if (struct.name === 'Stone Pool') {
+    // Reorder top 5 so the AI's needed materials are closest to the river. Tie-break
+    // by icon count (more icons = more value in upcoming auctions).
     const top = state.matDeck.slice(-5);
     if (top.length === 0) return;
-    top.sort((a, b) => a.totalIcons - b.totalIcons);
+    const wbm = playerWorkersByMaterial(state, playerIdx);
+    const matNeed = {};
+    for (const m of MAT_KEYS) matNeed[m] = 0;
+    for (const s of p.hand) for (const m in s.cost) {
+      matNeed[m] = Math.max(matNeed[m], (s.cost[m] || 0) - (wbm[m] || 0));
+    }
+    // Sort ascending; back of array is top of deck (popped first), so end with high-need.
+    top.sort((a, b) => {
+      const an = matNeed[a.material] || 0;
+      const bn = matNeed[b.material] || 0;
+      if (an !== bn) return an - bn;
+      return a.totalIcons - b.totalIcons;
+    });
     state.matDeck.splice(state.matDeck.length - top.length, top.length, ...top);
     return;
   }
