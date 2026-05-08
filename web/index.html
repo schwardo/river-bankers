@@ -871,9 +871,10 @@ const MATERIALS = {
 };
 const MAT_KEYS = Object.keys(MATERIALS);
 
-// 8 cards per material; mix of icon counts (3..7). Cost is slot-based, not card-based.
+// 5 cards per material; icon counts spread 4..8. Cost is slot-based, not card-based.
+// Tuned via sim.js to target ~30-min play time with lower jam rate than the 8-card deck.
 function buildMaterialDeck() {
-  const iconCounts = [3, 4, 4, 5, 5, 6, 6, 7];
+  const iconCounts = [4, 5, 6, 7, 8];
   const deck = [];
   let id = 0;
   for (const m of MAT_KEYS) {
