@@ -1584,10 +1584,10 @@ function renderActionPanel() {
       <div class="action-buttons">
         <button class="secondary" onclick="humanCallHome()" ${placed === 0 ? 'disabled' : ''}>Call workers home (${placed} out)</button>
         <button onclick="humanChooseAction('auction')" ${(cur.supply > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>1. Auction river card (1🐟)</button>
-        <button onclick="humanChooseAction('preriv')" ${(cur.supply > 0 && hasPreriv) ? '' : 'disabled'}>2. Pull upstream card (1–3🐟)</button>
+        <button onclick="humanChooseAction('preriv')" ${(cur.supply > 0 && hasPreriv) ? '' : 'disabled'}>2. Pull upstream card (2–4🐟)</button>
         <button onclick="humanChooseAction('browse')" ${state.structDeck.length > 0 ? '' : 'disabled'}>3. Invent N (N🐟)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx))) ? '' : 'disabled'}>4. Build a structure</button>
-        <button onclick="humanChooseAction('flush')" ${(hasPreriv || state.matDeck.length > 0) ? '' : 'disabled'}>5. Flush upstream (5🐟)</button>
+        <button onclick="humanChooseAction('flush')" ${(cur.supply > 0 && (hasPreriv || state.matDeck.length > 0)) ? '' : 'disabled'}>5. Flush upstream (5🐟)</button>
         ${state.endgame ? `<button class="ghost" onclick="humanRetire()">Retire (endgame)</button>` : ''}
       </div>
       <div class="action-hint">Tip: click any river or upstream card to auction it, or any buildable structure in your hand to build it.</div>`;
@@ -1600,7 +1600,7 @@ function renderActionPanel() {
   } else if (state.phase === 'select-preriv-card') {
     html = `<div class="action-panel-title">Pick an upstream card to pull</div>
       <div class="action-buttons">
-        <span class="action-hint">Click an upstream card. Move cost depends on the slot (3🐟 / 2🐟 / 1🐟).</span>
+        <span class="action-hint">Click an upstream card. Move cost depends on the slot (4🐟 / 3🐟 / 2🐟).</span>
         <button class="ghost" onclick="humanCancelAction()">Cancel</button>
       </div>`;
   } else if (state.phase === 'flush-pick-card') {
@@ -2048,7 +2048,7 @@ function aiChooseAction(playerIdx) {
 
   // 2) Score river + pre-river auction candidates jointly. Pick whatever
   //    yields the best (need × clinch_potential) net of trigger + per-item time.
-  let bestCard = null, bestScore = -1, bestKind = null, bestPrerivIdx = -1;
+  let bestCard = null, bestScore = -Infinity, bestKind = null, bestPrerivIdx = -1;
   // River cards: action cost 0t, per-item cost = riverSlotCost(slot).
   for (const c of state.riverCards) {
     if (uncoveredIcons(c) === 0) continue;
@@ -2083,13 +2083,12 @@ function aiChooseAction(playerIdx) {
     }
   }
 
-  // 4) Flush upstream when nothing in it matches our needs (or when stuck with empty deck).
+  // 4) Flush upstream when nothing in it matches our needs.
+  // Flush triggers an auction on a fresh upstream card, so it requires at least one worker.
   const upstreamHasNeeded = state.prerivCards.some(c => c && needs[c.material] > 0);
   const upstreamHasAny = state.prerivCards.some(c => c !== null);
-  if (upstreamHasAny && !upstreamHasNeeded) {
-    if (state.matDeck.length === 0 || p.supply > 0) {
-      return { type: 'flush' };
-    }
+  if (upstreamHasAny && !upstreamHasNeeded && p.supply > 0) {
+    return { type: 'flush' };
   }
 
   // 5) Last resort: browse if possible

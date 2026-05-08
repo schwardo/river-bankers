@@ -6,8 +6,8 @@ A 2–4 player card game in which rival semi-aquatic mammals — **beavers, sea 
 
 - **Material deck.** Cards each show one material (Logs, Stones, Reeds, Mud, Vines, Clay) and a row of item icons. Cards do *not* carry a printed cost — every cost is determined by where the card sits. Items are not separate tokens; players claim them by placing workers directly on the icons. The deck scales with player count: 2 cards per material are *always* included (5 and 7 icons); 1 more card per material with 4 icons is added at **3+ players**; and 1 more card per material with 8 icons is added at **4 players**. Totals: 12 cards (2P) / 18 cards (3P) / 24 cards (4P).
 - **Blank tokens.** Round chits from a shared pool. A blank is dropped onto any icon a worker leaves behind, marking it as already-sold and removing it from future auctions.
-- **Pre-river queue.** Three numbered slots upstream of the river: **slot 1, 2, 3** counting away from the river. Slot 1 is closest to the river, slot 3 is farthest upstream. Each slot has a fixed *move cost* (1🐟 / 2🐟 / 3🐟 respectively) — pay it to pull whichever card is in that slot down into the river.
-- **River track.** Four spaces. Each river space has a fixed *per-item cost*: **River 1 = 1🐟/item, River 2 = 2🐟/item, River 3 = 3🐟/item, River 4 = 4🐟/item.** That's how many fish each worker you win on a card costs you — cards drifting farther downriver demand longer swims and bigger meals. Cards enter the river at space 1 (after a pre-river move). **Multiple cards can occupy the same space** — they pile up there. A card only moves when *it itself* is auctioned and still has uncovered icons afterward: it slides one space downriver, where the per-item cost is one higher. New cards arriving upstream don't push the cards already in the river. Past the fourth (last) space is the **shoreline**.
+- **Pre-river queue.** Three numbered slots upstream of the river: **slot 1, 2, 3** counting away from the river. Slot 1 is closest to the river, slot 3 is farthest upstream. Each slot has a fixed *move cost* (2🐟 / 3🐟 / 4🐟 respectively) — pay it to pull whichever card is in that slot down into the river. (Pre-river auctions themselves resolve at a flat **upstream rate of 1🐟/item**, slightly cheaper than River 1.)
+- **River track.** Four spaces. Each river space has a fixed *per-item cost*: **River 1 = 2🐟/item, River 2 = 3🐟/item, River 3 = 4🐟/item, River 4 = 5🐟/item.** That's how many fish each worker you win on a card costs you — cards drifting farther downriver demand longer swims and bigger meals. Cards enter the river at space 1 (after a pre-river move). **Multiple cards can occupy the same space** — they pile up there. A card only moves when *it itself* is auctioned and still has uncovered icons afterward: it slides one space downriver, where the per-item cost is one higher. New cards arriving upstream don't push the cards already in the river. Past the fourth (last) space is the **shoreline**.
 - **Shoreline.** A column past the river where graduated cards collect. Shoreline cards can't be auctioned; their icon counts no longer matter. Workers still on them can be spent on builds. A shoreline card with no workers left is removed.
 - **Structure deck.** Cards each show a structure, the materials required to build it, the fish cost to build, and a victory-point value.
 - **Worker tokens.** Each player gets **8 meeples** of their species.
@@ -32,19 +32,19 @@ There are no rounds. The next player to act is whoever's *non-exhausted* pawn is
 
 **Optional first:** *Call workers home.* Pick up any number of your own workers from any cards on the river and return them to your supply. Drop a blank onto each icon you uncovered. Free; not an action.
 
-Then take exactly **one** action. Every action advances your pawn forward by its fish cost.
+Then take exactly **one** action. Every action advances your pawn forward by its fish cost. **Any action that triggers an auction (1, 2, or 5) requires at least one worker in your supply** — you can't start an auction you can't bid in.
 
-1. **Auction an existing river card — 0🐟.** Choose any river card that still has uncovered icons. You must bid at least one worker. The action itself is free; per-item fish still applies on whatever you win, set by the card's current river space (1/2/3/4🐟).
-2. **Pull a pre-river card into the river — 1, 2, or 3🐟.** Choose a card in the pre-river queue and pay the move cost on its slot (1🐟 for slot 1, 2🐟 for slot 2, 3🐟 for slot 3). An auction immediately runs on it at the River-1 rate of 1🐟/item. You must bid at least one worker. Card movement after the auction follows the universal rule below.
+1. **Auction an existing river card — 1🐟 flat.** Choose any river card that still has uncovered icons. You must bid at least one worker. The flat fish is paid immediately; per-item fish still applies on whatever you win, set by the card's current river space (2/3/4/5🐟).
+2. **Pull a pre-river card into the river — 2, 3, or 4🐟.** Choose a card in the pre-river queue and pay the move cost on its slot (2🐟 for slot 1, 3🐟 for slot 2, 4🐟 for slot 3). An auction immediately runs on it at the **upstream rate of 1🐟/item**. You must bid at least one worker. Card movement after the auction follows the universal rule below.
 3. **Invent — N🐟 (you choose N from 1–5).** Draw N structure cards from the deck, then discard N cards from your hand (any mix of new draws and old). Discards go face-down out of play.
 4. **Build a structure — fish cost printed on the card.** For each material listed, pick up that many of *your* workers from cards of the matching type and return them to your supply. Drop a blank on each uncovered river-card icon. (Shoreline cards don't need blanks.) Place the structure face-up in front of you for scoring, then draw a replacement structure card so your hand returns to 3.
-5. **Flush the upstream — 5🐟.** Discard all cards currently in the upstream queue (out of game). Refill the queue from the top of the deck (revealing 3 fresh cards). Pick one of those new cards and run an auction on it at the upstream rate (1🐟/item); triggering this auction is *free* — the 5🐟 already paid covers it — but you still pay for your own bid normally. The other two newly-revealed upstream cards stay in the queue. After the auction settles, the auctioned card's slot refills as usual. If the deck has fewer than 3 cards left when you flush, the queue refills with whatever's available.
+5. **Flush the upstream — 5🐟.** Discard all cards currently in the upstream queue (out of game). Refill the queue from the top of the deck (revealing 3 fresh cards). Pick one of those new cards and run an auction on it at the upstream rate (1🐟/item); triggering this auction is *free* — the 5🐟 already paid covers it — but you still pay for your own bid normally and **must bid at least one worker** on it. The other two newly-revealed upstream cards stay in the queue. After the auction settles, the auctioned card's slot refills as usual. If the deck has fewer than 3 cards left when you flush, the queue refills with whatever's available.
 
 After your action resolves (and any auction settles), check the fish track again. If you're still on top of the lowest occupied space, take another turn.
 
 ## Auctions
 
-Triggered by action 1 or action 2. The action's flat fish cost is paid immediately (0🐟 for an existing river card, 1/2/3🐟 to pull a pre-river card into River 1); auction results may cost additional fish.
+Triggered by action 1 or action 2. The action's flat fish cost is paid immediately (1🐟 for an existing river card, 2/3/4🐟 to pull a pre-river card into River 1); auction results may cost additional fish.
 
 Everyone — including the active player — secretly chooses how many workers from their supply to bid. The triggering player must bid at least one; other players may bid zero. A bid is capped only by your remaining supply.
 
@@ -52,7 +52,7 @@ When everyone's ready, all bids are revealed at the same time. Add them up and c
 
 ### Plenty to go around
 
-If the total of all bids is **no more than** the number of uncovered icons, everyone wins exactly what they bid. For each winner: take that many of your workers from your supply, place one on each of the icons you've claimed, and slide your pawn forward on the fish track by your bid count multiplied by the card's current river space (1/2/3/4🐟 per item).
+If the total of all bids is **no more than** the number of uncovered icons, everyone wins exactly what they bid. For each winner: take that many of your workers from your supply, place one on each of the icons you've claimed, and slide your pawn forward on the fish track by your bid count multiplied by the card's current per-item rate (1🐟 upstream, or 2/3/4/5🐟 for River 1/2/3/4).
 
 Then move the card per the **card movement rule** below.
 
@@ -64,9 +64,9 @@ If the total of all bids is **greater than** the number of uncovered icons, the 
 
 Then move the card per the **card movement rule** below.
 
-> **Example.** A card on River 2 has 5 uncovered log icons. You bid 4 workers. Your opponent bids 4. Together that's 8 — more than the card has. From your point of view: 5 logs minus your opponent's 4 leaves 1 log for you. From their point of view: 5 logs minus your 4 leaves 1 log for them. You each cover 1 icon with one of your workers; both of you advance 4 × 2🐟 = 8🐟 (River 2's per-item rate × your bid count, even though only 1 of those 4 workers clinched). The 3 uncovered icons stay where they are, and the card slides to River 3.
+> **Example.** A card on River 2 has 5 uncovered log icons. You bid 4 workers. Your opponent bids 4. Together that's 8 — more than the card has. From your point of view: 5 logs minus your opponent's 4 leaves 1 log for you. From their point of view: 5 logs minus your 4 leaves 1 log for them. You each cover 1 icon with one of your workers; both of you advance 4 × 3🐟 = 12🐟 (River 2's per-item rate × your bid count, even though only 1 of those 4 workers clinched). The 3 uncovered icons stay where they are, and the card slides to River 3.
 
-> **Example.** A card on River 1 has 5 uncovered log icons. You bid 1, opponent bids 6. Together that's 7. From your point of view: 5 logs minus their 6 is negative — you take nothing. You still pay 1 × 1🐟 = 1🐟 for the bid. From their point of view: 5 logs minus your 1 leaves 4, capped at their bid of 6, so they take 4. They advance 6 × 1🐟 = 6🐟 (the full bid). 1 icon stays uncovered; the card slides to River 2.
+> **Example.** A card on River 1 has 5 uncovered log icons. You bid 1, opponent bids 6. Together that's 7. From your point of view: 5 logs minus their 6 is negative — you take nothing. You still pay 1 × 2🐟 = 2🐟 for the bid. From their point of view: 5 logs minus your 1 leaves 4, capped at their bid of 6, so they take 4. They advance 6 × 2🐟 = 12🐟 (the full bid). 1 icon stays uncovered; the card slides to River 2.
 
 Workers that didn't clinch an icon return to your supply (the fish you fed them is the only cost). Workers placed on icons stay there until you spend them on a structure or call them home.
 

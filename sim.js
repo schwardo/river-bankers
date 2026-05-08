@@ -517,7 +517,7 @@ function aiChooseAction(state, playerIdx) {
   }
   const totalNeed = MAT_KEYS.reduce((sum, m) => sum + needs[m], 0);
 
-  let bestCard = null, bestScore = -1, bestKind = null, bestPrerivIdx = -1;
+  let bestCard = null, bestScore = -Infinity, bestKind = null, bestPrerivIdx = -1;
   for (const c of state.riverCards) {
     if (uncoveredIcons(c) === 0) continue;
     const need = needs[c.material];
@@ -546,8 +546,9 @@ function aiChooseAction(state, playerIdx) {
   }
   const upstreamHasNeeded = state.prerivCards.some(c => c && needs[c.material] > 0);
   const upstreamHasAny = state.prerivCards.some(c => c !== null);
-  if (upstreamHasAny && !upstreamHasNeeded) {
-    if (state.matDeck.length === 0 || p.supply > 0) return { type: 'flush' };
+  // Flush includes triggering an auction, which requires at least one worker.
+  if (upstreamHasAny && !upstreamHasNeeded && p.supply > 0) {
+    return { type: 'flush' };
   }
   if (state.structDeck.length > 0) return { type: 'browse', n: Math.min(1, state.structDeck.length) };
   return { type: 'pass' };
