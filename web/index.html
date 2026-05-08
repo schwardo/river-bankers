@@ -89,16 +89,15 @@
   }
   .time-track {
     display: flex;
-    overflow-x: auto;
     background: linear-gradient(180deg, #e8d6a0 0%, #d4b97a 100%);
     border-radius: 4px;
     padding: 6px 4px 4px;
-    gap: 1px;
+    gap: 0;
     border: 1px solid var(--bank);
   }
   .time-cell {
-    flex: 0 0 auto;
-    width: 32px;
+    flex: 1 1 0;
+    min-width: 0;
     height: 44px;
     border-right: 1px dashed rgba(0,0,0,0.15);
     text-align: center;
@@ -107,6 +106,8 @@
     position: relative;
     padding-top: 2px;
   }
+  .time-cell:last-child { border-right: none; }
+  .time-cell.lap-mark { background: rgba(0,0,0,0.06); }
   .time-cell .pawn-stack {
     position: absolute;
     bottom: 2px; left: 50%;
@@ -124,6 +125,11 @@
     box-shadow: 0 1px 2px rgba(0,0,0,0.3);
   }
   .pawn.next-up { animation: pulse 1.2s infinite; }
+  .pawn.exhausted {
+    transform: rotate(180deg);
+    filter: grayscale(0.7) brightness(0.7);
+    opacity: 0.65;
+  }
   @keyframes pulse {
     0%,100% { box-shadow: 0 0 0 0 rgba(255,200,0,0.7); }
     50%     { box-shadow: 0 0 0 6px rgba(255,200,0,0); }
@@ -155,6 +161,29 @@
     font-weight: 700;
     font-size: 13px;
     text-shadow: none;
+  }
+  .deck-progress {
+    margin: 4px 4px 8px;
+    color: rgba(255,255,255,0.95);
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
+  }
+  .deck-progress-label {
+    display: flex; justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+  .deck-progress-bar {
+    height: 8px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--bank);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .deck-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--forest-light) 0%, var(--forest) 50%, #1a3a20 100%);
+    transition: width 400ms ease;
   }
   .river-flow {
     display: flex;
@@ -769,6 +798,13 @@
       <span class="river-action-tag">Spend 1⏳ to auction</span>
       <span>Downriver →</span>
     </div>
+    <div class="deck-progress">
+      <div class="deck-progress-label">
+        <span>Material deck: <b id="deck-count">0</b> / <span id="deck-total">0</span> cards left</span>
+        <span><b id="deck-percent">0</b>% drawn</span>
+      </div>
+      <div class="deck-progress-bar"><div id="deck-progress-fill" class="deck-progress-fill"></div></div>
+    </div>
     <div id="river-flow" class="river-flow"></div>
   </div>
 
@@ -964,6 +1000,8 @@ function startGame() {
       timePos: 0,
       hand: [],
       built: [],
+      exhausted: false,
+      out: false,
     });
   }
 
@@ -987,12 +1025,14 @@ function startGame() {
     prerivCards[i] = c;
   }
 
+  const matDeckInitialSize = matDeck.length + PRERIV_SLOTS; // pre-pop already removed PRERIV_SLOTS
   state = {
     players,
     riverCards,
     prerivCards,
     shorelineCards: [],
     matDeck,
+    matDeckInitialSize,
     structDeck,
     structDiscard: [],
     log: [],
@@ -1002,6 +1042,8 @@ function startGame() {
     currentPlayer: 0,
     gameOver: false,
     phase: 'idle',
+    shadowedBy: {},
+    endgame: false,
   };
 
   // Pick first player: top of stack at lowest space
@@ -1017,26 +1059,73 @@ function startGame() {
 }
 
 // =============================================================================
-// TURN ORDER: pick the player whose pawn is on the lowest space; tie → top of stack
+// TURN ORDER: pick the lowest-pos non-exhausted player; tie → top of stack
 // =============================================================================
+const LAP_LENGTH = 60;
+
 function pickNextPlayer() {
   let lowest = Infinity;
-  for (const p of state.players) lowest = Math.min(lowest, p.timePos);
-  // among players at lowest position, find earliest in stackOrder
-  for (const idx of state.stackOrder) {
-    if (state.players[idx].timePos === lowest) return idx;
+  for (const p of state.players) {
+    if (p.exhausted || p.out) continue;
+    lowest = Math.min(lowest, p.timePos);
   }
-  return state.stackOrder[0];
+  if (lowest === Infinity) return -1; // no eligible player (likely game over)
+  for (const idx of state.stackOrder) {
+    const p = state.players[idx];
+    if (p.exhausted || p.out) continue;
+    if (p.timePos === lowest) return idx;
+  }
+  return state.stackOrder.find(i => !state.players[i].exhausted && !state.players[i].out) ?? state.stackOrder[0];
 }
 
+const ENDGAME_TRACK_END = 59;
+
+function triggerEndgame() {
+  if (state.endgame) return;
+  state.endgame = true;
+  const ordered = state.players
+    .map(p => ({ idx: p.idx, t: p.timePos, stackPos: state.stackOrder.indexOf(p.idx) }))
+    .filter(o => !state.players[o.idx].out)
+    .sort((a, b) => a.t - b.t || a.stackPos - b.stackPos);
+  ordered.forEach((o, i) => { state.players[o.idx].timePos = i + 1; });
+  state.shadowedBy = {};
+  for (const p of state.players) p.exhausted = false;
+  state.stackOrder = ordered.map(o => o.idx);
+  log(`🏁 Material deck is empty — entering endgame. Pawns reset to spaces 1–${ordered.length}; reach space ${ENDGAME_TRACK_END} or pass to retire.`);
+}
+
+// Pawns that get lapped become "exhausted" — flipped to the back, can't act, can't bid.
+// The flag toggles at each pass (lap 1 = exhausted, lap 2 = revived, lap 3 = exhausted again).
+// Only the moving player's advance can trigger transitions; a player's own movement does not.
 function advancePlayer(playerIdx, byTime) {
   const p = state.players[playerIdx];
+  const prev = p.timePos;
   p.timePos += byTime;
-  // Removing from old stack position. The pawn is leaving its current space.
-  // Stack-order rule applies per-space ties; we maintain a global stackOrder and
-  // when a pawn lands on a space, it goes to top — so move idx to front of stackOrder.
   state.stackOrder = state.stackOrder.filter(i => i !== playerIdx);
   state.stackOrder.unshift(playerIdx);
+  // Detect 60-multiple crossings made by p relative to each other player.
+  for (const other of state.players) {
+    if (other === p) continue;
+    const prevLaps = Math.max(0, Math.floor((prev - other.timePos) / LAP_LENGTH));
+    const newLaps  = Math.max(0, Math.floor((p.timePos - other.timePos) / LAP_LENGTH));
+    let crossings = newLaps - prevLaps;
+    if (crossings > 0) {
+      const key = playerIdx + '->' + other.idx;
+      while (crossings-- > 0) state.shadowedBy[key] = !state.shadowedBy[key];
+    }
+  }
+  // Recompute exhausted flags from shadow set.
+  for (const b of state.players) {
+    let was = b.exhausted;
+    let now = false;
+    for (const a of state.players) {
+      if (a === b) continue;
+      if (state.shadowedBy[a.idx + '->' + b.idx]) { now = true; break; }
+    }
+    b.exhausted = now;
+    if (!was && now) log(`💤 ${speciesLabel(b)} got lapped — exhausted until passed again.`);
+    if (was && !now) log(`☀ ${speciesLabel(b)} caught up — back in the action.`);
+  }
 }
 
 // =============================================================================
@@ -1061,32 +1150,51 @@ function render() {
   renderPlayers();
   renderHand();
   renderActionPanel();
-  // (deck/struct counts no longer displayed in the header)
+  renderDeckProgress();
+}
+
+function renderDeckProgress() {
+  if (!state) return;
+  const total = state.matDeckInitialSize || 0;
+  const remaining = state.matDeck.length;
+  const drawn = total - remaining;
+  const pct = total > 0 ? Math.round((drawn / total) * 100) : 0;
+  const dc = document.getElementById('deck-count');
+  const dt = document.getElementById('deck-total');
+  const dp = document.getElementById('deck-percent');
+  const fill = document.getElementById('deck-progress-fill');
+  if (dc) dc.textContent = remaining;
+  if (dt) dt.textContent = total;
+  if (dp) dp.textContent = pct;
+  if (fill) fill.style.width = pct + '%';
 }
 
 function renderTimeTrack() {
   const wrap = document.getElementById('time-track');
-  // Capture each pawn's current viewport rect BEFORE re-rendering, so we can FLIP-animate
-  // any pawns whose position changed.
+  // Capture each pawn's viewport rect BEFORE re-rendering for FLIP animation.
   const oldRects = {};
   for (const el of wrap.querySelectorAll('[data-pawn]')) {
     oldRects[el.dataset.pawn] = el.getBoundingClientRect();
   }
-  const maxPos = Math.max(20, ...state.players.map(p => p.timePos)) + 4;
+  // The track loops every LAP_LENGTH cells (0..LAP_LENGTH-1). Display position = timePos mod LAP_LENGTH.
   let html = '';
-  for (let i = 0; i <= maxPos; i++) {
-    const occupants = state.stackOrder.filter(idx => state.players[idx].timePos === i);
+  for (let i = 0; i < LAP_LENGTH; i++) {
+    const occupants = state.stackOrder.filter(idx => !state.players[idx].out && (state.players[idx].timePos % LAP_LENGTH) === i);
+    // Exhausted pawns render first → they sit at the bottom of the visual stack (behind active pawns).
+    occupants.sort((a, b) => Number(state.players[b].exhausted) - Number(state.players[a].exhausted));
     let pawns = '';
     for (const idx of occupants) {
       const p = state.players[idx];
-      const isNext = idx === state.currentPlayer && !state.gameOver;
-      pawns += `<div class="pawn ${isNext ? 'next-up' : ''}" data-pawn="${idx}" style="background:${p.species.color}" title="${p.species.name}">${p.species.emoji}</div>`;
+      const isNext = idx === state.currentPlayer && !state.gameOver && !p.exhausted;
+      const exh = p.exhausted ? ' exhausted' : '';
+      pawns += `<div class="pawn${isNext ? ' next-up' : ''}${exh}" data-pawn="${idx}" style="background:${p.species.color}" title="${p.species.name}${p.exhausted ? ' (exhausted)' : ''}">${p.species.emoji}</div>`;
     }
-    html += `<div class="time-cell"><div class="cell-num">${i}</div><div class="pawn-stack">${pawns}</div></div>`;
+    const isLapMark = (i === 0); // visual mark at the lap boundary
+    html += `<div class="time-cell${isLapMark ? ' lap-mark' : ''}"><div class="cell-num">${i}</div><div class="pawn-stack">${pawns}</div></div>`;
   }
   wrap.innerHTML = html;
-  // FLIP: for each pawn that existed before and moved, set initial transform to its old offset
-  // then transition back to identity.
+  // FLIP animation. Skip for pawns whose timePos crossed a lap boundary (the visual jumps from
+  // near LAP_LENGTH-1 back to a low position; sliding linearly would look like backwards motion).
   for (const el of wrap.querySelectorAll('[data-pawn]')) {
     const old = oldRects[el.dataset.pawn];
     if (!old) continue;
@@ -1094,28 +1202,18 @@ function renderTimeTrack() {
     const dx = old.left - cur.left;
     const dy = old.top - cur.top;
     if (dx === 0 && dy === 0) continue;
+    // If the slide would be very long horizontally (e.g., crossed wrap), skip animation.
+    if (Math.abs(dx) > 300) continue;
     el.style.transition = 'none';
     el.style.transform = `translate(${dx}px, ${dy}px)`;
-    // Force reflow so the next style change actually transitions.
     void el.offsetWidth;
     el.style.transition = 'transform 450ms cubic-bezier(0.34, 1.2, 0.64, 1)';
     el.style.transform = '';
   }
 }
 
-// Scroll the time track so the leftmost pawn (smallest timePos) sits near the left edge.
-// Called at the start of each turn — not on every render — so the user can watch pawns
-// advance during a turn without the view jumping.
-function scrollTimeTrackToLeftmost() {
-  const wrap = document.getElementById('time-track');
-  if (!wrap || !state) return;
-  const minPos = Math.min(...state.players.map(p => p.timePos));
-  const CELL_WIDTH = 33;   // 32px cell + 1px gap
-  const LEFT_PADDING = 16; // small inset so the pawn isn't flush with the edge
-  setTimeout(() => {
-    wrap.scrollLeft = Math.max(0, minPos * CELL_WIDTH - LEFT_PADDING);
-  }, 0);
-}
+// Track now shows a fixed LAP_LENGTH cells; no scrolling needed.
+function scrollTimeTrackToLeftmost() { /* no-op */ }
 
 function renderMatCard(card, opts = {}) {
   const m = MATERIALS[card.material];
@@ -1236,6 +1334,9 @@ function renderRiver() {
 
 function prerivCardClickOpts(slotIdx) {
   if (!prerivSlotSelectable(slotIdx)) return {};
+  if (state.phase === 'flush-pick-card') {
+    return { selectable: true, onClick: `humanSelectFlushTarget(${slotIdx})` };
+  }
   return { selectable: true, onClick: `humanSelectPrerivCard(${slotIdx})` };
 }
 
@@ -1245,6 +1346,7 @@ function prerivSlotSelectable(slotIdx) {
   const human = state.players.find(p => p.isHuman);
   const isHumanTurn = human && state.currentPlayer === human.idx;
   if (state.phase === 'select-preriv-card') return true;
+  if (state.phase === 'flush-pick-card') return true;
   if (state.phase === 'choose-action' && isHumanTurn && human.supply > 0) return true;
   return false;
 }
@@ -1393,6 +1495,8 @@ function renderActionPanel() {
         <button onclick="humanChooseAction('preriv')" ${(cur.supply > 0 && hasPreriv) ? '' : 'disabled'}>2. Pull upstream card (1–3⏳)</button>
         <button onclick="humanChooseAction('browse')" ${state.structDeck.length > 0 ? '' : 'disabled'}>3. Browse N (N⏳)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx))) ? '' : 'disabled'}>4. Build a structure</button>
+        <button onclick="humanChooseAction('flush')" ${(hasPreriv || state.matDeck.length > 0) ? '' : 'disabled'}>5. Flush upstream (5⏳)</button>
+        ${state.endgame ? `<button class="ghost" onclick="humanRetire()">Retire (endgame)</button>` : ''}
       </div>
       <div class="action-hint">Tip: click any river or upstream card to auction it, or any buildable structure in your hand to build it.</div>`;
   } else if (state.phase === 'select-auction-card') {
@@ -1406,6 +1510,11 @@ function renderActionPanel() {
       <div class="action-buttons">
         <span class="action-hint">Click an upstream card. Move cost depends on the slot (3⏳ / 2⏳ / 1⏳).</span>
         <button class="ghost" onclick="humanCancelAction()">Cancel</button>
+      </div>`;
+  } else if (state.phase === 'flush-pick-card') {
+    html = `<div class="action-panel-title">Pick which fresh upstream card to auction</div>
+      <div class="action-buttons">
+        <span class="action-hint">Upstream just refilled. Click any of the new cards to auction it for free (1⏳/item).</span>
       </div>`;
   } else if (state.phase === 'select-build') {
     html = `<div class="action-panel-title">Pick a structure to build</div>
@@ -1554,13 +1663,21 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   const bids = {};
   for (const p of state.players) {
     if (p.isHuman) continue;
+    if (p.exhausted || p.out) { bids[p.idx] = 0; continue; }
     const minBid = (p.idx === triggerPlayerIdx) ? minBidTrigger : 0;
     bids[p.idx] = aiDecideBid(p.idx, card, minBid);
   }
   const human = state.players.find(p => p.isHuman);
   if (human) {
-    const minBid = (human.idx === triggerPlayerIdx) ? minBidTrigger : 0;
-    bids[human.idx] = await humanBidForAuction(card, human, minBid);
+    if (human.out) {
+      bids[human.idx] = 0;
+    } else if (human.exhausted) {
+      bids[human.idx] = 0;
+      log(`💤 ${speciesLabel(human)} is exhausted — auto-passes (bid 0).`);
+    } else {
+      const minBid = (human.idx === triggerPlayerIdx) ? minBidTrigger : 0;
+      bids[human.idx] = await humanBidForAuction(card, human, minBid);
+    }
   }
 
   // Compact bid summary for the log
@@ -1840,13 +1957,22 @@ function aiChooseAction(playerIdx) {
     }
   }
 
-  // 4) Last resort: browse if possible
+  // 4) Flush upstream when nothing in it matches our needs (or when stuck with empty deck).
+  const upstreamHasNeeded = state.prerivCards.some(c => c && needs[c.material] > 0);
+  const upstreamHasAny = state.prerivCards.some(c => c !== null);
+  if (upstreamHasAny && !upstreamHasNeeded) {
+    if (state.matDeck.length === 0 || p.supply > 0) {
+      return { type: 'flush' };
+    }
+  }
+
+  // 5) Last resort: browse if possible
   if (state.structDeck.length > 0) {
     const N = Math.min(1, state.structDeck.length);
     return { type: 'browse', n: N };
   }
 
-  // 5) Pass
+  // 6) Pass
   return { type: 'pass' };
 }
 
@@ -1998,7 +2124,49 @@ function humanChooseAction(type) {
   } else if (type === 'build') {
     state.phase = 'select-build';
     render();
+  } else if (type === 'flush') {
+    humanFlushUpstream().then(() => humanResolver && humanResolver());
   }
+}
+
+async function humanFlushUpstream() {
+  state.lastHumanActionType = 'flush';
+  const human = state.players.find(p => p.isHuman);
+  advancePlayer(human.idx, 5);
+  log(`🌀 ${speciesLabel(human)} spends 5⏳ to flush the upstream queue.`);
+  // 1) Discard upstream cards.
+  for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
+  // 2) Refill upstream from deck.
+  for (let i = 0; i < PRERIV_SLOTS; i++) {
+    if (state.matDeck.length === 0) break;
+    const c = state.matDeck.pop();
+    c.slot = 'pre';
+    state.prerivCards[i] = c;
+  }
+  // 3) Prompt human to pick one upstream card to auction (free trigger; bid normally).
+  if (state.prerivCards.every(c => c === null)) {
+    state.phase = 'idle';
+    render();
+    return;
+  }
+  state.phase = 'flush-pick-card';
+  render();
+  await new Promise(resolve => { state._flushPickResolver = resolve; });
+}
+
+function humanSelectFlushTarget(slotIdx) {
+  if (state.phase !== 'flush-pick-card') return;
+  const card = state.prerivCards[slotIdx];
+  if (!card) return;
+  const human = state.players.find(p => p.isHuman);
+  log(`🎬 ${speciesLabel(human)} picks Upstream ${slotIdx + 1} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}⏳/item) to auction.`);
+  state.phase = 'idle';
+  render();
+  runAuction(card, human.idx, 1).then(() => {
+    const r = state._flushPickResolver;
+    state._flushPickResolver = null;
+    if (r) r();
+  });
 }
 
 function humanCancelAction() {
@@ -2008,7 +2176,15 @@ function humanCancelAction() {
   render();
 }
 
+function humanRetire() {
+  state.lastHumanActionType = 'retire';
+  state.phase = 'idle';
+  render();
+  if (humanResolver) humanResolver();
+}
+
 function humanSelectAuctionCard(cardId) {
+  state.lastHumanActionType = 'auction';
   const card = state.riverCards.find(c => c.id === cardId);
   if (!card || uncoveredIcons(card) === 0) return;
   const human = state.players.find(p => p.isHuman);
@@ -2020,6 +2196,7 @@ function humanSelectAuctionCard(cardId) {
 }
 
 function humanSelectPrerivCard(slotIdx) {
+  state.lastHumanActionType = 'preriv';
   const card = state.prerivCards[slotIdx];
   if (!card) return;
   const human = state.players.find(p => p.isHuman);
@@ -2033,6 +2210,7 @@ function humanSelectPrerivCard(slotIdx) {
 }
 
 function humanConfirmBrowseN() {
+  state.lastHumanActionType = 'browse';
   const N = parseInt(document.getElementById('browse-n').value) || 1;
   if (N < 1) return;
   const human = state.players.find(p => p.isHuman);
@@ -2081,6 +2259,7 @@ function humanConfirmBrowseKeep() {
 }
 
 function humanSelectBuild(handIdx) {
+  state.lastHumanActionType = 'build';
   const human = state.players.find(p => p.isHuman);
   const struct = human.hand[handIdx];
   const wbm = playerWorkersByMaterial(state, human.idx);
@@ -2264,48 +2443,89 @@ function scheduleTurn() {
 
 async function runOneTurn() {
   if (state.gameOver) return;
+  // Endgame trigger: when the material deck empties, snap pawns to spaces 1..N.
+  if (!state.endgame && state.matDeck.length === 0) {
+    triggerEndgame();
+    render();
+  }
+  // If everyone's out, end game.
+  if (state.endgame && state.players.every(p => p.out)) { showGameOver(); return; }
   state.currentPlayer = pickNextPlayer();
+  if (state.currentPlayer === -1) { showGameOver(); return; }
   const p = state.players[state.currentPlayer];
   const space = p.timePos;
   log(`— ${speciesLabel(p)} steps up at time ${space}.`);
   render();
   scrollTimeTrackToLeftmost();
 
+  let actionType = null;
   if (p.isHuman) {
     state.phase = 'choose-action';
+    state.lastHumanActionType = null;
     render();
     await awaitHuman();
+    actionType = state.lastHumanActionType;
   } else {
-    // Decide first. If a build is possible, that's the action — DON'T recall first
-    // (call-home would steal the very workers we're about to spend on the build).
     let action = aiChooseAction(p.idx);
     if (action.type !== 'build') {
       aiCallHomeIfNeeded(p.idx);
       aiForceRecallIfStuck(p.idx);
-      // Re-pick after recall (the action might be the same, but supply is now different).
       action = aiChooseAction(p.idx);
     }
     render();
     await sleep(500);
     await executeAIAction(p.idx, action);
+    actionType = action.type;
   }
 
   cleanupShoreline();
+
+  // Endgame removal: pass or reach/exceed track end.
+  if (state.endgame && !p.out) {
+    const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
+    const passed = actionType === 'pass' || actionType === 'retire';
+    if (reachedEnd || passed) {
+      p.out = true;
+      log(`🏁 ${speciesLabel(p)} retires from the endgame${reachedEnd ? ' (reached space ' + ENDGAME_TRACK_END + ')' : ''}.`);
+    }
+  }
   state.phase = 'idle';
   render();
 
-  // Check game end
-  if (checkGameEnd()) {
-    showGameOver();
-    return;
-  }
+  if (state.endgame && state.players.every(pp => pp.out)) { showGameOver(); return; }
+  if (checkGameEnd()) { showGameOver(); return; }
 
-  // Check if same player keeps going (still on top of lowest space)
   const next = pickNextPlayer();
   if (next === p.idx) {
     log(`↩ ${speciesLabel(p)} still on top of the lowest space — takes another turn.`);
   }
   scheduleTurn();
+}
+
+function aiChooseFlushTarget(playerIdx) {
+  const p = state.players[playerIdx];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  for (const s of p.hand) {
+    for (const m in s.cost) {
+      const deficit = Math.max(0, s.cost[m] - (wbm[m] || 0));
+      needs[m] = Math.max(needs[m], deficit);
+    }
+  }
+  let best = -1, bestScore = -Infinity;
+  for (let i = 0; i < state.prerivCards.length; i++) {
+    const c = state.prerivCards[i];
+    if (!c) continue;
+    const need = needs[c.material];
+    const got = Math.min(uncoveredIcons(c), p.supply, need);
+    const score = need * got;
+    if (score > bestScore) { bestScore = score; best = i; }
+  }
+  if (best === -1) {
+    for (let i = 0; i < state.prerivCards.length; i++) if (state.prerivCards[i] !== null) return i;
+  }
+  return best;
 }
 
 async function executeAIAction(playerIdx, action) {
@@ -2338,6 +2558,28 @@ async function executeAIAction(playerIdx, action) {
     log(`🎬 ${speciesLabel(p)} spends ${moveCost}⏳ to auction Upstream ${action.slotIdx + 1} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}⏳/item).`);
     render();
     await sleep(300);
+    await runAuction(card, playerIdx, 1);
+    return;
+  }
+  if (action.type === 'flush') {
+    advancePlayer(playerIdx, 5);
+    log(`🌀 ${speciesLabel(p)} spends 5⏳ to flush the upstream queue.`);
+    // Discard upstream
+    for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
+    // Refill from deck
+    for (let i = 0; i < state.prerivCards.length; i++) {
+      if (state.matDeck.length === 0) break;
+      const c = state.matDeck.pop();
+      c.slot = 'pre';
+      state.prerivCards[i] = c;
+    }
+    render();
+    await sleep(300);
+    // Pick best of fresh upstream and auction it (no extra time cost).
+    const targetIdx = aiChooseFlushTarget(playerIdx);
+    if (targetIdx === -1) return;
+    const card = state.prerivCards[targetIdx];
+    log(`🎬 ${speciesLabel(p)} picks Upstream ${targetIdx + 1} ${MATERIALS[card.material].name} to auction (${UPSTREAM_AUCTION_COST}⏳/item).`);
     await runAuction(card, playerIdx, 1);
     return;
   }

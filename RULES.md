@@ -11,7 +11,7 @@ A 2–4 player card game in which rival semi-aquatic mammals — **beavers, sea 
 - **Shoreline.** A column past the river where graduated cards collect. Shoreline cards can't be auctioned; their icon counts no longer matter. Workers still on them can be spent on builds. A shoreline card with no workers left is removed.
 - **Structure deck.** Cards each show a structure, the materials required to build it, the time cost to build, and a victory-point value.
 - **Worker tokens.** Each player gets **8 meeples** of their species.
-- **Time track.** A long shared track with one pawn per player. Sized so no player runs out of room.
+- **Time track.** A 60-space loop with one pawn per player. Pawns advance forward, wrapping back to 0 after space 59. If a pawn is *lapped* (caught up to from behind by another pawn), it gets flipped over and **exhausted** — it sits out, can't take turns, and can't bid in auctions, until the lapper passes it again (a second time around). The next "pass" wakes it back up.
 
 ## Setup
 
@@ -26,7 +26,7 @@ Score the most victory points from built structures. Tiebreaker: fewer spaces ad
 
 ## Turn order
 
-There are no rounds. The next player to act is whoever's pawn is on the **lowest space** of the time track; if pawns share that space, the one **on top of the stack** acts first. A pawn moving onto a space stacks on top.
+There are no rounds. The next player to act is whoever's *non-exhausted* pawn is on the **lowest space** of the time track; if pawns share that space, the one **on top of the stack** acts first. A pawn moving onto a space stacks on top. Exhausted pawns are skipped until they're revived by the next lap pass.
 
 ## Your turn
 
@@ -38,6 +38,7 @@ Then take exactly **one** action. Every action advances your pawn forward by its
 2. **Pull a pre-river card into the river — 1, 2, or 3 time.** Choose a card in the pre-river queue and pay the move cost on its slot (1t for slot 1, 2t for slot 2, 3t for slot 3). The card moves into River space 1, and an auction immediately runs on it at the River-1 rate of 1t/item. You must bid at least one worker.
 3. **Browse the structure deck — N time (you choose N).** Draw N structure cards, then discard N cards from your hand (any mix of new draws and old). Discards go face-down out of play.
 4. **Build a structure — time printed on the card.** For each material listed, pick up that many of *your* workers from cards of the matching type and return them to your supply. Drop a blank on each uncovered river-card icon. (Shoreline cards don't need blanks.) Place the structure face-up in front of you for scoring, then draw a replacement structure card so your hand returns to 3.
+5. **Flush the upstream — 5 time.** Discard all cards currently in the upstream queue (out of game). Refill the queue from the top of the deck (revealing 3 fresh cards). Pick one of those new cards and run an auction on it at the upstream rate (1t/item); triggering this auction is *free* — the 5⏳ already paid covers it — but you still pay for your own bid normally. The other two newly-revealed upstream cards stay in the queue. After the auction settles, the auctioned card's slot refills as usual. If the deck has fewer than 3 cards left when you flush, the queue refills with whatever's available.
 
 After your action resolves (and any auction settles), check the time track again. If you're still on top of the lowest occupied space, take another turn.
 
@@ -87,13 +88,26 @@ When a card reaches the shoreline, return any blanks on it to the pool. Workers 
 
 Spending or recalling a worker from a river card does *not* move the card — it just leaves a blank on the icon. The card keeps drifting normally. New material cards only enter the river by being pulled out of the pre-river queue.
 
-## Game end
+## Getting lapped
 
-The game ends after a turn in which **all** of the following are true:
+The time track wraps around every 60 spaces. If your pawn is at space N and another player's pawn passes you (catches up to space N from behind, having gone around the loop), you're **lapped** — flip your pawn upside-down and sit out:
 
-- The material deck is empty.
-- The pre-river queue is empty.
-- No river card has any uncovered icons left.
-- No player's hand contains a structure they could still build with their current workers (on the river or shoreline).
+- Your pawn doesn't take turns. The next non-exhausted pawn at the lowest space acts.
+- You can't bid on auctions while exhausted; you implicitly bid 0.
 
-Total the victory points on each player's built structures. Highest total wins; ties broken by fewer spaces advanced on the time track.
+You stay exhausted until the player who lapped you **passes you again** (a second loop). At that moment, flip your pawn back upright; you can act and bid as normal. If they lap you a third time, you're exhausted again — and so on.
+
+Multiple lappers stack: if two different opponents have lapped you and only one has caught back up, you stay exhausted until the other passes you too.
+
+## Endgame & game end
+
+The moment the **material deck runs out**, the endgame begins:
+
+1. Move all pawns to spaces 1, 2, 3, … on the time track, preserving their relative order (the player with the lowest pre-endgame time sits at 1, next at 2, and so on). Lap-shadow / exhaustion is cleared.
+2. Play continues with the same turn order (lowest non-retired pawn acts next; ties → top of stack). All actions are still legal: auctioning river cards, pulling upstream, browsing, building, and flushing the upstream queue (the flush still pays 5⏳ but skips the deck-draw step when the deck is empty — it just clears upstream and ends).
+3. A player **retires** (and their pawn is removed) when:
+   - their action advances them to space 59 or beyond, **or**
+   - they pass (have no productive action) — this typically signals they've used up their hand and material supply.
+4. Retired players don't take turns and don't bid in auctions; their built structures stay on the table for scoring.
+
+The game ends as soon as **every player has retired**. Total the victory points on each player's built structures. Highest total wins; ties broken by fewer spaces the retired pawn ended on (i.e., whoever retired earliest).
