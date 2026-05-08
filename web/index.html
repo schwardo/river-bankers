@@ -873,23 +873,18 @@ const MATERIALS = {
 const MAT_KEYS = Object.keys(MATERIALS);
 
 // Per-material tiered deck (tuned via sim.js):
-//   "always"  — in deck for any player count (4 cards/mat: [4,5,6,7] icons)
-//   "3+"      — added when numPlayers >= 3   (1 card/mat: [8] icons)
-//   "4P only premium" — added when numPlayers === 4, asymmetric across mats,
-//                       big icon counts to absorb 4-player demand without
-//                       inflating jam rate.
-// Counts: 2P=24 cards, 3P=30 cards, 4P=34 cards.
-const ALWAYS_ICONS = [4, 5, 6, 7];
-const TIER_3PLUS_ICONS = [8];
-const PREMIUM_4P = [
-  { material: 'logs',   icons: 10 },
-  { material: 'stones', icons: 10 },
-  { material: 'mud',    icons: 10 },
-  { material: 'reeds',  icons: 9 },
-];
+//   "always"  — in deck for any player count   (3 cards/mat: [5,6,7] icons)
+//   "3+"      — added when numPlayers >= 3     (1 card/mat: [4] icons)
+//   "4+"      — added when numPlayers === 4    (1 card/mat: [8] icons)
+// Counts: 2P=18 cards, 3P=24 cards, 4P=30 cards.
+const ALWAYS_ICONS = [5, 6, 7];
+const TIER_3PLUS_ICONS = [4];
+const TIER_4PLUS_ICONS = [8];
 
 function buildMaterialDeck(numPlayers) {
-  const iconCounts = ALWAYS_ICONS.concat(numPlayers >= 3 ? TIER_3PLUS_ICONS : []);
+  const iconCounts = ALWAYS_ICONS
+    .concat(numPlayers >= 3 ? TIER_3PLUS_ICONS : [])
+    .concat(numPlayers >= 4 ? TIER_4PLUS_ICONS : []);
   const deck = [];
   let id = 0;
   for (const m of MAT_KEYS) {
@@ -900,18 +895,6 @@ function buildMaterialDeck(numPlayers) {
         totalIcons: icons,
         slot: null,         // 0..3 in river, 'pre' in pre-river, 'shore', or null in deck
         workers: {},        // playerIdx -> count
-        blanks: 0,
-      });
-    }
-  }
-  if (numPlayers >= 4) {
-    for (const p of PREMIUM_4P) {
-      deck.push({
-        id: 'm' + (id++),
-        material: p.material,
-        totalIcons: p.icons,
-        slot: null,
-        workers: {},
         blanks: 0,
       });
     }
@@ -1831,7 +1814,7 @@ function resolveAuction(card, bids) {
     timeAdvances: {},          // playerIdx -> +time
     outcome: 'no-bids',        // 'no-bids' | 'plenty' | 'jam'
     leftover: 0,
-    cardFate: 'stays',         // 'stays' | 'shoreline-from-plenty' | 'shoreline-graduated' | 'jammed'
+    cardFate: 'stays',         // 'stays' | 'shoreline-from-plenty' | 'shoreline-graduated' | 'jammed' | 'pre-slid-from-plenty'
     cardNewSlot: null,
     cardNewCost: null,
   };
@@ -1859,11 +1842,26 @@ function resolveAuction(card, bids) {
       log(`✅ ${speciesLabel(p)} wins ${bid} icon${bid === 1 ? '' : 's'} (advance ${timeAdvance}🐟).`);
     }
     result.leftover = open - totalBid;
-    if (result.leftover > 0) {
-      log(`🌊 ${result.leftover} icon${result.leftover === 1 ? '' : 's'} unbid — card washes to shoreline.`);
+    if (card.slot === 'pre' && result.leftover > 0) {
+      // Pre-river plenty with leftovers: card slides into River 1 with its
+      // leftover icons (instead of washing to shoreline). Keeps upstream
+      // cards flowing through the river.
+      const m = MATERIALS[card.material];
+      const idx = prerivIndexOf(card);
+      card.slot = 0;
+      state.riverCards.push(card);
+      if (idx !== -1) refillPreriv(idx);
+      log(`💨 ${result.leftover} icon${result.leftover === 1 ? '' : 's'} unbid — ${m.emoji} ${m.name} card drifts into River 1 (${riverSlotCost(0)}🐟/item).`);
+      result.cardFate = 'pre-slid-from-plenty';
+      result.cardNewSlot = card.slot;
+      result.cardNewCost = cardCost(card);
+    } else {
+      if (result.leftover > 0) {
+        log(`🌊 ${result.leftover} icon${result.leftover === 1 ? '' : 's'} unbid — card washes to shoreline.`);
+      }
+      moveCardToShoreline(card);
+      result.cardFate = 'shoreline-from-plenty';
     }
-    moveCardToShoreline(card);
-    result.cardFate = 'shoreline-from-plenty';
   } else {
     result.outcome = 'jam';
     let totalTaken = 0;
@@ -1937,11 +1935,17 @@ async function showAuctionResult(result) {
     </div>`;
   } else if (result.outcome === 'plenty') {
     const leftover = result.leftover;
+    let fateLine;
+    if (result.cardFate === 'pre-slid-from-plenty') {
+      fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The pre-river card <b>drifts into River ${result.cardNewSlot + 1}</b>, where it can be auctioned again at <b>${result.cardNewCost}🐟</b> per item.</p>`;
+    } else if (leftover > 0) {
+      fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid and wash${leftover === 1 ? 'es' : ''} away — the card <b>drifts to the shoreline</b> (taking any workers on it).</p>`;
+    } else {
+      fateLine = `<p>Every open icon was claimed — the card still <b>drifts to the shoreline</b> (any further bids would find it empty anyway).</p>`;
+    }
     outcomeBox = `<div class="result-box plenty">
       <p><b>🌟 Plenty to go around.</b> Total bid ${result.totalBid} ≤ ${result.openBefore} open icons, so every bidder took exactly what they bid.</p>
-      ${leftover > 0
-        ? `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid and wash${leftover === 1 ? 'es' : ''} away — the card <b>drifts to the shoreline</b> (taking any workers on it).</p>`
-        : `<p>Every open icon was claimed — the card still <b>drifts to the shoreline</b> (any further bids would find it empty anyway).</p>`}
+      ${fateLine}
     </div>`;
   } else { // jam
     let fateLine;
