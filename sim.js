@@ -31,26 +31,26 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built, draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
-  { name: 'Watchtower',     cost: { logs: 5, stones: 2 },            time: 4, vp: 8 },
+  { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top card of the material deck at any time.' },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 5, effect: 'End game: +1 VP per shoreline card with at least one of your workers.' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
   { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 5, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1 fish.' },
-  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5 },
-  { name: 'Boat Dock',      cost: { logs: 4, reeds: 1 },             time: 3, vp: 5 },
+  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5, effect: 'At the start of your turn you may pay 1 fish to replace a pre-river card with the top of the material deck.' },
+  { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 5, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7, effect: 'When you would pass 0 on the fish track, stop at space 1 instead.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5, effect: 'When built, look at the top 5 material cards and rearrange them in any order.' },
   { name: 'Flush Channel',  cost: { mud: 4, reeds: 1 },              time: 3, vp: 5, effect: 'When built, trigger a free upstream-flush (no 5 fish cost).' },
-  { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5 },
-  { name: 'Treaty Stone',   cost: { stones: 6 },                     time: 4, vp: 7 },
+  { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5, effect: 'Once per game, your build costs 1 fewer of one listed material (your choice).' },
+  { name: 'Granite Spire',  cost: { stones: 6 },                     time: 4, vp: 7 },
   { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built, take an immediate extra turn.' },
   { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you call workers home, slide back 1 fish per worker recalled.' },
-  { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8 },
+  { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space upstream.' },
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
-  { name: 'Granite Spire',  cost: { stones: 4, clay: 1 },            time: 3, vp: 5 },
+  { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 5, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
   { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 7, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
-  { name: 'Twig Bridge',    cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5 },
+  { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5, effect: 'At the start of your turn you may pay 1 fish to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 6, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
 ];
@@ -211,18 +211,17 @@ function playerWorkersByMaterial(state, playerIdx) {
   return out;
 }
 function canBuild(structure, workersByMat, p = null) {
-  const reedMult = (p && hasEffect(p, 'Cattail Marsh')) ? 2 : 1;
-  let deficit = 0;
-  for (const m in structure.cost) {
-    const have = (workersByMat[m] || 0) * (m === 'reeds' ? reedMult : 1);
-    if (have < structure.cost[m]) deficit += structure.cost[m] - have;
+  if (!p) {
+    for (const m in structure.cost) {
+      if ((workersByMat[m] || 0) < structure.cost[m]) return false;
+    }
+    return true;
   }
-  if (deficit === 0) return true;
-  if (p && hasEffect(p, 'Charcoal Pit') && deficit <= 1) {
-    const claySlack = (workersByMat.clay || 0) - (structure.cost.clay || 0);
-    if (claySlack >= 1) return true;
+  const { eff } = effectiveBuildCost(structure, p, workersByMat);
+  for (const m in eff) {
+    if ((workersByMat[m] || 0) < eff[m]) return false;
   }
-  return false;
+  return true;
 }
 
 function effectiveBuildCost(struct, p, wbm) {
@@ -244,7 +243,17 @@ function effectiveBuildCost(struct, p, wbm) {
       }
     }
   }
-  return eff;
+  let granaryUsed = false;
+  if (hasEffect(p, 'Granary') && !p.granaryUsed) {
+    for (const m of Object.keys(eff)) {
+      if ((wbm[m] || 0) < eff[m]) {
+        eff[m] -= 1;
+        granaryUsed = true;
+        break;
+      }
+    }
+  }
+  return { eff, granaryUsed };
 }
 
 // Per-material tiers (shift-2 deck — tuned via sweepDeck under rule (c)):
@@ -309,6 +318,9 @@ function newGame(numPlayers, workersPerPlayer = 8) {
       built: [],
       exhausted: false,
       out: false,
+      granaryUsed: false,
+      floodgateUsed: false,
+      spyMoundUsed: false,
     });
   }
   const matDeck = buildMaterialDeck(numPlayers);
@@ -504,11 +516,43 @@ function callWorkersHome(state, playerIdx, recallSpec) {
 // =============================================================================
 function runAuction(state, card, triggerPlayerIdx, minBidTrigger) {
   state.metrics.auctions++;
+  // Floodgate: triggerer (only) auto-uses if available and card.slot >= 1.
+  const trig = state.players[triggerPlayerIdx];
+  if (hasEffect(trig, 'Floodgate') && !trig.floodgateUsed && typeof card.slot === 'number' && card.slot > 0) {
+    card.slot -= 1;
+    trig.floodgateUsed = true;
+  }
   const bids = {};
+  // Spy Mound: a player auto-defers to bid LAST. Only one Spy Mound user per auction.
+  let deferred = -1;
+  for (const p of state.players) {
+    if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out) {
+      // Defer if uncovered icons >= 4 (high-value auction).
+      if (uncoveredIcons(card) >= 4) {
+        deferred = p.idx;
+        break;
+      }
+    }
+  }
   for (const p of state.players) {
     if (p.exhausted || p.out) { bids[p.idx] = 0; continue; }
+    if (p.idx === deferred) continue;
     const minBid = (p.idx === triggerPlayerIdx) ? minBidTrigger : 0;
     bids[p.idx] = aiDecideBid(state, p.idx, card, minBid);
+  }
+  if (deferred !== -1) {
+    const p = state.players[deferred];
+    p.spyMoundUsed = true;
+    const open = uncoveredIcons(card);
+    const others = Object.values(bids).reduce((s, b) => s + b, 0);
+    let bid;
+    if (others < open) {
+      bid = Math.min(p.supply, open - others);
+    } else {
+      bid = (deferred === triggerPlayerIdx) ? Math.max(minBidTrigger, 1) : 0;
+    }
+    if (deferred === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
+    bids[p.idx] = bid;
   }
   resolveAuction(state, card, bids);
 }
@@ -559,7 +603,9 @@ function resolveAuction(state, card, bids) {
         p.supply -= got;
         card.workers[idx] = (card.workers[idx] || 0) + got;
       }
-      const timeAdvance = bid * playerCardCost(state, card, idx);
+      let billable = bid;
+      if (got < bid && hasEffect(p, 'Otter Raft')) billable = Math.max(0, bid - 1);
+      const timeAdvance = billable * playerCardCost(state, card, idx);
       advancePlayer(state, idx, timeAdvance);
       state.metrics.iconsClaimed += got;
       state.metrics.nonZeroBidders++;
@@ -670,6 +716,38 @@ function aiChooseAction(state, playerIdx) {
   return { type: 'pass' };
 }
 
+// Heron Roost / Driftwood Snag: optional start-of-turn abilities. Auto-fire for AI
+// when conditions are met. Each costs 1 fish.
+function aiStartOfTurnAbilities(state, playerIdx) {
+  const p = state.players[playerIdx];
+  // Heron Roost: replace a pre-river card whose material isn't in this AI's hand.
+  if (hasEffect(p, 'Heron Roost') && state.matDeck.length > 0 && p.timePos < ENDGAME_TRACK_END - 1) {
+    const myMats = new Set();
+    for (const s of p.hand) for (const m in s.cost) myMats.add(m);
+    const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
+    if (target !== -1) {
+      const newCard = state.matDeck.pop();
+      newCard.slot = 'pre';
+      state.prerivCards[target] = newCard;
+      state.metrics.iconsSpawned += newCard.totalIcons;
+      p.timePos += 1; // 1 fish cost
+    }
+  }
+  // Driftwood Snag: drop a blank on a card with the most uncovered icons (disruption).
+  if (hasEffect(p, 'Driftwood Snag') && p.timePos < ENDGAME_TRACK_END - 1) {
+    const myMats = new Set();
+    for (const s of p.hand) for (const m in s.cost) myMats.add(m);
+    // Only block cards we don't need ourselves.
+    const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
+      .filter(c => uncoveredIcons(c) >= 4 && !myMats.has(c.material));
+    if (cands.length > 0) {
+      const target = cands.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b);
+      target.blanks += 1;
+      p.timePos += 1; // 1 fish cost
+    }
+  }
+}
+
 function aiCallHomeIfNeeded(state, playerIdx) {
   const p = state.players[playerIdx];
   if (p.supply >= 3) return;
@@ -772,7 +850,8 @@ function performBuild(state, playerIdx, handIdx) {
   const p = state.players[playerIdx];
   const struct = p.hand[handIdx];
   const wbm = playerWorkersByMaterial(state, playerIdx);
-  const effCost = effectiveBuildCost(struct, p, wbm);
+  const { eff: effCost, granaryUsed } = effectiveBuildCost(struct, p, wbm);
+  if (granaryUsed) p.granaryUsed = true;
   for (const m in effCost) {
     let need = effCost[m];
     for (const c of state.shorelineCards) {
@@ -987,6 +1066,7 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
     state.metrics.turns++;
 
     const p = state.players[cur];
+    aiStartOfTurnAbilities(state, p.idx);
     let action = aiChooseAction(state, p.idx);
     if (action.type !== 'build') {
       aiCallHomeIfNeeded(state, p.idx);
