@@ -22,24 +22,24 @@ let MAT_KEYS = ORIG_MATERIALS.slice();
 // Disable a single card's effect for ablation via setStructureEffectDisabled.
 const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along).' },
-  { name: 'Lodge',          cost: { logs: 3, reeds: 1 },             time: 2, vp: 4 },
-  { name: 'Reed Snare',     cost: { reeds: 2, stones: 1 },           time: 2, vp: 3 },
+  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 4, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
+  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a pre-river card to River 1 for free; an auction immediately runs on it at 1 fish/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 8, effect: 'End game: +1 VP per shoreline card on the table.' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
   { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 1 fewer fish (min 1).' },
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
-  { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5 },
+  { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built, draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
   { name: 'Watchtower',     cost: { logs: 5, stones: 2 },            time: 4, vp: 8 },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 5, effect: 'End game: +1 VP per shoreline card with at least one of your workers.' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
   { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 5, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
-  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3 },
+  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1 fish.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5 },
   { name: 'Boat Dock',      cost: { logs: 4, reeds: 1 },             time: 3, vp: 5 },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7, effect: 'When you would pass 0 on the fish track, stop at space 1 instead.' },
-  { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5 },
+  { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5, effect: 'When built, look at the top 5 material cards and rearrange them in any order.' },
   { name: 'Flush Channel',  cost: { mud: 4, reeds: 1 },              time: 3, vp: 5, effect: 'When built, trigger a free upstream-flush (no 5 fish cost).' },
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5 },
   { name: 'Treaty Stone',   cost: { stones: 6 },                     time: 4, vp: 7 },
@@ -51,7 +51,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Granite Spire',  cost: { stones: 4, clay: 1 },            time: 3, vp: 5 },
   { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 7, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
   { name: 'Twig Bridge',    cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5 },
-  { name: 'Stone Hearth',   cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6 },
+  { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 6, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
 ];
 
@@ -97,9 +97,26 @@ function playerCardCost(state, card, playerIdx) {
   return base;
 }
 
-// Pass-0 freebies — Phase 2 implements Wood Pile / Hollowed-out Log here.
 function firePassZeroEffects(state, playerIdx, count) {
-  // Placeholder.
+  const p = state.players[playerIdx];
+  for (let i = 0; i < count; i++) {
+    if (hasEffect(p, 'Wood Pile')) {
+      const target = state.riverCards.find(c => c.material === 'logs' && uncoveredIcons(c) > 0);
+      if (target && p.supply > 0) {
+        p.supply -= 1;
+        target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
+        p.timePos += 1;
+      }
+    }
+    if (hasEffect(p, 'Hollowed-out Log')) {
+      const target = state.riverCards.find(c => workersOnCard(c, playerIdx) > 0);
+      if (target) {
+        target.workers[playerIdx] -= 1;
+        if (target.workers[playerIdx] === 0) delete target.workers[playerIdx];
+        p.supply += 1;
+      }
+    }
+  }
 }
 
 let STRUCTURE_TEMPLATES = BASE_STRUCTURE_TEMPLATES.slice();
@@ -844,6 +861,41 @@ function fireOnBuildEffect(state, playerIdx, struct) {
       p.supply -= place;
       target.workers[playerIdx] = (target.workers[playerIdx] || 0) + place;
     }
+    return;
+  }
+  if (struct.name === 'Snag Pile') {
+    const targetIdx = aiChooseFlushTarget(state, playerIdx);
+    if (targetIdx === -1) return;
+    const card = state.prerivCards[targetIdx];
+    if (!card) return;
+    runAuction(state, card, playerIdx, 1);
+    return;
+  }
+  if (struct.name === 'Vine Lattice') {
+    const drawCount = Math.min(3, state.structDeck.length);
+    if (drawCount === 0) return;
+    const drawn = [];
+    for (let i = 0; i < drawCount; i++) drawn.push(state.structDeck.pop());
+    const wbm = playerWorkersByMaterial(state, playerIdx);
+    function score(s) {
+      let deficit = 0;
+      for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
+      return s.vp - deficit * 1.5;
+    }
+    drawn.sort((a, b) => score(b) - score(a));
+    p.hand.push(drawn[0]);
+    for (let i = 1; i < drawn.length; i++) state.structDiscard.push(drawn[i]);
+    return;
+  }
+  if (struct.name === 'Stone Pool') {
+    const top = state.matDeck.slice(-5);
+    if (top.length === 0) return;
+    top.sort((a, b) => a.totalIcons - b.totalIcons);
+    state.matDeck.splice(state.matDeck.length - top.length, top.length, ...top);
+    return;
+  }
+  if (struct.name === 'Salt Lick') {
+    // No-op for sim — AI doesn't model opponent hand-knowledge.
     return;
   }
 }
