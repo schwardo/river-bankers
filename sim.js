@@ -10,45 +10,82 @@
 // =============================================================================
 // CONSTANTS
 // =============================================================================
-const MATERIALS = {
-  logs:   {}, stones: {}, reeds:  {}, mud: {}, fish: {},
-};
-const MAT_KEYS = Object.keys(MATERIALS);
+// Mirror the live game (web/index.html). 6 base materials with hand-tuned
+// structure costs. EXTRA_MATERIALS only used by configureMaterials() for
+// testing further additions (e.g., 7-material variants).
+const ORIG_MATERIALS = ['logs', 'stones', 'reeds', 'mud', 'vines', 'clay'];
+const EXTRA_MATERIALS = ['silt', 'bone', 'shells'];
+let MAT_KEYS = ORIG_MATERIALS.slice();
 
-const STRUCTURE_TEMPLATES = [
+const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6 },
   { name: 'Lodge',          cost: { logs: 3, reeds: 1 },             time: 2, vp: 4 },
-  { name: 'Fish Trap',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3 },
+  { name: 'Reed Snare',     cost: { reeds: 2, stones: 1 },           time: 2, vp: 3 },
   { name: 'Stone Bridge',   cost: { stones: 4, logs: 2 },            time: 4, vp: 8 },
   { name: 'Reed Hut',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4 },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5 },
   { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2 },
   { name: 'Mink Burrow',    cost: { mud: 2, reeds: 2 },              time: 2, vp: 4 },
-  { name: 'Spawning Pool',  cost: { fish: 3, reeds: 2 },             time: 3, vp: 5 },
-  { name: 'Smokehouse',     cost: { fish: 4, logs: 2 },              time: 3, vp: 7 },
+  { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5 },
+  { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7 },
   { name: 'Watchtower',     cost: { logs: 5, stones: 2 },            time: 4, vp: 8 },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 5 },
   { name: 'Cattail Patch',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6 },
   { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 5 },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3 },
-  { name: 'Heron Roost',    cost: { reeds: 3, fish: 2 },             time: 3, vp: 5 },
+  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5 },
   { name: 'Boat Dock',      cost: { logs: 4, reeds: 1 },             time: 3, vp: 5 },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7 },
-  { name: 'Tide Pool',      cost: { stones: 3, fish: 2 },            time: 3, vp: 5 },
+  { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5 },
   { name: 'River Bend',     cost: { mud: 4, reeds: 1 },              time: 3, vp: 5 },
-  { name: 'Granary',        cost: { reeds: 4, stones: 1 },           time: 3, vp: 5 },
+  { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5 },
   { name: 'Treaty Stone',   cost: { stones: 6 },                     time: 4, vp: 7 },
-  { name: 'Royal Lodge',    cost: { logs: 6, reeds: 2 },             time: 5, vp: 10 },
-  { name: 'Otter Den',      cost: { mud: 3, fish: 1 },               time: 2, vp: 4 },
-  { name: 'Floodgate',      cost: { mud: 4, stones: 3 },             time: 4, vp: 8 },
-  { name: 'Trout Run',      cost: { fish: 3, mud: 1 },               time: 2, vp: 4 },
-  { name: 'Sap Drip',       cost: { logs: 2, reeds: 2 },             time: 2, vp: 3 },
-  { name: 'Granite Spire',  cost: { stones: 4, mud: 1 },             time: 3, vp: 5 },
-  { name: 'Salmon Ladder',  cost: { fish: 4, stones: 2 },            time: 4, vp: 7 },
+  { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10 },
+  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4 },
+  { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8 },
+  { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 2, vp: 4 },
+  { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3 },
+  { name: 'Granite Spire',  cost: { stones: 4, clay: 1 },            time: 3, vp: 5 },
+  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 7 },
   { name: 'Twig Bridge',    cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5 },
-  { name: 'Stone Hearth',   cost: { stones: 3, logs: 2, fish: 1 },   time: 3, vp: 6 },
-  { name: 'Pearl Cache',    cost: { fish: 2, stones: 2, mud: 2 },    time: 3, vp: 6 },
+  { name: 'Stone Hearth',   cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6 },
+  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 6 },
 ];
+
+let STRUCTURE_TEMPLATES = BASE_STRUCTURE_TEMPLATES.slice();
+
+// Reseeded LCG so structure remapping is deterministic across games for a given numMats.
+function lcg(seed) {
+  let s = seed >>> 0;
+  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+// Configure global material set + structure templates. Base = 6 (live game).
+// For numMats > 6: each material reference in a base structure has prob
+// (numMats-6)/numMats of being remapped to a new extra material — so demand
+// spreads evenly across all materials.
+function configureMaterials(numMats) {
+  if (numMats < ORIG_MATERIALS.length) throw new Error(`numMats must be >= ${ORIG_MATERIALS.length}`);
+  MAT_KEYS = ORIG_MATERIALS.concat(EXTRA_MATERIALS.slice(0, numMats - ORIG_MATERIALS.length));
+  if (numMats === ORIG_MATERIALS.length) {
+    STRUCTURE_TEMPLATES = BASE_STRUCTURE_TEMPLATES.slice();
+    return;
+  }
+  const extras = EXTRA_MATERIALS.slice(0, numMats - ORIG_MATERIALS.length);
+  const rng = lcg(42);
+  STRUCTURE_TEMPLATES = BASE_STRUCTURE_TEMPLATES.map(s => {
+    const newCost = {};
+    for (const [m, c] of Object.entries(s.cost)) {
+      if (rng() < extras.length / numMats) {
+        const newMat = extras[Math.floor(rng() * extras.length)];
+        newCost[newMat] = (newCost[newMat] || 0) + c;
+      } else {
+        newCost[m] = (newCost[m] || 0) + c;
+      }
+    }
+    return { ...s, cost: newCost };
+  });
+}
 
 const PRERIV_SLOTS = 3;
 const RIVER_SLOTS = 4;
@@ -636,7 +673,8 @@ function checkGameEnd(state) {
 // =============================================================================
 // RUN ONE GAME
 // =============================================================================
-function runGame(numPlayers, iconCounts) {
+function runGame(numPlayers, iconCounts, numMats = ORIG_MATERIALS.length) {
+  configureMaterials(numMats);
   const state = newGame(numPlayers, iconCounts);
   // initial spawned icons (3 upstream)
   for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
@@ -679,19 +717,11 @@ function pad(s, n) { s = String(s); return s.length >= n ? s : s + ' '.repeat(n 
 function padL(s, n) { s = String(s); return s.length >= n ? s : ' '.repeat(n - s.length) + s; }
 
 function sweep() {
-  // Two icon-distribution profiles, each tested at 4..8 cards per material.
-  // Keeps profile averages roughly constant; only the deck size varies.
+  // Sweep material count × cards-per-material with the wider-3-8 icon profile.
+  // The chosen production setting is wider-3-8 @ 5 cards/material, 5 materials.
   const profiles = {
-    baseline: { // avg ~5.0
-      8: [3,4,4,5,5,6,6,7],
-      7: [3,4,5,5,5,6,7],
-      6: [4,4,5,5,6,6],
-      5: [4,4,5,5,6],
-      4: [4,5,5,6],
-    },
-    'wider-3-8': { // avg ~5.5
+    'wider-3-8': {
       8: [3,4,5,5,6,6,7,8],
-      7: [4,5,5,6,6,7,8],
       6: [4,5,6,6,7,8],
       5: [4,5,6,7,8],
       4: [5,6,6,7],
@@ -700,16 +730,18 @@ function sweep() {
   const numP = 3;
   const N = 400;
 
-  console.log(`\nRiver Bankers deck-size sweep (${numP} players, ${N} games per config)\n`);
-  console.log(pad('profile', 11) + pad('cards/mat', 11) + pad(' icons', 26) + padL('totIc', 6) + padL('turns', 7) + padL('aucs', 6) + padL('jam%', 7) + padL('plt%', 7) + padL('nob%', 7) + padL('wstIc', 7) + padL('wst%', 7) + padL('built', 7) + padL('endg%', 7));
-  console.log('-'.repeat(11+11+26+6+7+6+7+7+7+7+7+7+7));
+  console.log(`\nRiver Bankers material-count sweep (${numP} players, ${N} games, wider-3-8 icon profile)\n`);
+  console.log('Live game: 6 materials × 5 cards/material with [4,5,6,7,8] icons (★ row).\n');
+  console.log(pad('mats', 5) + pad('c/mat', 7) + pad('deck', 6) + pad(' icons', 22) + padL('totIc', 6) + padL('turns', 7) + padL('aucs', 6) + padL('jam%', 7) + padL('plt%', 7) + padL('nob%', 7) + padL('wstIc', 7) + padL('wst%', 7) + padL('built', 7) + padL('endg%', 7));
+  console.log('-'.repeat(5+7+6+22+6+7+6+7+7+7+7+7+7+7));
 
-  for (const profileName of Object.keys(profiles)) {
-    for (const cardsPerMat of [8, 7, 6, 5, 4]) {
+  const profileName = 'wider-3-8';
+  for (const numMats of [6, 7, 8]) {
+    for (const cardsPerMat of [8, 6, 5, 4]) {
       const icons = profiles[profileName][cardsPerMat];
-      const totIcons = icons.reduce((s, x) => s + x, 0) * MAT_KEYS.length;
+      const totIcons = icons.reduce((s, x) => s + x, 0) * numMats;
       const trials = [];
-      for (let t = 0; t < N; t++) trials.push(runGame(numP, icons));
+      for (let t = 0; t < N; t++) trials.push(runGame(numP, icons, numMats));
       const turns = avg(trials.map(m => m.turns));
       const auctions = avg(trials.map(m => m.auctions));
       const jamPct = avg(trials.map(m => pct(m.jamAuctions, m.auctions)));
@@ -720,9 +752,10 @@ function sweep() {
       const built = avg(trials.map(m => m.cardsBuilt));
       const endg = avg(trials.map(m => m.endgameTriggered ? 100 : 0));
       console.log(
-        pad(profileName, 11) +
-        pad(`${cardsPerMat} (${cardsPerMat * MAT_KEYS.length} total)`, 11) +
-        pad(' [' + icons.join(',') + ']', 26) +
+        pad(numMats, 5) +
+        pad(cardsPerMat, 7) +
+        pad(numMats * cardsPerMat, 6) +
+        pad(' [' + icons.join(',') + ']', 22) +
         padL(totIcons, 6) +
         padL(turns.toFixed(0), 7) +
         padL(auctions.toFixed(1), 6) +
@@ -738,16 +771,19 @@ function sweep() {
     console.log();
   }
   console.log('Legend:');
-  console.log('  totIc  = total icons in deck (icons sum × 5 materials)');
+  console.log('  mats   = number of materials in play (6 = current; 7+ adds silt/bone/shells via auto-remap)');
+  console.log('  c/mat  = cards per material in the deck');
+  console.log('  deck   = total cards in the material deck');
+  console.log('  totIc  = total icons in deck');
   console.log('  turns  = avg total player-turns per game');
   console.log('  aucs   = avg auctions per game');
-  console.log('  jam%   = % of auctions where total bid > open icons');
-  console.log('  plt%   = % of auctions resolved without jam (and any positive bid)');
-  console.log('  nob%   = % of auctions with no bids');
-  console.log('  wstIc  = avg icons wasted (left uncovered when card hit shoreline)');
+  console.log('  jam%   = auctions where total bid > open icons');
+  console.log('  plt%   = auctions resolved without jam (and any positive bid)');
+  console.log('  nob%   = auctions with no bids');
+  console.log('  wstIc  = avg icons wasted (uncovered when card hit shoreline)');
   console.log('  wst%   = wasted icons as % of total icons spawned');
   console.log('  built  = avg structures built across all players');
-  console.log('  endg%  = % of games that triggered endgame (deck emptied)\n');
+  console.log('  endg%  = % of games that triggered endgame\n');
 }
 
 if (require.main === module) sweep();

@@ -4,7 +4,7 @@ A 2–4 player card game in which rival semi-aquatic mammals — **beavers, sea 
 
 ## Components
 
-- **Material deck.** Cards each show one material (Logs, Stones, Reeds, Mud, Fish) and a row of 3–7 item icons. Cards do *not* carry a printed cost — every cost is determined by where the card sits. Items are not separate tokens; players claim them by placing workers directly on the icons.
+- **Material deck.** Cards each show one material (Logs, Stones, Reeds, Mud, Vines, Clay) and a row of 4–8 item icons. Cards do *not* carry a printed cost — every cost is determined by where the card sits. Items are not separate tokens; players claim them by placing workers directly on the icons.
 - **Blank tokens.** Round chits from a shared pool. A blank is dropped onto any icon a worker leaves behind, marking it as already-sold and removing it from future auctions.
 - **Pre-river queue.** Three numbered slots upstream of the river: **slot 1, 2, 3** counting away from the river. Slot 1 is closest to the river, slot 3 is farthest upstream. Each slot has a fixed *move cost* (1t / 2t / 3t respectively) — pay it to pull whichever card is in that slot down into the river.
 - **River track.** Four spaces. Each river space has a fixed *per-item cost*: **River 1 = 1t/item, River 2 = 2t/item, River 3 = 3t/item, River 4 = 4t/item.** That's how much time each worker you win on a card costs you. Cards enter the river at space 1 (after a pre-river move). **Multiple cards can occupy the same space** — they pile up there. A card only moves when *it itself* loses an auction by jamming: it slides one space downriver, where the per-item cost is one higher. New cards arriving upstream don't push the cards already in the river. Past the fourth (last) space is the **shoreline**.
