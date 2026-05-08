@@ -57,15 +57,15 @@ If the total of all bids is **no more than** the number of uncovered icons, ever
 
 If the total of all bids is **greater than** the number of uncovered icons, the river jams. Nobody simply gets what they asked for. To work out what each player actually takes, look at their bid and ask: "after I subtract *everyone else's* bids from the uncovered icons, how many would still be left for me?" That answer, capped at your own bid (and never less than zero), is what you take.
 
+**You pay for every worker you bid, win or lose.** Slide your pawn forward by `bid × per-item cost` — the full bid count, not just what you clinched. Workers that didn't claim an icon return to your supply (no extra cost), but the time you spent on them is gone. This makes blanket over-bidding to "block" a card expensive and self-correcting.
+
 After resolution, any icons still uncovered stay on the card, and the card slides one space downriver — the per-item cost on it now matches the new space (one higher). If the card was already on the last river space, sliding any further graduates it to the shoreline: it leaves the river entirely (with its workers).
 
-> **Example.** A card on River 2 has 5 uncovered log icons. You bid 4 workers. Your opponent bids 4. Together that's 8 — more than the card has. From your point of view: 5 logs minus your opponent's 4 leaves 1 log for you. From their point of view: 5 logs minus your 4 leaves 1 log for them. You each cover 1 icon with one of your workers and slide your pawn forward by 1 × 2t = 2t (River 2's per-item rate). The 3 uncovered icons stay where they are, and the card slides to River 3, where the rate becomes 3t per item.
+> **Example.** A card on River 2 has 5 uncovered log icons. You bid 4 workers. Your opponent bids 4. Together that's 8 — more than the card has. From your point of view: 5 logs minus your opponent's 4 leaves 1 log for you. From their point of view: 5 logs minus your 4 leaves 1 log for them. You each cover 1 icon with one of your workers; both of you advance 4 × 2t = 8t (River 2's per-item rate × your bid count, even though only 1 of those 4 workers clinched). The 3 uncovered icons stay where they are, and the card slides to River 3.
 
-> **Example.** A card on River 1 has 5 uncovered log icons. You bid 1, opponent bids 6. Together that's 7. From your point of view: 5 logs minus their 6 is negative — you take nothing. From their point of view: 5 logs minus your 1 leaves 4, capped at their bid of 6, so they take 4. They cover 4 icons and advance by 4 × 1t = 4t. 1 icon stays uncovered; the card slides to River 2, where it'll cost 2t per item next time.
+> **Example.** A card on River 1 has 5 uncovered log icons. You bid 1, opponent bids 6. Together that's 7. From your point of view: 5 logs minus their 6 is negative — you take nothing. You still pay 1 × 1t = 1t for the bid. From their point of view: 5 logs minus your 1 leaves 4, capped at their bid of 6, so they take 4. They advance 6 × 1t = 6t (the full bid). 1 icon stays uncovered; the card slides to River 2.
 
-If your bid took nothing, those workers return to your supply at no extra cost.
-
-Workers placed on icons stay there until you spend them on a structure or call them home.
+Workers that didn't clinch an icon return to your supply (the time you spent on them is the only cost). Workers placed on icons stay there until you spend them on a structure or call them home.
 
 ## Card movement summary
 

@@ -1634,15 +1634,19 @@ function resolveAuction(card, bids) {
       if (got > 0) {
         p.supply -= got;
         card.workers[idx] = (card.workers[idx] || 0) + got;
-        const timeAdvance = got * cardCost(card);
-        advancePlayer(idx, timeAdvance);
-        result.takings[idx] = got;
-        result.timeAdvances[idx] = timeAdvance;
-        log(`✅ ${speciesLabel(p)} bid ${bid}, took ${got} (advance ${timeAdvance}⏳).`);
-        totalTaken += got;
-      } else {
-        log(`✗ ${speciesLabel(p)} bid ${bid} but took none.`);
       }
+      // Pay-for-bid: every worker you bid costs time, even those that won nothing.
+      // Workers that didn't clinch an icon return to your supply for free.
+      const timeAdvance = bid * cardCost(card);
+      advancePlayer(idx, timeAdvance);
+      result.takings[idx] = got;
+      result.timeAdvances[idx] = timeAdvance;
+      if (got > 0) {
+        log(`✅ ${speciesLabel(p)} bid ${bid}, took ${got} (advance ${timeAdvance}⏳).`);
+      } else {
+        log(`✗ ${speciesLabel(p)} bid ${bid}, took 0 (advance ${timeAdvance}⏳ for the bid).`);
+      }
+      totalTaken += got;
     }
     result.leftover = open - totalTaken;
     const wasOnLastSlot = card.slot === 3;
@@ -1707,7 +1711,7 @@ async function showAuctionResult(result) {
       fateLine = `<p>${result.leftover} icon${result.leftover === 1 ? '' : 's'} stay${result.leftover === 1 ? 's' : ''} uncovered. The card <b>slides to River ${result.cardNewSlot + 1}</b>, where its per-item cost is <b>${result.cardNewCost}⏳</b>.</p>`;
     }
     outcomeBox = `<div class="result-box jam">
-      <p><b>🌊 River jams.</b> Total bid (${result.totalBid}) exceeded ${result.openBefore} open icons. Each bidder took <code>max(0, ${result.openBefore} − others' bids)</code>, capped at their own bid.</p>
+      <p><b>🌊 River jams.</b> Total bid (${result.totalBid}) exceeded ${result.openBefore} open icons. Each bidder took <code>max(0, ${result.openBefore} − others' bids)</code>, capped at their own bid. <b>Every worker you bid still costs you time</b> even if it didn't clinch an icon — workers that didn't win return to your supply.</p>
       ${fateLine}
     </div>`;
   }
@@ -1750,11 +1754,14 @@ function aiDecideBid(playerIdx, card, minBid) {
   // Blend of total-need and best-single-need
   let target = Math.round((need + maxNeed) / 2);
 
-  // Don't bid more than supply, more than open (no point), or more than 4
+  // Don't bid more than supply, more than open (no point — every over-bid worker
+  // costs time without a chance of clinching), or more than 4.
   target = Math.min(target, p.supply, open, 4);
 
-  // Cost penalty: if per-item cost is high, scale back
+  // Cost penalty: at higher per-item cost, the risk of paying for a bid that jams
+  // is bigger, so trim more aggressively.
   if (cardCost(card) >= 3 && target > 1) target = Math.max(1, target - 1);
+  if (cardCost(card) >= 4 && target > 1) target = Math.max(1, target - 1);
 
   // Random tweak for unpredictability
   const r = Math.random();
@@ -2172,7 +2179,7 @@ function updateBidPreview(cost, supplyBefore, timeBefore) {
   if (tAfter) tAfter.textContent = timeAfter;
   if (tDelta) {
     const delta = timeAfter - timeBefore;
-    tDelta.textContent = v > 0 ? `+${delta}⏳ (max — less if jam)` : 'no time spent';
+    tDelta.textContent = v > 0 ? `+${delta}⏳ (you pay for every bid worker)` : 'no time spent';
   }
 }
 
