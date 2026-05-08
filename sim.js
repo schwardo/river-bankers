@@ -132,20 +132,46 @@ function canBuild(structure, workersByMat) {
   return true;
 }
 
-function buildMaterialDeck(iconCounts) {
-  const deck = [];
-  let id = 0;
+// Per-material tiers:
+//   "always"  → in deck for any player count
+//   "3+"      → only included when numPlayers >= 3
+//   "4+"      → only included when numPlayers >= 4
+// Plus 4P-only "premium" cards (asymmetric — not every material gets one)
+// with extra icons, to expand 4P supply without inflating jam rate.
+const ALWAYS_ICONS = [4, 5, 6, 7];
+const TIER_3PLUS_ICONS = [8];
+const TIER_4PLUS_ICONS = []; // (no extra per-material card; 4P expansion is via PREMIUM_4P below)
+const PREMIUM_4P = [
+  { material: 'logs',   icons: 10 },
+  { material: 'stones', icons: 10 },
+  { material: 'mud',    icons: 10 },
+  { material: 'reeds',  icons: 9 },
+];
+
+function makeCardSpecs(numPlayers) {
+  const specs = [];
   for (const m of MAT_KEYS) {
-    for (const icons of iconCounts) {
-      deck.push({
-        id: 'm' + (id++),
-        material: m,
-        totalIcons: icons,
-        slot: null,
-        workers: {},
-        blanks: 0,
-      });
-    }
+    for (const icons of ALWAYS_ICONS)              specs.push({ material: m, icons });
+    if (numPlayers >= 3) for (const icons of TIER_3PLUS_ICONS) specs.push({ material: m, icons });
+    if (numPlayers >= 4) for (const icons of TIER_4PLUS_ICONS) specs.push({ material: m, icons });
+  }
+  if (numPlayers >= 4) for (const p of PREMIUM_4P) specs.push({ material: p.material, icons: p.icons });
+  return specs;
+}
+
+function buildMaterialDeck(numPlayers) {
+  const deck = makeCardSpecs(numPlayers).map((spec, id) => ({
+    id: 'm' + id,
+    material: spec.material,
+    totalIcons: spec.icons,
+    slot: null,
+    workers: {},
+    blanks: 0,
+  }));
+  // shuffle inline
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   return shuffle(deck);
 }
@@ -157,12 +183,12 @@ function buildStructureDeck() {
 // =============================================================================
 // STATE / TURN ORDER
 // =============================================================================
-function newGame(numPlayers, iconCounts) {
+function newGame(numPlayers, workersPerPlayer = 8) {
   const players = [];
   for (let i = 0; i < numPlayers; i++) {
     players.push({
       idx: i,
-      supply: 8,
+      supply: workersPerPlayer,
       timePos: 0,
       hand: [],
       built: [],
@@ -170,7 +196,7 @@ function newGame(numPlayers, iconCounts) {
       out: false,
     });
   }
-  const matDeck = buildMaterialDeck(iconCounts);
+  const matDeck = buildMaterialDeck(numPlayers);
   const structDeck = buildStructureDeck();
   for (const p of players) {
     for (let i = 0; i < 3; i++) p.hand.push(structDeck.pop());
@@ -673,9 +699,9 @@ function checkGameEnd(state) {
 // =============================================================================
 // RUN ONE GAME
 // =============================================================================
-function runGame(numPlayers, iconCounts, numMats = ORIG_MATERIALS.length) {
+function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer = 8) {
   configureMaterials(numMats);
-  const state = newGame(numPlayers, iconCounts);
+  const state = newGame(numPlayers, workersPerPlayer);
   // initial spawned icons (3 upstream)
   for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
   while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
@@ -705,6 +731,15 @@ function runGame(numPlayers, iconCounts, numMats = ORIG_MATERIALS.length) {
     if (state.endgame && state.players.every(pp => pp.out)) break;
     if (checkGameEnd(state)) break;
   }
+  // Final per-player VP tally
+  const vps = state.players.map(p => p.built.reduce((s, x) => s + x.vp, 0));
+  vps.sort((a, b) => b - a);
+  state.metrics.winnerVP = vps[0];
+  state.metrics.runnerUpVP = vps.length > 1 ? vps[1] : 0;
+  state.metrics.loserVP = vps[vps.length - 1];
+  state.metrics.vpSpread = vps[0] - vps[vps.length - 1];
+  state.metrics.winMargin = vps.length > 1 ? vps[0] - vps[1] : vps[0];
+  state.metrics.totalVP = vps.reduce((s, x) => s + x, 0);
   return state.metrics;
 }
 
@@ -717,73 +752,77 @@ function pad(s, n) { s = String(s); return s.length >= n ? s : s + ' '.repeat(n 
 function padL(s, n) { s = String(s); return s.length >= n ? s : ' '.repeat(n - s.length) + s; }
 
 function sweep() {
-  // Sweep material count × cards-per-material with the wider-3-8 icon profile.
-  // The chosen production setting is wider-3-8 @ 5 cards/material, 5 materials.
-  const profiles = {
-    'wider-3-8': {
-      8: [3,4,5,5,6,6,7,8],
-      6: [4,5,6,6,7,8],
-      5: [4,5,6,7,8],
-      4: [5,6,6,7],
-    },
-  };
-  const numP = 3;
-  const N = 400;
+  // Sweep player count × workers/player with player-tiered deck:
+  //   "always" cards in every game, "3+" added in 3P/4P, "4+" added in 4P,
+  //   plus 4P-only premium cards.
+  const numMats = 6;
+  const N = 800;
 
-  console.log(`\nRiver Bankers material-count sweep (${numP} players, ${N} games, wider-3-8 icon profile)\n`);
-  console.log('Live game: 6 materials × 5 cards/material with [4,5,6,7,8] icons (★ row).\n');
-  console.log(pad('mats', 5) + pad('c/mat', 7) + pad('deck', 6) + pad(' icons', 22) + padL('totIc', 6) + padL('turns', 7) + padL('aucs', 6) + padL('jam%', 7) + padL('plt%', 7) + padL('nob%', 7) + padL('wstIc', 7) + padL('wst%', 7) + padL('built', 7) + padL('endg%', 7));
-  console.log('-'.repeat(5+7+6+22+6+7+6+7+7+7+7+7+7+7));
+  console.log(`\nRiver Bankers player × workers sweep (${N} games per config)`);
+  console.log(`Setting: ${numMats} materials, tiered deck (always [${ALWAYS_ICONS.join(',')}]/mat, 3+ adds [${TIER_3PLUS_ICONS.join(',')}]/mat, 4+ adds [${TIER_4PLUS_ICONS.join(',')}]/mat + ${PREMIUM_4P.length} premium 4P-only cards).\n`);
+  // Show deck composition per player count
+  for (const numP of [2, 3, 4]) {
+    configureMaterials(numMats);
+    const specs = makeCardSpecs(numP);
+    const totIcons = specs.reduce((s, x) => s + x.icons, 0);
+    console.log(`  ${numP}P deck: ${specs.length} cards, ${totIcons} icons total (${(totIcons / specs.length).toFixed(1)} avg)`);
+  }
+  console.log();
+  console.log(
+    pad('numP', 5) + pad('wkrs', 5) +
+    padL('turns', 7) + padL('t/p', 6) +
+    padL('aucs', 6) + padL('jam%', 7) + padL('nob%', 7) + padL('wst%', 7) +
+    padL('built/p', 8) + padL('endg%', 7) +
+    padL('winVP', 7) + padL('lastVP', 8) + padL('spread', 8) + padL('margin', 8)
+  );
+  console.log('-'.repeat(5+5+7+6+6+7+7+7+8+7+7+8+8+8));
 
-  const profileName = 'wider-3-8';
-  for (const numMats of [6, 7, 8]) {
-    for (const cardsPerMat of [8, 6, 5, 4]) {
-      const icons = profiles[profileName][cardsPerMat];
-      const totIcons = icons.reduce((s, x) => s + x, 0) * numMats;
+  for (const numP of [2, 3, 4]) {
+    for (const workers of [6, 8, 10]) {
       const trials = [];
-      for (let t = 0; t < N; t++) trials.push(runGame(numP, icons, numMats));
+      for (let t = 0; t < N; t++) trials.push(runGame(numP, numMats, workers));
       const turns = avg(trials.map(m => m.turns));
       const auctions = avg(trials.map(m => m.auctions));
       const jamPct = avg(trials.map(m => pct(m.jamAuctions, m.auctions)));
-      const pltPct = avg(trials.map(m => pct(m.plentyAuctions, m.auctions)));
       const nobPct = avg(trials.map(m => pct(m.noBidAuctions, m.auctions)));
-      const wasted = avg(trials.map(m => m.iconsWastedToShore));
       const wstPct = avg(trials.map(m => pct(m.iconsWastedToShore, m.iconsSpawned)));
       const built = avg(trials.map(m => m.cardsBuilt));
       const endg = avg(trials.map(m => m.endgameTriggered ? 100 : 0));
+      const winVP = avg(trials.map(m => m.winnerVP));
+      const lastVP = avg(trials.map(m => m.loserVP));
+      const spread = avg(trials.map(m => m.vpSpread));
+      const margin = avg(trials.map(m => m.winMargin));
       console.log(
-        pad(numMats, 5) +
-        pad(cardsPerMat, 7) +
-        pad(numMats * cardsPerMat, 6) +
-        pad(' [' + icons.join(',') + ']', 22) +
-        padL(totIcons, 6) +
-        padL(turns.toFixed(0), 7) +
+        pad(numP, 5) + pad(workers, 5) +
+        padL(turns.toFixed(0), 7) + padL((turns / numP).toFixed(0), 6) +
         padL(auctions.toFixed(1), 6) +
-        padL(jamPct.toFixed(1), 7) +
-        padL(pltPct.toFixed(1), 7) +
-        padL(nobPct.toFixed(1), 7) +
-        padL(wasted.toFixed(1), 7) +
+        padL(jamPct.toFixed(1), 7) + padL(nobPct.toFixed(1), 7) +
         padL(wstPct.toFixed(1) + '%', 7) +
-        padL(built.toFixed(1), 7) +
-        padL(endg.toFixed(0) + '%', 7)
+        padL((built / numP).toFixed(1), 8) +
+        padL(endg.toFixed(0) + '%', 7) +
+        padL(winVP.toFixed(1), 7) +
+        padL(lastVP.toFixed(1), 8) +
+        padL(spread.toFixed(1), 8) +
+        padL(margin.toFixed(1), 8)
       );
     }
     console.log();
   }
   console.log('Legend:');
-  console.log('  mats   = number of materials in play (6 = current; 7+ adds silt/bone/shells via auto-remap)');
-  console.log('  c/mat  = cards per material in the deck');
-  console.log('  deck   = total cards in the material deck');
-  console.log('  totIc  = total icons in deck');
-  console.log('  turns  = avg total player-turns per game');
-  console.log('  aucs   = avg auctions per game');
-  console.log('  jam%   = auctions where total bid > open icons');
-  console.log('  plt%   = auctions resolved without jam (and any positive bid)');
-  console.log('  nob%   = auctions with no bids');
-  console.log('  wstIc  = avg icons wasted (uncovered when card hit shoreline)');
-  console.log('  wst%   = wasted icons as % of total icons spawned');
-  console.log('  built  = avg structures built across all players');
-  console.log('  endg%  = % of games that triggered endgame\n');
+  console.log('  numP    = number of players');
+  console.log('  wkrs    = starting workers per player');
+  console.log('  turns   = avg total player-turns per game');
+  console.log('  t/p     = avg turns per player (turns / numP)');
+  console.log('  aucs    = avg auctions per game');
+  console.log('  jam%    = auctions where total bid > open icons');
+  console.log('  nob%    = auctions with no bids');
+  console.log('  wst%    = wasted icons as % of total icons spawned');
+  console.log('  built/p = avg structures built per player');
+  console.log('  endg%   = % of games that triggered endgame (deck emptied)');
+  console.log('  winVP   = avg VP of the winner');
+  console.log('  lastVP  = avg VP of the last-place player');
+  console.log('  spread  = avg (winner − last) VP within a game');
+  console.log('  margin  = avg (winner − runner-up) VP within a game\n');
 }
 
 if (require.main === module) sweep();

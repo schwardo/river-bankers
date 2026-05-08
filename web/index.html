@@ -872,10 +872,24 @@ const MATERIALS = {
 };
 const MAT_KEYS = Object.keys(MATERIALS);
 
-// 5 cards per material; icon counts spread 4..8. Cost is slot-based, not card-based.
-// Tuned via sim.js to target ~30-min play time with lower jam rate than the 8-card deck.
-function buildMaterialDeck() {
-  const iconCounts = [4, 5, 6, 7, 8];
+// Per-material tiered deck (tuned via sim.js):
+//   "always"  — in deck for any player count (4 cards/mat: [4,5,6,7] icons)
+//   "3+"      — added when numPlayers >= 3   (1 card/mat: [8] icons)
+//   "4P only premium" — added when numPlayers === 4, asymmetric across mats,
+//                       big icon counts to absorb 4-player demand without
+//                       inflating jam rate.
+// Counts: 2P=24 cards, 3P=30 cards, 4P=34 cards.
+const ALWAYS_ICONS = [4, 5, 6, 7];
+const TIER_3PLUS_ICONS = [8];
+const PREMIUM_4P = [
+  { material: 'logs',   icons: 10 },
+  { material: 'stones', icons: 10 },
+  { material: 'mud',    icons: 10 },
+  { material: 'reeds',  icons: 9 },
+];
+
+function buildMaterialDeck(numPlayers) {
+  const iconCounts = ALWAYS_ICONS.concat(numPlayers >= 3 ? TIER_3PLUS_ICONS : []);
   const deck = [];
   let id = 0;
   for (const m of MAT_KEYS) {
@@ -886,6 +900,18 @@ function buildMaterialDeck() {
         totalIcons: icons,
         slot: null,         // 0..3 in river, 'pre' in pre-river, 'shore', or null in deck
         workers: {},        // playerIdx -> count
+        blanks: 0,
+      });
+    }
+  }
+  if (numPlayers >= 4) {
+    for (const p of PREMIUM_4P) {
+      deck.push({
+        id: 'm' + (id++),
+        material: p.material,
+        totalIcons: p.icons,
+        slot: null,
+        workers: {},
         blanks: 0,
       });
     }
@@ -1081,7 +1107,7 @@ function startGame() {
     });
   }
 
-  const matDeck = buildMaterialDeck();
+  const matDeck = buildMaterialDeck(numPlayers);
   const structDeck = buildStructureDeck();
 
   // Initial hands: 3 each
