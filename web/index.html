@@ -740,6 +740,55 @@
   .result-box.jam    { background: #fde8d3; border-left: 4px solid #b85a1a; }
   .result-box.info   { background: #e8eef5; border-left: 4px solid var(--water-deep); }
 
+  /* ================= EFFECT-PICKER MODALS ================= */
+  .picker-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+  .picker-btn {
+    padding: 8px 10px; text-align: left; border-radius: 6px;
+    background: var(--shore-light); border: 2px solid var(--bank);
+    cursor: pointer; font-size: 13px; color: var(--ink);
+    font-family: inherit; line-height: 1.35;
+  }
+  .picker-btn:hover { background: #fef6e7; }
+  .reorder-list { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  .reorder-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 10px; background: rgba(0,0,0,0.04); border-radius: 4px;
+    font-size: 13px;
+  }
+  .reorder-row .reorder-btns { display: flex; gap: 4px; }
+  .reorder-row button {
+    padding: 2px 10px; font-size: 12px; cursor: pointer;
+    border: 1.5px solid var(--bank); border-radius: 3px;
+    background: var(--paper);
+  }
+  .reorder-row button:hover:not(:disabled) { background: #fef6e7; }
+  .reorder-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .lookout-peek {
+    font-size: 11px; color: #5a4a1f; font-style: italic; margin-top: 4px;
+    background: rgba(139,90,43,0.10); border-left: 3px solid #5a4a1f;
+    padding: 3px 6px; border-radius: 3px;
+  }
+  .ability-row {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    margin-top: 6px; padding-top: 6px;
+    border-top: 1px dotted rgba(0,0,0,0.15);
+  }
+  .ability-row .ability-label {
+    font-size: 11px; color: var(--ink-soft); font-style: italic;
+    margin-right: 4px;
+  }
+  .ability-btn {
+    background: #fef6e7; border: 2px solid var(--bank); color: #5a4a1f;
+    font-size: 12px; padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    font-family: inherit;
+  }
+  .ability-btn:hover { background: #fae6b8; }
+  .spy-toggle {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    padding: 6px 10px; background: #efe9d9; border-radius: 4px;
+    font-size: 12px; color: #5a4a1f;
+  }
+
   /* ================= LOG ================= */
   .log-area {
     background: var(--paper);
@@ -967,6 +1016,12 @@ const STRUCTURE_TEMPLATES = [
 const STRUCTURE_EFFECT_DISABLED = {};
 function effectActive(name) { return STRUCTURE_EFFECT_DISABLED[name] !== true; }
 function hasEffect(p, name) { return effectActive(name) && p.built.some(s => s.name === name); }
+function oncePerGameUsed(p, name) {
+  if (name === 'Granary'   && p.granaryUsed)   return true;
+  if (name === 'Floodgate' && p.floodgateUsed) return true;
+  if (name === 'Spy Mound' && p.spyMoundUsed)  return true;
+  return false;
+}
 function maxHandSize(p) { return 3 + (hasEffect(p, 'Cache Burrow') ? 1 : 0); }
 function totalVP(p, state) {
   let v = p.built.reduce((s, b) => s + b.vp, 0);
@@ -1642,8 +1697,9 @@ function renderPlayers() {
       const plainCards = p.built.filter(b => !b.effect);
       let html2 = '';
       for (const b of effectCards) {
+        const usedTag = oncePerGameUsed(p, b.name);
         html2 += `<div class="built-effect-card">
-          <div class="head"><b>${b.name}</b><span class="vp">${b.vp}★</span></div>
+          <div class="head"><b>${b.name}${usedTag ? ' <span class="small-note">(used)</span>' : ''}</b><span class="vp">${b.vp}★</span></div>
           <div class="effect-text">${b.effect}</div>
         </div>`;
       }
@@ -1651,6 +1707,11 @@ function renderPlayers() {
         html2 += `<div class="built-list">${plainCards.map(b => `<span class="built-chip" title="${b.name} – ${b.vp}vp">${b.name} ${b.vp}★</span>`).join('')}</div>`;
       }
       builtList = html2;
+    }
+    let lookoutPeek = '';
+    if (p.isHuman && hasEffect(p, 'Lookout Tree') && state.matDeck.length > 0) {
+      const top = state.matDeck[state.matDeck.length - 1];
+      lookoutPeek = `<div class="lookout-peek">🔭 Top of deck: <span style="color:${MATERIALS[top.material].color}">${MATERIALS[top.material].emoji} ${MATERIALS[top.material].name}</span> · ${top.totalIcons} icons</div>`;
     }
     html += `<div class="${cls.join(' ')}">
       <div class="player-head">
@@ -1665,6 +1726,7 @@ function renderPlayers() {
       </div>
       <div class="player-stats" style="margin-top:4px;">${matSummary}</div>
       ${builtList}
+      ${lookoutPeek}
       <div class="player-fish">${p.timePos} 🐟</div>
     </div>`;
   }
@@ -1752,6 +1814,17 @@ function renderActionPanel() {
   if (state.phase === 'choose-action') {
     const placed = MAT_KEYS.reduce((s, m) => s + playerWorkersByMaterial(state, cur.idx)[m], 0);
     const hasPreriv = state.prerivCards.some(c => c !== null);
+    const abilityBtns = [];
+    if (hasEffect(cur, 'Heron Roost') && state.matDeck.length > 0 && cur.timePos < ENDGAME_TRACK_END - 1 && hasPreriv) {
+      abilityBtns.push(`<button class="ability-btn" onclick="humanUseHeronRoost()">🦩 Heron Roost (1🐟): replace upstream</button>`);
+    }
+    if (hasEffect(cur, 'Driftwood Snag') && cur.timePos < ENDGAME_TRACK_END - 1) {
+      const anyOpen = [...state.riverCards, ...state.prerivCards.filter(c => c)].some(c => uncoveredIcons(c) > 0);
+      if (anyOpen) abilityBtns.push(`<button class="ability-btn" onclick="humanUseDriftwoodSnag()">🪵 Driftwood Snag (1🐟): drop blank</button>`);
+    }
+    const abilityRow = abilityBtns.length
+      ? `<div class="ability-row"><span class="ability-label">Optional abilities:</span>${abilityBtns.join('')}</div>`
+      : '';
     html = `<div class="action-panel-title">Your turn — choose an action</div>
       <div class="action-buttons">
         <button class="secondary" onclick="humanCallHome()" ${placed === 0 ? 'disabled' : ''}>Call workers home (${placed} out)</button>
@@ -1762,6 +1835,7 @@ function renderActionPanel() {
         <button onclick="humanChooseAction('flush')" ${(cur.supply > 0 && (hasPreriv || state.matDeck.length > 0)) ? '' : 'disabled'}>5. Flush upstream (5🐟)</button>
         ${state.endgame ? `<button class="ghost" onclick="humanRetire()">Retire (endgame)</button>` : ''}
       </div>
+      ${abilityRow}
       <div class="action-hint">Tip: click any river or upstream card to auction it, or any buildable structure in your hand to build it.</div>`;
   } else if (state.phase === 'select-auction-card') {
     html = `<div class="action-panel-title">Pick a river card to auction</div>
@@ -1924,12 +1998,23 @@ function callWorkersHome(playerIdx, recallSpec) {
 // AUCTION
 // =============================================================================
 async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
-  // Floodgate: triggerer auto-uses if available and card.slot >= 1 (saves them fish).
+  // Floodgate: AI auto-uses; human is prompted (it's once-per-game, so you may want to save it).
   const trig = state.players[triggerPlayerIdx];
   if (hasEffect(trig, 'Floodgate') && !trig.floodgateUsed && typeof card.slot === 'number' && card.slot > 0) {
-    card.slot -= 1;
-    trig.floodgateUsed = true;
-    log(`🚪 Floodgate: ${speciesLabel(trig)} slides the card 1 space upstream.`);
+    let useIt = true;
+    if (trig.isHuman) {
+      const newSlotCost = riverSlotCost(card.slot - 1);
+      const oldSlotCost = riverSlotCost(card.slot);
+      useIt = await confirmModal(
+        '🚪 Floodgate?',
+        `Slide this card from River ${card.slot + 1} (${oldSlotCost}🐟/item) up to River ${card.slot} (${newSlotCost}🐟/item) before the auction? Once-per-game.`
+      );
+    }
+    if (useIt) {
+      card.slot -= 1;
+      trig.floodgateUsed = true;
+      log(`🚪 Floodgate: ${speciesLabel(trig)} slides the card 1 space upstream.`);
+    }
   }
   // Collect bids: AIs decide privately; human inputs via modal.
   state.phase = 'auction-bidding';
@@ -1937,19 +2022,35 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   const slotLbl = card.slot === 'pre' ? 'Upstream' : `River ${card.slot + 1}`;
   log(`🎲 Auction begins on ${m.emoji} ${m.name} at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
 
-  // Spy Mound: if any AI has it available, defer their bid until after others reveal.
-  // TODO(human-ui): a human owner of Spy Mound currently can't elect to defer. Add a
-  //   "Use Spy Mound (defer bid)" toggle on the human bid modal — when set, capture
-  //   their bid AFTER showing other reveals, then re-render results.
-  // TODO(human-ui): Floodgate also auto-fires above for the triggerer. The human owner
-  //   should be prompted ("Slide upstream for free?") rather than auto-using the
-  //   once-per-game charge on the first eligible auction.
+  // Spy Mound: holders can defer their bid until after others reveal.
+  //   - AIs auto-defer if eligible.
+  //   - Human is prompted up-front (modal) so they can decide whether to spend the once-per-game charge.
   let deferredAi = -1;
   for (const p of state.players) {
     if (p.isHuman) continue;
     if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out && uncoveredIcons(card) >= 4) {
       deferredAi = p.idx;
       break;
+    }
+  }
+  const human = state.players.find(p => p.isHuman);
+  let deferredHuman = -1;
+  if (human && !human.out && !human.exhausted
+      && hasEffect(human, 'Spy Mound') && !human.spyMoundUsed
+      && uncoveredIcons(card) >= 4 && deferredAi === -1) {
+    startHumanTimer();
+    let useIt;
+    try {
+      useIt = await confirmModal(
+        '🕵 Spy Mound — defer your bid?',
+        `Wait for ${state.players.length - 1} other player${state.players.length - 1 === 1 ? '' : 's'} to reveal their bids before you decide yours? Once-per-game.`
+      );
+    } finally {
+      stopHumanTimer();
+    }
+    if (useIt) {
+      deferredHuman = human.idx;
+      human.spyMoundUsed = true;
     }
   }
   const bids = {};
@@ -1960,13 +2061,14 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     const minBid = (p.idx === triggerPlayerIdx) ? minBidTrigger : 0;
     bids[p.idx] = aiDecideBid(p.idx, card, minBid);
   }
-  const human = state.players.find(p => p.isHuman);
   if (human) {
     if (human.out) {
       bids[human.idx] = 0;
     } else if (human.exhausted) {
       bids[human.idx] = 0;
       log(`💤 ${speciesLabel(human)} is exhausted — auto-passes (bid 0).`);
+    } else if (human.idx === deferredHuman) {
+      // Resolved below after all other bids are visible.
     } else {
       const minBid = (human.idx === triggerPlayerIdx) ? minBidTrigger : 0;
       startHumanTimer();
@@ -1989,6 +2091,17 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     if (deferredAi === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
     bids[sp.idx] = bid;
     log(`🕵 Spy Mound: ${speciesLabel(sp)} bids ${bid} after seeing reveals.`);
+  }
+  if (deferredHuman !== -1) {
+    const sp = state.players[deferredHuman];
+    const minBid = (deferredHuman === triggerPlayerIdx) ? minBidTrigger : 0;
+    startHumanTimer();
+    try {
+      bids[sp.idx] = await humanBidForAuction(card, sp, minBid, { revealedBids: { ...bids } });
+    } finally {
+      stopHumanTimer();
+    }
+    log(`🕵 Spy Mound: ${speciesLabel(sp)} bids ${bids[sp.idx]} after seeing reveals.`);
   }
 
   // Compact bid summary for the log
@@ -2557,6 +2670,51 @@ function humanCallHome() {
   });
 }
 
+async function humanUseHeronRoost() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human || !hasEffect(human, 'Heron Roost') || state.matDeck.length === 0) return;
+  if (human.timePos >= ENDGAME_TRACK_END - 1) return;
+  const cands = state.prerivCards
+    .map((c, i) => c ? { card: c, idx: i } : null)
+    .filter(x => x);
+  if (cands.length === 0) return;
+  const pick = await pickFromList(
+    '🦩 Heron Roost — replace upstream card',
+    'Pick which upstream card to discard. The top of the material deck replaces it. Costs 1🐟.',
+    cands,
+    x => `Upstream ${x.idx + 1}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} (${x.card.totalIcons} icons)`
+  );
+  if (!pick) return;
+  const newCard = state.matDeck.pop();
+  newCard.slot = 'pre';
+  state.prerivCards[pick.idx] = newCard;
+  human.timePos += 1;
+  log(`🦩 Heron Roost: ${speciesLabel(human)} replaces Upstream ${pick.idx + 1} with ${MATERIALS[newCard.material].name} (+1🐟).`);
+  render();
+}
+
+async function humanUseDriftwoodSnag() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human || !hasEffect(human, 'Driftwood Snag')) return;
+  if (human.timePos >= ENDGAME_TRACK_END - 1) return;
+  const cands = [
+    ...state.riverCards.map(c => ({ card: c, where: `River ${c.slot + 1}` })),
+    ...state.prerivCards.map((c, i) => c ? { card: c, where: `Upstream ${i + 1}` } : null).filter(x => x),
+  ].filter(x => uncoveredIcons(x.card) > 0);
+  if (cands.length === 0) return;
+  const pick = await pickFromList(
+    '🪵 Driftwood Snag — drop a blank',
+    'Pick any river or upstream card with an uncovered icon. One icon becomes blocked. Costs 1🐟.',
+    cands,
+    x => `${x.where}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open)`
+  );
+  if (!pick) return;
+  pick.card.blanks += 1;
+  human.timePos += 1;
+  log(`🪵 Driftwood Snag: ${speciesLabel(human)} drops a blank on ${MATERIALS[pick.card.material].name} (+1🐟).`);
+  render();
+}
+
 function humanChooseAction(type) {
   const human = state.players.find(p => p.isHuman);
   if (type === 'auction') {
@@ -2722,7 +2880,29 @@ async function performBuild(playerIdx, handIdx) {
   const p = state.players[playerIdx];
   const struct = p.hand[handIdx];
   const wbm = playerWorkersByMaterial(state, playerIdx);
+  // Granary prompt: if a human owner could choose to save it for a later build, ask.
+  // (When Granary is required to make this build buildable at all, auto-fire silently.)
+  let suppressGranary = false;
+  if (p.isHuman && hasEffect(p, 'Granary') && !p.granaryUsed) {
+    const wouldFire = effectiveBuildCost(struct, p, wbm).granaryUsed;
+    if (wouldFire) {
+      const savedFlag = p.granaryUsed;
+      p.granaryUsed = true;
+      const buildableWithout = canBuild(struct, wbm, p);
+      p.granaryUsed = savedFlag;
+      if (buildableWithout) {
+        const useNow = await confirmModal(
+          '🌾 Use Granary?',
+          'Save 1 worker on this build, or save Granary for a future build? (Once per game.)',
+          'Use now', 'Save for later'
+        );
+        if (!useNow) suppressGranary = true;
+      }
+    }
+  }
+  if (suppressGranary) p.granaryUsed = true;
   const { eff: effCost, granaryUsed } = effectiveBuildCost(struct, p, wbm);
+  if (suppressGranary) p.granaryUsed = false;
   if (granaryUsed) {
     p.granaryUsed = true;
     log(`🌾 ${speciesLabel(p)} uses Granary to save 1 worker on this build.`);
@@ -2773,19 +2953,13 @@ async function performBuild(playerIdx, handIdx) {
 }
 
 // One-time on-build effects fire here (web). Each card's effect is triggered by name.
-// async because Snag Pile triggers an auction (which awaits human bid modal).
-//
-// TODO(human-ui): Several effects auto-resolve their target picks for both AI and human:
-//   - Sap Drip   → human should pick which river card to land 2 free workers on
-//   - Mud Levee  → human should pick which uncovered icons to blank (currently auto-greedy)
-//   - Snag Pile  → human should pick which pre-river slot to pull
-//   - Vine Lattice → human should pick which 1 of the 3 drawn to keep
-//   - Stone Pool → human should rearrange the top 5 (currently auto-sorted by icon count)
-//   - Flush Channel → currently skips the post-flush auction step entirely; should let human
-//                     pick a target and run the auction at upstream rate
+// async because Snag Pile / Flush Channel trigger auctions and several effects await
+// human-pick modals (Mud Levee, Sap Drip, Snag Pile, Vine Lattice, Stone Pool, Flush Channel,
+// Salt Lick).
 async function fireOnBuildEffect(playerIdx, struct) {
   const p = state.players[playerIdx];
   if (!effectActive(struct.name)) return;
+  const isHuman = !!p.isHuman;
   if (struct.name === 'Burrow Run') {
     const before = p.timePos;
     p.timePos = Math.max(0, p.timePos - 5);
@@ -2805,22 +2979,37 @@ async function fireOnBuildEffect(playerIdx, struct) {
   }
   if (struct.name === 'Mud Levee') {
     let dropped = 0;
-    // Drop on cards with the most uncovered icons first (greedy disruption).
-    const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
-      .filter(c => uncoveredIcons(c) > 0)
-      .sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
-    for (const c of cands) {
-      while (dropped < 2 && uncoveredIcons(c) > 0) {
-        c.blanks++;
+    if (isHuman) {
+      for (let drop = 0; drop < 2; drop++) {
+        const cands = [
+          ...state.riverCards.map(c => ({ card: c, where: `River ${c.slot + 1}` })),
+          ...state.prerivCards.map((c, i) => c ? { card: c, where: `Upstream ${i + 1}` } : null).filter(x => x),
+        ].filter(x => uncoveredIcons(x.card) > 0);
+        if (cands.length === 0) break;
+        const pick = await pickFromList(
+          `🧱 Mud Levee — drop blank ${drop + 1}/2`,
+          'Pick a card to block one uncovered icon.',
+          cands,
+          x => `${x.where}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} open`
+        );
+        if (!pick) break;
+        pick.card.blanks++;
         dropped++;
+        render();
       }
-      if (dropped >= 2) break;
+    } else {
+      const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
+        .filter(c => uncoveredIcons(c) > 0)
+        .sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
+      for (const c of cands) {
+        while (dropped < 2 && uncoveredIcons(c) > 0) { c.blanks++; dropped++; }
+        if (dropped >= 2) break;
+      }
     }
     log(`🧱 Mud Levee drops ${dropped} blank${dropped === 1 ? '' : 's'}.`);
     return;
   }
   if (struct.name === 'Flush Channel') {
-    // Free upstream-flush — discard upstream, refill, run an auction at upstream rate.
     for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
     for (let i = 0; i < state.prerivCards.length; i++) {
       if (state.matDeck.length === 0) break;
@@ -2829,23 +3018,52 @@ async function fireOnBuildEffect(playerIdx, struct) {
       state.prerivCards[i] = c;
     }
     log(`🌀 Flush Channel discards upstream and refills.`);
-    // (Auction step omitted — keeps this simpler in mid-build context.)
+    render();
+    const cands = state.prerivCards
+      .map((c, i) => c ? { card: c, idx: i } : null)
+      .filter(x => x);
+    if (cands.length === 0) return;
+    let pick;
+    if (isHuman) {
+      pick = await pickFromList(
+        '🌀 Flush Channel — pick auction target',
+        'Pick a fresh upstream card to auction (free trigger; you must bid at least 1 worker at 1🐟/item).',
+        cands,
+        x => `Upstream ${x.idx + 1}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
+        { cancelable: false }
+      );
+    } else {
+      const aiIdx = aiChooseFlushTarget(playerIdx);
+      if (aiIdx === -1) return;
+      pick = { card: state.prerivCards[aiIdx], idx: aiIdx };
+    }
+    log(`🎬 ${speciesLabel(p)} picks Upstream ${pick.idx + 1} ${MATERIALS[pick.card.material].name} (1🐟/item) to auction.`);
+    await runAuction(pick.card, playerIdx, 1);
     return;
   }
   if (struct.name === 'Sap Drip') {
-    // Place 2 free workers on a river card whose material we actually need (fall back
-    // to max-uncovered-icons when nothing is needed).
-    const wbm = playerWorkersByMaterial(state, playerIdx);
-    const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
     const cands = state.riverCards.filter(c => uncoveredIcons(c) > 0);
     if (cands.length === 0 || p.supply === 0) return;
-    cands.sort((a, b) => {
-      const aScore = Math.min(2, need(a.material), uncoveredIcons(a));
-      const bScore = Math.min(2, need(b.material), uncoveredIcons(b));
-      if (aScore !== bScore) return bScore - aScore;
-      return uncoveredIcons(b) - uncoveredIcons(a);
-    });
-    const target = cands[0];
+    let target;
+    if (isHuman) {
+      target = await pickFromList(
+        '💧 Sap Drip — place 2 free workers',
+        `Pick a river card. ${Math.min(2, p.supply)} of your workers will be placed for free (no auction, no fish).`,
+        cands,
+        c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} · River ${c.slot + 1} · ${uncoveredIcons(c)} open`
+      );
+      if (!target) return;
+    } else {
+      const wbm = playerWorkersByMaterial(state, playerIdx);
+      const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
+      cands.sort((a, b) => {
+        const aScore = Math.min(2, need(a.material), uncoveredIcons(a));
+        const bScore = Math.min(2, need(b.material), uncoveredIcons(b));
+        if (aScore !== bScore) return bScore - aScore;
+        return uncoveredIcons(b) - uncoveredIcons(a);
+      });
+      target = cands[0];
+    }
     const place = Math.min(2, p.supply, uncoveredIcons(target));
     if (place > 0) {
       p.supply -= place;
@@ -2858,59 +3076,122 @@ async function fireOnBuildEffect(playerIdx, struct) {
     // Pull a pre-river card to River 1, run auction at upstream rate (cardCost('pre')==1).
     // The card stays in pre-river state during the auction so its per-item cost is 1🐟; the
     // auction's normal slide rule moves it to River 1 (or shoreline if all icons claimed).
-    const targetIdx = aiChooseFlushTarget(playerIdx);
-    if (targetIdx === -1) return;
-    const card = state.prerivCards[targetIdx];
-    if (!card) return;
-    log(`🪤 Snag Pile: ${speciesLabel(p)} pulls Upstream ${targetIdx + 1} ${MATERIALS[card.material].name} (1🐟/item).`);
-    await runAuction(card, playerIdx, 1);
+    const cands = state.prerivCards
+      .map((c, i) => c ? { card: c, idx: i } : null)
+      .filter(x => x);
+    if (cands.length === 0) return;
+    let pick;
+    if (isHuman) {
+      pick = await pickFromList(
+        '🪤 Snag Pile — pull upstream card',
+        'Pick which upstream card to pull. An auction immediately runs on it at 1🐟/item; you must bid at least 1 worker.',
+        cands,
+        x => `Upstream ${x.idx + 1}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
+        { cancelable: false }
+      );
+    } else {
+      const aiIdx = aiChooseFlushTarget(playerIdx);
+      if (aiIdx === -1) return;
+      pick = { card: state.prerivCards[aiIdx], idx: aiIdx };
+    }
+    log(`🪤 Snag Pile: ${speciesLabel(p)} pulls Upstream ${pick.idx + 1} ${MATERIALS[pick.card.material].name} (1🐟/item).`);
+    await runAuction(pick.card, playerIdx, 1);
     return;
   }
   if (struct.name === 'Vine Lattice') {
-    // Draw 3, keep best 1 by score (vp - deficit*1.5), discard 2.
     const drawCount = Math.min(3, state.structDeck.length);
     if (drawCount === 0) return;
     const drawn = [];
     for (let i = 0; i < drawCount; i++) drawn.push(state.structDeck.pop());
     const wbm = playerWorkersByMaterial(state, playerIdx);
-    function score(s) {
-      let deficit = 0;
-      for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
-      return s.vp - deficit * 1.5;
+    let keep;
+    if (isHuman) {
+      keep = await pickFromList(
+        `🌿 Vine Lattice — keep 1 of ${drawn.length}`,
+        `Pick the structure card to keep. The other ${drawn.length - 1} will be discarded.`,
+        drawn,
+        s => {
+          const reqs = Object.entries(s.cost).map(([m, n]) => {
+            const have = wbm[m] || 0;
+            return `${MATERIALS[m].emoji}${have}/${n}`;
+          }).join(' ');
+          const eff = s.effect ? `<br><i>${s.effect}</i>` : '';
+          return `<b>${s.name}</b> · ${s.time}🐟 · ${s.vp}★<br>${reqs}${eff}`;
+        },
+        { cancelable: false }
+      );
+    } else {
+      function score(s) {
+        let deficit = 0;
+        for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
+        return s.vp - deficit * 1.5;
+      }
+      drawn.sort((a, b) => score(b) - score(a));
+      keep = drawn[0];
     }
-    drawn.sort((a, b) => score(b) - score(a));
-    const keep = drawn[0];
-    const discard = drawn.slice(1);
+    const discard = drawn.filter(s => s !== keep);
     p.hand.push(keep);
     for (const d of discard) state.structDiscard.push(d);
-    log(`🌿 Vine Lattice: ${speciesLabel(p)} drew 3, kept <b>${keep.name}</b>, discarded ${discard.length}.`);
+    log(`🌿 Vine Lattice: ${speciesLabel(p)} drew ${drawn.length}, kept <b>${keep.name}</b>, discarded ${discard.length}.`);
     return;
   }
   if (struct.name === 'Stone Pool') {
-    // Reorder so AI's needed materials surface first; tie-break by icon count.
     const top = state.matDeck.slice(-5);
     if (top.length === 0) return;
-    const wbm = playerWorkersByMaterial(state, playerIdx);
-    const matNeed = {};
-    for (const m of MAT_KEYS) matNeed[m] = 0;
-    for (const s of p.hand) for (const m in s.cost) {
-      matNeed[m] = Math.max(matNeed[m], (s.cost[m] || 0) - (wbm[m] || 0));
+    if (isHuman) {
+      // matDeck is a stack — last element is the next pop. Show in draw order (next-drawn first).
+      const drawOrder = top.slice().reverse();
+      const reordered = await reorderListModal(
+        `💧 Stone Pool — reorder next ${drawOrder.length} material cards`,
+        'Top of the list will be drawn first. Use ▲/▼ to rearrange.',
+        drawOrder,
+        c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} (${c.totalIcons} icons)`
+      );
+      if (reordered) {
+        const stackOrder = reordered.slice().reverse();
+        state.matDeck.splice(state.matDeck.length - top.length, top.length, ...stackOrder);
+      }
+    } else {
+      const wbm = playerWorkersByMaterial(state, playerIdx);
+      const matNeed = {};
+      for (const m of MAT_KEYS) matNeed[m] = 0;
+      for (const s of p.hand) for (const m in s.cost) {
+        matNeed[m] = Math.max(matNeed[m], (s.cost[m] || 0) - (wbm[m] || 0));
+      }
+      top.sort((a, b) => {
+        const an = matNeed[a.material] || 0;
+        const bn = matNeed[b.material] || 0;
+        if (an !== bn) return an - bn;
+        return a.totalIcons - b.totalIcons;
+      });
+      state.matDeck.splice(state.matDeck.length - top.length, top.length, ...top);
     }
-    top.sort((a, b) => {
-      const an = matNeed[a.material] || 0;
-      const bn = matNeed[b.material] || 0;
-      if (an !== bn) return an - bn;
-      return a.totalIcons - b.totalIcons;
-    });
-    state.matDeck.splice(state.matDeck.length - top.length, top.length, ...top);
     log(`💧 Stone Pool: ${speciesLabel(p)} reorders top ${top.length} material cards.`);
     return;
   }
   if (struct.name === 'Salt Lick') {
-    // Looking at opponent hands — pure information. AI doesn't make use of it; for human, log a peek.
-    const peeks = state.players.filter(o => o.idx !== playerIdx && !o.out)
-      .map(o => `${o.species.name}: ${o.hand.map(s => s.name).join(', ') || '(empty)'}`);
+    const others = state.players.filter(o => o.idx !== playerIdx && !o.out);
+    const peeks = others.map(o => `${o.species.name}: ${o.hand.map(s => s.name).join(', ') || '(empty)'}`);
     log(`🧂 Salt Lick: ${speciesLabel(p)} peeks at hands — ${peeks.join(' | ')}.`);
+    if (isHuman && others.length > 0) {
+      const html = others.map(o => `
+        <div style="margin-bottom:8px;">
+          <b>${o.species.emoji} ${o.species.name}</b>
+          ${o.hand.length === 0
+            ? ' <span class="small-note">(empty hand)</span>'
+            : '<ul style="margin:4px 0 0 18px;padding:0;">' + o.hand.map(s =>
+                `<li>${s.name} <span class="small-note">(${Object.entries(s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')} · ${s.time}🐟 · ${s.vp}★)</span></li>`
+              ).join('') + '</ul>'}
+        </div>
+      `).join('');
+      await new Promise(resolve => {
+        showModal({
+          title: '🧂 Salt Lick — opponents\' hands',
+          body: () => html,
+          actions: [{ label: 'Close', primary: true, onClick: () => { closeModal(); resolve(); }}],
+        });
+      });
+    }
     return;
   }
 }
@@ -2940,6 +3221,100 @@ function closeModal() {
   document.getElementById('modal-root').innerHTML = '';
 }
 
+// Yes/No prompt — resolves true on yes, false on no.
+function confirmModal(title, msg, yesLabel = 'Use it', noLabel = 'Skip') {
+  return new Promise(resolve => {
+    showModal({
+      title,
+      body: () => `<p>${msg}</p>`,
+      actions: [
+        { label: yesLabel, primary: true, onClick: () => { closeModal(); resolve(true); } },
+        { label: noLabel, ghost: true, onClick: () => { closeModal(); resolve(false); } },
+      ],
+    });
+  });
+}
+
+// Click-to-pick a single item from a list (each item rendered to its own button).
+// Resolves with the chosen item, or null if the user cancels.
+let _pickerSeq = 0;
+function pickFromList(title, intro, items, renderItem, opts = {}) {
+  return new Promise(resolve => {
+    const fnName = '_picker_' + (++_pickerSeq);
+    window[fnName] = (i) => {
+      const it = items[i];
+      delete window[fnName];
+      closeModal();
+      resolve(it);
+    };
+    const actions = [];
+    if (opts.cancelable !== false) {
+      actions.push({ label: 'Cancel', ghost: true, onClick: () => {
+        delete window[fnName];
+        closeModal();
+        resolve(null);
+      }});
+    }
+    showModal({
+      title,
+      body: () => `<p class="small-note">${intro}</p>
+        <div class="picker-list">
+          ${items.map((it, i) => `<button class="picker-btn" onclick="window['${fnName}'](${i})">${renderItem(it, i)}</button>`).join('')}
+        </div>`,
+      actions,
+    });
+  });
+}
+
+// Reorder a list of cards (typically Stone Pool's top-5 in draw order).
+// Items are passed in DRAW ORDER (first to be drawn at index 0).
+// Returns the reordered array (also in draw order); null on cancel.
+let _reorderSeq = 0;
+function reorderListModal(title, intro, items, renderItem) {
+  return new Promise(resolve => {
+    const order = items.slice();
+    const moveName = '_reorderMove_' + (++_reorderSeq);
+    function bodyHtml() {
+      return `<p class="small-note">${intro}</p>
+        <div class="reorder-list">
+          ${order.map((it, i) => `
+            <div class="reorder-row">
+              <span><b>${i + 1}.</b> ${renderItem(it, i)}</span>
+              <span class="reorder-btns">
+                <button onclick="window['${moveName}'](${i}, -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+                <button onclick="window['${moveName}'](${i}, 1)" ${i === order.length - 1 ? 'disabled' : ''}>▼</button>
+              </span>
+            </div>
+          `).join('')}
+        </div>`;
+    }
+    window[moveName] = (idx, dir) => {
+      const j = idx + dir;
+      if (j < 0 || j >= order.length) return;
+      [order[idx], order[j]] = [order[j], order[idx]];
+      const root = document.getElementById('modal-root');
+      const inner = root.querySelector('.modal > div:not(.action-buttons)');
+      if (inner) inner.innerHTML = bodyHtml();
+    };
+    showModal({
+      title,
+      body: bodyHtml,
+      actions: [
+        { label: 'Confirm order', primary: true, onClick: () => {
+          delete window[moveName];
+          closeModal();
+          resolve(order.slice());
+        }},
+        { label: 'Cancel', ghost: true, onClick: () => {
+          delete window[moveName];
+          closeModal();
+          resolve(null);
+        }},
+      ],
+    });
+  });
+}
+
 function updateBidPreview(cost, supplyBefore, timeBefore) {
   const input = document.getElementById('human-bid');
   const cur = document.getElementById('bid-current');
@@ -2962,7 +3337,7 @@ function updateBidPreview(cost, supplyBefore, timeBefore) {
   }
 }
 
-async function humanBidForAuction(card, human, minBid) {
+async function humanBidForAuction(card, human, minBid, opts = {}) {
   // No workers left → auto-pass without prompting.
   // (Action 1 requires supply > 0 to trigger, so minBid is 0 here.)
   if (human.supply === 0) {
@@ -2981,9 +3356,24 @@ async function humanBidForAuction(card, human, minBid) {
     const supplyLimited = human.supply <= open;
     const supplyBefore = human.supply;
     const timeBefore = human.timePos;
+    let revealHtml = '';
+    if (opts.revealedBids) {
+      const rows = state.players
+        .filter(p => p.idx !== human.idx && p.idx in opts.revealedBids)
+        .map(p => {
+          const b = opts.revealedBids[p.idx] | 0;
+          return `<div class="bidder-row">
+            <span class="bidder-name">${p.species.emoji} ${p.species.name}${p.exhausted ? ' 💤' : ''}</span>
+            <span><b>${b}</b> worker${b === 1 ? '' : 's'}</span>
+          </div>`;
+        }).join('');
+      revealHtml = `<p class="small-note" style="margin-top:0;">🕵 Spy Mound — you've seen everyone else's bids:</p>
+        <div class="auction-bidders">${rows}</div>`;
+    }
     showModal({
       title: `🎲 Auction: ${m.emoji} ${m.name} at ${slotLbl}`,
       body: () => `
+        ${revealHtml}
         <p>${open} icon${open === 1 ? '' : 's'} open · ${cost}🐟 per item · minimum bid <b>${minBid}</b>${minBid > 0 ? ' (you triggered)' : ''} · maximum <b>${maxBid}</b> ${supplyLimited ? '(your supply)' : '(open icons)'}.</p>
         <div class="bid-slider-row">
           <span class="small-note">${minBid}</span>
