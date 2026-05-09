@@ -82,7 +82,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Beaver Dam** | 4 logs, 2 mud | 3🐟 | Wash every card currently in River 1 to the shoreline (carry workers along). |
+| **Beaver Dam** | 4 logs, 2 mud | 3🐟 | Wash every card currently in River 1 to the shoreline (carry workers along). Slide back 1🐟 on the fish track per card washed. |
 | **Mud Levee** | 3 mud, 2 stones | 3🐟 | Drop 2 blanks on any uncovered icons in the river. |
 | **Flush Channel** | 4 mud, 1 reed | 3🐟 | Trigger a free upstream-flush (skip the 5🐟 cost; deck still refills and the auction step still runs as normal). |
 

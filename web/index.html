@@ -976,7 +976,7 @@ function buildMaterialDeck(numPlayers) {
 //   decorative. For human play, add a small persistent peek widget (e.g., a "🔭 Top of deck:
 //   <material> <icons>" indicator) that's visible whenever the human has Lookout Tree built.
 const STRUCTURE_TEMPLATES = [
-  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along).' },
+  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along), and slide back 1🐟 per card washed.' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 4, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a pre-river card to River 1 for free; an auction immediately runs on it at 1🐟/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 2, effect: 'End game: +1 VP per shoreline card on the table.' },
@@ -2974,7 +2974,11 @@ async function fireOnBuildEffect(playerIdx, struct) {
   if (struct.name === 'Beaver Dam') {
     const r1 = state.riverCards.filter(c => c.slot === 0);
     for (const c of r1) moveCardToShoreline(c);
-    if (r1.length > 0) log(`🦫 Beaver Dam washes ${r1.length} card${r1.length === 1 ? '' : 's'} to the shoreline.`);
+    if (r1.length > 0) {
+      const before = p.timePos;
+      p.timePos = Math.max(0, p.timePos - r1.length);
+      log(`🦫 Beaver Dam washes ${r1.length} card${r1.length === 1 ? '' : 's'} to the shoreline; ${speciesLabel(p)} slides back ${before - p.timePos}🐟.`);
+    }
     return;
   }
   if (struct.name === 'Mud Levee') {

@@ -21,7 +21,7 @@ let MAT_KEYS = ORIG_MATERIALS.slice();
 // Hooks are keyed off the structure name in helpers below.
 // Disable a single card's effect for ablation via setStructureEffectDisabled.
 const BASE_STRUCTURE_TEMPLATES = [
-  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along).' },
+  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along), and slide back 1 fish per card washed.' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 4, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a pre-river card to River 1 for free; an auction immediately runs on it at 1 fish/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 2, effect: 'End game: +1 VP per shoreline card on the table.' },
@@ -155,7 +155,8 @@ function configureMaterials(numMats) {
 }
 
 const PRERIV_SLOTS = 3;
-const RIVER_SLOTS = 4;
+let RIVER_SLOTS = 4;
+function setRiverSlots(n) { RIVER_SLOTS = n; }
 const LAP_LENGTH = 60;
 const ENDGAME_TRACK_END = 59;
 const UPSTREAM_AUCTION_COST = 1;
@@ -469,7 +470,7 @@ function jamCardDownriver(state, card) {
     return;
   }
   const newSlot = card.slot + 1;
-  if (newSlot > 3) { moveCardToShoreline(state, card); return; }
+  if (newSlot > RIVER_SLOTS - 1) { moveCardToShoreline(state, card); return; }
   card.slot = newSlot;
 }
 function refillPreriv(state, emptiedIdx) {
@@ -990,6 +991,7 @@ function fireOnBuildEffect(state, playerIdx, struct) {
   if (struct.name === 'Beaver Dam') {
     const r1 = state.riverCards.filter(c => c.slot === 0);
     for (const c of r1) moveCardToShoreline(state, c);
+    if (r1.length > 0) p.timePos = Math.max(0, p.timePos - r1.length);
     return;
   }
   if (struct.name === 'Mud Levee') {
@@ -1710,6 +1712,75 @@ function sweepAblation(numGamesArg, numPArg, workersArg) {
   console.log('  Lookout Tree, Salt Lick are intentional sim no-ops → expect Δ ≈ 0.\n');
 }
 
+// Compare 4-river-slot baseline vs 3-river-slot variant. Cards graduating off
+// the deepest river slot still go to the shoreline as usual; the only change
+// is that the deepest slot is now River 3 (4🐟/item) instead of River 4 (5🐟/item).
+function sweepRiverSlots() {
+  const numMats = 6;
+  const workers = 8;
+  const N = 2000;
+  console.log(`\nRiver-slot count comparison: 4 slots (live) vs 3 slots (drop River 4)`);
+  console.log(`Setting: ${workers} workers/player, ${numMats} materials, ${N} games per row.\n`);
+  console.log(
+    pad('numP', 5) + pad('slots', 6) +
+    padL('turns', 6) + padL('t/p', 5) + padL('~min', 6) +
+    padL('aucs', 6) + padL('jam%', 6) +
+    padL('exitR', 7) + padL('@R1%', 7) + padL('@R2%', 7) + padL('@R3%', 7) + padL('@R4%', 7) +
+    padL('past1%', 8) + padL('wst%', 7) +
+    padL('built/p', 8) + padL('winVP', 7) + padL('endg%', 7)
+  );
+  console.log('-'.repeat(5+6+6+5+6+6+6+7+7+7+7+7+8+7+8+7+7));
+  setSpeculativeBidProb(0);
+  setPrerivPlentySlides(true);
+  setAllPlentySlides(true);
+  for (const numP of [2, 3, 4]) {
+    for (const slots of [4, 3]) {
+      setRiverSlots(slots);
+      const trials = [];
+      for (let t = 0; t < N; t++) trials.push(runGame(numP, numMats, workers));
+      const turns = avg(trials.map(m => m.turns));
+      const auctions = avg(trials.map(m => m.auctions));
+      const jamPct = avg(trials.map(m => pct(m.jamAuctions, m.auctions)));
+      const allExits = [].concat(...trials.map(m => m.riverExitSlots));
+      const exitMean = allExits.length ? (allExits.reduce((s, x) => s + x, 0) / allExits.length) + 1 : 0;
+      const at = i => allExits.length ? (allExits.filter(s => s === i).length / allExits.length) * 100 : 0;
+      const past1Pct = allExits.length ? (allExits.filter(s => s >= 1).length / allExits.length) * 100 : 0;
+      const wstPct = avg(trials.map(m => pct(m.iconsWastedToShore, m.iconsSpawned)));
+      const built = avg(trials.map(m => m.cardsBuilt));
+      const winVP = avg(trials.map(m => m.winnerVP));
+      const endg = avg(trials.map(m => m.endgameTriggered ? 100 : 0));
+      const estMin = (turns * 30) / 60;
+      console.log(
+        pad(numP, 5) + pad(slots, 6) +
+        padL(turns.toFixed(0), 6) +
+        padL((turns / numP).toFixed(0), 5) +
+        padL(estMin.toFixed(1), 6) +
+        padL(auctions.toFixed(1), 6) +
+        padL(jamPct.toFixed(1), 6) +
+        padL(exitMean.toFixed(2), 7) +
+        padL(at(0).toFixed(1) + '%', 7) +
+        padL(at(1).toFixed(1) + '%', 7) +
+        padL(at(2).toFixed(1) + '%', 7) +
+        padL(at(3).toFixed(1) + '%', 7) +
+        padL(past1Pct.toFixed(1) + '%', 8) +
+        padL(wstPct.toFixed(1) + '%', 7) +
+        padL((built / numP).toFixed(1), 8) +
+        padL(winVP.toFixed(1), 7) +
+        padL(endg.toFixed(0) + '%', 7)
+      );
+    }
+    console.log();
+  }
+  setRiverSlots(4);
+  console.log('Legend:');
+  console.log('  exitR     = avg river slot a card LEFT FROM (1-indexed; only cards that entered the river)');
+  console.log('  @Ri%      = % of river-exits whose final slot was River i (i=1..4)');
+  console.log('  past1%    = % of river-exits where the card reached River 2+');
+  console.log('  wst%      = wasted icons (shore-bound w/ no claim) as % of total icons spawned');
+  console.log('  built/p   = avg structures built per player');
+  console.log('  endg%     = % of games that hit the endgame trigger (deck emptied)\n');
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
@@ -1717,5 +1788,6 @@ if (require.main === module) {
   else if (mode === 'deck') sweepDeck(process.argv[3]);
   else if (mode === 'uniform') sweepUniform();
   else if (mode === 'ablation') sweepAblation(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'river-slots') sweepRiverSlots();
   else sweep();
 }
