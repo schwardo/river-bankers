@@ -884,7 +884,7 @@
 
   <div class="river-wrap">
     <div class="river-header">
-      <span>← Upstream queue · River · Shoreline</span>
+      <span>← Headwaters · River · Shoreline</span>
       <span class="river-action-tag">Spend 1🐟 to auction</span>
       <span>Downriver →</span>
     </div>
@@ -978,7 +978,7 @@ function buildMaterialDeck(numPlayers) {
 const STRUCTURE_TEMPLATES = [
   { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along), and slide back 1🐟 per card washed.' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 4, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
-  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a pre-river card to River 1 for free; an auction immediately runs on it at 1🐟/item.' },
+  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a Headwaters card to River 1 for free; an auction immediately runs on it at 1🐟/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 2, effect: 'End game: +1 VP per shoreline card on the table.' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
@@ -991,16 +991,16 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
   { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 1, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1🐟.' },
-  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5, effect: 'At the start of your turn you may pay 1🐟 to replace a pre-river card with the top of the material deck.' },
+  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5, effect: 'At the start of your turn you may pay 1🐟 to replace a Headwaters card with the top of the material deck.' },
   { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 5, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7, effect: 'When you would pass 0 on the fish track, stop at space 1 instead.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5, effect: 'When built, look at the top 5 material cards and rearrange them in any order.' },
-  { name: 'Flush Channel',  cost: { mud: 4, reeds: 1 },              time: 3, vp: 5, effect: 'When built, trigger a free upstream-flush (no 5🐟 cost).' },
+  { name: 'Flush Channel',  cost: { mud: 4, reeds: 1 },              time: 3, vp: 5, effect: 'When built, trigger a free Headwaters flush (no 5🐟 cost).' },
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5, effect: 'Once per game, your build costs 1 fewer of one listed material (your choice).' },
   { name: 'Granite Spire',  cost: { stones: 6 },                     time: 4, vp: 7 },
   { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built, take an immediate extra turn.' },
   { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you call workers home, slide back 1 fish per worker recalled.' },
-  { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space upstream.' },
+  { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
   { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 5, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
@@ -1596,7 +1596,7 @@ function renderRiver() {
     prerivInner += `<div class="${slotCls.join(' ')}">${sideLabel}${cardArea}</div>`;
   }
   html += `<div class="river-section preriv-section">
-    <div class="section-header">Upstream · <span class="slot-cost-badge">${UPSTREAM_AUCTION_COST}🐟/item</span></div>
+    <div class="section-header">Headwaters · <span class="slot-cost-badge">${UPSTREAM_AUCTION_COST}🐟/item</span></div>
     <div class="preriv-column">${prerivInner}</div>
   </div>`;
   // divider between pre-river and river
@@ -1816,7 +1816,7 @@ function renderActionPanel() {
     const hasPreriv = state.prerivCards.some(c => c !== null);
     const abilityBtns = [];
     if (hasEffect(cur, 'Heron Roost') && state.matDeck.length > 0 && cur.timePos < ENDGAME_TRACK_END - 1 && hasPreriv) {
-      abilityBtns.push(`<button class="ability-btn" onclick="humanUseHeronRoost()">🦩 Heron Roost (1🐟): replace upstream</button>`);
+      abilityBtns.push(`<button class="ability-btn" onclick="humanUseHeronRoost()">🦩 Heron Roost (1🐟): replace Headwaters card</button>`);
     }
     if (hasEffect(cur, 'Driftwood Snag') && cur.timePos < ENDGAME_TRACK_END - 1) {
       const anyOpen = [...state.riverCards, ...state.prerivCards.filter(c => c)].some(c => uncoveredIcons(c) > 0);
@@ -1829,14 +1829,14 @@ function renderActionPanel() {
       <div class="action-buttons">
         <button class="secondary" onclick="humanCallHome()" ${placed === 0 ? 'disabled' : ''}>Call workers home (${placed} out)</button>
         <button onclick="humanChooseAction('auction')" ${(cur.supply > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>1. Auction river card (1🐟)</button>
-        <button onclick="humanChooseAction('preriv')" ${(cur.supply > 0 && hasPreriv) ? '' : 'disabled'}>2. Pull upstream card (2–4🐟)</button>
+        <button onclick="humanChooseAction('preriv')" ${(cur.supply > 0 && hasPreriv) ? '' : 'disabled'}>2. Pull Headwaters card (2–4🐟)</button>
         <button onclick="humanChooseAction('browse')" ${state.structDeck.length > 0 ? '' : 'disabled'}>3. Invent N (N🐟)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>4. Build a structure</button>
-        <button onclick="humanChooseAction('flush')" ${(cur.supply > 0 && (hasPreriv || state.matDeck.length > 0)) ? '' : 'disabled'}>5. Flush upstream (5🐟)</button>
+        <button onclick="humanChooseAction('flush')" ${(cur.supply > 0 && (hasPreriv || state.matDeck.length > 0)) ? '' : 'disabled'}>5. Flush Headwaters (5🐟)</button>
         ${state.endgame ? `<button class="ghost" onclick="humanRetire()">Retire (endgame)</button>` : ''}
       </div>
       ${abilityRow}
-      <div class="action-hint">Tip: click any river or upstream card to auction it, or any buildable structure in your hand to build it.</div>`;
+      <div class="action-hint">Tip: click any river or Headwaters card to auction it, or any buildable structure in your hand to build it.</div>`;
   } else if (state.phase === 'select-auction-card') {
     html = `<div class="action-panel-title">Pick a river card to auction</div>
       <div class="action-buttons">
@@ -1844,15 +1844,15 @@ function renderActionPanel() {
         <button class="ghost" onclick="humanCancelAction()">Cancel</button>
       </div>`;
   } else if (state.phase === 'select-preriv-card') {
-    html = `<div class="action-panel-title">Pick an upstream card to pull</div>
+    html = `<div class="action-panel-title">Pick a Headwaters card to pull</div>
       <div class="action-buttons">
-        <span class="action-hint">Click an upstream card. Move cost depends on the slot (4🐟 / 3🐟 / 2🐟).</span>
+        <span class="action-hint">Click a Headwaters card. Move cost depends on the slot (4🐟 / 3🐟 / 2🐟).</span>
         <button class="ghost" onclick="humanCancelAction()">Cancel</button>
       </div>`;
   } else if (state.phase === 'flush-pick-card') {
-    html = `<div class="action-panel-title">Pick which fresh upstream card to auction</div>
+    html = `<div class="action-panel-title">Pick which fresh Headwaters card to auction</div>
       <div class="action-buttons">
-        <span class="action-hint">Upstream just refilled. Click any of the new cards to auction it for free (1🐟/item).</span>
+        <span class="action-hint">Headwaters just refilled. Click any of the new cards to auction it for free (1🐟/item).</span>
       </div>`;
   } else if (state.phase === 'select-build') {
     html = `<div class="action-panel-title">Pick a structure to build</div>
@@ -1915,7 +1915,7 @@ function jamCardDownriver(card) {
     card.slot = 0;
     state.riverCards.push(card);
     if (idx !== -1) refillPreriv(idx);
-    log(`💨 ${MATERIALS[card.material].emoji} ${MATERIALS[card.material].name} jams from Upstream into River 1 (${riverSlotCost(0)}🐟/item).`);
+    log(`💨 ${MATERIALS[card.material].emoji} ${MATERIALS[card.material].name} jams from the Headwaters into River 1 (${riverSlotCost(0)}🐟/item).`);
     return;
   }
   // Cost is slot-based: jamming to a higher slot raises the per-item cost automatically.
@@ -1942,7 +1942,7 @@ function refillPreriv(emptiedIdx) {
     const c = state.matDeck.pop();
     c.slot = 'pre';
     state.prerivCards[0] = c;
-    log(`⬇ ${MATERIALS[c.material].emoji} new ${MATERIALS[c.material].name} card enters Upstream 1 (move: ${prerivTriggerCost(0)}🐟).`);
+    log(`⬇ ${MATERIALS[c.material].emoji} new ${MATERIALS[c.material].name} card enters Headwaters 3 (move: ${prerivTriggerCost(0)}🐟).`);
   }
 }
 
@@ -2013,13 +2013,13 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     if (useIt) {
       card.slot -= 1;
       trig.floodgateUsed = true;
-      log(`🚪 Floodgate: ${speciesLabel(trig)} slides the card 1 space upstream.`);
+      log(`🚪 Floodgate: ${speciesLabel(trig)} slides the card 1 space toward the Headwaters.`);
     }
   }
   // Collect bids: AIs decide privately; human inputs via modal.
   state.phase = 'auction-bidding';
   const m = MATERIALS[card.material];
-  const slotLbl = card.slot === 'pre' ? 'Upstream' : `River ${card.slot + 1}`;
+  const slotLbl = card.slot === 'pre' ? 'Headwaters' : `River ${card.slot + 1}`;
   log(`🎲 Auction begins on ${m.emoji} ${m.name} at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
 
   // Spy Mound: holders can defer their bid until after others reveal.
@@ -2519,7 +2519,7 @@ function aiStartOfTurnAbilities(playerIdx) {
       newCard.slot = 'pre';
       state.prerivCards[target] = newCard;
       p.timePos += 1;
-      log(`🦩 Heron Roost: ${speciesLabel(p)} replaces an Upstream card (+1🐟).`);
+      log(`🦩 Heron Roost: ${speciesLabel(p)} replaces a Headwaters card (+1🐟).`);
     }
   }
   if (hasEffect(p, 'Driftwood Snag') && p.timePos < ENDGAME_TRACK_END - 1) {
@@ -2679,17 +2679,17 @@ async function humanUseHeronRoost() {
     .filter(x => x);
   if (cands.length === 0) return;
   const pick = await pickFromList(
-    '🦩 Heron Roost — replace upstream card',
-    'Pick which upstream card to discard. The top of the material deck replaces it. Costs 1🐟.',
+    '🦩 Heron Roost — replace Headwaters card',
+    'Pick which Headwaters card to discard. The top of the material deck replaces it. Costs 1🐟.',
     cands,
-    x => `Upstream ${x.idx + 1}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} (${x.card.totalIcons} icons)`
+    x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} (${x.card.totalIcons} icons)`
   );
   if (!pick) return;
   const newCard = state.matDeck.pop();
   newCard.slot = 'pre';
   state.prerivCards[pick.idx] = newCard;
   human.timePos += 1;
-  log(`🦩 Heron Roost: ${speciesLabel(human)} replaces Upstream ${pick.idx + 1} with ${MATERIALS[newCard.material].name} (+1🐟).`);
+  log(`🦩 Heron Roost: ${speciesLabel(human)} replaces Headwaters ${PRERIV_SLOTS - pick.idx} with ${MATERIALS[newCard.material].name} (+1🐟).`);
   render();
 }
 
@@ -2699,12 +2699,12 @@ async function humanUseDriftwoodSnag() {
   if (human.timePos >= ENDGAME_TRACK_END - 1) return;
   const cands = [
     ...state.riverCards.map(c => ({ card: c, where: `River ${c.slot + 1}` })),
-    ...state.prerivCards.map((c, i) => c ? { card: c, where: `Upstream ${i + 1}` } : null).filter(x => x),
+    ...state.prerivCards.map((c, i) => c ? { card: c, where: `Headwaters ${PRERIV_SLOTS - i}` } : null).filter(x => x),
   ].filter(x => uncoveredIcons(x.card) > 0);
   if (cands.length === 0) return;
   const pick = await pickFromList(
     '🪵 Driftwood Snag — drop a blank',
-    'Pick any river or upstream card with an uncovered icon. One icon becomes blocked. Costs 1🐟.',
+    'Pick any river or Headwaters card with an uncovered icon. One icon becomes blocked. Costs 1🐟.',
     cands,
     x => `${x.where}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open)`
   );
@@ -2738,7 +2738,7 @@ async function humanFlushUpstream() {
   state.lastHumanActionType = 'flush';
   const human = state.players.find(p => p.isHuman);
   advancePlayer(human.idx, 5);
-  log(`🌀 ${speciesLabel(human)} spends 5🐟 to flush the upstream queue.`);
+  log(`🌀 ${speciesLabel(human)} spends 5🐟 to flush the Headwaters.`);
   // 1) Discard upstream cards.
   for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
   // 2) Refill upstream from deck.
@@ -2764,7 +2764,7 @@ function humanSelectFlushTarget(slotIdx) {
   const card = state.prerivCards[slotIdx];
   if (!card) return;
   const human = state.players.find(p => p.isHuman);
-  log(`🎬 ${speciesLabel(human)} picks Upstream ${slotIdx + 1} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}🐟/item) to auction.`);
+  log(`🎬 ${speciesLabel(human)} picks Headwaters ${PRERIV_SLOTS - slotIdx} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}🐟/item) to auction.`);
   state.phase = 'idle';
   render();
   runAuction(card, human.idx, 1).then(() => {
@@ -2808,7 +2808,7 @@ function humanSelectPrerivCard(slotIdx) {
   if (human.supply === 0) return;
   const moveCost = prerivTriggerCost(slotIdx);
   advancePlayer(human.idx, moveCost);
-  log(`🎬 ${speciesLabel(human)} spends ${moveCost}🐟 to auction Upstream ${slotIdx + 1} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}🐟/item).`);
+  log(`🎬 ${speciesLabel(human)} spends ${moveCost}🐟 to auction Headwaters ${PRERIV_SLOTS - slotIdx} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}🐟/item).`);
   state.phase = 'idle';
   render();
   runAuction(card, human.idx, 1).then(() => humanResolver && humanResolver());
@@ -2987,7 +2987,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
       for (let drop = 0; drop < 2; drop++) {
         const cands = [
           ...state.riverCards.map(c => ({ card: c, where: `River ${c.slot + 1}` })),
-          ...state.prerivCards.map((c, i) => c ? { card: c, where: `Upstream ${i + 1}` } : null).filter(x => x),
+          ...state.prerivCards.map((c, i) => c ? { card: c, where: `Headwaters ${PRERIV_SLOTS - i}` } : null).filter(x => x),
         ].filter(x => uncoveredIcons(x.card) > 0);
         if (cands.length === 0) break;
         const pick = await pickFromList(
@@ -3021,7 +3021,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
       c.slot = 'pre';
       state.prerivCards[i] = c;
     }
-    log(`🌀 Flush Channel discards upstream and refills.`);
+    log(`🌀 Flush Channel discards the Headwaters and refills.`);
     render();
     const cands = state.prerivCards
       .map((c, i) => c ? { card: c, idx: i } : null)
@@ -3031,9 +3031,9 @@ async function fireOnBuildEffect(playerIdx, struct) {
     if (isHuman) {
       pick = await pickFromList(
         '🌀 Flush Channel — pick auction target',
-        'Pick a fresh upstream card to auction (free trigger; you must bid at least 1 worker at 1🐟/item).',
+        'Pick a fresh Headwaters card to auction (free trigger; you must bid at least 1 worker at 1🐟/item).',
         cands,
-        x => `Upstream ${x.idx + 1}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
+        x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
         { cancelable: false }
       );
     } else {
@@ -3041,7 +3041,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
       if (aiIdx === -1) return;
       pick = { card: state.prerivCards[aiIdx], idx: aiIdx };
     }
-    log(`🎬 ${speciesLabel(p)} picks Upstream ${pick.idx + 1} ${MATERIALS[pick.card.material].name} (1🐟/item) to auction.`);
+    log(`🎬 ${speciesLabel(p)} picks Headwaters ${PRERIV_SLOTS - pick.idx} ${MATERIALS[pick.card.material].name} (1🐟/item) to auction.`);
     await runAuction(pick.card, playerIdx, 1);
     return;
   }
@@ -3087,10 +3087,10 @@ async function fireOnBuildEffect(playerIdx, struct) {
     let pick;
     if (isHuman) {
       pick = await pickFromList(
-        '🪤 Snag Pile — pull upstream card',
-        'Pick which upstream card to pull. An auction immediately runs on it at 1🐟/item; you must bid at least 1 worker.',
+        '🪤 Snag Pile — pull Headwaters card',
+        'Pick which Headwaters card to pull. An auction immediately runs on it at 1🐟/item; you must bid at least 1 worker.',
         cands,
-        x => `Upstream ${x.idx + 1}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
+        x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
         { cancelable: false }
       );
     } else {
@@ -3098,7 +3098,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
       if (aiIdx === -1) return;
       pick = { card: state.prerivCards[aiIdx], idx: aiIdx };
     }
-    log(`🪤 Snag Pile: ${speciesLabel(p)} pulls Upstream ${pick.idx + 1} ${MATERIALS[pick.card.material].name} (1🐟/item).`);
+    log(`🪤 Snag Pile: ${speciesLabel(p)} pulls Headwaters ${PRERIV_SLOTS - pick.idx} ${MATERIALS[pick.card.material].name} (1🐟/item).`);
     await runAuction(pick.card, playerIdx, 1);
     return;
   }
@@ -3352,7 +3352,7 @@ async function humanBidForAuction(card, human, minBid, opts = {}) {
     const m = MATERIALS[card.material];
     const open = uncoveredIcons(card);
     const cost = playerCardCost(card, human.idx);
-    const slotLbl = card.slot === 'pre' ? 'Upstream' : `River ${card.slot + 1}`;
+    const slotLbl = card.slot === 'pre' ? 'Headwaters' : `River ${card.slot + 1}`;
     // Cap bids at the smaller of your supply and the open icons. Bidding more than the
     // open count never gets you more — you can only ever take open items at most.
     const maxBid = Math.min(human.supply, open);
@@ -3557,7 +3557,7 @@ async function executeAIAction(playerIdx, action) {
     if (!card) return;
     const moveCost = prerivTriggerCost(action.slotIdx);
     advancePlayer(playerIdx, moveCost);
-    log(`🎬 ${speciesLabel(p)} spends ${moveCost}🐟 to auction Upstream ${action.slotIdx + 1} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}🐟/item).`);
+    log(`🎬 ${speciesLabel(p)} spends ${moveCost}🐟 to auction Headwaters ${PRERIV_SLOTS - action.slotIdx} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}🐟/item).`);
     render();
     await sleep(300);
     await runAuction(card, playerIdx, 1);
@@ -3565,7 +3565,7 @@ async function executeAIAction(playerIdx, action) {
   }
   if (action.type === 'flush') {
     advancePlayer(playerIdx, 5);
-    log(`🌀 ${speciesLabel(p)} spends 5🐟 to flush the upstream queue.`);
+    log(`🌀 ${speciesLabel(p)} spends 5🐟 to flush the Headwaters.`);
     // Discard upstream
     for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
     // Refill from deck
@@ -3581,7 +3581,7 @@ async function executeAIAction(playerIdx, action) {
     const targetIdx = aiChooseFlushTarget(playerIdx);
     if (targetIdx === -1) return;
     const card = state.prerivCards[targetIdx];
-    log(`🎬 ${speciesLabel(p)} picks Upstream ${targetIdx + 1} ${MATERIALS[card.material].name} to auction (${UPSTREAM_AUCTION_COST}🐟/item).`);
+    log(`🎬 ${speciesLabel(p)} picks Headwaters ${PRERIV_SLOTS - targetIdx} ${MATERIALS[card.material].name} to auction (${UPSTREAM_AUCTION_COST}🐟/item).`);
     await runAuction(card, playerIdx, 1);
     return;
   }

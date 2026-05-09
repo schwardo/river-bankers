@@ -22,8 +22,8 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 | **Lookout Tree** | 5 logs, 2 stones | 4🐟 | Peek at the top card of the material deck at any time. |
 | **Spy Mound** | 4 stones, 1 clay | 3🐟 | Once per game, you may decide your auction bid after the other players have revealed their bids. |
 | **Otter Raft** | 4 logs, 1 reed | 3🐟 | Whenever you place fewer workers than your bid due to a jammed auction, pay fish for one fewer worker. |
-| **Heron Roost** | 3 reeds, 2 vines | 3🐟 | At the start of your turn you may pay 1 fish to replace a pre-river card of your choice with the top card of the material deck.  The replaced card is discarded. |
-| **Driftwood Snag** | 2 logs, 2 reeds, 1 mud | 3🐟 | At the start of your turn you may pay 1 fish to add a blank to any uncovered icon — either on the river or upstream. |
+| **Heron Roost** | 3 reeds, 2 vines | 3🐟 | At the start of your turn you may pay 1 fish to replace a Headwaters card of your choice with the top card of the material deck.  The replaced card is discarded. |
+| **Driftwood Snag** | 2 logs, 2 reeds, 1 mud | 3🐟 | At the start of your turn you may pay 1 fish to add a blank to any uncovered icon — either on the river or in the Headwaters. |
 
 ### Material / build
 
@@ -41,7 +41,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 | **Hollowed-out Log** | 3 logs, 1 reed | 2🐟 | When you pass 0, recall one worker from a river card without dropping a blank. |
 | **Cache Burrow** | 2 mud, 2 reeds | 2🐟 | Your hand size is 4 instead of 3. |
 | **Granary** | 4 reeds, 1 clay | 3🐟 | Once per game, your build costs 1 fewer of one listed material (your choice). |
-| **Floodgate** | 4 mud, 3 clay | 4🐟 | Once per game, before an auction resolves, slide the auctioned card 1 space upstream (cheaper). |
+| **Floodgate** | 4 mud, 3 clay | 4🐟 | Once per game, before an auction resolves, slide the auctioned card 1 space upstream — toward the Headwaters (cheaper). |
 | **Otter Den** | 3 mud, 1 vine | 2🐟 | When you recall your workers, move backwards on the fish card by the number of recalled workers. |
 
 ### Shoreline / endgame scoring
@@ -62,7 +62,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 |------|------|------|--------|
 | **Royal Lodge** | 6 logs, 2 vines | 5🐟 | Take an immediate extra turn after building. |
 | **Burrow Run** | 3 vines, 1 mud | 0🐟 | Slide your pawn back 5 on the fish track. |
-| **Snag Pile** | 2 reeds, 1 stone | 2🐟 | Pull a pre-river card to River 1 for free; an auction immediately runs on it at 1🐟/item. *(Your bid still costs at the new river rate.)* |
+| **Snag Pile** | 2 reeds, 1 stone | 2🐟 | Pull a Headwaters card to River 1 for free; an auction immediately runs on it at 1🐟/item. *(Your bid still costs at the new river rate.)* |
 
 ### Worker reshuffle
 
@@ -84,7 +84,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 |------|------|------|--------|
 | **Beaver Dam** | 4 logs, 2 mud | 3🐟 | Wash every card currently in River 1 to the shoreline (carry workers along). Slide back 1🐟 on the fish track per card washed. |
 | **Mud Levee** | 3 mud, 2 stones | 3🐟 | Drop 2 blanks on any uncovered icons in the river. |
-| **Flush Channel** | 4 mud, 1 reed | 3🐟 | Trigger a free upstream-flush (skip the 5🐟 cost; deck still refills and the auction step still runs as normal). |
+| **Flush Channel** | 4 mud, 1 reed | 3🐟 | Trigger a free Headwaters flush (skip the 5🐟 cost; deck still refills and the auction step still runs as normal). |
 
 ### Conditional VP (resolved at game end)
 

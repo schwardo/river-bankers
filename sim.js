@@ -23,7 +23,7 @@ let MAT_KEYS = ORIG_MATERIALS.slice();
 const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along), and slide back 1 fish per card washed.' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 4, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
-  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a pre-river card to River 1 for free; an auction immediately runs on it at 1 fish/item.' },
+  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a Headwaters card to River 1 for free; an auction immediately runs on it at 1 fish/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 2, effect: 'End game: +1 VP per shoreline card on the table.' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
@@ -36,16 +36,16 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
   { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 1, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1 fish.' },
-  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5, effect: 'At the start of your turn you may pay 1 fish to replace a pre-river card with the top of the material deck.' },
+  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5, effect: 'At the start of your turn you may pay 1 fish to replace a Headwaters card with the top of the material deck.' },
   { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 5, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7, effect: 'When you would pass 0 on the fish track, stop at space 1 instead.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5, effect: 'When built, look at the top 5 material cards and rearrange them in any order.' },
-  { name: 'Flush Channel',  cost: { mud: 4, reeds: 1 },              time: 3, vp: 5, effect: 'When built, trigger a free upstream-flush (no 5 fish cost).' },
+  { name: 'Flush Channel',  cost: { mud: 4, reeds: 1 },              time: 3, vp: 5, effect: 'When built, trigger a free Headwaters flush (no 5 fish cost).' },
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5, effect: 'Once per game, your build costs 1 fewer of one listed material (your choice).' },
   { name: 'Granite Spire',  cost: { stones: 6 },                     time: 4, vp: 7 },
   { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built, take an immediate extra turn.' },
   { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you call workers home, slide back 1 fish per worker recalled.' },
-  { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space upstream.' },
+  { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
   { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 5, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
@@ -369,8 +369,19 @@ function newGame(numPlayers, workersPerPlayer = 8) {
       nonZeroBidders: 0,          // count of (auction, bidder) pairs with bid > 0
       zeroClinchBidders: 0,       // of those, bidders that clinched 0 icons (only possible in jams)
       zeroClinchAuctions: 0,      // auctions where total bids > 0 but total clinched = 0
+      peakBlanks: 0,              // max total blanks across all river/preriv cards at any point
     },
   };
+}
+
+// Sum of all blank tokens currently on the board (river + pre-river only —
+// shoreline cards have their blanks returned to the pool when they graduate).
+// Called after every operation that mints a blank to update the peak metric.
+function noteBlanks(state) {
+  let total = 0;
+  for (const c of state.riverCards) total += c.blanks;
+  for (const c of state.prerivCards) if (c) total += c.blanks;
+  if (total > state.metrics.peakBlanks) state.metrics.peakBlanks = total;
 }
 
 function pickNextPlayer(state) {
@@ -505,6 +516,7 @@ function callWorkersHome(state, playerIdx, recallSpec) {
     p.supply += take;
     total += take;
   }
+  noteBlanks(state);
   // Otter Den: slide back 1 fish per worker recalled.
   if (total > 0 && hasEffect(p, 'Otter Den')) {
     p.timePos = Math.max(0, p.timePos - total);
@@ -828,6 +840,7 @@ function aiStartOfTurnAbilities(state, playerIdx) {
     if (cands.length > 0) {
       const target = cands.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b);
       target.blanks += 1;
+      noteBlanks(state);
       p.timePos += 1; // 1 fish cost
     }
   }
@@ -961,6 +974,7 @@ function performBuild(state, playerIdx, handIdx) {
       need -= take;
     }
   }
+  noteBlanks(state);
   p.supply += Object.values(effCost).reduce((s, n) => s + n, 0);
   // Otter Slide: build advances 1 fewer fish (min 1). Cards with printed time 0 stay 0.
   const slideDiscount = hasEffect(p, 'Otter Slide') ? 1 : 0;
@@ -1003,6 +1017,7 @@ function fireOnBuildEffect(state, playerIdx, struct) {
       while (dropped < 2 && uncoveredIcons(c) > 0) { c.blanks++; dropped++; }
       if (dropped >= 2) break;
     }
+    noteBlanks(state);
     return;
   }
   if (struct.name === 'Flush Channel') {
@@ -1781,6 +1796,49 @@ function sweepRiverSlots() {
   console.log('  endg%     = % of games that hit the endgame trigger (deck emptied)\n');
 }
 
+// Distribution of peak simultaneous blank tokens per game across player counts.
+// Used to decide how many blank chits to physically include in the box.
+function sweepBlanks() {
+  const numMats = 6;
+  const workers = 8;
+  const N = 5000;
+  console.log(`\nPeak simultaneous blank tokens per game (${N} games per row, ${workers} workers/player, ${numMats} materials).`);
+  console.log(`Blanks return to the pool when a card graduates to the shoreline, so the relevant number is the max in flight at any moment.\n`);
+  console.log(
+    pad('numP', 5) +
+    padL('mean', 7) + padL('p50', 6) + padL('p90', 6) + padL('p95', 6) + padL('p99', 6) +
+    padL('max', 6) + padL('@max', 6)
+  );
+  console.log('-'.repeat(5 + 7 + 6 * 6));
+  for (const numP of [2, 3, 4]) {
+    const peaks = [];
+    let maxCount = 0;
+    for (let t = 0; t < N; t++) {
+      const m = runGame(numP, numMats, workers);
+      peaks.push(m.peakBlanks);
+      if (m.peakBlanks > maxCount) maxCount = m.peakBlanks;
+    }
+    peaks.sort((a, b) => a - b);
+    const q = pctile => peaks[Math.min(peaks.length - 1, Math.floor(pctile * peaks.length))];
+    const mean = peaks.reduce((s, x) => s + x, 0) / peaks.length;
+    const atMax = peaks.filter(x => x === maxCount).length;
+    console.log(
+      pad(numP, 5) +
+      padL(mean.toFixed(1), 7) +
+      padL(q(0.50), 6) +
+      padL(q(0.90), 6) +
+      padL(q(0.95), 6) +
+      padL(q(0.99), 6) +
+      padL(maxCount, 6) +
+      padL(atMax, 6)
+    );
+  }
+  console.log('\nLegend:');
+  console.log('  mean/p50/p90/p95/p99 = peak-blanks distribution across the N simulated games');
+  console.log('  max  = highest peak observed in any single game');
+  console.log('  @max = how many of the N games hit that max (0 = singular outlier)\n');
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
@@ -1789,5 +1847,6 @@ if (require.main === module) {
   else if (mode === 'uniform') sweepUniform();
   else if (mode === 'ablation') sweepAblation(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'river-slots') sweepRiverSlots();
+  else if (mode === 'blanks') sweepBlanks();
   else sweep();
 }
