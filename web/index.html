@@ -472,18 +472,6 @@
     color: var(--ink-soft);
     font-style: italic;
   }
-  .player-fish {
-    position: absolute;
-    bottom: 6px;
-    right: 10px;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--ink);
-    background: rgba(255,255,255,0.6);
-    padding: 1px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--bank);
-  }
   .built-list {
     margin-top: 4px;
     display: flex; flex-wrap: wrap; gap: 3px;
@@ -1727,7 +1715,6 @@ function renderPlayers() {
       <div class="player-stats" style="margin-top:4px;">${matSummary}</div>
       ${builtList}
       ${lookoutPeek}
-      <div class="player-fish">${p.timePos} 🐟</div>
     </div>`;
   }
   wrap.innerHTML = html;
