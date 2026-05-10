@@ -167,173 +167,133 @@
     margin-bottom: 10px;
     box-shadow: inset 0 0 30px rgba(0,0,0,0.2);
   }
-  .river-header {
-    display: flex; justify-content: space-between; align-items: center;
-    color: #fff;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
-    margin-bottom: 6px;
-    font-size: 12px;
-    padding: 0 4px;
-  }
-  .river-action-tag {
-    background: var(--paper);
-    color: var(--ink);
-    border: 2px solid var(--bank);
-    padding: 2px 12px;
-    border-radius: 999px;
-    font-weight: 700;
-    font-size: 13px;
-    text-shadow: none;
-  }
-  .deck-progress {
-    margin: 4px 4px 8px;
-    color: rgba(255,255,255,0.95);
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
-  }
-  .deck-progress-label {
-    display: flex; justify-content: space-between;
-    font-size: 11px;
-    margin-bottom: 3px;
-  }
-  .deck-progress-bar {
-    height: 8px;
-    background: rgba(0,0,0,0.25);
-    border: 1px solid var(--bank);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  .deck-progress-fill {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, var(--forest-light) 0%, var(--forest) 50%, #1a3a20 100%);
-    transition: width 400ms ease;
-  }
-  .river-flow {
+  /* ================= BOARD LAYOUT ================= */
+  .board {
     display: flex;
     gap: 6px;
     align-items: stretch;
   }
-  .river-section {
-    display: flex; flex-direction: column;
-    min-width: 0;
-    gap: 4px;
-  }
-  .river-section.preriv-section { flex: 1.1; min-width: 220px; }
-  .river-section.river-slot-section { flex: 1.2; }
-  .river-section.shoreline-section { flex: 1; min-width: 180px; }
-  .section-header {
-    color: rgba(255,255,255,0.95);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    text-align: center;
-    padding: 4px 0 2px;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
-  }
-  .preriv-column {
+  .board-main {
+    flex: 1;
     display: flex; flex-direction: column;
     gap: 6px;
-    flex: 1;
+    min-width: 0;
   }
-  .preriv-slot {
+  .board-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    min-width: 0;
+  }
+  .board-shoreline {
+    flex: 0 0 200px;
+    display: flex; flex-direction: column;
+  }
+  .slot-tile {
     background: rgba(255,255,255,0.04);
     border: 2px dashed rgba(255,255,255,0.3);
     border-radius: 6px;
-    padding: 4px;
-    flex: 1;
-    display: flex; flex-direction: row;
-    align-items: stretch;
-    gap: 6px;
-    min-height: 0;
-  }
-  .preriv-slot.selectable { cursor: pointer; }
-  .preriv-slot.selectable:hover { background: rgba(255,255,0,0.15); border-color: yellow; }
-  .preriv-side-label {
-    flex: 0 0 auto;
-    width: 92px;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    text-align: center;
-  }
-  .preriv-slot-num {
-    font-weight: 700;
-    color: rgba(255,255,255,0.85);
-  }
-  .preriv-slot-cost {
-    color: rgba(255,255,255,0.95);
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0;
-    text-transform: none;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
-  }
-  .preriv-slot .slot-cards { flex: 1; min-width: 0; }
-  .divider {
-    background: repeating-linear-gradient(
-      45deg,
-      var(--shore) 0 6px,
-      var(--shore-light) 6px 12px
-    );
-    border-radius: 3px;
-    border: 1px solid var(--bank);
-  }
-  .river-slot {
-    background: rgba(255,255,255,0.08);
-    border: 2px dashed rgba(255,255,255,0.4);
-    border-radius: 6px;
-    min-height: 200px;
-    padding: 4px;
-    display: flex; flex-direction: column;
-    position: relative;
-    flex: 1;
-  }
-  /* Cost gradient on river slots: deeper / darker = pricier per item. */
-  .river-slot[data-cost="2"] { background: rgba(135,192,216,0.18); }
-  .river-slot[data-cost="3"] { background: rgba(58,143,183,0.22); }
-  .river-slot[data-cost="4"] { background: rgba(29,78,107,0.30); }
-  .river-slot[data-cost="5"] { background: rgba(15,40,60,0.42); }
-  .slot-cost-badge {
-    display: inline-block;
-    background: var(--paper);
-    color: var(--ink);
-    font-weight: 700;
-    border: 1.5px solid var(--bank);
-    border-radius: 999px;
-    padding: 1px 8px;
-    font-size: 12px;
-    letter-spacing: 0;
-    margin-left: 4px;
-    text-transform: none;
-  }
-  .slot-cards {
+    padding: 6px;
     display: flex; flex-direction: column;
     gap: 4px;
-    flex: 1;
+    min-width: 0; min-height: 200px;
   }
-  .river-slot.selectable { cursor: pointer; }
-  .river-slot.selectable:hover { background: rgba(255,255,0,0.15); border-color: yellow; }
-  .river-slot-label { display: none; /* moved out to .river-slot-header */ }
+  .slot-tile-header {
+    text-align: center;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.95);
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+    font-weight: 700;
+  }
+  .slot-tile-cost {
+    text-align: center;
+    color: rgba(255,255,255,0.95);
+    font-weight: 700;
+    font-size: 12px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
+  }
+  .slot-tile-body {
+    flex: 1;
+    display: flex; flex-direction: column;
+    min-height: 0;
+    gap: 4px;
+  }
+  .slot-tile-empty {
+    color: rgba(255,255,255,0.5);
+    font-style: italic; font-size: 11px;
+    text-align: center;
+    margin: auto;
+  }
+  /* Material deck tile (row 1, far left) */
+  .slot-tile.deck-tile {
+    background: rgba(40, 70, 40, 0.30);
+    border-style: solid;
+    border-color: rgba(255,255,255,0.25);
+    align-items: center; justify-content: flex-start;
+  }
+  .deck-count-large {
+    font-size: 36px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.95);
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    line-height: 1;
+    margin: auto 0;
+  }
+  .deck-count-small {
+    font-size: 11px;
+    color: rgba(255,255,255,0.85);
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .deck-flush-btn {
+    margin-top: auto;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--paper);
+    color: var(--ink);
+    border: 2px solid var(--bank);
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .deck-flush-btn:hover:not(:disabled) {
+    background: var(--paper-warm, #fff4d6);
+    border-color: var(--forest);
+  }
+  .deck-flush-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  /* Headwaters tiles */
+  .slot-tile.preriv-tile.selectable { cursor: pointer; }
+  .slot-tile.preriv-tile.selectable:hover { background: rgba(255,255,0,0.15); border-color: yellow; }
+  /* River tiles — cost gradient: deeper / darker = pricier per item. */
+  .slot-tile.river-tile[data-cost="2"] { background: rgba(135,192,216,0.18); }
+  .slot-tile.river-tile[data-cost="3"] { background: rgba(58,143,183,0.22); }
+  .slot-tile.river-tile[data-cost="4"] { background: rgba(29,78,107,0.30); }
+  .slot-tile.river-tile[data-cost="5"] { background: rgba(15,40,60,0.42); }
+  .slot-tile.river-tile.selectable { cursor: pointer; }
+  .slot-tile.river-tile.selectable:hover { background: rgba(255,255,0,0.15); border-color: yellow; }
+  /* Shoreline (full-height tile on the right) */
   .shoreline-area {
+    flex: 1;
     background: linear-gradient(180deg, var(--shore-light) 0%, var(--shore) 100%);
     border: 2px solid var(--bank);
     border-radius: 6px;
-    min-height: 200px;
-    padding: 4px;
+    padding: 6px;
     display: flex; flex-direction: column;
-    flex: 1;
+    gap: 4px;
   }
-  .shoreline-label {
+  .shoreline-area .slot-tile-header {
     color: var(--bank);
-    font-size: 10px;
-    text-align: center;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 4px;
-    font-weight: 700;
+    text-shadow: none;
   }
   .shoreline-cards {
     display: flex; flex-direction: column; gap: 4px;
+    flex: 1;
   }
 
   /* ================= MATERIAL CARD ================= */
@@ -511,6 +471,29 @@
     padding: 10px;
     margin-bottom: 10px;
   }
+  .hand-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+  }
+  .hand-header h2 { margin: 0; }
+  .hand-invent-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    background: var(--paper);
+    color: var(--ink);
+    border: 2px solid var(--bank);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .hand-invent-btn:hover:not(:disabled) {
+    background: var(--paper-warm, #fff4d6);
+    border-color: var(--forest);
+  }
+  .hand-invent-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
   .hand-cards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -589,6 +572,41 @@
   }
   .hand-and-action-row .action-panel { flex: 1; margin-bottom: 0; }
   .hand-and-action-row .hand-area { flex: 1; margin-bottom: 0; }
+  .struct-piles {
+    flex: 0 0 110px;
+    background: var(--paper);
+    border: 2px solid var(--bank);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex; flex-direction: column;
+    gap: 6px;
+    margin-bottom: 0;
+  }
+  .struct-pile-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink);
+    text-align: center;
+    border-bottom: 1px solid var(--bank);
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+  }
+  .struct-pile-row {
+    display: flex; flex-direction: column;
+    align-items: center;
+  }
+  .struct-pile-label {
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .struct-pile-count {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1;
+  }
   .action-panel {
     background: var(--paper);
     border: 3px solid var(--forest);
@@ -871,26 +889,28 @@
   </div>
 
   <div class="river-wrap">
-    <div class="river-header">
-      <span>← Headwaters · River · Shoreline</span>
-      <span class="river-action-tag">Spend 1🐟 to auction</span>
-      <span>Downriver →</span>
-    </div>
-    <div class="deck-progress">
-      <div class="deck-progress-label">
-        <span>Material deck: <b id="deck-count">0</b> / <span id="deck-total">0</span> cards left</span>
-        <span><b id="deck-percent">0</b>% drawn</span>
-      </div>
-      <div class="deck-progress-bar"><div id="deck-progress-fill" class="deck-progress-fill"></div></div>
-    </div>
-    <div id="river-flow" class="river-flow"></div>
+    <div id="board" class="board"></div>
   </div>
 
   <div class="hand-and-action-row">
     <div id="action-panel" class="action-panel hidden"></div>
     <div id="hand-area" class="hand-area hidden">
-      <h2>🃏 Your structures</h2>
+      <div class="hand-header">
+        <h2>🃏 Your structures</h2>
+        <button id="hand-invent-btn" class="hand-invent-btn" onclick="humanChooseAction('browse')">📜 Invent (N🐟)</button>
+      </div>
       <div id="hand-cards" class="hand-cards"></div>
+    </div>
+    <div id="struct-piles" class="struct-piles hidden">
+      <div class="struct-pile-title">📚 Structures</div>
+      <div class="struct-pile-row">
+        <div class="struct-pile-label">Deck</div>
+        <div id="struct-deck-count" class="struct-pile-count">0</div>
+      </div>
+      <div class="struct-pile-row">
+        <div class="struct-pile-label">Discard</div>
+        <div id="struct-discard-count" class="struct-pile-count">0</div>
+      </div>
     </div>
   </div>
 
@@ -970,7 +990,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 2, effect: 'End game: +1 VP per shoreline card on the table.' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
-  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 1 fewer fish (min 1).' },
+  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 3 fewer fish (min 1).' },
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built, draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
@@ -997,6 +1017,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/2/3/5/8/10 for 1/2/3/4/5/6 distinct materials across your built structures.' },
+  { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile.' },
 ];
 
 // Cattail Patch end-game schedule, indexed by distinct-material count (0..6).
@@ -1071,6 +1092,88 @@ function firePassZeroEffects(playerIdx, count) {
         log(`🪵 Hollowed-out Log: ${speciesLabel(p)} recalls 1 worker (no blank).`);
       }
     }
+    if (hasEffect(p, 'Pack Rat Burrow') && p.hand.length > 0 && state.structDiscard.length > 0) {
+      if (p.isHuman) {
+        // Defer to the end of the turn — modal interaction shouldn't block the
+        // synchronous advancePlayer math. Queue a pending swap prompt.
+        state.pendingPackRatSwaps = (state.pendingPackRatSwaps || 0) + 1;
+      } else {
+        const wbm = playerWorkersByMaterial(state, playerIdx);
+        const score = (s) => {
+          let deficit = 0;
+          for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
+          return s.vp + aiEffectValue(s, p, state) - deficit * 1.5;
+        };
+        const handScored = p.hand.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => a.sc - b.sc);
+        const discardScored = state.structDiscard.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => b.sc - a.sc);
+        const worstHand = handScored[0];
+        const bestDiscard = discardScored[0];
+        if (bestDiscard.sc > worstHand.sc) {
+          const taken = state.structDiscard.splice(bestDiscard.i, 1)[0];
+          const dropped = p.hand.splice(worstHand.i, 1)[0];
+          state.structDiscard.push(dropped);
+          p.hand.push(taken);
+          log(`🐀 Pack Rat Burrow: ${speciesLabel(p)} swaps ${dropped.name} ↔ ${taken.name} (discard pile).`);
+        }
+      }
+    }
+  }
+}
+
+// Pack Rat Burrow swap UI for the human, called after a turn settles when the
+// pass-0 event queued one or more pending swaps.
+async function resolvePendingPackRatSwaps() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human) return;
+  while ((state.pendingPackRatSwaps || 0) > 0) {
+    state.pendingPackRatSwaps -= 1;
+    if (human.hand.length === 0 || state.structDiscard.length === 0) continue;
+    await new Promise(resolve => {
+      const handRows = human.hand.map((s, i) =>
+        `<label class="bidder-row" style="cursor:pointer;">
+          <input type="radio" name="prb-hand" value="${i}" ${i === 0 ? 'checked' : ''}>
+          <span class="bidder-name">${s.name}</span>
+          <span class="small-note">${s.vp}★ · ${s.time}🐟</span>
+        </label>`).join('');
+      const discardRows = state.structDiscard.map((s, i) =>
+        `<label class="bidder-row" style="cursor:pointer;">
+          <input type="radio" name="prb-disc" value="${i}" ${i === 0 ? 'checked' : ''}>
+          <span class="bidder-name">${s.name}</span>
+          <span class="small-note">${s.vp}★ · ${s.time}🐟</span>
+        </label>`).join('');
+      showModal({
+        title: '🐀 Pack Rat Burrow — swap a structure',
+        body: () => `
+          <p class="small-note">Discard one structure from your hand, take one from the discard pile. (Free; you may skip.)</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div>
+              <div style="font-weight:700; margin-bottom:4px;">Discard from hand:</div>
+              <div class="auction-bidders">${handRows}</div>
+            </div>
+            <div>
+              <div style="font-weight:700; margin-bottom:4px;">Take from discard pile:</div>
+              <div class="auction-bidders">${discardRows}</div>
+            </div>
+          </div>
+        `,
+        actions: [
+          { label: 'Swap', primary: true, onClick: () => {
+            const handIdx = parseInt(document.querySelector('input[name="prb-hand"]:checked')?.value);
+            const discIdx = parseInt(document.querySelector('input[name="prb-disc"]:checked')?.value);
+            if (isNaN(handIdx) || isNaN(discIdx)) { closeModal(); resolve(); return; }
+            const taken = state.structDiscard.splice(discIdx, 1)[0];
+            const dropped = human.hand.splice(handIdx, 1)[0];
+            state.structDiscard.push(dropped);
+            human.hand.push(taken);
+            log(`🐀 Pack Rat Burrow: ${speciesLabel(human)} swaps ${dropped.name} ↔ ${taken.name}.`);
+            closeModal();
+            render();
+            resolve();
+          }},
+          { label: 'Skip', onClick: () => { closeModal(); resolve(); } },
+        ],
+      });
+    });
   }
 }
 
@@ -1470,24 +1573,7 @@ function render() {
   renderPlayers();
   renderHand();
   renderActionPanel();
-  renderDeckProgress();
   renderSimTime();
-}
-
-function renderDeckProgress() {
-  if (!state) return;
-  const total = state.matDeckInitialSize || 0;
-  const remaining = state.matDeck.length;
-  const drawn = total - remaining;
-  const pct = total > 0 ? Math.round((drawn / total) * 100) : 0;
-  const dc = document.getElementById('deck-count');
-  const dt = document.getElementById('deck-total');
-  const dp = document.getElementById('deck-percent');
-  const fill = document.getElementById('deck-progress-fill');
-  if (dc) dc.textContent = remaining;
-  if (dt) dt.textContent = total;
-  if (dp) dp.textContent = pct;
-  if (fill) fill.style.width = pct + '%';
 }
 
 function renderTimeTrack() {
@@ -1593,64 +1679,77 @@ function renderMatCard(card, opts = {}) {
 }
 
 function renderRiver() {
-  const wrap = document.getElementById('river-flow');
-  let html = '';
-  // ============================ Pre-river section ============================
-  let prerivInner = '';
+  const wrap = document.getElementById('board');
+  // ===================== Row 1: Material Deck + Headwaters 1/2/3 =====================
+  const total = state.matDeckInitialSize || 0;
+  const remaining = state.matDeck.length;
+  // Flush button — enabled with the same conditions as the action-panel flush:
+  // human's choose-action phase, has worker available, and there's something to flush.
+  const human = state.players.find(p => p.isHuman);
+  const isHumanChoosingAction = human && state.currentPlayer === human.idx
+    && state.phase === 'choose-action' && !state.gameOver;
+  const hasPreriv = state.prerivCards.some(c => c !== null);
+  const humanTriggerPool = human
+    ? human.supply + MAT_KEYS.reduce((s, m) => s + playerWorkersByMaterial(state, human.idx)[m], 0)
+    : 0;
+  const flushEnabled = isHumanChoosingAction && humanTriggerPool > 0
+    && (hasPreriv || state.matDeck.length > 0);
+  const flushBtn = `<button class="deck-flush-btn" onclick="humanChooseAction('flush')" ${flushEnabled ? '' : 'disabled'}>
+    🌀 Flush Headwaters (5🐟)
+  </button>`;
+  const deckTile = `<div class="slot-tile deck-tile">
+    <div class="slot-tile-header">Material Deck</div>
+    <div class="deck-count-large">${remaining}<span style="font-size:18px; opacity:0.7;"> / ${total}</span></div>
+    <div class="deck-count-small">cards remaining</div>
+    ${flushBtn}
+  </div>`;
+  let prerivTiles = '';
   for (let i = 0; i < state.prerivCards.length; i++) {
     const card = state.prerivCards[i];
     const cost = prerivTriggerCost(i);
-    const slotCls = ['preriv-slot'];
-    if (card && prerivSlotSelectable(i)) slotCls.push('selectable');
-    const sideLabel = `<div class="preriv-side-label">
-        <div class="preriv-slot-cost">Spend ${cost}🐟 to auction</div>
-      </div>`;
-    let cardArea;
-    if (!card) {
-      cardArea = `<div class="slot-cards" style="display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-style:italic;font-size:11px;">—</div>`;
-    } else {
-      cardArea = `<div class="slot-cards">${renderMatCard(card, prerivCardClickOpts(i))}</div>`;
-    }
-    prerivInner += `<div class="${slotCls.join(' ')}">${sideLabel}${cardArea}</div>`;
+    const cls = ['slot-tile', 'preriv-tile'];
+    if (card && prerivSlotSelectable(i)) cls.push('selectable');
+    const slotNum = PRERIV_SLOTS - i;  // existing label convention: nearest-river is 1
+    const body = card
+      ? renderMatCard(card, prerivCardClickOpts(i))
+      : `<div class="slot-tile-empty">—</div>`;
+    prerivTiles += `<div class="${cls.join(' ')}">
+      <div class="slot-tile-header">Headwaters ${slotNum}</div>
+      <div class="slot-tile-cost">${cost}🐟 to auction · ${UPSTREAM_AUCTION_COST}🐟/item</div>
+      <div class="slot-tile-body">${body}</div>
+    </div>`;
   }
-  html += `<div class="river-section preriv-section">
-    <div class="section-header">Headwaters · <span class="slot-cost-badge">${UPSTREAM_AUCTION_COST}🐟/item</span></div>
-    <div class="preriv-column">${prerivInner}</div>
-  </div>`;
-  // divider between pre-river and river
-  html += `<div class="divider" title="enters river"></div>`;
-  // ============================ River sections ============================
+  // ===================== Row 2: River 1/2/3/4 =====================
+  let riverTiles = '';
   for (let slot = 0; slot < 4; slot++) {
     const cards = state.riverCards.filter(c => c.slot === slot);
     const perItem = riverSlotCost(slot);
-    let body = '';
-    if (cards.length === 0) {
-      body = `<div style="color:rgba(255,255,255,0.5);text-align:center;font-style:italic;font-size:11px;margin-top:60px;">—</div>`;
-    } else {
-      body = `<div class="slot-cards">${cards.map(c => renderMatCard(c, riverCardClickOpts(c))).join('')}</div>`;
-    }
-    html += `<div class="river-section river-slot-section" data-cost="${perItem}">
-      <div class="section-header">River ${slot + 1} · <span class="slot-cost-badge">${perItem}🐟/item</span></div>
-      <div class="river-slot" data-cost="${perItem}">${body}</div>
+    const body = cards.length === 0
+      ? `<div class="slot-tile-empty">—</div>`
+      : cards.map(c => renderMatCard(c, riverCardClickOpts(c))).join('');
+    riverTiles += `<div class="slot-tile river-tile" data-cost="${perItem}">
+      <div class="slot-tile-header">River ${slot + 1}</div>
+      <div class="slot-tile-cost">1🐟 to auction · ${perItem}🐟/item</div>
+      <div class="slot-tile-body">${body}</div>
     </div>`;
   }
-  // divider
-  html += `<div class="divider" title="bank"></div>`;
-  // ============================ Shoreline section ============================
-  let shoreInner = `<div class="shoreline-cards">`;
+  // ===================== Shoreline (right column, full height) =====================
+  let shoreCards;
   if (state.shorelineCards.length === 0) {
-    shoreInner += `<div style="color:var(--bank);font-style:italic;font-size:11px;text-align:center;margin-top:60px;">(empty)</div>`;
+    shoreCards = `<div class="slot-tile-empty" style="color:var(--bank);">(empty)</div>`;
   } else {
-    for (const c of state.shorelineCards) {
-      shoreInner += renderMatCard(c, { note: 'shoreline' });
-    }
+    shoreCards = state.shorelineCards.map(c => renderMatCard(c, { note: 'shoreline' })).join('');
   }
-  shoreInner += `</div>`;
-  html += `<div class="river-section shoreline-section">
-    <div class="section-header">⛱ Shoreline</div>
-    <div class="shoreline-area">${shoreInner}</div>
+  const shoreline = `<div class="board-shoreline">
+    <div class="shoreline-area">
+      <div class="slot-tile-header">⛱ Shoreline</div>
+      <div class="shoreline-cards">${shoreCards}</div>
+    </div>
   </div>`;
-  wrap.innerHTML = html;
+  wrap.innerHTML = `<div class="board-main">
+    <div class="board-row">${deckTile}${prerivTiles}</div>
+    <div class="board-row">${riverTiles}</div>
+  </div>${shoreline}`;
 }
 
 function prerivCardClickOpts(slotIdx) {
@@ -1752,9 +1851,30 @@ function renderPlayers() {
 
 function renderHand() {
   const wrap = document.getElementById('hand-area');
+  const piles = document.getElementById('struct-piles');
   const human = state.players.find(p => p.isHuman);
-  if (!human) { wrap.classList.add('hidden'); return; }
+  if (!human) {
+    wrap.classList.add('hidden');
+    if (piles) piles.classList.add('hidden');
+    return;
+  }
   wrap.classList.remove('hidden');
+  if (piles) {
+    piles.classList.remove('hidden');
+    const dc = document.getElementById('struct-deck-count');
+    const xc = document.getElementById('struct-discard-count');
+    if (dc) dc.textContent = state.structDeck.length;
+    if (xc) xc.textContent = state.structDiscard.length;
+  }
+  // Invent button: enabled only on the human's choose-action phase with cards in the structure deck.
+  const inventBtn = document.getElementById('hand-invent-btn');
+  if (inventBtn) {
+    const enabled = state.currentPlayer === human.idx
+      && state.phase === 'choose-action'
+      && !state.gameOver
+      && state.structDeck.length > 0;
+    inventBtn.disabled = !enabled;
+  }
   const div = document.getElementById('hand-cards');
   if (human.hand.length === 0) {
     div.innerHTML = '<span class="small-note">(empty hand)</span>';
@@ -2397,8 +2517,9 @@ const EFFECT_VP_FIXED = {
   'Otter Raft': 1,
   'Cache Burrow': 1,
   'Reed Bed': 0.5,
-  'Otter Slide': 0.5,
+  'Otter Slide': 2,
   'Mill Wheel': 0.5,
+  'Pack Rat Burrow': 1.5,
   'Royal Lodge': 1,
   'Burrow Run': 1,
   'Sap Drip': 1,
@@ -2931,8 +3052,8 @@ async function performBuild(playerIdx, handIdx) {
     }
   }
   p.supply += Object.values(effCost).reduce((s, n) => s + n, 0);
-  // Build cost in time — Otter Slide reduces by 1 (min 1) when active. Cards with printed time 0 stay 0.
-  const slideDiscount = hasEffect(p, 'Otter Slide') ? 1 : 0;
+  // Build cost in time — Otter Slide reduces by 3 (min 1) when active. Cards with printed time 0 stay 0.
+  const slideDiscount = hasEffect(p, 'Otter Slide') ? 3 : 0;
   const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount);
   advancePlayer(playerIdx, timeCost);
   // Move card from hand to built
@@ -3602,6 +3723,9 @@ async function runOneTurn() {
   }
 
   cleanupShoreline();
+
+  // Pack Rat Burrow: if pass-0 queued any swap prompts for the human, resolve them now.
+  if (state.pendingPackRatSwaps > 0) await resolvePendingPackRatSwaps();
 
   // Endgame removal: pass or reach/exceed track end.
   if (state.endgame && !p.out) {

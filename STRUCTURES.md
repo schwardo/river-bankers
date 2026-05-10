@@ -12,7 +12,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Otter Slide** | 2 mud, 1 log | 1🐟 | When you build, advance 1 fewer fish (min 1). |
+| **Otter Slide** | 2 mud, 1 log | 1🐟 | When you build, advance 3 fewer fish (min 1). |
 | **Mill Wheel** | 3 logs, 3 stones | 4🐟 | Any time you would pass 0 on the fish track, stop at space 1 instead. |
 
 ### Bidding / auction
@@ -40,6 +40,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
 | **Hollowed-out Log** | 3 logs, 1 reed | 2🐟 | When you pass 0, recall one worker from a river card without dropping a blank. |
+| **Pack Rat Burrow** | 2 reeds, 2 mud | 2🐟 | When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile. |
 | **Cache Burrow** | 2 mud, 2 reeds | 2🐟 | Your hand size is 4 instead of 3. |
 | **Granary** | 4 reeds, 1 clay | 3🐟 | Once per game, your build costs 1 fewer of one listed material (your choice). |
 | **Floodgate** | 4 mud, 3 clay | 4🐟 | Once per game, before an auction resolves, slide the auctioned card 1 space upstream — toward the Headwaters (cheaper). |

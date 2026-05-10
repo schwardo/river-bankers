@@ -27,7 +27,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 2, effect: 'End game: +1 VP per shoreline card on the table.' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
-  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 1 fewer fish (min 1).' },
+  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 3 fewer fish (min 1).' },
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built, draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
@@ -54,6 +54,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/2/3/5/8/10 for 1/2/3/4/5/6 distinct materials across your built structures.' },
+  { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile.' },
 ];
 
 // Cattail Patch end-game schedule, indexed by distinct-material count (0..6).
@@ -118,6 +119,26 @@ function firePassZeroEffects(state, playerIdx, count) {
         target.workers[playerIdx] -= 1;
         if (target.workers[playerIdx] === 0) delete target.workers[playerIdx];
         p.supply += 1;
+      }
+    }
+    if (hasEffect(p, 'Pack Rat Burrow') && p.hand.length > 0 && state.structDiscard.length > 0) {
+      // Score discard pile against player's current built materials; pick the
+      // best swap if the discard's best card scores higher than the worst hand card.
+      const wbm = playerWorkersByMaterial(state, playerIdx);
+      const score = (s) => {
+        let deficit = 0;
+        for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
+        return s.vp + aiEffectValue(s, p, state) - deficit * 1.5;
+      };
+      const handScored = p.hand.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => a.sc - b.sc);
+      const discardScored = state.structDiscard.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => b.sc - a.sc);
+      const worstHand = handScored[0];
+      const bestDiscard = discardScored[0];
+      if (bestDiscard.sc > worstHand.sc) {
+        const taken = state.structDiscard.splice(bestDiscard.i, 1)[0];
+        const dropped = p.hand.splice(worstHand.i, 1)[0];
+        state.structDiscard.push(dropped);
+        p.hand.push(taken);
       }
     }
   }
@@ -745,8 +766,9 @@ const EFFECT_VP_FIXED = {
   'Cache Burrow': 1,
   // Mid-low constants
   'Reed Bed': 0.5,
-  'Otter Slide': 0.5,
+  'Otter Slide': 2,
   'Mill Wheel': 0.5,
+  'Pack Rat Burrow': 1.5,
   // One-time
   'Royal Lodge': 1,
   'Burrow Run': 1,
@@ -1052,8 +1074,8 @@ function performBuild(state, playerIdx, handIdx) {
   }
   noteBlanks(state);
   p.supply += Object.values(effCost).reduce((s, n) => s + n, 0);
-  // Otter Slide: build advances 1 fewer fish (min 1). Cards with printed time 0 stay 0.
-  const slideDiscount = hasEffect(p, 'Otter Slide') ? 1 : 0;
+  // Otter Slide: build advances 3 fewer fish (min 1). Cards with printed time 0 stay 0.
+  const slideDiscount = hasEffect(p, 'Otter Slide') ? 3 : 0;
   const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount);
   advancePlayer(state, playerIdx, timeCost);
   p.hand.splice(handIdx, 1);
