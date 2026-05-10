@@ -44,7 +44,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5, effect: 'Once per game, your build costs 1 fewer of one listed material (your choice).' },
   { name: 'Granite Spire',  cost: { stones: 6 },                     time: 4, vp: 7 },
   { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built, take an immediate extra turn.' },
-  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you call workers home, slide back 1 fish per worker recalled.' },
+  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you recall workers before an auction, slide back 1 fish per worker recalled.' },
   { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
@@ -432,23 +432,37 @@ function advancePlayer(state, playerIdx, byTime) {
   if (passZeroCount > 0) firePassZeroEffects(state, playerIdx, passZeroCount);
   state.stackOrder = state.stackOrder.filter(i => i !== playerIdx);
   state.stackOrder.unshift(playerIdx);
+  // Lap / catch-up bookkeeping.
+  // shadowedBy[a -> b] = true means "a lapped b and is still waiting for b
+  // to catch up". Under the lapping rule, the LAPPER (a) is exhausted, not
+  // the lapped (b), and a wakes when each b they lapped catches up to a's
+  // non-modular position.
   for (const other of state.players) {
     if (other === p) continue;
+    // Catch-up event: p crossed other's non-modular position going up. If
+    // `other` had lapped p (and is exhausted because of it), p catching up
+    // to their stopping point wakes them with respect to p.
+    if (prev < other.timePos && p.timePos >= other.timePos) {
+      const key = other.idx + '->' + playerIdx;
+      if (state.shadowedBy[key]) state.shadowedBy[key] = false;
+    }
+    // Lap event: p gained a full LAP_LENGTH on other in non-modular terms.
+    // Mark p as the lapper (outgoing shadow); p will be exhausted.
     const prevLaps = Math.max(0, Math.floor((prev - other.timePos) / LAP_LENGTH));
     const newLaps  = Math.max(0, Math.floor((p.timePos - other.timePos) / LAP_LENGTH));
-    let crossings = newLaps - prevLaps;
-    if (crossings > 0) {
-      const key = playerIdx + '->' + other.idx;
-      while (crossings-- > 0) state.shadowedBy[key] = !state.shadowedBy[key];
+    if (newLaps > prevLaps) {
+      state.shadowedBy[playerIdx + '->' + other.idx] = true;
     }
   }
-  for (const b of state.players) {
+  // Recompute exhausted: a player is exhausted iff they have any outstanding
+  // outgoing shadow (i.e., they lapped someone who hasn't caught back up).
+  for (const a of state.players) {
     let now = false;
-    for (const a of state.players) {
+    for (const b of state.players) {
       if (a === b) continue;
       if (state.shadowedBy[a.idx + '->' + b.idx]) { now = true; break; }
     }
-    b.exhausted = now;
+    a.exhausted = now;
   }
 }
 
@@ -635,9 +649,17 @@ function resolveAuction(state, card, bids) {
 // =============================================================================
 function aiDecideBid(state, playerIdx, card, minBid) {
   const p = state.players[playerIdx];
-  if (p.supply === 0) return Math.min(0, minBid);
   const open = uncoveredIcons(card);
-  if (open === 0) return Math.min(p.supply, minBid);
+  const { safe, fallback } = aiRecallBudget(state, playerIdx);
+  const safeCount = totalCount(safe);
+  const fallbackCount = totalCount(fallback);
+  // For non-trigger bids: only consider supply + safe-recallable workers (don't
+  // disrupt build plans for marginal contention). For trigger bids: also allow
+  // dipping into fallback to satisfy the min-bid requirement.
+  const safePool = p.supply + safeCount;
+  const totalPool = safePool + fallbackCount;
+  if (totalPool === 0) return Math.min(0, minBid);
+  if (open === 0) return Math.min(totalPool, minBid);
 
   const wbm = playerWorkersByMaterial(state, playerIdx);
   let need = 0;
@@ -648,16 +670,17 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   }
   const maxNeed = Math.max(0, ...p.hand.map(s => Math.max(0, (s.cost[card.material] || 0) - (wbm[card.material] || 0))));
   let target = Math.round((need + maxNeed) / 2);
-  target = Math.min(target, p.supply, open, 4);
+  target = Math.min(target, safePool, open, 4);
   // Use the player-specific per-item cost so Reed Bed makes reed auctions more attractive.
   const myCost = playerCardCost(state, card, playerIdx);
   if (myCost >= 3 && target > 1) target = Math.max(1, target - 1);
   if (myCost >= 4 && target > 1) target = Math.max(1, target - 1);
   const r = Math.random();
   if (r < 0.15 && target > 0) target -= 1;
-  else if (r > 0.85 && target < p.supply && target < open) target += 1;
+  else if (r > 0.85 && target < safePool && target < open) target += 1;
   // Speculative bid: non-trigger AI with no current need but a hand structure
   // that uses this material may bid 1 worker on a cheap slot to add contention.
+  // Speculative bids should only spend supply, never trigger a recall.
   if (
     target === 0 && minBid === 0 && SPECULATIVE_BID_PROB > 0 &&
     myCost <= 2 && p.supply > 0 &&
@@ -667,9 +690,18 @@ function aiDecideBid(state, playerIdx, card, minBid) {
     target = 1;
   }
   target = Math.max(target, minBid);
-  target = Math.min(target, p.supply);
+  // Cap at safe pool unless we need fallback to satisfy the trigger min-bid.
+  target = Math.min(target, target > safePool && minBid > 0 ? totalPool : safePool);
   if (target < 0) target = 0;
-  return target;
+  // Pre-auction recall: pull workers off the river/shoreline to fund the bid.
+  // Use safe budget first, then fallback only as needed.
+  let needRecall = target - p.supply;
+  if (needRecall > 0) {
+    const tookSafe = aiRecallFromList(state, playerIdx, safe, needRecall);
+    needRecall -= tookSafe;
+    if (needRecall > 0) aiRecallFromList(state, playerIdx, fallback, needRecall);
+  }
+  return Math.min(target, p.supply);
 }
 
 // =============================================================================
@@ -775,12 +807,16 @@ function aiChooseAction(state, playerIdx) {
   }
   const totalNeed = MAT_KEYS.reduce((sum, m) => sum + needs[m], 0);
 
+  // Effective worker pool for triggering an auction = supply + workers we could
+  // recall before bidding. Pre-auction recall makes a worker on a card just as
+  // good for triggering as one already in supply.
+  const triggerPool = aiTriggerPool(state, playerIdx);
   let bestCard = null, bestScore = -Infinity, bestKind = null, bestPrerivIdx = -1;
   for (const c of state.riverCards) {
     if (uncoveredIcons(c) === 0) continue;
     const need = needs[c.material];
     if (need === 0) continue;
-    const got = Math.min(uncoveredIcons(c), p.supply, need);
+    const got = Math.min(uncoveredIcons(c), triggerPool, need);
     // playerCardCost picks up Reed Bed's per-item discount when scoring auction targets.
     const score = need * got - playerCardCost(state, c, playerIdx) * got * 0.4;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'river'; }
@@ -790,13 +826,13 @@ function aiChooseAction(state, playerIdx) {
     if (!c) continue;
     const need = needs[c.material];
     if (need === 0) continue;
-    const got = Math.min(uncoveredIcons(c), p.supply, need);
+    const got = Math.min(uncoveredIcons(c), triggerPool, need);
     if (got === 0) continue;
     const trigger = prerivTriggerCost(i);
     const score = need * got - 1 * got * 0.4 - trigger * 0.6;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'preriv'; bestPrerivIdx = i; }
   }
-  if (bestCard && p.supply > 0) {
+  if (bestCard && triggerPool > 0) {
     if (bestKind === 'river') return { type: 'auction', cardId: bestCard.id };
     return { type: 'preriv', slotIdx: bestPrerivIdx };
   }
@@ -805,8 +841,9 @@ function aiChooseAction(state, playerIdx) {
   }
   const upstreamHasNeeded = state.prerivCards.some(c => c && needs[c.material] > 0);
   const upstreamHasAny = state.prerivCards.some(c => c !== null);
-  // Flush includes triggering an auction, which requires at least one worker.
-  if (upstreamHasAny && !upstreamHasNeeded && p.supply > 0) {
+  // Flush includes triggering an auction, which requires at least one worker
+  // (supply or recallable, since pre-auction recall covers triggers too).
+  if (upstreamHasAny && !upstreamHasNeeded && triggerPool > 0) {
     return { type: 'flush' };
   }
   if (state.structDeck.length > 0) return { type: 'browse', n: Math.min(1, state.structDeck.length) };
@@ -846,56 +883,63 @@ function aiStartOfTurnAbilities(state, playerIdx) {
   }
 }
 
-function aiCallHomeIfNeeded(state, playerIdx) {
+// Returns {safe, fallback}: ordered lists of {cardId, count}.
+//   safe     — no-regret recalls: shoreline (no blank), then irrelevant-material
+//              river workers, then surplus useful workers (placed > hand cap).
+//   fallback — at-cap useful workers, river-side, highest per-item cost first.
+//              These risk delaying a planned build, so callers should only dip
+//              into them when supply is genuinely 0 or to satisfy a min-bid.
+function aiRecallBudget(state, playerIdx) {
   const p = state.players[playerIdx];
-  if (p.supply >= 3) return;
   const useful = new Set();
   for (const s of p.hand) for (const m in s.cost) useful.add(m);
   const cap = {};
   for (const m of MAT_KEYS) cap[m] = 0;
   for (const s of p.hand) for (const m in s.cost) cap[m] = Math.max(cap[m], s.cost[m]);
   const placed = playerWorkersByMaterial(state, playerIdx);
-  const recallSpec = [];
+  const safe = [], fallback = [];
   const cards = [
-    ...state.shorelineCards.map(c => ({ c })),
-    ...state.riverCards.slice().sort((a, b) => cardCost(b) - cardCost(a)).map(c => ({ c })),
+    ...state.shorelineCards.map(c => ({ c, river: false })),
+    ...state.riverCards.slice().sort((a, b) => cardCost(b) - cardCost(a)).map(c => ({ c, river: true })),
   ];
-  for (const { c } of cards) {
+  for (const { c, river } of cards) {
     const w = workersOnCard(c, playerIdx);
     if (w === 0) continue;
-    let canRecall;
-    if (!useful.has(c.material)) canRecall = w;
-    else canRecall = Math.min(w, Math.max(0, placed[c.material] - cap[c.material]));
-    if (canRecall > 0) {
-      recallSpec.push({ cardId: c.id, count: canRecall });
-      placed[c.material] -= canRecall;
+    let safeRecall;
+    if (!useful.has(c.material)) safeRecall = w;
+    else safeRecall = Math.min(w, Math.max(0, placed[c.material] - cap[c.material]));
+    if (safeRecall > 0) {
+      safe.push({ cardId: c.id, count: safeRecall });
+      placed[c.material] -= safeRecall;
     }
+    const remaining = w - safeRecall;
+    if (remaining > 0 && river) fallback.push({ cardId: c.id, count: remaining });
   }
-  if (recallSpec.length > 0) callWorkersHome(state, playerIdx, recallSpec);
+  return { safe, fallback };
 }
 
-function aiForceRecallIfStuck(state, playerIdx) {
-  const p = state.players[playerIdx];
-  if (p.supply > 0) return;
-  const candidates = [];
-  for (const c of state.shorelineCards) {
-    const w = workersOnCard(c, playerIdx);
-    if (w > 0) candidates.push({ card: c, w, score: 0 });
-  }
-  for (const c of state.riverCards) {
-    const w = workersOnCard(c, playerIdx);
-    if (w > 0) candidates.push({ card: c, w, score: 1 + cardCost(c) });
-  }
-  candidates.sort((a, b) => a.score - b.score);
-  let toRecall = 2;
+function totalCount(list) { return list.reduce((s, x) => s + x.count, 0); }
+
+// Total worker pool a player could marshal for an auction = supply + all recallable.
+function aiTriggerPool(state, playerIdx) {
+  const { safe, fallback } = aiRecallBudget(state, playerIdx);
+  return state.players[playerIdx].supply + totalCount(safe) + totalCount(fallback);
+}
+
+// Recall up to `count` workers from the given ordered list of recall items.
+function aiRecallFromList(state, playerIdx, list, count) {
+  if (count <= 0) return 0;
   const spec = [];
-  for (const cand of candidates) {
-    if (toRecall <= 0) break;
-    const take = Math.min(cand.w, toRecall);
-    spec.push({ cardId: cand.card.id, count: take });
-    toRecall -= take;
+  let need = count;
+  for (const item of list) {
+    if (need <= 0) break;
+    const take = Math.min(item.count, need);
+    spec.push({ cardId: item.cardId, count: take });
+    need -= take;
   }
-  if (spec.length > 0) callWorkersHome(state, playerIdx, spec);
+  if (spec.length === 0) return 0;
+  callWorkersHome(state, playerIdx, spec);
+  return count - need;
 }
 
 function aiBrowseDiscardChoice(state, playerIdx, drawn) {
@@ -1191,12 +1235,7 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
 
     const p = state.players[cur];
     aiStartOfTurnAbilities(state, p.idx);
-    let action = aiChooseAction(state, p.idx);
-    if (action.type !== 'build') {
-      aiCallHomeIfNeeded(state, p.idx);
-      aiForceRecallIfStuck(state, p.idx);
-      action = aiChooseAction(state, p.idx);
-    }
+    const action = aiChooseAction(state, p.idx);
     executeAction(state, p.idx, action);
     cleanupShoreline(state);
 
@@ -1641,12 +1680,7 @@ function sweepAblation(numGamesArg, numPArg, workersArg) {
       state.currentPlayer = cur;
       const p = state.players[cur];
       aiStartOfTurnAbilities(state, p.idx);
-      let action = aiChooseAction(state, p.idx);
-      if (action.type !== 'build') {
-        aiCallHomeIfNeeded(state, p.idx);
-        aiForceRecallIfStuck(state, p.idx);
-        action = aiChooseAction(state, p.idx);
-      }
+      const action = aiChooseAction(state, p.idx);
       executeAction(state, p.idx, action);
       cleanupShoreline(state);
       if (state.endgame && !p.out) {

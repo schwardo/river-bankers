@@ -40,9 +40,7 @@ There are no rounds. The next player to act is whoever's *non-exhausted* pawn is
 
 ## Your turn
 
-**Optional first:** *Call workers home.* Pick up any number of your own workers from any cards on the river and return them to your supply. Drop a blank onto each icon you uncovered. Free; not an action.
-
-Then take exactly **one** action. Every action advances your pawn forward by its fish cost. **Any action that triggers an auction (1, 2, or 5) requires at least one worker in your supply** — you can't start an auction you can't bid in.
+Take exactly **one** action. Every action advances your pawn forward by its fish cost. **Any action that triggers an auction (1, 2, or 5) requires at least one worker available** — in your supply or placed on a card you could recall (see *Pre-auction recall* under Auctions).
 
 1. **Auction an existing river card — 1🐟 flat.** Choose any river card that still has uncovered icons. You must bid at least one worker. The flat fish is paid immediately; per-item fish still applies on whatever you win, set by the card's current river space (2/3/4/5🐟).
 2. **Pull a Headwaters card into the river — 2, 3, or 4🐟.** Choose a card in the Headwaters and pay the move cost on its slot (2🐟 for Headwaters 1, 3🐟 for Headwaters 2, 4🐟 for Headwaters 3). An auction immediately runs on it at the **Headwaters rate of 1🐟/item**. You must bid at least one worker. Card movement after the auction follows the universal rule below.
@@ -55,6 +53,14 @@ After your action resolves (and any auction settles), check the fish track again
 ## Auctions
 
 Triggered by action 1 or action 2. The action's flat fish cost is paid immediately (1🐟 for an existing river card, 2/3/4🐟 to pull a Headwaters card into River 1); auction results may cost additional fish.
+
+### Pre-auction recall
+
+Immediately before any auction (yours or another player's), each player may recall any number of their own workers from river cards back to their supply. Drop a blank onto each river-card icon you uncover. Workers recalled from shoreline cards do not need blanks. Recall is free — no fish cost — and the recalled workers are immediately available to bid in the auction that's about to take place.
+
+Recalls are public and resolve before bidding begins. They're not an action; they don't move any card.
+
+### Bidding
 
 Everyone — including the active player — secretly chooses how many workers from their supply to bid. The triggering player must bid at least one; other players may bid zero. A bid is capped only by your remaining supply.
 
@@ -93,18 +99,18 @@ After a Headwaters card vacates its slot, any Headwaters cards in higher-numbere
 
 When a card reaches the shoreline, return any blanks on it to the pool. Workers stay on it until spent on a build. Once the last worker leaves a shoreline card, the card is discarded.
 
-Spending or recalling a worker from a river card does *not* move the card — it just leaves a blank on the icon. The card keeps drifting normally. New material cards only enter the river by being pulled out of the Headwaters.
+Spending or recalling a worker from a river card does *not* move the card — it just leaves a blank on the icon. The card keeps drifting normally. New material cards only enter the river by being pulled out of the Headwaters. (See *Pre-auction recall* under Auctions for the recall step that runs immediately before bidding.)
 
-## Getting lapped
+## Lapping (and getting winded)
 
-The fish track wraps around every 60 spaces. If your pawn is at space N and another player's pawn passes you (catches up to space N from behind, having gone around the loop), you're **lapped** — flip your pawn upside-down and sit out:
+The fish track wraps around every 60 spaces. When your pawn passes another player's pawn by going all the way around the loop — i.e., your pawn catches up to their space N from behind, having gone the long way around — **you** (the lapper) get **exhausted**. Flip your pawn upside-down and sit out:
 
 - Your pawn doesn't take turns. The next non-exhausted pawn at the lowest space acts.
 - You can't bid on auctions while exhausted; you implicitly bid 0.
 
-You stay exhausted until the player who lapped you **passes you again** (a second loop). At that moment, flip your pawn back upright; you can act and bid as normal. If they lap you a third time, you're exhausted again — and so on.
+You stay exhausted until each player you lapped **catches up to your spot on the track**. Each such catch-up wakes you with respect to that one player; you remain exhausted until *all* the players you lapped have caught back up. Once they all have, flip your pawn back upright; you can act and bid as normal.
 
-Multiple lappers stack: if two different opponents have lapped you and only one has caught back up, you stay exhausted until the other passes you too.
+Lapping the same player again later (after they've caught up and you've woken) exhausts you again.
 
 ## Endgame & game end
 

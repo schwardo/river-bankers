@@ -987,7 +987,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5, effect: 'Once per game, your build costs 1 fewer of one listed material (your choice).' },
   { name: 'Granite Spire',  cost: { stones: 6 },                     time: 4, vp: 7 },
   { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built, take an immediate extra turn.' },
-  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you call workers home, slide back 1 fish per worker recalled.' },
+  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you recall workers before an auction, slide back 1 fish per worker recalled.' },
   { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
@@ -1374,9 +1374,11 @@ function triggerEndgame() {
   log(`🏁 Material deck is empty — entering endgame. Pawns reset to spaces 1–${ordered.length}; reach space ${ENDGAME_TRACK_END} or pass to retire.`);
 }
 
-// Pawns that get lapped become "exhausted" — flipped to the back, can't act, can't bid.
-// The flag toggles at each pass (lap 1 = exhausted, lap 2 = revived, lap 3 = exhausted again).
-// Only the moving player's advance can trigger transitions; a player's own movement does not.
+// Lapping a player exhausts the LAPPER (the heavy spender), not the lapped.
+// shadowedBy[a -> b] = true means "a lapped b and is still waiting for b to
+// catch up to a's stopping point on the track". The lapper a is exhausted
+// while any of their outgoing shadows are set; each lapped b catching back
+// up clears their shadow. Only the moving player's advance can transition.
 function advancePlayer(playerIdx, byTime) {
   const p = state.players[playerIdx];
   const prev = p.timePos;
@@ -1393,28 +1395,34 @@ function advancePlayer(playerIdx, byTime) {
   if (passZeroCount > 0) firePassZeroEffects(playerIdx, passZeroCount);
   state.stackOrder = state.stackOrder.filter(i => i !== playerIdx);
   state.stackOrder.unshift(playerIdx);
-  // Detect 60-multiple crossings made by p relative to each other player.
   for (const other of state.players) {
     if (other === p) continue;
+    // Catch-up event: p crossed other's non-modular position going up. If
+    // `other` had lapped p (and is exhausted because of it), p catching back
+    // up to their spot wakes other with respect to p.
+    if (prev < other.timePos && p.timePos >= other.timePos) {
+      const key = other.idx + '->' + playerIdx;
+      if (state.shadowedBy[key]) state.shadowedBy[key] = false;
+    }
+    // Lap event: p gained a full LAP_LENGTH on other. p is the lapper.
     const prevLaps = Math.max(0, Math.floor((prev - other.timePos) / LAP_LENGTH));
     const newLaps  = Math.max(0, Math.floor((p.timePos - other.timePos) / LAP_LENGTH));
-    let crossings = newLaps - prevLaps;
-    if (crossings > 0) {
-      const key = playerIdx + '->' + other.idx;
-      while (crossings-- > 0) state.shadowedBy[key] = !state.shadowedBy[key];
+    if (newLaps > prevLaps) {
+      state.shadowedBy[playerIdx + '->' + other.idx] = true;
     }
   }
-  // Recompute exhausted flags from shadow set.
-  for (const b of state.players) {
-    let was = b.exhausted;
+  // Recompute exhausted flags: a player is exhausted iff they have any
+  // outstanding outgoing shadow (lapped someone who hasn't caught back up).
+  for (const a of state.players) {
+    let was = a.exhausted;
     let now = false;
-    for (const a of state.players) {
+    for (const b of state.players) {
       if (a === b) continue;
       if (state.shadowedBy[a.idx + '->' + b.idx]) { now = true; break; }
     }
-    b.exhausted = now;
-    if (!was && now) log(`💤 ${speciesLabel(b)} got lapped — exhausted until passed again.`);
-    if (was && !now) log(`☀ ${speciesLabel(b)} caught up — back in the action.`);
+    a.exhausted = now;
+    if (!was && now) log(`💤 ${speciesLabel(a)} lapped someone — exhausted until they catch up.`);
+    if (was && !now) log(`☀ ${speciesLabel(a)} all opponents caught up — back in the action.`);
   }
 }
 
@@ -1812,18 +1820,19 @@ function renderActionPanel() {
     const abilityRow = abilityBtns.length
       ? `<div class="ability-row"><span class="ability-label">Optional abilities:</span>${abilityBtns.join('')}</div>`
       : '';
+    // Worker pool that can fund a triggered auction = supply + placed (you can recall before bidding).
+    const triggerPool = cur.supply + placed;
     html = `<div class="action-panel-title">Your turn — choose an action</div>
       <div class="action-buttons">
-        <button class="secondary" onclick="humanCallHome()" ${placed === 0 ? 'disabled' : ''}>Call workers home (${placed} out)</button>
-        <button onclick="humanChooseAction('auction')" ${(cur.supply > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>1. Auction river card (1🐟)</button>
-        <button onclick="humanChooseAction('preriv')" ${(cur.supply > 0 && hasPreriv) ? '' : 'disabled'}>2. Pull Headwaters card (2–4🐟)</button>
+        <button onclick="humanChooseAction('auction')" ${(triggerPool > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>1. Auction river card (1🐟)</button>
+        <button onclick="humanChooseAction('preriv')" ${(triggerPool > 0 && hasPreriv) ? '' : 'disabled'}>2. Pull Headwaters card (2–4🐟)</button>
         <button onclick="humanChooseAction('browse')" ${state.structDeck.length > 0 ? '' : 'disabled'}>3. Invent N (N🐟)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>4. Build a structure</button>
-        <button onclick="humanChooseAction('flush')" ${(cur.supply > 0 && (hasPreriv || state.matDeck.length > 0)) ? '' : 'disabled'}>5. Flush Headwaters (5🐟)</button>
+        <button onclick="humanChooseAction('flush')" ${(triggerPool > 0 && (hasPreriv || state.matDeck.length > 0)) ? '' : 'disabled'}>5. Flush Headwaters (5🐟)</button>
         ${state.endgame ? `<button class="ghost" onclick="humanRetire()">Retire (endgame)</button>` : ''}
       </div>
       ${abilityRow}
-      <div class="action-hint">Tip: click any river or Headwaters card to auction it, or any buildable structure in your hand to build it.</div>`;
+      <div class="action-hint">Tip: click any river or Headwaters card to auction it, or any buildable structure in your hand to build it. Out of supply? You can recall placed workers from the bid dialog.</div>`;
   } else if (state.phase === 'select-auction-card') {
     html = `<div class="action-panel-title">Pick a river card to auction</div>
       <div class="action-buttons">
@@ -2048,6 +2057,9 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     const minBid = (p.idx === triggerPlayerIdx) ? minBidTrigger : 0;
     bids[p.idx] = aiDecideBid(p.idx, card, minBid);
   }
+  // Re-render so any AI pre-auction recalls (blanks dropped, supplies grown) are
+  // visible behind the human's bid dialog.
+  if (human && !human.out && !human.exhausted) render();
   if (human) {
     if (human.out) {
       bids[human.idx] = 0;
@@ -2296,10 +2308,16 @@ async function showAuctionResult(result) {
 // =============================================================================
 function aiDecideBid(playerIdx, card, minBid) {
   const p = state.players[playerIdx];
-  if (p.supply === 0) return Math.min(0, minBid);
-
   const open = uncoveredIcons(card);
-  if (open === 0) return Math.min(p.supply, minBid);
+  const { safe, fallback } = aiRecallBudget(playerIdx);
+  const safeCount = safe.reduce((s, x) => s + x.count, 0);
+  const fallbackCount = fallback.reduce((s, x) => s + x.count, 0);
+  // For non-trigger bids: only consider supply + safe-recallable. For trigger
+  // bids: also dip into fallback (at-cap workers) to satisfy the min-bid.
+  const safePool = p.supply + safeCount;
+  const totalPool = safePool + fallbackCount;
+  if (totalPool === 0) return Math.min(0, minBid);
+  if (open === 0) return Math.min(totalPool, minBid);
 
   // How many of this material does the AI need overall (across hand structures)?
   const wbm = playerWorkersByMaterial(state, playerIdx);
@@ -2314,9 +2332,8 @@ function aiDecideBid(playerIdx, card, minBid) {
   // Blend of total-need and best-single-need
   let target = Math.round((need + maxNeed) / 2);
 
-  // Don't bid more than supply, more than open (no point — every over-bid worker
-  // costs time without a chance of clinching), or more than 4.
-  target = Math.min(target, p.supply, open, 4);
+  // Cap by safe pool, open, and 4 — never auto-disrupt builds for marginal contention.
+  target = Math.min(target, safePool, open, 4);
 
   // Cost penalty: at higher per-item cost, the risk of paying for a bid that jams
   // is bigger, so trim more aggressively.
@@ -2326,14 +2343,22 @@ function aiDecideBid(playerIdx, card, minBid) {
   // Random tweak for unpredictability
   const r = Math.random();
   if (r < 0.15 && target > 0) target -= 1;
-  else if (r > 0.85 && target < p.supply && target < open) target += 1;
+  else if (r > 0.85 && target < safePool && target < open) target += 1;
 
   // Respect minBid
   target = Math.max(target, minBid);
-  target = Math.min(target, p.supply);
+  // Allow fallback only when needed to meet a min-bid trigger requirement.
+  target = Math.min(target, target > safePool && minBid > 0 ? totalPool : safePool);
 
   if (target < 0) target = 0;
-  return target;
+  // Pre-auction recall: pull workers off the river/shoreline to fund the bid.
+  let needRecall = target - p.supply;
+  if (needRecall > 0) {
+    const tookSafe = aiRecallFromList(playerIdx, safe, needRecall);
+    needRecall -= tookSafe;
+    if (needRecall > 0) aiRecallFromList(playerIdx, fallback, needRecall);
+  }
+  return Math.min(target, p.supply);
 }
 
 // =============================================================================
@@ -2434,13 +2459,16 @@ function aiChooseAction(playerIdx) {
 
   // 2) Score river + pre-river auction candidates jointly. Pick whatever
   //    yields the best (need × clinch_potential) net of trigger + per-item time.
+  // Effective worker pool for triggering an auction = supply + workers we could
+  // recall before bidding (pre-auction recall makes them just as good as supply).
+  const triggerPool = p.supply + aiTotalRecallable(playerIdx);
   let bestCard = null, bestScore = -Infinity, bestKind = null, bestPrerivIdx = -1;
   // River cards: action cost 0t, per-item cost = riverSlotCost(slot).
   for (const c of state.riverCards) {
     if (uncoveredIcons(c) === 0) continue;
     const need = needs[c.material];
     if (need === 0) continue;
-    const got = Math.min(uncoveredIcons(c), p.supply, need);
+    const got = Math.min(uncoveredIcons(c), triggerPool, need);
     // playerCardCost picks up Reed Bed's per-item discount.
     const score = need * got - playerCardCost(c, playerIdx) * got * 0.4;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'river'; }
@@ -2451,13 +2479,13 @@ function aiChooseAction(playerIdx) {
     if (!c) continue;
     const need = needs[c.material];
     if (need === 0) continue;
-    const got = Math.min(uncoveredIcons(c), p.supply, need);
+    const got = Math.min(uncoveredIcons(c), triggerPool, need);
     if (got === 0) continue;
     const trigger = prerivTriggerCost(i);
     const score = need * got - 1 * got * 0.4 - trigger * 0.6;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'preriv'; bestPrerivIdx = i; }
   }
-  if (bestCard && p.supply > 0) {
+  if (bestCard && triggerPool > 0) {
     if (bestKind === 'river') return { type: 'auction', cardId: bestCard.id };
     return { type: 'preriv', slotIdx: bestPrerivIdx };
   }
@@ -2471,10 +2499,11 @@ function aiChooseAction(playerIdx) {
   }
 
   // 4) Flush upstream when nothing in it matches our needs.
-  // Flush triggers an auction on a fresh upstream card, so it requires at least one worker.
+  // Flush triggers an auction on a fresh upstream card, so it requires at least one worker
+  // (supply or recallable, since pre-auction recall covers triggers too).
   const upstreamHasNeeded = state.prerivCards.some(c => c && needs[c.material] > 0);
   const upstreamHasAny = state.prerivCards.some(c => c !== null);
-  if (upstreamHasAny && !upstreamHasNeeded && p.supply > 0) {
+  if (upstreamHasAny && !upstreamHasNeeded && triggerPool > 0) {
     return { type: 'flush' };
   }
 
@@ -2523,75 +2552,59 @@ function aiStartOfTurnAbilities(playerIdx) {
   }
 }
 
-function aiCallHomeIfNeeded(playerIdx) {
+// Returns {safe, fallback}: ordered lists of {cardId, count} for pre-auction recall.
+//   safe     — no-regret recalls: shoreline (no blank), then irrelevant-material
+//              river workers, then surplus useful workers (placed > hand-build cap).
+//   fallback — at-cap useful workers, river-side, highest per-item cost first.
+//              Dipped into only when supply is 0 / a min-bid forces it.
+function aiRecallBudget(playerIdx) {
   const p = state.players[playerIdx];
-  if (p.supply >= 3) return;
-  // A material is "useful" if ANY hand structure references it — even if currently satisfied,
-  // because those workers will be spent when the structure is built. Only workers on totally
-  // unrelated materials should be recalled.
   const useful = new Set();
-  for (const s of p.hand) {
-    for (const m in s.cost) useful.add(m);
-  }
-  // Per-material caps: each material's max-need across hand structures. Workers on a material
-  // beyond that cap are surplus and safe to recall.
+  for (const s of p.hand) for (const m in s.cost) useful.add(m);
   const cap = {};
   for (const m of MAT_KEYS) cap[m] = 0;
-  for (const s of p.hand) {
-    for (const m in s.cost) cap[m] = Math.max(cap[m], s.cost[m]);
-  }
-  // How many workers we currently have on each material (will be decremented as we plan recalls)
+  for (const s of p.hand) for (const m in s.cost) cap[m] = Math.max(cap[m], s.cost[m]);
   const placed = playerWorkersByMaterial(state, playerIdx);
-  const recallSpec = [];
-  // Pull from shoreline first (no blank cost), then river by highest cost (recalling from a
-  // pricey card is least likely to hurt — we'd want to re-bid on cheap cards if anything).
+  const safe = [], fallback = [];
   const cards = [
     ...state.shorelineCards.map(c => ({ c, river: false })),
     ...state.riverCards.slice().sort((a, b) => cardCost(b) - cardCost(a)).map(c => ({ c, river: true })),
   ];
-  for (const { c } of cards) {
+  for (const { c, river } of cards) {
     const w = workersOnCard(c, playerIdx);
     if (w === 0) continue;
-    let canRecall;
-    if (!useful.has(c.material)) {
-      canRecall = w;  // material is irrelevant — recall everything
-    } else {
-      // Surplus only: keep up to cap[m] across this material's cards.
-      const surplus = Math.max(0, placed[c.material] - cap[c.material]);
-      canRecall = Math.min(w, surplus);
+    let safeRecall;
+    if (!useful.has(c.material)) safeRecall = w;
+    else safeRecall = Math.min(w, Math.max(0, placed[c.material] - cap[c.material]));
+    if (safeRecall > 0) {
+      safe.push({ cardId: c.id, count: safeRecall });
+      placed[c.material] -= safeRecall;
     }
-    if (canRecall > 0) {
-      recallSpec.push({ cardId: c.id, count: canRecall });
-      placed[c.material] -= canRecall;
-    }
+    const remaining = w - safeRecall;
+    if (remaining > 0 && river) fallback.push({ cardId: c.id, count: remaining });
   }
-  if (recallSpec.length > 0) callWorkersHome(playerIdx, recallSpec);
+  return { safe, fallback };
 }
 
-function aiForceRecallIfStuck(playerIdx) {
-  // If supply is 0 and player has any workers placed, recall enough to act.
-  const p = state.players[playerIdx];
-  if (p.supply > 0) return;
-  // Recall up to 2 workers, preferring shoreline (no blank cost), then cheapest river card.
-  const candidates = [];
-  for (const c of state.shorelineCards) {
-    const w = workersOnCard(c, playerIdx);
-    if (w > 0) candidates.push({ card: c, w, score: 0 });
-  }
-  for (const c of state.riverCards) {
-    const w = workersOnCard(c, playerIdx);
-    if (w > 0) candidates.push({ card: c, w, score: 1 + cardCost(c) });
-  }
-  candidates.sort((a, b) => a.score - b.score);
-  let toRecall = 2;
+function aiTotalRecallable(playerIdx) {
+  const { safe, fallback } = aiRecallBudget(playerIdx);
+  return safe.reduce((s, x) => s + x.count, 0) + fallback.reduce((s, x) => s + x.count, 0);
+}
+
+// Recall up to `count` workers from the given ordered list. Returns # actually recalled.
+function aiRecallFromList(playerIdx, list, count) {
+  if (count <= 0) return 0;
   const spec = [];
-  for (const cand of candidates) {
-    if (toRecall <= 0) break;
-    const take = Math.min(cand.w, toRecall);
-    spec.push({ cardId: cand.card.id, count: take });
-    toRecall -= take;
+  let need = count;
+  for (const item of list) {
+    if (need <= 0) break;
+    const take = Math.min(item.count, need);
+    spec.push({ cardId: item.cardId, count: take });
+    need -= take;
   }
-  if (spec.length > 0) callWorkersHome(playerIdx, spec);
+  if (spec.length === 0) return 0;
+  callWorkersHome(playerIdx, spec);
+  return count - need;
 }
 
 function aiBrowseDiscardChoice(playerIdx, drawn) {
@@ -2620,41 +2633,6 @@ let humanResolver = null;
 
 function awaitHuman() {
   return new Promise(r => { humanResolver = r; });
-}
-
-function humanCallHome() {
-  const human = state.players.find(p => p.isHuman);
-  // Show a recall modal listing each card with workers
-  const cards = [...state.riverCards, ...state.shorelineCards].filter(c => workersOnCard(c, human.idx) > 0);
-  if (cards.length === 0) return;
-  showModal({
-    title: '🏠 Call workers home',
-    body: () => {
-      let html = `<p class="small-note">Pick how many to recall from each card. (Free; not an action.)</p>`;
-      for (const c of cards) {
-        const w = workersOnCard(c, human.idx);
-        const slotLbl = typeof c.slot === 'number' ? `River ${c.slot + 1}` : 'Shoreline';
-        html += `<div class="bidder-row">
-          <span class="bidder-name">${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} <span class="small-note">(${slotLbl})</span></span>
-          <span><input type="number" id="recall-${c.id}" min="0" max="${w}" value="0"> / ${w}</span>
-        </div>`;
-      }
-      return html;
-    },
-    actions: [
-      { label: 'Recall', primary: true, onClick: () => {
-        const spec = [];
-        for (const c of cards) {
-          const v = parseInt(document.getElementById('recall-' + c.id).value) || 0;
-          if (v > 0) spec.push({ cardId: c.id, count: v });
-        }
-        closeModal();
-        callWorkersHome(human.idx, spec);
-        render();
-      }},
-      { label: 'Cancel', onClick: closeModal },
-    ],
-  });
 }
 
 async function humanUseHeronRoost() {
@@ -3306,47 +3284,134 @@ function reorderListModal(title, intro, items, renderItem) {
   });
 }
 
-function updateBidPreview(cost, supplyBefore, timeBefore) {
-  const input = document.getElementById('human-bid');
+// State for the in-flight bid modal: tracks the current per-card recall plan so
+// onChange handlers can recompute the deficit between bid intent and supply.
+// The slider's max stays fixed at the maximum-possible bid (supply + all
+// recallable, capped at open icons); recalls become required only when the
+// player drags above their supply.
+let humanBidRecallState = null;
+
+function humanBidRecallTotal() {
+  if (!humanBidRecallState) return 0;
+  return Object.values(humanBidRecallState.plan).reduce((s, v) => s + (v | 0), 0);
+}
+
+function updateBidPreview() {
+  const st = humanBidRecallState;
+  if (!st) return;
+  const slider = document.getElementById('human-bid');
+  if (!slider) return;
+  const v = parseInt(slider.value) || 0;
+  const recall = humanBidRecallTotal();
+  const needRecall = Math.max(0, v - st.baseSupply);
+  const deficit = Math.max(0, needRecall - recall);
+  const effSupply = st.baseSupply + recall;
+
   const cur = document.getElementById('bid-current');
-  const wAfter = document.getElementById('bid-workers-after');
+  if (cur) cur.textContent = v;
+  const supplyAfterLbl = document.getElementById('bid-workers-after');
+  if (supplyAfterLbl) supplyAfterLbl.textContent = effSupply - v;
   const wDelta = document.getElementById('bid-workers-delta');
+  if (wDelta) {
+    const parts = [];
+    if (recall > 0) parts.push(`+${recall} recalled`);
+    if (v > 0) parts.push(`−${v} placed`);
+    wDelta.textContent = parts.length ? parts.join(', ') : 'no change';
+  }
+  const timeAfter = st.baseTime + v * st.cost;
   const tAfter = document.getElementById('bid-time-after');
-  const tDelta = document.getElementById('bid-time-delta');
-  if (!input || !cur) return;
-  let v = parseInt(input.value);
-  if (isNaN(v)) v = 0;
-  cur.textContent = v;
-  const supplyAfter = supplyBefore - v;
-  const timeAfter = timeBefore + v * cost;
-  if (wAfter) wAfter.textContent = supplyAfter;
-  if (wDelta) wDelta.textContent = v > 0 ? `−${v} placed` : 'no workers placed';
   if (tAfter) tAfter.textContent = timeAfter;
+  const tDelta = document.getElementById('bid-time-delta');
   if (tDelta) {
-    const delta = timeAfter - timeBefore;
+    const delta = timeAfter - st.baseTime;
     tDelta.textContent = v > 0 ? `+${delta}🐟 (you pay for every bid worker)` : 'no fish spent';
   }
+
+  // Recall section: only relevant when bid exceeds supply.
+  const recallSection = document.getElementById('bid-recall-section');
+  if (recallSection) recallSection.style.display = needRecall > 0 ? '' : 'none';
+  const recallHeader = document.getElementById('bid-recall-header');
+  if (recallHeader) {
+    if (deficit > 0) {
+      recallHeader.innerHTML = `⚠️ Bid is ${needRecall} above your supply — recall <b>${deficit}</b> more worker${deficit === 1 ? '' : 's'} from the cards below, or lower your bid.`;
+      recallHeader.style.color = 'var(--warning, #c87a2d)';
+    } else if (needRecall > 0) {
+      recallHeader.innerHTML = `✅ Recalling <b>${recall}</b> worker${recall === 1 ? '' : 's'} to fund this bid (drops ${recall} blank${recall === 1 ? '' : 's'} on river cards).`;
+      recallHeader.style.color = '';
+    }
+  }
+
+  // Submit disabled while there's a deficit.
+  const submitBtn = document.getElementById('modal-btn-0');
+  if (submitBtn) submitBtn.disabled = deficit > 0;
+}
+
+function adjustBidRecall(cardId, delta) {
+  if (!humanBidRecallState) return;
+  const max = humanBidRecallState.maxByCard[cardId] || 0;
+  const cur = humanBidRecallState.plan[cardId] || 0;
+  const next = Math.max(0, Math.min(max, cur + delta));
+  humanBidRecallState.plan[cardId] = next;
+  const lbl = document.getElementById(`bid-recall-${cardId}`);
+  if (lbl) lbl.textContent = next;
+  updateBidPreview();
 }
 
 async function humanBidForAuction(card, human, minBid, opts = {}) {
-  // No workers left → auto-pass without prompting.
-  // (Action 1 requires supply > 0 to trigger, so minBid is 0 here.)
-  if (human.supply === 0) {
-    log(`💤 ${speciesLabel(human)} has no workers left — auto-passes (bid 0).`);
-    return 0;
-  }
   return new Promise(resolve => {
     const m = MATERIALS[card.material];
     const open = uncoveredIcons(card);
     const cost = playerCardCost(card, human.idx);
     const slotLbl = card.slot === 'pre' ? 'Headwaters' : `River ${card.slot + 1}`;
-    // Cap bids at the smaller of your supply and the open icons. Bidding more than the
-    // open count never gets you more — you can only ever take open items at most.
-    const maxBid = Math.min(human.supply, open);
-    const initVal = Math.min(minBid, maxBid);
-    const supplyLimited = human.supply <= open;
-    const supplyBefore = human.supply;
-    const timeBefore = human.timePos;
+    const baseSupply = human.supply;
+    const baseTime = human.timePos;
+
+    // Cards the human has workers on, eligible for pre-auction recall.
+    const recallCards = [
+      ...state.shorelineCards.map(c => ({ c, river: false })),
+      ...state.riverCards.slice().map(c => ({ c, river: true })),
+    ].filter(({ c }) => workersOnCard(c, human.idx) > 0);
+    const maxByCard = {};
+    for (const { c } of recallCards) maxByCard[c.id] = workersOnCard(c, human.idx);
+    const totalRecallable = Object.values(maxByCard).reduce((s, v) => s + v, 0);
+
+    // Total workers we could marshal = supply + recallable. If 0, auto-pass.
+    if (baseSupply + totalRecallable === 0) {
+      log(`💤 ${speciesLabel(human)} has no workers anywhere — auto-passes (bid 0).`);
+      resolve(0);
+      return;
+    }
+
+    // Slider goes all the way up to the max-possible bid (supply + all
+    // recallable, capped at open icons). Recalls only become *required* when
+    // the player drags above supply.
+    const sliderMax = Math.min(baseSupply + totalRecallable, open);
+
+    // Default recall plan: pre-fill just enough to satisfy minBid (trigger case).
+    const plan = {};
+    let needPrefill = Math.max(0, minBid - baseSupply);
+    if (needPrefill > 0) {
+      // Prefer shoreline (no blank), then river by highest cost.
+      const ordered = [
+        ...recallCards.filter(x => !x.river),
+        ...recallCards.filter(x => x.river).sort((a, b) => cardCost(b.c) - cardCost(a.c)),
+      ];
+      for (const { c } of ordered) {
+        if (needPrefill <= 0) break;
+        const take = Math.min(maxByCard[c.id], needPrefill);
+        if (take > 0) {
+          plan[c.id] = take;
+          needPrefill -= take;
+        }
+      }
+    }
+
+    humanBidRecallState = { baseSupply, baseTime, cost, open, minBid, plan, maxByCard };
+    const initRecall = humanBidRecallTotal();
+    // Default bid: minBid (which equals 0 for non-trigger; trigger has prefilled recalls).
+    const initBid = Math.min(Math.max(minBid, 0), sliderMax);
+    const initNeedRecall = Math.max(0, initBid - baseSupply);
+
     let revealHtml = '';
     if (opts.revealedBids) {
       const rows = state.players
@@ -3361,51 +3426,94 @@ async function humanBidForAuction(card, human, minBid, opts = {}) {
       revealHtml = `<p class="small-note" style="margin-top:0;">🕵 Spy Mound — you've seen everyone else's bids:</p>
         <div class="auction-bidders">${rows}</div>`;
     }
+
+    let recallHtml = '';
+    if (recallCards.length > 0) {
+      const rows = recallCards.map(({ c, river }) => {
+        const w = maxByCard[c.id];
+        const where = river ? `River ${c.slot + 1}` : 'Shoreline';
+        const blankNote = river ? '(drops a blank)' : '(no blank)';
+        const v = plan[c.id] || 0;
+        return `<div class="bidder-row">
+          <span class="bidder-name">${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} <span class="small-note">${where} ${blankNote}</span></span>
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <button type="button" onclick="adjustBidRecall('${c.id}', -1)" style="width:24px;">−</button>
+            <span id="bid-recall-${c.id}" style="min-width:22px; text-align:center;"><b>${v}</b></span>
+            <button type="button" onclick="adjustBidRecall('${c.id}', 1)" style="width:24px;">+</button>
+            <span class="small-note">/ ${w}</span>
+          </span>
+        </div>`;
+      }).join('');
+      recallHtml = `
+        <div id="bid-recall-section" style="margin-top:10px; padding:8px; border:1px solid var(--border, #333); border-radius:4px; display:${initNeedRecall > 0 ? '' : 'none'};">
+          <div id="bid-recall-header" class="small-note" style="margin-bottom:6px;"></div>
+          <div class="auction-bidders">${rows}</div>
+        </div>
+      `;
+    }
+
     showModal({
       title: `🎲 Auction: ${m.emoji} ${m.name} at ${slotLbl}`,
       body: () => `
         ${revealHtml}
-        <p>${open} icon${open === 1 ? '' : 's'} open · ${cost}🐟 per item · minimum bid <b>${minBid}</b>${minBid > 0 ? ' (you triggered)' : ''} · maximum <b>${maxBid}</b> ${supplyLimited ? '(your supply)' : '(open icons)'}.</p>
+        <p>${open} icon${open === 1 ? '' : 's'} open · ${cost}🐟 per item · minimum bid <b>${minBid}</b>${minBid > 0 ? ' (you triggered)' : ''} · maximum <b>${sliderMax}</b> ${sliderMax === open ? '(open icons)' : `(${baseSupply} supply + up to ${totalRecallable} recall)`}.</p>
         <div class="bid-slider-row">
           <span class="small-note">${minBid}</span>
-          <input id="human-bid" class="bid-slider" type="range" min="${minBid}" max="${maxBid}" value="${initVal}"
-                 oninput="updateBidPreview(${cost}, ${supplyBefore}, ${timeBefore})">
-          <span class="small-note">${maxBid}</span>
-          <div id="bid-current" class="bid-current">${initVal}</div>
+          <input id="human-bid" class="bid-slider" type="range" min="${minBid}" max="${sliderMax}" value="${initBid}" oninput="updateBidPreview()">
+          <span class="small-note">${sliderMax}</span>
+          <div id="bid-current" class="bid-current">${initBid}</div>
         </div>
         <div class="bid-stats">
           <div class="bid-stat">
-            <div class="bid-stat-label">Workers</div>
+            <div class="bid-stat-label">Supply</div>
             <div class="bid-stat-vals">
-              <span class="bid-stat-before">${supplyBefore}</span>
+              <span class="bid-stat-before">${baseSupply}</span>
               <span class="bid-stat-arrow">→</span>
-              <span class="bid-stat-after" id="bid-workers-after">${supplyBefore - initVal}</span>
+              <span class="bid-stat-after" id="bid-workers-after">${baseSupply + initRecall - initBid}</span>
             </div>
-            <div class="bid-stat-delta" id="bid-workers-delta">${initVal > 0 ? '−' + initVal + ' placed' : 'no workers placed'}</div>
+            <div class="bid-stat-delta" id="bid-workers-delta">${initRecall > 0 || initBid > 0 ? [initRecall > 0 ? `+${initRecall} recalled` : null, initBid > 0 ? `−${initBid} placed` : null].filter(x => x).join(', ') : 'no change'}</div>
           </div>
           <div class="bid-stat">
             <div class="bid-stat-label">Fish</div>
             <div class="bid-stat-vals">
-              <span class="bid-stat-before">${timeBefore}</span>
+              <span class="bid-stat-before">${baseTime}</span>
               <span class="bid-stat-arrow">→</span>
-              <span class="bid-stat-after" id="bid-time-after">${timeBefore + initVal * cost}</span>
+              <span class="bid-stat-after" id="bid-time-after">${baseTime + initBid * cost}</span>
             </div>
-            <div class="bid-stat-delta" id="bid-time-delta">${initVal > 0 ? '+' + (initVal * cost) + '🐟 (max — less if jam)' : 'no fish spent'}</div>
+            <div class="bid-stat-delta" id="bid-time-delta">${initBid > 0 ? '+' + (initBid * cost) + '🐟 (max — less if jam)' : 'no fish spent'}</div>
           </div>
         </div>
+        ${recallHtml}
       `,
       actions: [
         { label: 'Submit bid', primary: true, onClick: () => {
-          const v = parseInt(document.getElementById('human-bid').value);
-          if (isNaN(v) || v < minBid || v > maxBid) {
-            alert(`Bid must be between ${minBid} and ${maxBid}.`);
+          const slider = document.getElementById('human-bid');
+          const v = parseInt(slider.value);
+          const recall = humanBidRecallTotal();
+          const needRecall = Math.max(0, v - baseSupply);
+          if (isNaN(v) || v < minBid || v > sliderMax) {
+            alert(`Bid must be between ${minBid} and ${sliderMax}.`);
+            return;
+          }
+          if (recall < needRecall) {
+            alert(`You need to recall ${needRecall - recall} more worker(s) to support this bid.`);
             return;
           }
           closeModal();
+          // Apply pre-auction recall first (drops blanks on river cards).
+          const spec = [];
+          for (const cardId of Object.keys(humanBidRecallState.plan)) {
+            const n = humanBidRecallState.plan[cardId];
+            if (n > 0) spec.push({ cardId, count: n });
+          }
+          if (spec.length > 0) callWorkersHome(human.idx, spec);
+          humanBidRecallState = null;
           resolve(v);
         }},
       ],
     });
+    // Initialize header text + submit-disabled state for the just-rendered modal.
+    updateBidPreview();
   });
 }
 
@@ -3454,12 +3562,7 @@ async function runOneTurn() {
     actionType = state.lastHumanActionType;
   } else {
     aiStartOfTurnAbilities(p.idx);
-    let action = aiChooseAction(p.idx);
-    if (action.type !== 'build') {
-      aiCallHomeIfNeeded(p.idx);
-      aiForceRecallIfStuck(p.idx);
-      action = aiChooseAction(p.idx);
-    }
+    const action = aiChooseAction(p.idx);
     render();
     await sleep(500);
     await executeAIAction(p.idx, action);
