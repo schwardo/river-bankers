@@ -32,6 +32,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 | **Reed Bed** | 3 reeds, 1 mud | 2🐟 | Reed icons cost you 1 less fish per item (min 1). |
 | **Charcoal Pit** | 4 clay, 2 logs | 3🐟 | When building, 1 Clay worker may substitute for any other material. |
 | **Cattail Marsh** | 4 reeds, 2 mud | 3🐟 | Each Reed worker you spend on a build counts as 2 reeds. |
+| **Treaty Stone** | 3 stones, 2 clay | 3🐟 | When building, you may spend 2 of any one material as 1 of any other material. Once per build. |
 | **Wood Pile** | 4 logs | 2🐟 | When you pass 0, claim 1 uncovered Log icon from any river card for 1🐟. |
 
 ### Worker logistics
@@ -50,7 +51,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 |------|------|------|--------|
 | **Pier** | 3 logs, 2 stones | 3🐟 | End game: +1 VP per shoreline card with at least one of your workers on it. |
 | **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End game: +2 VP per built structure of yours that uses Vines. |
-| **Stone Cairn** | 5 stones | 3🐟 | End game: +1 VP per distinct material across your built structures (max +5). |
+| **Cattail Patch** | 3 reeds, 2 mud | 3🐟 | End game: card is worth 0 VP itself, plus 1/2/3/5/8/10 VP for 1/2/3/4/5/6 distinct materials across your built structures. |
 
 ---
 
@@ -99,13 +100,12 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 Names reserved for plain monument cards — no special effect, just material cost → VP. Costs and VP TBD.
 
-- **Cattail Patch**
-- **Treaty Stone**
 - **Granite Spire**
 - **Twig Bridge**
 - **Reed Snare**
 - **Stone Hearth**
 - **Sun-Warmed Rock**
+- **Stone Cairn**
 
 ---
 

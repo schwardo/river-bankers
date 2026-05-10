@@ -977,7 +977,6 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top card of the material deck at any time.' },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 2, effect: 'End game: +1 VP per shoreline card with at least one of your workers.' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
-  { name: 'Stone Cairn',    cost: { stones: 5 },                     time: 3, vp: 1, effect: 'End game: +1 VP per distinct material across your built structures (max +5).' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5, effect: 'At the start of your turn you may pay 1🐟 to replace a Headwaters card with the top of the material deck.' },
   { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 5, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
@@ -996,7 +995,12 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5, effect: 'At the start of your turn you may pay 1🐟 to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
+  { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
+  { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/2/3/5/8/10 for 1/2/3/4/5/6 distinct materials across your built structures.' },
 ];
+
+// Cattail Patch end-game schedule, indexed by distinct-material count (0..6).
+const CATTAIL_PATCH_VP = [0, 1, 2, 3, 5, 8, 10];
 
 // Ablation toggle: set STRUCTURE_EFFECT_DISABLED['Pier'] = true to ignore that
 // card's effect (still in the deck, still costs/scores its printed VP — only
@@ -1016,10 +1020,10 @@ function totalVP(p, state) {
   if (hasEffect(p, 'Pier')) {
     v += state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length;
   }
-  if (hasEffect(p, 'Stone Cairn')) {
+  if (hasEffect(p, 'Cattail Patch')) {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
-    v += Math.min(5, mats.size);
+    v += CATTAIL_PATCH_VP[Math.min(mats.size, CATTAIL_PATCH_VP.length - 1)];
   }
   if (hasEffect(p, 'Vine Ladder')) {
     v += 2 * p.built.filter(b => (b.cost.vines || 0) > 0).length;
@@ -1161,6 +1165,24 @@ function effectiveBuildCost(struct, p, wbm) {
           break;
         }
       }
+    }
+  }
+  // Treaty Stone: once per build, cover 1 missing of one material by paying
+  // 2 of a surplus material (any-to-any). Applied after free 1:1 saves so it
+  // only fires when a real deficit remains.
+  if (hasEffect(p, 'Treaty Stone')) {
+    for (const target of MAT_KEYS) {
+      if ((wbm[target] || 0) >= (eff[target] || 0)) continue;
+      let found = false;
+      for (const source of MAT_KEYS) {
+        if (source === target) continue;
+        if ((wbm[source] || 0) - (eff[source] || 0) < 2) continue;
+        eff[target] -= 1;
+        eff[source] = (eff[source] || 0) + 2;
+        found = true;
+        break;
+      }
+      if (found) break;
     }
   }
   // Granary: once-per-game, drop 1 from a remaining deficient material.
@@ -2370,6 +2392,7 @@ function aiDecideBid(playerIdx, card, minBid) {
 const EFFECT_VP_FIXED = {
   'Granary': 3,
   'Charcoal Pit': 2,
+  'Treaty Stone': 2,
   'Cattail Marsh': 1,
   'Otter Raft': 1,
   'Cache Burrow': 1,
@@ -2405,10 +2428,18 @@ function aiEffectValue(struct, p, state) {
     const remaining = state.matDeck.length + state.riverCards.length;
     return placed + Math.min(5, Math.floor(remaining * 0.25));
   }
-  if (struct.name === 'Stone Cairn') {
+  if (struct.name === 'Cattail Patch') {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
-    return Math.min(5, mats.size + 2);
+    for (const m in struct.cost) mats.add(m);
+    const handMats = new Set();
+    for (const s of p.hand) for (const m in s.cost) handMats.add(m);
+    let projected = mats.size;
+    for (const m of handMats) {
+      if (!mats.has(m) && projected < 6) projected += 1;
+      if (projected - mats.size >= 2) break;
+    }
+    return CATTAIL_PATCH_VP[Math.min(projected, CATTAIL_PATCH_VP.length - 1)];
   }
   if (struct.name === 'Vine Ladder') {
     const builtVine = p.built.filter(b => (b.cost.vines || 0) > 0).length;
