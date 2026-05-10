@@ -40,19 +40,19 @@ There are no rounds. The next player to act is whoever's *non-exhausted* pawn is
 
 ## Your turn
 
-Take exactly **one** action. Every action advances your pawn forward by its fish cost. **Any action that triggers an auction (1, 2, or 5) requires at least one worker available** — in your supply or placed on a card you could recall (see *Pre-auction recall* under Auctions).
+Take exactly **one** action. Every action advances your pawn forward by its fish cost. **Any action that triggers an auction (1, 2, or 3) requires at least one worker available** — in your supply or placed on a card you could recall (see *Pre-auction recall* under Auctions).
 
-1. **Auction an existing river card — 1🐟 flat.** Choose any river card that still has uncovered icons. You must bid at least one worker. The flat fish is paid immediately; per-item fish still applies on whatever you win, set by the card's current river space (2/3/4/5🐟).
-2. **Pull a Headwaters card into the river — 2, 3, or 4🐟.** Choose a card in the Headwaters and pay the move cost on its slot (2🐟 for Headwaters 1, 3🐟 for Headwaters 2, 4🐟 for Headwaters 3). An auction immediately runs on it at the **Headwaters rate of 1🐟/item**. You must bid at least one worker. Card movement after the auction follows the universal rule below.
-3. **Invent — N🐟 (you choose N from 1–5).** Draw N structure cards from the deck, then discard N cards from your hand (any mix of new draws and old). Discards go face-down out of play.
-4. **Build a structure — fish cost printed on the card.** For each material listed, pick up that many of *your* workers from cards of the matching type and return them to your supply. Drop a blank on each uncovered river-card icon. (Shoreline cards don't need blanks.) Place the structure face-up in front of you for scoring, then draw a replacement structure card so your hand returns to 3.
-5. **Flush the Headwaters — 5🐟.** Discard all cards currently in the Headwaters (out of game). Refill from the top of the deck (revealing 3 fresh cards). Pick one of those new cards and run an auction on it at the Headwaters rate (1🐟/item); triggering this auction is *free* — the 5🐟 already paid covers it — but you still pay for your own bid normally and **must bid at least one worker** on it. The other two newly-revealed Headwaters cards stay in their slots. After the auction settles, the auctioned card's slot refills as usual. If the deck has fewer than 3 cards left when you flush, the Headwaters refills with whatever's available.
+1. **Pull a Headwaters card into the river — 2, 3, or 4🐟.** Choose a card in the Headwaters and pay the move cost on its slot (2🐟 for Headwaters 1, 3🐟 for Headwaters 2, 4🐟 for Headwaters 3). An auction immediately runs on it at the **Headwaters rate of 1🐟/item**. You must bid at least one worker. Card movement after the auction follows the universal rule below.
+2. **Auction an existing river card — 1🐟 flat.** Choose any river card that still has uncovered icons. You must bid at least one worker. The flat fish is paid immediately; per-item fish still applies on whatever you win, set by the card's current river space (2/3/4/5🐟).
+3. **Flush the Headwaters — 5🐟.** Discard all cards currently in the Headwaters (out of game). Refill from the top of the deck (revealing 3 fresh cards). Pick one of those new cards and run an auction on it at the Headwaters rate (1🐟/item); triggering this auction is *free* — the 5🐟 already paid covers it — but you still pay for your own bid normally and **must bid at least one worker** on it. The other two newly-revealed Headwaters cards stay in their slots. After the auction settles, the auctioned card's slot refills as usual. If the deck has fewer than 3 cards left when you flush, the Headwaters refills with whatever's available.
+4. **Invent structures — N🐟 (you choose N from 1–5).** Draw N structure cards from the deck, then discard N cards from your hand (any mix of new draws and old). Discards go face-down out of play.
+5. **Build a structure — fish cost printed on the card.** For each material listed, pick up that many of *your* workers from cards of the matching type and return them to your supply. Drop a blank on each uncovered river-card icon. (Shoreline cards don't need blanks.) Place the structure face-up in front of you for scoring, then draw a replacement structure card so your hand returns to 3.
 
 After your action resolves (and any auction settles), check the fish track again. If you're still on top of the lowest occupied space, take another turn.
 
 ## Auctions
 
-Triggered by action 1 or action 2. The action's flat fish cost is paid immediately (1🐟 for an existing river card, 2/3/4🐟 to pull a Headwaters card into River 1); auction results may cost additional fish.
+Triggered by action 1, 2, or 3. The action's flat fish cost is paid immediately (2/3/4🐟 to pull a Headwaters card into River 1, 1🐟 for an existing river card, 5🐟 to flush the Headwaters); auction results may cost additional fish.
 
 ### Pre-auction recall
 
