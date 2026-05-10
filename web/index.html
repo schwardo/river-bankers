@@ -1993,7 +1993,7 @@ function renderActionPanel() {
     const triggerPool = cur.supply + placed;
     html = `<div class="action-panel-title">Your turn — choose an action</div>
       <div class="action-buttons">
-        <button onclick="humanChooseAction('preriv')" ${(triggerPool > 0 && hasPreriv) ? '' : 'disabled'}>1. Pull Headwaters card (2–4🐟)</button>
+        <button onclick="humanChooseAction('preriv')" ${(triggerPool > 0 && hasPreriv) ? '' : 'disabled'}>1. Auction Headwaters card (2–4🐟)</button>
         <button onclick="humanChooseAction('auction')" ${(triggerPool > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>2. Auction river card (1🐟)</button>
         <button onclick="humanChooseAction('flush')" ${(triggerPool > 0 && (hasPreriv || state.matDeck.length > 0)) ? '' : 'disabled'}>3. Flush Headwaters (5🐟)</button>
         <button onclick="humanChooseAction('browse')" ${state.structDeck.length > 0 ? '' : 'disabled'}>4. Invent structures (N🐟)</button>
@@ -2009,7 +2009,7 @@ function renderActionPanel() {
         <button class="ghost" onclick="humanCancelAction()">Cancel</button>
       </div>`;
   } else if (state.phase === 'select-preriv-card') {
-    html = `<div class="action-panel-title">Pick a Headwaters card to pull</div>
+    html = `<div class="action-panel-title">Pick a Headwaters card to auction</div>
       <div class="action-buttons">
         <span class="action-hint">Click a Headwaters card. Move cost depends on the slot (4🐟 / 3🐟 / 2🐟).</span>
         <button class="ghost" onclick="humanCancelAction()">Cancel</button>
