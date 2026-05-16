@@ -1215,6 +1215,26 @@ function shuffle(arr) {
   return a;
 }
 
+// Draw a card from the structure deck. If the deck is empty, the discard
+// pile is shuffled into a new deck first. Returns undefined when both
+// piles are empty.
+function popStructDeck(state) {
+  if (state.structDeck.length === 0) {
+    if (state.structDiscard.length === 0) return undefined;
+    state.structDeck = shuffle(state.structDiscard);
+    state.structDiscard = [];
+    if (typeof log === 'function') {
+      log(`📚 Structure deck empty — discard pile (${state.structDeck.length}) reshuffled into the deck.`);
+    }
+  }
+  return state.structDeck.pop();
+}
+
+// Total structure cards still in circulation (deck + discard).
+function structAvailable(state) {
+  return state.structDeck.length + state.structDiscard.length;
+}
+
 function uncoveredIcons(card) {
   let workers = 0;
   for (const k in card.workers) workers += card.workers[k];
@@ -1893,7 +1913,7 @@ function renderHand() {
     const enabled = state.currentPlayer === human.idx
       && state.phase === 'choose-action'
       && !state.gameOver
-      && state.structDeck.length > 0;
+      && structAvailable(state) > 0;
     inventBtn.disabled = !enabled;
   }
   const div = document.getElementById('hand-cards');
@@ -1996,7 +2016,7 @@ function renderActionPanel() {
         <button onclick="humanChooseAction('preriv')" ${(triggerPool > 0 && hasPreriv) ? '' : 'disabled'}>1. Auction Headwaters card (2–4🐟)</button>
         <button onclick="humanChooseAction('auction')" ${(triggerPool > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>2. Auction river card (1🐟)</button>
         <button onclick="humanChooseAction('flush')" ${(triggerPool > 0 && (hasPreriv || state.matDeck.length > 0)) ? '' : 'disabled'}>3. Flush Headwaters (5🐟)</button>
-        <button onclick="humanChooseAction('browse')" ${state.structDeck.length > 0 ? '' : 'disabled'}>4. Invent structures (N🐟)</button>
+        <button onclick="humanChooseAction('browse')" ${structAvailable(state) > 0 ? '' : 'disabled'}>4. Invent structures (N🐟)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>5. Build a structure</button>
         ${state.endgame ? `<button class="ghost" onclick="humanRetire()">Retire (endgame)</button>` : ''}
       </div>
@@ -2671,8 +2691,8 @@ function aiChooseAction(playerIdx) {
 
   // 3) If hand has no needs at all (can't make progress) → browse
   if (totalNeed === 0 || p.hand.length === 0) {
-    if (state.structDeck.length > 0) {
-      const N = Math.min(2, state.structDeck.length);
+    if (structAvailable(state) > 0) {
+      const N = Math.min(2, structAvailable(state));
       return { type: 'browse', n: N };
     }
   }
@@ -2687,8 +2707,8 @@ function aiChooseAction(playerIdx) {
   }
 
   // 5) Last resort: browse if possible
-  if (state.structDeck.length > 0) {
-    const N = Math.min(1, state.structDeck.length);
+  if (structAvailable(state) > 0) {
+    const N = Math.min(1, structAvailable(state));
     return { type: 'browse', n: N };
   }
 
@@ -2963,9 +2983,9 @@ function humanConfirmBrowseN() {
   let N = parseInt(document.getElementById('browse-n').value) || 1;
   N = Math.max(1, Math.min(5, N));
   const human = state.players.find(p => p.isHuman);
-  const drawCount = Math.min(N, state.structDeck.length);
+  const drawCount = Math.min(N, structAvailable(state));
   const drawn = [];
-  for (let i = 0; i < drawCount; i++) drawn.push(state.structDeck.pop());
+  for (let i = 0; i < drawCount; i++) drawn.push(popStructDeck(state));
   advancePlayer(human.idx, drawCount);
   log(`📚 ${speciesLabel(human)} invents from ${drawCount} cards (${drawCount}🐟).`);
   state.browseDrawn = drawn;
@@ -3090,8 +3110,8 @@ async function performBuild(playerIdx, handIdx) {
   // Fire on-build effect (one-time triggers).
   await fireOnBuildEffect(playerIdx, struct);
   // Draw replacements up to (post-build) hand size — Cache Burrow may now be active.
-  while (p.hand.length < maxHandSize(p) && state.structDeck.length > 0) {
-    p.hand.push(state.structDeck.pop());
+  while (p.hand.length < maxHandSize(p) && structAvailable(state) > 0) {
+    p.hand.push(popStructDeck(state));
   }
   cleanupShoreline();
 }
@@ -3247,10 +3267,10 @@ async function fireOnBuildEffect(playerIdx, struct) {
     return;
   }
   if (struct.name === 'Vine Lattice') {
-    const drawCount = Math.min(3, state.structDeck.length);
+    const drawCount = Math.min(3, structAvailable(state));
     if (drawCount === 0) return;
     const drawn = [];
-    for (let i = 0; i < drawCount; i++) drawn.push(state.structDeck.pop());
+    for (let i = 0; i < drawCount; i++) drawn.push(popStructDeck(state));
     const wbm = playerWorkersByMaterial(state, playerIdx);
     let keep;
     if (isHuman) {
@@ -3859,9 +3879,9 @@ async function executeAIAction(playerIdx, action) {
   }
   if (action.type === 'browse') {
     const N = action.n;
-    const drawCount = Math.min(N, state.structDeck.length);
+    const drawCount = Math.min(N, structAvailable(state));
     const drawn = [];
-    for (let i = 0; i < drawCount; i++) drawn.push(state.structDeck.pop());
+    for (let i = 0; i < drawCount; i++) drawn.push(popStructDeck(state));
     advancePlayer(playerIdx, drawCount);
     log(`📚 ${speciesLabel(p)} invents from ${drawCount} cards (${drawCount}🐟).`);
     const sel = aiBrowseDiscardChoice(playerIdx, drawn);

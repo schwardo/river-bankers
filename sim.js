@@ -215,6 +215,19 @@ function cardCost(card) {
 // =============================================================================
 // HELPERS
 // =============================================================================
+function popStructDeck(state) {
+  if (state.structDeck.length === 0) {
+    if (state.structDiscard.length === 0) return undefined;
+    state.structDeck = shuffle(state.structDiscard);
+    state.structDiscard = [];
+  }
+  return state.structDeck.pop();
+}
+
+function structAvailable(state) {
+  return state.structDeck.length + state.structDiscard.length;
+}
+
 function shuffle(arr) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -891,7 +904,7 @@ function aiChooseAction(state, playerIdx) {
     return { type: 'preriv', slotIdx: bestPrerivIdx };
   }
   if (totalNeed === 0 || p.hand.length === 0) {
-    if (state.structDeck.length > 0) return { type: 'browse', n: Math.min(2, state.structDeck.length) };
+    if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(2, structAvailable(state)) };
   }
   const upstreamHasNeeded = state.prerivCards.some(c => c && needs[c.material] > 0);
   const upstreamHasAny = state.prerivCards.some(c => c !== null);
@@ -900,7 +913,7 @@ function aiChooseAction(state, playerIdx) {
   if (upstreamHasAny && !upstreamHasNeeded && triggerPool > 0) {
     return { type: 'flush' };
   }
-  if (state.structDeck.length > 0) return { type: 'browse', n: Math.min(1, state.structDeck.length) };
+  if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(1, structAvailable(state)) };
   return { type: 'pass' };
 }
 
@@ -1083,8 +1096,8 @@ function performBuild(state, playerIdx, handIdx) {
   state.metrics.cardsBuilt++;
   fireOnBuildEffect(state, playerIdx, struct);
   // Replace from deck up to maxHandSize (Cache Burrow → 4).
-  while (p.hand.length < maxHandSize(p) && state.structDeck.length > 0) {
-    p.hand.push(state.structDeck.pop());
+  while (p.hand.length < maxHandSize(p) && structAvailable(state) > 0) {
+    p.hand.push(popStructDeck(state));
   }
   cleanupShoreline(state);
 }
@@ -1159,10 +1172,10 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     return;
   }
   if (struct.name === 'Vine Lattice') {
-    const drawCount = Math.min(3, state.structDeck.length);
+    const drawCount = Math.min(3, structAvailable(state));
     if (drawCount === 0) return;
     const drawn = [];
-    for (let i = 0; i < drawCount; i++) drawn.push(state.structDeck.pop());
+    for (let i = 0; i < drawCount; i++) drawn.push(popStructDeck(state));
     const wbm = playerWorkersByMaterial(state, playerIdx);
     function score(s) {
       let deficit = 0;
@@ -1242,9 +1255,9 @@ function executeAction(state, playerIdx, action) {
   }
   if (action.type === 'browse') {
     const N = action.n;
-    const drawCount = Math.min(N, state.structDeck.length);
+    const drawCount = Math.min(N, structAvailable(state));
     const drawn = [];
-    for (let i = 0; i < drawCount; i++) drawn.push(state.structDeck.pop());
+    for (let i = 0; i < drawCount; i++) drawn.push(popStructDeck(state));
     advancePlayer(state, playerIdx, drawCount);
     const sel = aiBrowseDiscardChoice(state, playerIdx, drawn);
     const newHand = [];
