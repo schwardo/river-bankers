@@ -55,6 +55,10 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/2/3/5/8/10 for 1/2/3/4/5/6 distinct materials across your built structures.' },
   { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile.' },
+  { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game, at the start of your turn, force an opponent to recall one of their workers from a river card (dropping a blank). The opponent slides back 3 fish in compensation.' },
+  { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 7, effect: 'On your turn, instead of a regular action, pay 2 fish to slide a river card 1 space toward the Headwaters.' },
+  { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 5, effect: 'At the start of your turn, swap one of your workers on a river card with another worker (yours or an opponent\'s) on a different river card. Pay the source card\'s per-item cost in fish.' },
+  { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 7, effect: 'As your main action, place 1-5 workers from your supply onto uncovered icons of one river card. Fish cost escalates 2/3/5/8/13 per successive worker.' },
 ];
 
 // Cattail Patch end-game schedule, indexed by distinct-material count (0..6).
@@ -378,6 +382,7 @@ function newGame(numPlayers, workersPerPlayer = 8) {
       granaryUsed: false,
       floodgateUsed: false,
       spyMoundUsed: false,
+      tributeStoneUsed: false,
     });
   }
   const matDeck = buildMaterialDeck(numPlayers);
@@ -798,6 +803,10 @@ const EFFECT_VP_FIXED = {
   'Driftwood Snag': 0,
   'Floodgate': 0,
   'Spy Mound': 0,
+  'Tribute Stone': 0.5,
+  'Beaver Tow': 1,
+  'Otter Trail': 1.5,
+  'Salmon Run': 2,
   'Stone Pool': 0,
   'Flush Channel': 0,
   // Sim no-ops (would be > 0 with smarter AI)
@@ -810,6 +819,7 @@ function aiEffectValue(struct, p, state) {
   if (struct.name === 'Granary' && p.granaryUsed) return 0;
   if (struct.name === 'Floodgate' && p.floodgateUsed) return 0;
   if (struct.name === 'Spy Mound' && p.spyMoundUsed) return 0;
+  if (struct.name === 'Tribute Stone' && p.tributeStoneUsed) return 0;
   // Endgame VP — state-dependent projections.
   if (struct.name === 'Pier') {
     const placed = state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length;
@@ -903,6 +913,19 @@ function aiChooseAction(state, playerIdx) {
     if (bestKind === 'river') return { type: 'auction', cardId: bestCard.id };
     return { type: 'preriv', slotIdx: bestPrerivIdx };
   }
+  // Beaver Tow: if no good auction was found, slide a useful card upstream
+  // (cheaper for a future auction).
+  if (hasEffect(p, 'Beaver Tow') && p.timePos + 2 < ENDGAME_TRACK_END) {
+    const towTarget = findBeaverTowTarget(state, playerIdx, needs);
+    if (towTarget) return { type: 'beaverTow', cardId: towTarget.id };
+  }
+  // Salmon Run: place workers from supply on a single card with escalating cost.
+  if (hasEffect(p, 'Salmon Run') && p.supply > 0 && p.timePos + 2 < ENDGAME_TRACK_END) {
+    const target = findSalmonRunTarget(state, playerIdx, needs);
+    if (target && p.timePos + salmonRunCumulativeCost(target.n) < ENDGAME_TRACK_END) {
+      return { type: 'salmonRun', cardId: target.card.id, workerCount: target.n };
+    }
+  }
   if (totalNeed === 0 || p.hand.length === 0) {
     if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(2, structAvailable(state)) };
   }
@@ -917,8 +940,160 @@ function aiChooseAction(state, playerIdx) {
   return { type: 'pass' };
 }
 
-// Heron Roost / Driftwood Snag: optional start-of-turn abilities. Auto-fire for AI
-// when conditions are met. Each costs 1 fish.
+// Tribute Stone: once-per-game force-recall of an opponent's worker.
+// Drops a blank like a normal recall; the victim slides back 3 fish.
+function doTributeStone(state, playerIdx, victimIdx, card) {
+  const p = state.players[playerIdx];
+  const victim = state.players[victimIdx];
+  if (p.tributeStoneUsed) return false;
+  if (workersOnCard(card, victimIdx) <= 0) return false;
+  card.workers[victimIdx] -= 1;
+  if (card.workers[victimIdx] === 0) delete card.workers[victimIdx];
+  if (typeof card.slot === 'number') { card.blanks += 1; noteBlanks(state); }
+  victim.supply += 1;
+  victim.timePos = Math.max(0, victim.timePos - 3);
+  p.tributeStoneUsed = true;
+  return true;
+}
+
+function findTributeStoneTarget(state, playerIdx) {
+  let best = null;
+  for (const c of state.riverCards) {
+    for (const k in c.workers) {
+      const opIdx = parseInt(k);
+      if (opIdx === playerIdx) continue;
+      if (c.workers[k] <= 0) continue;
+      const value = cardCost(c);
+      if (!best || value > best.value) best = { victimIdx: opIdx, card: c, value };
+    }
+  }
+  return best;
+}
+
+// Otter Trail: swap your worker on river card A with another worker on card B.
+// Pay A's per-item cost.
+function doOtterTrail(state, playerIdx, cardAId, cardBId, otherPlayerIdx) {
+  const cardA = state.riverCards.find(c => c.id === cardAId);
+  const cardB = state.riverCards.find(c => c.id === cardBId);
+  if (!cardA || !cardB || cardA.id === cardB.id) return false;
+  if (typeof cardA.slot !== 'number' || typeof cardB.slot !== 'number') return false;
+  if (workersOnCard(cardA, playerIdx) <= 0) return false;
+  if (workersOnCard(cardB, otherPlayerIdx) <= 0) return false;
+  cardA.workers[playerIdx] -= 1;
+  if (cardA.workers[playerIdx] === 0) delete cardA.workers[playerIdx];
+  cardB.workers[otherPlayerIdx] -= 1;
+  if (cardB.workers[otherPlayerIdx] === 0) delete cardB.workers[otherPlayerIdx];
+  cardA.workers[otherPlayerIdx] = (cardA.workers[otherPlayerIdx] || 0) + 1;
+  cardB.workers[playerIdx] = (cardB.workers[playerIdx] || 0) + 1;
+  advancePlayer(state, playerIdx, cardCost(cardA));
+  return true;
+}
+
+function findOtterTrailTarget(state, playerIdx) {
+  const p = state.players[playerIdx];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  for (const s of p.hand) {
+    for (const m in s.cost) {
+      needs[m] = Math.max(needs[m], Math.max(0, s.cost[m] - (wbm[m] || 0)));
+    }
+  }
+  let bestB = null, bestBOther = -1, bestBNeed = 0;
+  for (const c of state.riverCards) {
+    if (typeof c.slot !== 'number') continue;
+    if ((needs[c.material] || 0) === 0) continue;
+    for (const k in c.workers) {
+      const opIdx = parseInt(k);
+      if (opIdx === playerIdx) continue;
+      if (c.workers[k] <= 0) continue;
+      if (needs[c.material] > bestBNeed) {
+        bestBNeed = needs[c.material];
+        bestB = c;
+        bestBOther = opIdx;
+      }
+    }
+  }
+  if (!bestB) return null;
+  let bestA = null, bestACost = Infinity;
+  for (const c of state.riverCards) {
+    if (c.id === bestB.id) continue;
+    if (typeof c.slot !== 'number') continue;
+    if (workersOnCard(c, playerIdx) <= 0) continue;
+    const cost = cardCost(c);
+    const uselessBonus = (needs[c.material] || 0) === 0 ? -1 : 0;
+    if (cost + uselessBonus < bestACost) { bestACost = cost + uselessBonus; bestA = c; }
+  }
+  if (!bestA) return null;
+  if (cardCost(bestA) > bestBNeed * 2) return null;
+  return { cardA: bestA, cardB: bestB, otherIdx: bestBOther };
+}
+
+// Salmon Run: marginal fish cost for the 1st/2nd/3rd/4th/5th worker placed.
+const SALMON_RUN_COSTS = [2, 3, 5, 8, 13];
+function salmonRunCumulativeCost(n) {
+  let total = 0;
+  for (let i = 0; i < n && i < SALMON_RUN_COSTS.length; i++) total += SALMON_RUN_COSTS[i];
+  return total;
+}
+
+function doSalmonRun(state, playerIdx, cardId, workerCount) {
+  const p = state.players[playerIdx];
+  const card = state.riverCards.find(c => c.id === cardId);
+  if (!card || typeof card.slot !== 'number') return false;
+  const maxPlaceable = Math.min(workerCount, p.supply, uncoveredIcons(card), SALMON_RUN_COSTS.length);
+  if (maxPlaceable <= 0) return false;
+  const cost = salmonRunCumulativeCost(maxPlaceable);
+  card.workers[playerIdx] = (card.workers[playerIdx] || 0) + maxPlaceable;
+  p.supply -= maxPlaceable;
+  advancePlayer(state, playerIdx, cost);
+  return true;
+}
+
+function findSalmonRunTarget(state, playerIdx, needs) {
+  const p = state.players[playerIdx];
+  let best = null;
+  for (const c of state.riverCards) {
+    if (typeof c.slot !== 'number') continue;
+    const need = needs[c.material] || 0;
+    if (need === 0) continue;
+    const yieldPerWorker = playerCardCost(state, c, playerIdx);
+    let bestN = 0, bestGain = 0;
+    const maxN = Math.min(p.supply, uncoveredIcons(c), need, SALMON_RUN_COSTS.length);
+    for (let n = 1; n <= maxN; n++) {
+      const gain = n * yieldPerWorker - salmonRunCumulativeCost(n);
+      if (gain > bestGain) { bestGain = gain; bestN = n; }
+    }
+    if (bestN > 0 && (best === null || bestGain > best.gain)) {
+      best = { card: c, n: bestN, gain: bestGain };
+    }
+  }
+  return best;
+}
+
+// Beaver Tow: pay 2 fish, slide a river card 1 slot upstream (toward Headwaters).
+function doBeaverTow(state, playerIdx, cardId) {
+  const card = state.riverCards.find(c => c.id === cardId);
+  if (!card || typeof card.slot !== 'number' || card.slot === 0) return false;
+  card.slot -= 1;
+  advancePlayer(state, playerIdx, 2);
+  return true;
+}
+
+function findBeaverTowTarget(state, playerIdx, needs) {
+  let best = null;
+  for (const c of state.riverCards) {
+    if (typeof c.slot !== 'number' || c.slot === 0) continue;
+    if ((needs[c.material] || 0) === 0) continue;
+    if (uncoveredIcons(c) < 4) continue;
+    if (!best || c.slot > best.slot || (c.slot === best.slot && uncoveredIcons(c) > uncoveredIcons(best))) best = c;
+  }
+  return best;
+}
+
+// Heron Roost / Driftwood Snag / Tribute Stone: optional start-of-turn abilities.
+// Auto-fire for AI when conditions are met. Heron Roost / Driftwood Snag each
+// cost 1 fish; Tribute Stone is free (once per game).
 function aiStartOfTurnAbilities(state, playerIdx) {
   const p = state.players[playerIdx];
   // Heron Roost: replace a pre-river card whose material isn't in this AI's hand.
@@ -938,7 +1113,6 @@ function aiStartOfTurnAbilities(state, playerIdx) {
   if (hasEffect(p, 'Driftwood Snag') && p.timePos < ENDGAME_TRACK_END - 1) {
     const myMats = new Set();
     for (const s of p.hand) for (const m in s.cost) myMats.add(m);
-    // Only block cards we don't need ourselves.
     const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
       .filter(c => uncoveredIcons(c) >= 4 && !myMats.has(c.material));
     if (cands.length > 0) {
@@ -946,6 +1120,19 @@ function aiStartOfTurnAbilities(state, playerIdx) {
       target.blanks += 1;
       noteBlanks(state);
       p.timePos += 1; // 1 fish cost
+    }
+  }
+  // Tribute Stone: fire when there's a high-value opponent worker (per-item cost ≥ 3)
+  // and we're not too deep into endgame (compensation is useless if the victim is already retired).
+  if (hasEffect(p, 'Tribute Stone') && !p.tributeStoneUsed && p.timePos < ENDGAME_TRACK_END - 10) {
+    const target = findTributeStoneTarget(state, playerIdx);
+    if (target && target.value >= 3) doTributeStone(state, playerIdx, target.victimIdx, target.card);
+  }
+  // Otter Trail: swap to pry an opponent off a useful material card.
+  if (hasEffect(p, 'Otter Trail') && p.timePos < ENDGAME_TRACK_END - 5) {
+    const target = findOtterTrailTarget(state, playerIdx);
+    if (target && p.timePos + cardCost(target.cardA) < ENDGAME_TRACK_END) {
+      doOtterTrail(state, playerIdx, target.cardA.id, target.cardB.id, target.otherIdx);
     }
   }
 }
@@ -1218,6 +1405,14 @@ function executeAction(state, playerIdx, action) {
   const p = state.players[playerIdx];
   if (action.type === 'pass') {
     advancePlayer(state, playerIdx, 1);
+    return;
+  }
+  if (action.type === 'beaverTow') {
+    doBeaverTow(state, playerIdx, action.cardId);
+    return;
+  }
+  if (action.type === 'salmonRun') {
+    doSalmonRun(state, playerIdx, action.cardId, action.workerCount);
     return;
   }
   if (action.type === 'build') {

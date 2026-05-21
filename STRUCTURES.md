@@ -110,6 +110,27 @@ Names reserved for plain monument cards — no special effect, just material cos
 
 ---
 
+## Proposed (pre-sim) — novel-action cards
+
+Brainstormed in `games/board-games.org` ("Design more structure cards with novel action shapes"). First-pass costs below; need AI-loop simulation to validate before promoting into the tables above.
+
+| Name | Cost | Time | Effect |
+|------|------|------|--------|
+| **Otter Trail** | 3 vines, 2 stones | 3🐟 | At the start of your turn, pick one of your workers on a river card A and another worker (yours or an opponent's) on a different river card B. Pay A's per-item cost in fish; swap the two workers. No blanks drop. |
+| **Tribute Stone** | 2 clay, 2 stones | 3🐟 | Once per game, at the start of your turn, force an opponent to recall one of their workers from the river. The opponent slides back 3🐟 in compensation. |
+| **Salmon Run** | 4 logs, 2 vines | 4🐟 | As your main action, place 1–5 workers from your supply onto uncovered icons of a single river card (no auction). Cumulative fish cost for 1/2/3/4/5 workers placed is 2🐟 / 5🐟 / 10🐟 / 18🐟 / 31🐟 (marginal: 2/3/5/8/13). |
+| **Beaver Tow** | 4 mud, 2 clay, 1 vine | 4🐟 | As your main action, pay 2🐟 to slide a river card one slot upstream (toward the Headwaters). |
+
+**Pricing anchors:**
+- *Otter Trail* ↔ Heron Roost (3 reeds, 2 vines, 3🐟) — same utility footprint; the per-item cost gates abuse so no per-turn cap is needed in the first draft.
+- *Tribute Stone* ↔ Spy Mound (4 stones, 1 clay, 3🐟) — same once-per-game anti-opponent footprint; slightly cheaper because the 3🐟 compensation softens the attack. Other "mean-with-comp" variants worth simming: discard from hand for 2🐟, steal a Headwaters card for 4🐟.
+- *Salmon Run* ↔ Royal Lodge (6 logs, 2 vines, 5🐟) — one tier down on time/mats because each use is a main action, not a free extra turn. Fibonacci-ish escalation caps practical use at 3–4 workers (10🐟 for 3, 18🐟 for 4).
+- *Beaver Tow* ↔ Floodgate (4 mud, 3 clay, 4🐟) — repeatable version swaps 1 clay for 1 vine to widen material draw; per-use 2🐟 self-limits.
+
+**Watch list.** Salmon Run and Beaver Tow both bypass core auction tension — sim first; expect retuning.
+
+---
+
 ## Tuning notes
 
 - **Pass-0 triggers** are the cleanest cadence — there's already a clear physical event (your pawn crossing the wrap point) so no extra tracking. Banked pass-0 abilities (e.g. Spy Mound) just refresh on each crossing.
