@@ -92,7 +92,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Hidden Cache** | 2 vines, 2 stones, 2 clay | 3🐟 | +5 VP if your built structures include at least 1 of each material; otherwise +2. |
+| **Hidden Cache** | 2 vines, 2 stones, 2 clay | 3🐟 | +5 VP if your built structures include at least 1 of each material. |
 | **Heron Watch** | 4 stones, 2 logs | 4🐟 | +1 VP per shoreline card on the table at game end. |
 
 ---

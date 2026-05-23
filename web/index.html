@@ -1072,7 +1072,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 4, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5, effect: 'At the start of your turn you may pay 1🐟 to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
-  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
+  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material.' },
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/2/3/5/8/10 for 1/2/3/4/5/6 distinct materials across your built structures.' },
   { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile.' },
@@ -1115,7 +1115,7 @@ function totalVP(p, state) {
   if (hasEffect(p, 'Hidden Cache')) {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
-    v += MAT_KEYS.every(m => mats.has(m)) ? 5 : 2;
+    if (MAT_KEYS.every(m => mats.has(m))) v += 5;
   }
   if (hasEffect(p, 'Heron Watch')) {
     v += state.shorelineCards.length;
@@ -3575,6 +3575,10 @@ async function humanSelectBuild(handIdx) {
 async function performBuild(playerIdx, handIdx) {
   const p = state.players[playerIdx];
   const struct = p.hand[handIdx];
+  // Snapshot for potential undo from an interactive on-build modal (e.g. Sap
+  // Drip's Cancel button). JSON clone is safe because state is plain data
+  // (no functions, no DOM refs).
+  const buildSnapshot = JSON.parse(JSON.stringify(state));
   const wbm = playerWorkersByMaterial(state, playerIdx);
   // Granary prompt: if a human owner could choose to save it for a later build, ask.
   // (When Granary is required to make this build buildable at all, auto-fire silently.)
@@ -3676,6 +3680,17 @@ async function performBuild(playerIdx, handIdx) {
   log(`🏗 ${speciesLabel(p)} builds <b>${struct.name}</b> (${timeCost}🐟, ${struct.vp}★).`);
   // Fire on-build effect (one-time triggers).
   await fireOnBuildEffect(playerIdx, struct);
+  // If an on-build modal flagged the build for cancellation, restore the
+  // pre-build state in-place (so any outside references to `state` itself stay
+  // valid) and bail before drawing replacements.
+  if (state._buildCancelled) {
+    delete state._buildCancelled;
+    for (const k of Object.keys(state)) delete state[k];
+    Object.assign(state, buildSnapshot);
+    log(`🚫 ${speciesLabel(state.players[playerIdx])} cancelled the ${struct.name} build — workers, materials, and time refunded.`);
+    render();
+    return;
+  }
   // Draw replacements up to (post-build) hand size — Cache Burrow may now be active.
   while (p.hand.length < maxHandSize(p) && structAvailable(state) > 0) {
     p.hand.push(popStructDeck(state));
@@ -3781,13 +3796,21 @@ async function fireOnBuildEffect(playerIdx, struct) {
     if (cands.length === 0 || p.supply === 0) return;
     let target;
     if (isHuman) {
-      target = await pickFromList(
+      const result = await pickFromList(
         '💧 Sap Drip — place 2 free workers',
-        `Pick a river card. ${Math.min(2, p.supply)} of your workers will be placed for free (no auction, no fish).`,
+        `Pick a river card. ${Math.min(2, p.supply)} of your workers will be placed for free (no auction, no fish).<br>` +
+          `<b>Decline</b> to keep the structure built but skip placing workers. ` +
+          `<b>Cancel</b> to undo the entire Sap Drip build.`,
         cands,
-        c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} · River ${c.slot + 1} · ${uncoveredIcons(c)} open`
+        c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} · River ${c.slot + 1} · ${uncoveredIcons(c)} open`,
+        { declineLabel: 'Decline (skip placement)', cancelLabel: 'Cancel (undo build)' }
       );
-      if (!target) return;
+      if (result === PICKER_DECLINE) return;
+      if (!result) {
+        state._buildCancelled = true;
+        return;
+      }
+      target = result;
     } else {
       const wbm = playerWorkersByMaterial(state, playerIdx);
       const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
@@ -3973,6 +3996,8 @@ function confirmModal(title, msg, yesLabel = 'Use it', noLabel = 'Skip') {
 // Click-to-pick a single item from a list (each item rendered to its own button).
 // Resolves with the chosen item, or null if the user cancels.
 let _pickerSeq = 0;
+// Sentinel returned when the user clicks the optional "Decline" button.
+const PICKER_DECLINE = '__decline__';
 function pickFromList(title, intro, items, renderItem, opts = {}) {
   return new Promise(resolve => {
     const fnName = '_picker_' + (++_pickerSeq);
@@ -3983,8 +4008,15 @@ function pickFromList(title, intro, items, renderItem, opts = {}) {
       resolve(it);
     };
     const actions = [];
+    if (opts.declineLabel) {
+      actions.push({ label: opts.declineLabel, ghost: true, onClick: () => {
+        delete window[fnName];
+        closeModal();
+        resolve(PICKER_DECLINE);
+      }});
+    }
     if (opts.cancelable !== false) {
-      actions.push({ label: 'Cancel', ghost: true, onClick: () => {
+      actions.push({ label: opts.cancelLabel || 'Cancel', ghost: true, onClick: () => {
         delete window[fnName];
         closeModal();
         resolve(null);

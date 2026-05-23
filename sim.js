@@ -51,7 +51,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 4, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5, effect: 'At the start of your turn you may pay 1 fish to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
-  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material; otherwise +2.' },
+  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material.' },
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/2/3/5/8/10 for 1/2/3/4/5/6 distinct materials across your built structures.' },
   { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile.' },
@@ -90,7 +90,7 @@ function totalVP(p, state) {
   if (hasEffect(p, 'Hidden Cache')) {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
-    v += MAT_KEYS.every(m => mats.has(m)) ? 5 : 2;
+    if (MAT_KEYS.every(m => mats.has(m))) v += 5;
   }
   if (hasEffect(p, 'Heron Watch')) {
     v += state.shorelineCards.length;
