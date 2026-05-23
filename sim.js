@@ -246,25 +246,71 @@ function uncoveredIcons(card) {
   return card.totalIcons - workers - card.blanks;
 }
 function workersOnCard(card, playerIdx) { return card.workers[playerIdx] || 0; }
+// Material yield multiplier per worker on a card. Old Growth yields 2x while
+// at River 3 or River 4 (slots 2 and 3); shoreline / R1 / R2 → 1x. All other
+// cards always yield 1x.
+function cardYieldMultiplier(card) {
+  if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) return 2;
+  return 1;
+}
+// wbm[m] = vanilla-card material units this player can spend on material m.
+// wbm._wildPools = [{materials: [primary, alt], count}] — each pool's units
+// may cover either of its two materials at build time. Tracked separately so
+// canBuild doesn't double-count.
 function playerWorkersByMaterial(state, playerIdx) {
   const out = {};
   for (const m of MAT_KEYS) out[m] = 0;
-  for (const c of state.riverCards) out[c.material] += workersOnCard(c, playerIdx);
-  for (const c of state.shorelineCards) out[c.material] += workersOnCard(c, playerIdx);
+  out._wildPools = [];
+  const addCard = (c) => {
+    const w = workersOnCard(c, playerIdx);
+    if (w === 0) return;
+    const units = w * cardYieldMultiplier(c);
+    if (c.wildAlt) {
+      out._wildPools.push({ materials: [c.material, c.wildAlt], count: units });
+    } else {
+      out[c.material] += units;
+    }
+  };
+  for (const c of state.riverCards) addCard(c);
+  for (const c of state.shorelineCards) addCard(c);
   return out;
 }
-function canBuild(structure, workersByMat, p = null) {
-  if (!p) {
-    for (const m in structure.cost) {
-      if ((workersByMat[m] || 0) < structure.cost[m]) return false;
+
+// Greedy check: can the wild pools cover the remaining material deficits?
+// Each pool serves one of its two materials; we assign each pool to its
+// largest-remaining-deficit option first. Sufficient for our 2-material wilds.
+function canCoverWithWild(deficits, pools) {
+  const rem = { ...deficits };
+  for (const pool of pools) {
+    let avail = pool.count;
+    if (avail === 0) continue;
+    const sorted = pool.materials.slice().sort((a, b) => (rem[b] || 0) - (rem[a] || 0));
+    for (const m of sorted) {
+      if (avail === 0) break;
+      const need = rem[m] || 0;
+      if (need === 0) continue;
+      const take = Math.min(avail, need);
+      rem[m] -= take;
+      avail -= take;
     }
-    return true;
   }
-  const { eff } = effectiveBuildCost(structure, p, workersByMat);
-  for (const m in eff) {
-    if ((workersByMat[m] || 0) < eff[m]) return false;
-  }
+  for (const m in rem) if (rem[m] > 0) return false;
   return true;
+}
+function canBuild(structure, workersByMat, p = null) {
+  const targetCost = p
+    ? effectiveBuildCost(structure, p, workersByMat).eff
+    : structure.cost;
+  // Compute per-material deficits after vanilla coverage, then see if wild
+  // pools can fill the gaps.
+  const deficits = {};
+  let totalDeficit = 0;
+  for (const m in targetCost) {
+    const d = Math.max(0, targetCost[m] - (workersByMat[m] || 0));
+    if (d > 0) { deficits[m] = d; totalDeficit += d; }
+  }
+  if (totalDeficit === 0) return true;
+  return canCoverWithWild(deficits, workersByMat._wildPools || []);
 }
 
 function effectiveBuildCost(struct, p, wbm) {
@@ -344,15 +390,50 @@ function makeCardSpecs(numPlayers) {
   return specs;
 }
 
+// =============================================================================
+// MATERIAL CARD EFFECTS (see MATERIALS.md). 8 of the 24 deck slots are
+// effect-bearing, keyed by (material, icons). Vanilla cards have effect = null.
+// =============================================================================
+const EFFECT_CARDS = [
+  // Always tier (2P+)
+  { material: 'logs',   icons: 5, effect: 'wild',         wildAlt: 'reeds', name: 'Driftwood Tangle' },
+  { material: 'clay',   icons: 7, effect: 'wild',         wildAlt: 'mud',   name: 'Mud Slick' },
+  // 3+ tier
+  { material: 'reeds',  icons: 4, effect: 'solo-bonus',   bonusPerWorker: 1, name: 'Hidden Inlet' },
+  { material: 'vines',  icons: 4, effect: 'peek-rearrange', name: 'Vine Curtain' },
+  { material: 'mud',    icons: 4, effect: 'most-workers', flatBonus: 2,     name: 'Mud Wallow' },
+  // 4+ tier
+  { material: 'reeds',  icons: 8, effect: 'most-workers', flatBonus: 3,     name: 'Cattail Cluster' },
+  { material: 'clay',   icons: 8, effect: 'slipping-sandbar', name: 'Slipping Sandbar' },
+  { material: 'logs',   icons: 8, effect: 'old-growth',   name: 'Old Growth' },
+];
+function effectSpecFor(material, icons) {
+  return EFFECT_CARDS.find(e => e.material === material && e.icons === icons) || null;
+}
+
+// Fish-track move helper. Backward = good (act sooner). Clamps at 0; does NOT
+// trigger pass-0 effects (those only fire on forward laps).
+function moveBackward(state, playerIdx, spaces) {
+  if (spaces <= 0) return;
+  const p = state.players[playerIdx];
+  p.timePos = Math.max(0, p.timePos - spaces);
+}
+
 function buildMaterialDeck(numPlayers) {
-  const deck = makeCardSpecs(numPlayers).map((spec, id) => ({
-    id: 'm' + id,
-    material: spec.material,
-    totalIcons: spec.icons,
-    slot: null,
-    workers: {},
-    blanks: 0,
-  }));
+  const deck = makeCardSpecs(numPlayers).map((spec, id) => {
+    const eff = effectSpecFor(spec.material, spec.icons);
+    return {
+      id: 'm' + id,
+      material: spec.material,
+      totalIcons: spec.icons,
+      slot: null,
+      workers: {},
+      blanks: 0,
+      effect: eff ? eff.effect : null,
+      effectSpec: eff,
+      wildAlt: eff && eff.wildAlt ? eff.wildAlt : null,
+    };
+  });
   // shuffle inline
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -531,6 +612,8 @@ function advancePlayer(state, playerIdx, byTime) {
 // CARD MOVEMENT
 // =============================================================================
 function moveCardToShoreline(state, card) {
+  // Fire card-exit effects before counting wasted icons / changing slot.
+  fireOnShoreline(state, card);
   // count leftover (uncovered) icons as wasted
   state.metrics.iconsWastedToShore += uncoveredIcons(card);
   card.blanks = 0;
@@ -546,11 +629,37 @@ function moveCardToShoreline(state, card) {
   card.slot = 'shore';
   state.shorelineCards.push(card);
 }
+
+// End-of-life effect dispatcher: fires when a card moves from river → shoreline.
+//   solo-bonus    → if exactly one player has workers here, move them backward
+//                   on the fish track by N spaces per their worker (Hidden Inlet).
+//   most-workers  → player with strictly most workers moves backward N spaces;
+//                   ties grant no bonus (Mud Wallow, Cattail Cluster).
+function fireOnShoreline(state, card) {
+  if (!card.effect) return;
+  const entries = Object.entries(card.workers).filter(([, n]) => n > 0);
+  if (entries.length === 0) return;
+  if (card.effect === 'solo-bonus') {
+    if (entries.length !== 1) return;
+    const [idxStr, count] = entries[0];
+    const spec = card.effectSpec;
+    moveBackward(state, parseInt(idxStr), count * (spec.bonusPerWorker || 1));
+    return;
+  }
+  if (card.effect === 'most-workers') {
+    entries.sort((a, b) => b[1] - a[1]);
+    if (entries.length > 1 && entries[0][1] === entries[1][1]) return; // tie → no bonus
+    const idx = parseInt(entries[0][0]);
+    moveBackward(state, idx, card.effectSpec.flatBonus || 0);
+    return;
+  }
+}
 function jamCardDownriver(state, card) {
   if (card.slot === 'pre') {
     state.metrics.preToRiverCards++;
     const idx = prerivIndexOf(state, card);
-    card.slot = 0;
+    // Slipping Sandbar enters at River 4 instead of River 1 (see MATERIALS.md).
+    card.slot = (card.effect === 'slipping-sandbar') ? (RIVER_SLOTS - 1) : 0;
     state.riverCards.push(card);
     if (idx !== -1) refillPreriv(state, idx);
     return;
@@ -558,6 +667,16 @@ function jamCardDownriver(state, card) {
   const newSlot = card.slot + 1;
   if (newSlot > RIVER_SLOTS - 1) { moveCardToShoreline(state, card); return; }
   card.slot = newSlot;
+}
+
+// Slipping Sandbar: after an auction with placement, slide upstream (toward R1)
+// instead of downstream. At R1 with uncovered icons remaining, retire to shoreline.
+function slidesSandbarUpstream(state, card) {
+  if (card.slot === 0) {
+    moveCardToShoreline(state, card);
+    return;
+  }
+  card.slot -= 1;
 }
 function refillPreriv(state, emptiedIdx) {
   for (let i = emptiedIdx; i > 0; i--) state.prerivCards[i] = state.prerivCards[i - 1];
@@ -676,7 +795,13 @@ function resolveAuction(state, card, bids) {
     if (slidesNow) {
       if (card.slot === 'pre') state.metrics.preToRiverFromPlenty++;
       else state.metrics.riverPlentySlides++;
-      jamCardDownriver(state, card);
+      // Slipping Sandbar: with workers placed (totalBid > 0) and leftover icons,
+      // drift upstream instead of downstream.
+      if (card.effect === 'slipping-sandbar' && totalBid > 0 && typeof card.slot === 'number') {
+        slidesSandbarUpstream(state, card);
+      } else {
+        jamCardDownriver(state, card);
+      }
     } else {
       moveCardToShoreline(state, card);
     }
@@ -701,7 +826,13 @@ function resolveAuction(state, card, bids) {
       totalClinched += got;
     }
     if (totalClinched === 0) state.metrics.zeroClinchAuctions++;
-    jamCardDownriver(state, card);
+    // Slipping Sandbar: if any workers actually landed on the card this auction,
+    // drift upstream instead of the normal downstream jam.
+    if (card.effect === 'slipping-sandbar' && totalClinched > 0 && typeof card.slot === 'number') {
+      slidesSandbarUpstream(state, card);
+    } else {
+      jamCardDownriver(state, card);
+    }
   }
 }
 
@@ -1248,32 +1379,68 @@ function performBuild(state, playerIdx, handIdx) {
   const wbm = playerWorkersByMaterial(state, playerIdx);
   const { eff: effCost, granaryUsed } = effectiveBuildCost(struct, p, wbm);
   if (granaryUsed) p.granaryUsed = true;
-  for (const m in effCost) {
-    let need = effCost[m];
+  // Track how many workers we actually pull off cards (for supply refund) —
+  // this can differ from effCost when Old Growth doubles a card's yield.
+  let workersReturned = 0;
+  const remainingNeed = { ...effCost };
+
+  // Helper: consume up to `need` material from `card` for the building player.
+  // Returns { take, yielded } where take is workers pulled (returned to supply)
+  // and yielded is material units produced (≥ take when Old Growth doubles).
+  const consume = (c, need) => {
+    const have = workersOnCard(c, playerIdx);
+    if (have === 0 || need === 0) return { take: 0, yielded: 0 };
+    const mult = cardYieldMultiplier(c);
+    const wantWorkers = Math.ceil(need / mult);
+    const take = Math.min(have, wantWorkers);
+    c.workers[playerIdx] = have - take;
+    if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
+    if (typeof c.slot === 'number') c.blanks += take;
+    return { take, yielded: take * mult };
+  };
+
+  // Pass A: vanilla (non-wild) cards first — preserves wild capacity for
+  // materials that have no vanilla source.
+  for (const m of Object.keys(remainingNeed)) {
+    if (remainingNeed[m] === 0) continue;
     for (const c of state.shorelineCards) {
-      if (need === 0) break;
-      if (c.material !== m) continue;
-      const have = workersOnCard(c, playerIdx);
-      if (have === 0) continue;
-      const take = Math.min(have, need);
-      c.workers[playerIdx] = have - take;
-      if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
-      need -= take;
+      if (remainingNeed[m] === 0) break;
+      if (c.material !== m || c.wildAlt) continue;
+      const { take, yielded } = consume(c, remainingNeed[m]);
+      remainingNeed[m] = Math.max(0, remainingNeed[m] - yielded);
+      workersReturned += take;
     }
-    const riverByCost = state.riverCards.filter(c => c.material === m && workersOnCard(c, playerIdx) > 0)
+    const riverVanilla = state.riverCards
+      .filter(c => c.material === m && !c.wildAlt && workersOnCard(c, playerIdx) > 0)
       .sort((a, b) => cardCost(a) - cardCost(b));
-    for (const c of riverByCost) {
-      if (need === 0) break;
-      const have = workersOnCard(c, playerIdx);
-      const take = Math.min(have, need);
-      c.workers[playerIdx] = have - take;
-      if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
-      c.blanks += take;
-      need -= take;
+    for (const c of riverVanilla) {
+      if (remainingNeed[m] === 0) break;
+      const { take, yielded } = consume(c, remainingNeed[m]);
+      remainingNeed[m] = Math.max(0, remainingNeed[m] - yielded);
+      workersReturned += take;
     }
   }
+
+  // Pass B: wild cards cover any leftover deficits (greedy — same shape as
+  // canCoverWithWild).  Visit pools in deck order; each pool fulfills its
+  // largest-remaining-deficit material first.
+  const wildCards = []
+    .concat(state.shorelineCards.filter(c => c.wildAlt && workersOnCard(c, playerIdx) > 0))
+    .concat(state.riverCards.filter(c => c.wildAlt && workersOnCard(c, playerIdx) > 0)
+      .sort((a, b) => cardCost(a) - cardCost(b)));
+  for (const c of wildCards) {
+    const options = [c.material, c.wildAlt].sort((a, b) => (remainingNeed[b] || 0) - (remainingNeed[a] || 0));
+    for (const m of options) {
+      if ((remainingNeed[m] || 0) === 0) continue;
+      if (workersOnCard(c, playerIdx) === 0) break;
+      const { take, yielded } = consume(c, remainingNeed[m]);
+      remainingNeed[m] = Math.max(0, (remainingNeed[m] || 0) - yielded);
+      workersReturned += take;
+    }
+  }
+
   noteBlanks(state);
-  p.supply += Object.values(effCost).reduce((s, n) => s + n, 0);
+  p.supply += workersReturned;
   // Otter Slide: build advances 3 fewer fish (min 1). Cards with printed time 0 stay 0.
   const slideDiscount = hasEffect(p, 'Otter Slide') ? 3 : 0;
   const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount);
