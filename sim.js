@@ -419,6 +419,27 @@ function moveBackward(state, playerIdx, spaces) {
   p.timePos = Math.max(0, p.timePos - spaces);
 }
 
+// Vine Curtain peek+rearrange: greedy AI heuristic. Looks at the top 2 of
+// matDeck (the next two to be drawn — matDeck.pop() returns the last element)
+// and swaps them iff the second one matches more of the player's hand needs.
+function aiVineCurtainRearrange(state, playerIdx) {
+  const deck = state.matDeck;
+  if (deck.length < 2) return;
+  const top = deck[deck.length - 1];
+  const second = deck[deck.length - 2];
+  if (top.material === second.material) return;
+  const p = state.players[playerIdx];
+  const need = (mat) => {
+    let n = 0;
+    for (const s of p.hand) n += s.cost[mat] || 0;
+    return n;
+  };
+  if (need(second.material) > need(top.material)) {
+    deck[deck.length - 1] = second;
+    deck[deck.length - 2] = top;
+  }
+}
+
 function buildMaterialDeck(numPlayers) {
   const deck = makeCardSpecs(numPlayers).map((spec, id) => {
     const eff = effectSpecFor(spec.material, spec.icons);
@@ -1382,6 +1403,7 @@ function performBuild(state, playerIdx, handIdx) {
   // Track how many workers we actually pull off cards (for supply refund) —
   // this can differ from effCost when Old Growth doubles a card's yield.
   let workersReturned = 0;
+  let vineCurtainHit = false; // fires Vine Curtain peek-rearrange once per build
   const remainingNeed = { ...effCost };
 
   // Helper: consume up to `need` material from `card` for the building player.
@@ -1396,6 +1418,7 @@ function performBuild(state, playerIdx, handIdx) {
     c.workers[playerIdx] = have - take;
     if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
     if (typeof c.slot === 'number') c.blanks += take;
+    if (take > 0 && c.effect === 'peek-rearrange') vineCurtainHit = true;
     return { take, yielded: take * mult };
   };
 
@@ -1441,6 +1464,7 @@ function performBuild(state, playerIdx, handIdx) {
 
   noteBlanks(state);
   p.supply += workersReturned;
+  if (vineCurtainHit) aiVineCurtainRearrange(state, playerIdx);
   // Otter Slide: build advances 3 fewer fish (min 1). Cards with printed time 0 stay 0.
   const slideDiscount = hasEffect(p, 'Otter Slide') ? 3 : 0;
   const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount);

@@ -1306,6 +1306,57 @@ function moveBackward(state, playerIdx, spaces) {
   p.timePos = Math.max(0, p.timePos - spaces);
 }
 
+// Vine Curtain peek+rearrange AI heuristic. Looks at the top 2 of matDeck
+// (matDeck.pop() returns the last element, so "top" is at length-1) and swaps
+// them iff the second one matches more of the building player's hand needs.
+function aiVineCurtainRearrange(playerIdx) {
+  const deck = state.matDeck;
+  if (deck.length < 2) return;
+  const top = deck[deck.length - 1];
+  const second = deck[deck.length - 2];
+  if (top.material === second.material) return;
+  const p = state.players[playerIdx];
+  const need = (mat) => {
+    let n = 0;
+    for (const s of p.hand) n += s.cost[mat] || 0;
+    return n;
+  };
+  if (need(second.material) > need(top.material)) {
+    deck[deck.length - 1] = second;
+    deck[deck.length - 2] = top;
+    log(`✦ Vine Curtain (AI): swapped top 2 of material deck — ${MATERIALS[second.material].name} now next.`);
+  }
+}
+
+// Vine Curtain human modal — show top 2 in draw order, let them reorder.
+async function humanVineCurtainRearrange(playerIdx) {
+  const deck = state.matDeck;
+  if (deck.length < 2) {
+    if (deck.length === 1) {
+      const top = deck[0];
+      log(`✦ Vine Curtain: only 1 card left in material deck (${MATERIALS[top.material].name} ${top.totalIcons}-icon). Nothing to rearrange.`);
+    }
+    return;
+  }
+  // Draw order: first to be drawn = matDeck.pop() = last element. Pass to
+  // modal as [top, second] so index 0 = next-drawn.
+  const top = deck[deck.length - 1];
+  const second = deck[deck.length - 2];
+  const reordered = await reorderListModal(
+    '✦ Vine Curtain — peek + rearrange',
+    'Next 2 material cards to be drawn from the deck. Re-order with ▲/▼; #1 enters the Headwaters first.',
+    [top, second],
+    (c) => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} · ${c.totalIcons} icons`
+  );
+  if (!reordered) return; // user cancelled (no change)
+  // Write back: index 0 of reordered = top of deck = matDeck[length-1].
+  deck[deck.length - 1] = reordered[0];
+  deck[deck.length - 2] = reordered[1];
+  if (reordered[0] !== top) {
+    log(`✦ Vine Curtain: ${MATERIALS[reordered[0].material].name} now next from the deck.`);
+  }
+}
+
 // wbm[m] = vanilla-card material units this player can spend on material m.
 // wbm._wildPools = [{materials: [primary, alt], count}] — each pool's units
 // may cover either of its two materials at build time. Tracked separately so
@@ -3610,6 +3661,7 @@ async function performBuild(playerIdx, handIdx) {
   // Two-pass consumption: vanilla cards first (preserves wild capacity for
   // materials with no vanilla source), wild cards second to cover deficits.
   let workersReturned = 0;
+  let vineCurtainHit = false; // fires Vine Curtain peek-rearrange once per build
   const remainingNeed = { ...effCost };
 
   const consume = (c, need, mLabel) => {
@@ -3624,6 +3676,7 @@ async function performBuild(playerIdx, handIdx) {
     if (mult > 1 && take > 0) {
       log(`🌳 Old Growth doubled yield: ${take} worker${take === 1 ? '' : 's'} → ${take * mult} ${mLabel}.`);
     }
+    if (take > 0 && c.effect === 'peek-rearrange') vineCurtainHit = true;
     return { take, yielded: take * mult };
   };
 
@@ -3670,6 +3723,13 @@ async function performBuild(playerIdx, handIdx) {
   }
 
   p.supply += workersReturned;
+  // Vine Curtain (Vines-4 effect card): when a worker is retrieved from it
+  // during this build, the building player gets to peek + rearrange the top 2
+  // of the material deck. Human gets a modal; AI rearranges greedily.
+  if (vineCurtainHit) {
+    if (p.isHuman) await humanVineCurtainRearrange(playerIdx);
+    else aiVineCurtainRearrange(playerIdx);
+  }
   // Build cost in time — Otter Slide reduces by 3 (min 1) when active. Cards with printed time 0 stay 0.
   const slideDiscount = hasEffect(p, 'Otter Slide') ? 3 : 0;
   const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount);

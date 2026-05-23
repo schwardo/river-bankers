@@ -51,7 +51,7 @@ Effects in this set require the following hooks (none required for the existing 
 - **Solo-occupant check** (Hidden Inlet): at retrieve, count distinct player workers on the card.
 - **Most-workers check** (Mud Wallow, Cattail Cluster): at retrieve, find unique max — no bonus on ties.
 - **Fish-track move helper**: shared helper that walks a pawn backward N spaces, no lap effects (since we're moving backward, not forward).
-- **Material-deck peek + rearrange** (Vine Curtain): inspect top 2, allow swap.
+- **Material-deck peek + rearrange** (Vine Curtain): when a worker is consumed from Vine Curtain during a build, the building player peeks at and may reorder the top 2 of the material deck. Human gets a reorder modal; AI swaps greedily (puts the material that matches more of its hand on top).
 - **Special entry slot** (Slipping Sandbar): pre-river → River 4 instead of River 1.
 - **Post-auction upstream slide** (Slipping Sandbar): after auction resolves, if any workers were placed, slide card one slot toward River 1; at River 1 with leftover icons, send to shoreline.
 - **Position-gated yield multiplier** (Old Growth): at retrieve, check current slot and double if River 3/4.
