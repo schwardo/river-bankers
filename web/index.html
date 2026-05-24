@@ -2345,6 +2345,37 @@ function renderActionPanel() {
         abilityBtns.push(`<button class="ability-btn" onclick="humanUseOtterTrail()">🦦 Otter Trail (pay source 🐟): swap a river worker</button>`);
       }
     }
+    // Snare Set (mink species starter, same shape as Tribute Stone w/ its own once-per-game flag).
+    if (hasEffect(cur, 'Snare Set') && !cur.snareSetUsed) {
+      const anyOpponentWorker = state.riverCards.some(c =>
+        Object.keys(c.workers).some(k => parseInt(k) !== cur.idx && c.workers[k] > 0));
+      if (anyOpponentWorker) abilityBtns.push(`<button class="ability-btn" onclick="humanUseSnareSet()">🪤 Snare Set (once per game): force opponent recall</button>`);
+    }
+    // Tail Slap (beaver species starter): pay 1🐟 to drop a blank on a R1 card.
+    if (hasEffect(cur, 'Tail Slap') && cur.timePos < ENDGAME_TRACK_END - 1) {
+      const anyR1Open = state.riverCards.some(c => c.slot === 0 && uncoveredIcons(c) > 0);
+      if (anyR1Open) abilityBtns.push(`<button class="ability-btn" onclick="humanUseTailSlap()">🦫 Tail Slap (1🐟): drop blank on a R1 card</button>`);
+    }
+    // Channel Clearer (muskrat species starter): free per-turn opponent Reed worker discard.
+    if (hasEffect(cur, 'Channel Clearer')) {
+      const anyOppReed = state.riverCards.some(c =>
+        c.material === 'reeds' && Object.keys(c.workers).some(k => parseInt(k) !== cur.idx && c.workers[k] > 0));
+      if (anyOppReed) abilityBtns.push(`<button class="ability-btn" onclick="humanUseChannelClearer()">🐭 Channel Clearer (free): discard an opponent Reed worker</button>`);
+    }
+    // Rolling Float (otter species starter): once-per-game free same-slot swap.
+    if (hasEffect(cur, 'Rolling Float') && !cur.rollingFloatUsed) {
+      // Need at least one of MY workers on a card sharing a slot with another card holding an opponent worker.
+      let avail = false;
+      for (const a of state.riverCards) {
+        if (typeof a.slot !== 'number' || workersOnCard(a, cur.idx) <= 0) continue;
+        for (const b of state.riverCards) {
+          if (b.id === a.id || b.slot !== a.slot) continue;
+          if (Object.keys(b.workers).some(k => parseInt(k) !== cur.idx && b.workers[k] > 0)) { avail = true; break; }
+        }
+        if (avail) break;
+      }
+      if (avail) abilityBtns.push(`<button class="ability-btn" onclick="humanUseRollingFloat()">🦦 Rolling Float (once per game): swap workers in the same slot</button>`);
+    }
     const abilityRow = abilityBtns.length
       ? `<div class="ability-row"><span class="ability-label">Optional abilities:</span>${abilityBtns.join('')}</div>`
       : '';
@@ -2635,22 +2666,41 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   }
   const human = state.players.find(p => p.isHuman);
   let deferredHuman = -1;
+  let deferredHumanViaQuickStrike = false;
   if (human && !human.out && !human.exhausted
-      && hasEffect(human, 'Spy Mound') && !human.spyMoundUsed
       && uncoveredIcons(card) >= 4 && deferredAi === -1) {
-    startHumanTimer();
-    let useIt;
-    try {
-      useIt = await confirmModal(
-        '🕵 Spy Mound — defer your bid?',
-        `Wait for ${state.players.length - 1} other player${state.players.length - 1 === 1 ? '' : 's'} to reveal their bids before you decide yours? Once-per-game.`
-      );
-    } finally {
-      stopHumanTimer();
-    }
-    if (useIt) {
-      deferredHuman = human.idx;
-      human.spyMoundUsed = true;
+    // Prefer Spy Mound (one-shot resource) if available; fall back to Quick
+    // Strike (unlimited mink species starter) otherwise. Only one prompt either way.
+    if (hasEffect(human, 'Spy Mound') && !human.spyMoundUsed) {
+      startHumanTimer();
+      let useIt;
+      try {
+        useIt = await confirmModal(
+          '🕵 Spy Mound — defer your bid?',
+          `Wait for ${state.players.length - 1} other player${state.players.length - 1 === 1 ? '' : 's'} to reveal their bids before you decide yours? Once-per-game.`
+        );
+      } finally {
+        stopHumanTimer();
+      }
+      if (useIt) {
+        deferredHuman = human.idx;
+        human.spyMoundUsed = true;
+      }
+    } else if (hasEffect(human, 'Quick Strike')) {
+      startHumanTimer();
+      let useIt;
+      try {
+        useIt = await confirmModal(
+          '⚡ Quick Strike — defer your bid?',
+          `Wait for ${state.players.length - 1} other player${state.players.length - 1 === 1 ? '' : 's'} to reveal their bids before you decide yours? No use limit.`
+        );
+      } finally {
+        stopHumanTimer();
+      }
+      if (useIt) {
+        deferredHuman = human.idx;
+        deferredHumanViaQuickStrike = true;
+      }
     }
   }
   const bids = {};
@@ -2713,7 +2763,8 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     } finally {
       stopHumanTimer();
     }
-    log(`🕵 Spy Mound: ${speciesLabel(sp)} bids ${bids[sp.idx]} after seeing reveals.`);
+    const label = deferredHumanViaQuickStrike ? '⚡ Quick Strike' : '🕵 Spy Mound';
+    log(`${label}: ${speciesLabel(sp)} bids ${bids[sp.idx]} after seeing reveals.`);
   }
 
   // Compact bid summary for the log
@@ -3713,6 +3764,119 @@ async function humanUseTributeStone() {
   );
   if (!pick) return;
   doTributeStone(human.idx, pick.victimIdx, pick.card);
+  render();
+}
+
+// Species-starter human handlers (Snare Set, Tail Slap, Channel Clearer, Rolling Float).
+async function humanUseSnareSet() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human || !hasEffect(human, 'Snare Set') || human.snareSetUsed) return;
+  const cands = [];
+  for (const c of state.riverCards) {
+    for (const k in c.workers) {
+      const opIdx = parseInt(k);
+      if (opIdx === human.idx || c.workers[k] <= 0) continue;
+      cands.push({ card: c, victimIdx: opIdx });
+    }
+  }
+  if (cands.length === 0) return;
+  const pick = await pickFromList(
+    '🪤 Snare Set — force an opponent recall',
+    `Pick an opponent's worker on a river card. That worker returns to their supply (blank dropped). The opponent slides back 3🐟 in compensation. Once per game.`,
+    cands,
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name}`
+  );
+  if (!pick) return;
+  const victim = state.players[pick.victimIdx];
+  const before = victim.timePos;
+  pick.card.workers[pick.victimIdx] -= 1;
+  if (pick.card.workers[pick.victimIdx] === 0) delete pick.card.workers[pick.victimIdx];
+  if (typeof pick.card.slot === 'number') pick.card.blanks += 1;
+  victim.supply += 1;
+  victim.timePos = Math.max(0, victim.timePos - 3);
+  human.snareSetUsed = true;
+  log(`🪤 Snare Set: ${speciesLabel(human)} forces ${speciesLabel(victim)} to recall a worker from ${MATERIALS[pick.card.material].name}; ${speciesLabel(victim)} slides back ${before - victim.timePos}🐟.`);
+  render();
+}
+
+async function humanUseTailSlap() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human || !hasEffect(human, 'Tail Slap') || human.timePos >= ENDGAME_TRACK_END - 1) return;
+  const cands = state.riverCards.filter(c => c.slot === 0 && uncoveredIcons(c) > 0);
+  if (cands.length === 0) return;
+  const pick = await pickFromList(
+    '🦫 Tail Slap — drop a blank',
+    `Pay 1🐟 to drop a blank on any uncovered icon on a River 1 card. May be used once per turn.`,
+    cands,
+    c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} (River 1, ${uncoveredIcons(c)} open)`
+  );
+  if (!pick) return;
+  pick.blanks += 1;
+  human.timePos += 1;
+  log(`🦫 Tail Slap: ${speciesLabel(human)} drops a blank on R1 ${MATERIALS[pick.material].name} (+1🐟).`);
+  render();
+}
+
+async function humanUseChannelClearer() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human || !hasEffect(human, 'Channel Clearer')) return;
+  const cands = [];
+  for (const c of state.riverCards) {
+    if (c.material !== 'reeds') continue;
+    for (const k in c.workers) {
+      const opIdx = parseInt(k);
+      if (opIdx === human.idx || c.workers[k] <= 0) continue;
+      cands.push({ card: c, victimIdx: opIdx });
+    }
+  }
+  if (cands.length === 0) return;
+  const pick = await pickFromList(
+    '🐭 Channel Clearer — discard a Reed worker',
+    `Pick 1 opponent's Reed worker on a river card. It returns to their supply (no blank, no fish compensation). Free; once per turn.`,
+    cands,
+    x => `River ${x.card.slot + 1}: ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name}`
+  );
+  if (!pick) return;
+  const victim = state.players[pick.victimIdx];
+  pick.card.workers[pick.victimIdx] -= 1;
+  if (pick.card.workers[pick.victimIdx] === 0) delete pick.card.workers[pick.victimIdx];
+  victim.supply += 1;
+  log(`🐭 Channel Clearer: ${speciesLabel(human)} clears 1 Reed worker from ${speciesLabel(victim)}.`);
+  render();
+}
+
+async function humanUseRollingFloat() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human || !hasEffect(human, 'Rolling Float') || human.rollingFloatUsed) return;
+  // Build candidate pairs: my worker on cardA, opponent's worker on cardB, same slot.
+  const pairs = [];
+  for (const a of state.riverCards) {
+    if (typeof a.slot !== 'number' || workersOnCard(a, human.idx) <= 0) continue;
+    for (const b of state.riverCards) {
+      if (b.id === a.id || b.slot !== a.slot) continue;
+      for (const k in b.workers) {
+        const opIdx = parseInt(k);
+        if (opIdx === human.idx || b.workers[k] <= 0) continue;
+        pairs.push({ a, b, opIdx });
+      }
+    }
+  }
+  if (pairs.length === 0) return;
+  const pick = await pickFromList(
+    '🦦 Rolling Float — swap workers in the same slot',
+    `Pick a (your worker, opponent worker) pair from cards sharing a river slot. The two swap. No fish cost. Once per game.`,
+    pairs,
+    p => `River ${p.a.slot + 1}: your worker on ${MATERIALS[p.a.material].emoji} ${MATERIALS[p.a.material].name} ↔ ${speciesLabel(state.players[p.opIdx])}'s on ${MATERIALS[p.b.material].emoji} ${MATERIALS[p.b.material].name}`
+  );
+  if (!pick) return;
+  pick.a.workers[human.idx] -= 1;
+  if (pick.a.workers[human.idx] === 0) delete pick.a.workers[human.idx];
+  pick.b.workers[pick.opIdx] -= 1;
+  if (pick.b.workers[pick.opIdx] === 0) delete pick.b.workers[pick.opIdx];
+  pick.a.workers[pick.opIdx] = (pick.a.workers[pick.opIdx] || 0) + 1;
+  pick.b.workers[human.idx] = (pick.b.workers[human.idx] || 0) + 1;
+  human.rollingFloatUsed = true;
+  log(`🦦 Rolling Float: ${speciesLabel(human)} swaps a worker on ${MATERIALS[pick.a.material].name} ↔ ${speciesLabel(state.players[pick.opIdx])}'s on ${MATERIALS[pick.b.material].name} (same slot).`);
   render();
 }
 
