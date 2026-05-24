@@ -47,7 +47,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 4, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
-  { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 5, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
+  { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 7, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
   { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End game: +4 VP per built structure of yours that uses Vines.' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'At the start of your turn you may pay 1 fish to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
@@ -858,25 +858,26 @@ function runAuction(state, card, triggerPlayerIdx, minBidTrigger) {
   }
   const bids = {};
   // Spy Mound (once per game) / Quick Strike (mink species starter, unlimited):
-  // a player auto-defers to bid LAST on a high-value auction. Spy Mound used
-  // first when both are available (one-shot resource).
+  // a player auto-defers to bid LAST on a high-value auction whose material
+  // they actually want. Spy Mound used first when both are available
+  // (one-shot resource). The "want" check prevents wasted activations on
+  // materials nothing in the player's hand needs.
   let deferred = -1;
   let deferredViaQuickStrike = false;
-  for (const p of state.players) {
-    if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out) {
-      if (uncoveredIcons(card) >= 4) {
-        deferred = p.idx;
-        break;
+  const wantsMaterial = (p) => {
+    const mats = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+    return p.hand.some(s => mats.some(m => (s.cost[m] || 0) > 0));
+  };
+  if (uncoveredIcons(card) >= 4) {
+    for (const p of state.players) {
+      if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out) {
+        if (wantsMaterial(p)) { deferred = p.idx; break; }
       }
     }
-  }
-  if (deferred === -1) {
-    for (const p of state.players) {
-      if (hasEffect(p, 'Quick Strike') && !p.exhausted && !p.out) {
-        if (uncoveredIcons(card) >= 4) {
-          deferred = p.idx;
-          deferredViaQuickStrike = true;
-          break;
+    if (deferred === -1) {
+      for (const p of state.players) {
+        if (hasEffect(p, 'Quick Strike') && !p.exhausted && !p.out) {
+          if (wantsMaterial(p)) { deferred = p.idx; deferredViaQuickStrike = true; break; }
         }
       }
     }
@@ -893,13 +894,17 @@ function runAuction(state, card, triggerPlayerIdx, minBidTrigger) {
     if (!deferredViaQuickStrike) p.spyMoundUsed = true;
     const open = uncoveredIcons(card);
     const others = Object.values(bids).reduce((s, b) => s + b, 0);
-    let bid;
-    if (others < open) {
-      bid = Math.min(p.supply, open - others);
+    const room = open - others;
+    const minBid = (deferred === triggerPlayerIdx) ? minBidTrigger : 0;
+    // Use the normal bid calculator (which considers material need) for the
+    // base recommendation, then cap at remaining room so we never jam.
+    let bid = aiDecideBid(state, p.idx, card, minBid);
+    if (room <= 0) {
+      bid = deferred === triggerPlayerIdx ? Math.max(minBidTrigger, 1) : 0;
     } else {
-      bid = (deferred === triggerPlayerIdx) ? Math.max(minBidTrigger, 1) : 0;
+      bid = Math.min(bid, room);
+      if (deferred === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
     }
-    if (deferred === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
     bids[p.idx] = bid;
   }
   resolveAuction(state, card, bids);
