@@ -21,48 +21,49 @@ let MAT_KEYS = ORIG_MATERIALS.slice();
 // Hooks are keyed off the structure name in helpers below.
 // Disable a single card's effect for ablation via setStructureEffectDisabled.
 const BASE_STRUCTURE_TEMPLATES = [
-  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 3, vp: 6, effect: 'When built, wash every card in River 1 to the shoreline (carrying any workers along), and slide back 1 fish per card washed.' },
+  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 2, vp: 6, effect: 'When built, wash one card of your choice from River 1 to the shoreline (workers carry along), and slide back 2 fish.' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 4, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a Headwaters card to River 1 for free; an auction immediately runs on it at 1 fish/item.' },
-  { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 2, effect: 'End game: +1 VP per shoreline card on the table.' },
+  { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End game: +1 VP per shoreline card on the table (max +7).' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 5, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
   { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 3 fewer fish (min 1).' },
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built, draw 3 structure cards, keep 1, discard 2.' },
-  { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 7, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
+  { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 6, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top card of the material deck at any time.' },
-  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 2, effect: 'End game: +1 VP per shoreline card with at least one of your workers.' },
+  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End game: +2 VP per shoreline card with at least one of your workers.' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 3, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1 fish.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 5, effect: 'At the start of your turn you may pay 1 fish to replace a Headwaters card with the top of the material deck.' },
-  { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 5, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
+  { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7, effect: 'When you would pass 0 on the fish track, stop at space 1 instead.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5, effect: 'When built, look at the top 5 material cards and rearrange them in any order.' },
-  { name: 'Flush Channel',  cost: { mud: 4, reeds: 1 },              time: 3, vp: 5, effect: 'When built, trigger a free Headwaters flush (no 5 fish cost).' },
-  { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 5, effect: 'Once per game, your build costs 1 fewer of one listed material (your choice).' },
+  { name: 'Flush Channel',  cost: { mud: 4, reeds: 1 },              time: 2, vp: 5, effect: 'When built, discard 1 Headwaters card of your choice (out of game) and refill that slot from the top of the material deck. No auction.' },
+  { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 4, effect: 'Once per game, your build costs 1 fewer of one listed material (your choice).' },
   { name: 'Granite Spire',  cost: { stones: 6 },                     time: 4, vp: 7 },
   { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built, take an immediate extra turn.' },
   { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you recall workers before an auction, slide back 1 fish per worker recalled.' },
   { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
-  { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 3, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
+  { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 5, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
   { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 5, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
-  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 4, effect: 'End game: +2 VP per built structure of yours that uses Vines.' },
+  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End game: +3 VP per built structure of yours that uses Vines.' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 5, effect: 'At the start of your turn you may pay 1 fish to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
-  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 3, effect: 'End game: +5 VP if your built structures include at least 1 of each material.' },
-  { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
-  { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/2/3/5/8/10 for 1/2/3/4/5/6 distinct materials across your built structures.' },
+  { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 0, effect: 'End game: +3 VP per 2 distinct materials in your built structures (max +9).' },
+  { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 4, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
+  { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
   { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile.' },
   { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game, at the start of your turn, force an opponent to recall one of their workers from a river card (dropping a blank). The opponent slides back 3 fish in compensation.' },
-  { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 7, effect: 'On your turn, instead of a regular action, pay 2 fish to slide a river card 1 space toward the Headwaters.' },
+  { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 9, effect: 'On your turn, instead of a regular action, pay 2 fish to slide a river card 1 space toward the Headwaters.' },
   { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 5, effect: 'At the start of your turn, swap one of your workers on a river card with another worker (yours or an opponent\'s) on a different river card. Pay the source card\'s per-item cost in fish.' },
   { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 7, effect: 'As your main action, place 1-5 workers from your supply onto uncovered icons of one river card. Fish cost escalates 2/3/5/8/13 per successive worker.' },
+  { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game, take a turn immediately after another player takes their turn, even if you are not next on the fish track.' },
 ];
 
 // Cattail Patch end-game schedule, indexed by distinct-material count (0..6).
-const CATTAIL_PATCH_VP = [0, 1, 2, 3, 5, 8, 10];
+const CATTAIL_PATCH_VP = [0, 1, 1, 2, 3, 5, 8];
 
 // Ablation toggle: set STRUCTURE_EFFECT_DISABLED['Pier'] = true to ignore that
 // card's effect (still in deck, still scores its printed VP — only the bonus is suppressed).
@@ -77,7 +78,7 @@ function maxHandSize(p) { return 3 + (hasEffect(p, 'Cache Burrow') ? 1 : 0); }
 function totalVP(p, state) {
   let v = p.built.reduce((s, b) => s + b.vp, 0);
   if (hasEffect(p, 'Pier')) {
-    v += state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length;
+    v += Math.min(6, 2 * state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length);
   }
   if (hasEffect(p, 'Cattail Patch')) {
     const mats = new Set();
@@ -85,15 +86,15 @@ function totalVP(p, state) {
     v += CATTAIL_PATCH_VP[Math.min(mats.size, CATTAIL_PATCH_VP.length - 1)];
   }
   if (hasEffect(p, 'Vine Ladder')) {
-    v += 2 * p.built.filter(b => (b.cost.vines || 0) > 0).length;
+    v += 3 * p.built.filter(b => (b.cost.vines || 0) > 0).length;
   }
   if (hasEffect(p, 'Hidden Cache')) {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
-    if (MAT_KEYS.every(m => mats.has(m))) v += 5;
+    v += Math.min(9, Math.floor(mats.size / 2) * 3);
   }
   if (hasEffect(p, 'Heron Watch')) {
-    v += state.shorelineCards.length;
+    v += Math.min(7, state.shorelineCards.length);
   }
   return v;
 }
@@ -462,9 +463,13 @@ function buildMaterialDeck(numPlayers) {
   }
   return shuffle(deck);
 }
-function buildStructureDeck() {
+function buildStructureDeck(numPlayers) {
   let id = 0;
-  return shuffle(STRUCTURE_TEMPLATES.map(s => ({ ...s, id: 's' + (id++), cost: { ...s.cost } })));
+  const templates = STRUCTURE_TEMPLATES.filter(s => {
+    if (s.only2P) return numPlayers === 2;
+    return true;
+  });
+  return shuffle(templates.map(s => ({ ...s, id: 's' + (id++), cost: { ...s.cost } })));
 }
 
 // =============================================================================
@@ -485,10 +490,11 @@ function newGame(numPlayers, workersPerPlayer = 8) {
       floodgateUsed: false,
       spyMoundUsed: false,
       tributeStoneUsed: false,
+      slipstreamUsed: false,
     });
   }
   const matDeck = buildMaterialDeck(numPlayers);
-  const structDeck = buildStructureDeck();
+  const structDeck = buildStructureDeck(numPlayers);
   for (const p of players) {
     for (let i = 0; i < 3; i++) p.hand.push(structDeck.pop());
   }
@@ -545,6 +551,28 @@ function noteBlanks(state) {
   for (const c of state.riverCards) total += c.blanks;
   for (const c of state.prerivCards) if (c) total += c.blanks;
   if (total > state.metrics.peakBlanks) state.metrics.peakBlanks = total;
+}
+
+// Slipstream: after any player's turn, an opponent who built Slipstream and
+// hasn't used it may take an out-of-order bonus turn (overriding fish-track
+// position once per game). AI heuristic: pick the eligible owner with the
+// lowest fish-track position who would otherwise wait longest. Returns true if
+// fired (caller should respect state.bonusTurnPlayer on next pickNextPlayer).
+function maybeFireSlipstream(state, lastTurnPlayerIdx) {
+  if (state.bonusTurnPlayer != null) return false; // another bonus already pending
+  const eligible = state.players.filter(p =>
+    p.idx !== lastTurnPlayerIdx && !p.out && !p.exhausted &&
+    !p.slipstreamUsed && p.built.some(b => b.name === 'Slipstream') && effectActive('Slipstream')
+  );
+  if (eligible.length === 0) return false;
+  // AI heuristic: only fire if firing actually changes who goes next.
+  const naturalNext = pickNextPlayer(state);
+  const ownersByWait = eligible.slice().sort((a, b) => a.timePos - b.timePos);
+  const owner = ownersByWait.find(o => o.idx !== naturalNext) || null;
+  if (!owner) return false;
+  owner.slipstreamUsed = true;
+  state.bonusTurnPlayer = owner.idx;
+  return true;
 }
 
 function pickNextPlayer(state) {
@@ -976,7 +1004,7 @@ function aiEffectValue(struct, p, state) {
   if (struct.name === 'Pier') {
     const placed = state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length;
     const remaining = state.matDeck.length + state.riverCards.length;
-    return placed + Math.min(5, Math.floor(remaining * 0.25));
+    return Math.min(6, 2 * (placed + Math.min(3, Math.floor(remaining * 0.25))));
   }
   if (struct.name === 'Cattail Patch') {
     const mats = new Set();
@@ -995,17 +1023,24 @@ function aiEffectValue(struct, p, state) {
   if (struct.name === 'Vine Ladder') {
     const builtVine = p.built.filter(b => (b.cost.vines || 0) > 0).length;
     const handVine = p.hand.filter(s => (s.cost.vines || 0) > 0).length;
-    return 2 * (builtVine + Math.min(handVine, 2));
+    return 3 * (builtVine + Math.min(handVine, 2));
   }
   if (struct.name === 'Hidden Cache') {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
-    // Optimistic: expect to fill out remaining materials over the game.
-    return mats.size >= MAT_KEYS.length - 1 ? 5 : 3;
+    // Project a couple more materials from hand builds, then apply the 3-per-2 curve.
+    const handMats = new Set();
+    for (const s of p.hand) for (const m in s.cost) handMats.add(m);
+    let projected = mats.size;
+    for (const m of handMats) {
+      if (!mats.has(m) && projected < 6) projected += 1;
+      if (projected - mats.size >= 2) break;
+    }
+    return Math.min(9, Math.floor(projected / 2) * 3);
   }
   if (struct.name === 'Heron Watch') {
     const remaining = state.matDeck.length + state.riverCards.length;
-    return state.shorelineCards.length + Math.floor(remaining * 0.5);
+    return Math.min(7, state.shorelineCards.length + Math.floor(remaining * 0.5));
   }
   return EFFECT_VP_FIXED[struct.name] || 0;
 }
@@ -1493,8 +1528,17 @@ function fireOnBuildEffect(state, playerIdx, struct) {
   }
   if (struct.name === 'Beaver Dam') {
     const r1 = state.riverCards.filter(c => c.slot === 0);
-    for (const c of r1) moveCardToShoreline(state, c);
-    if (r1.length > 0) p.timePos = Math.max(0, p.timePos - r1.length);
+    if (r1.length === 0) return;
+    // Pick the R1 card whose removal best frees the river — most uncovered
+    // icons (it's been sitting there blocking new arrivals). Tie-break: fewest
+    // of our own workers (smaller ergonomic cost to us).
+    r1.sort((a, b) => {
+      const ua = uncoveredIcons(a), ub = uncoveredIcons(b);
+      if (ua !== ub) return ub - ua;
+      return workersOnCard(a, playerIdx) - workersOnCard(b, playerIdx);
+    });
+    moveCardToShoreline(state, r1[0]);
+    p.timePos = Math.max(0, p.timePos - 2);
     return;
   }
   if (struct.name === 'Mud Levee') {
@@ -1510,14 +1554,29 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     return;
   }
   if (struct.name === 'Flush Channel') {
-    for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
+    // Pick one Headwaters card to discard (out of game) and refill its slot.
+    // AI heuristic: discard the card that's least likely to be useful for our
+    // own hand — i.e. the material we need least, with most icons (so removing
+    // it stops opponents from cheaply grabbing it).
+    const slots = [];
     for (let i = 0; i < state.prerivCards.length; i++) {
-      if (state.matDeck.length === 0) break;
-      const c = state.matDeck.pop();
-      c.slot = 'pre';
-      state.prerivCards[i] = c;
-      state.metrics.iconsSpawned += c.totalIcons;
+      if (state.prerivCards[i]) slots.push(i);
     }
+    if (slots.length === 0) return;
+    const need = (mat) => {
+      let n = 0;
+      for (const s of p.hand) n += s.cost[mat] || 0;
+      return n;
+    };
+    slots.sort((a, b) => {
+      const ca = state.prerivCards[a], cb = state.prerivCards[b];
+      const na = need(ca.material), nb = need(cb.material);
+      if (na !== nb) return na - nb; // lowest need first
+      return cb.totalIcons - ca.totalIcons; // tie: most icons (denial value)
+    });
+    const targetIdx = slots[0];
+    state.prerivCards[targetIdx] = null;
+    refillPreriv(state, targetIdx);
     return;
   }
   if (struct.name === 'Sap Drip') {
@@ -1697,6 +1756,7 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
       const passed = action.type === 'pass';
       if (reachedEnd || passed) p.out = true;
     }
+    maybeFireSlipstream(state, p.idx);
     if (state.endgame && state.players.every(pp => pp.out)) break;
     if (checkGameEnd(state)) break;
   }
@@ -2141,6 +2201,7 @@ function sweepAblation(numGamesArg, numPArg, workersArg) {
         const passed = action.type === 'pass';
         if (reachedEnd || passed) p.out = true;
       }
+      maybeFireSlipstream(state, p.idx);
       if (state.endgame && state.players.every(pp => pp.out)) break;
       if (checkGameEnd(state)) break;
     }

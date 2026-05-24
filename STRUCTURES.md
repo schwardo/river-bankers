@@ -14,6 +14,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 |------|------|------|--------|
 | **Otter Slide** | 2 mud, 1 log | 1🐟 | When you build, advance 3 fewer fish (min 1). |
 | **Mill Wheel** | 3 logs, 3 stones | 4🐟 | Any time you would pass 0 on the fish track, stop at space 1 instead. |
+| **Slipstream** | 2 mud, 2 vines | 3🐟 | Once per game, take a turn immediately after another player takes their turn, even if you are not next on the fish track. |
 
 ### Bidding / auction
 
@@ -48,11 +49,13 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 ### Shoreline / endgame scoring
 
+> **Print convention.** Any card whose VP comes from its effect prints **VP: *** (asterisk). The "*" refers to the effect text. These cards' baseline printed VP is treated as 0 so the effect determines the entire contribution.
+
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Pier** | 3 logs, 2 stones | 3🐟 | End game: +1 VP per shoreline card with at least one of your workers on it. |
-| **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End game: +2 VP per built structure of yours that uses Vines. |
-| **Cattail Patch** | 3 reeds, 2 mud | 3🐟 | End game: card is worth 0 VP itself, plus 1/2/3/5/8/10 VP for 1/2/3/4/5/6 distinct materials across your built structures. |
+| **Pier** | 3 logs, 2 stones | 3🐟 | End game: +2 VP per shoreline card with at least one of your workers on it (max +6). |
+| **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End game: +3 VP per built structure of yours that uses Vines. |
+| **Cattail Patch** | 3 reeds, 2 mud | 3🐟 | End game: 1/1/2/3/5/8 VP for 1/2/3/4/5/6 distinct materials across your built structures. |
 
 ---
 
@@ -84,16 +87,16 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Beaver Dam** | 4 logs, 2 mud | 3🐟 | Wash every card currently in River 1 to the shoreline (carry workers along). Slide back 1🐟 on the fish track per card washed. |
+| **Beaver Dam** | 4 logs, 2 mud | 2🐟 | Wash **one** River 1 card of your choice to the shoreline (workers carry along). Slide back 2🐟 on the fish track. |
 | **Mud Levee** | 3 mud, 2 stones | 3🐟 | Drop 2 blanks on any uncovered icons in the river. |
-| **Flush Channel** | 4 mud, 1 reed | 3🐟 | Trigger a free Headwaters flush (skip the 5🐟 cost; deck still refills and the auction step still runs as normal). |
+| **Flush Channel** | 4 mud, 1 reed | 2🐟 | Discard 1 Headwaters card of your choice (out of game). Refill that slot from the top of the material deck. No auction. |
 
 ### Conditional VP (resolved at game end)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Hidden Cache** | 2 vines, 2 stones, 2 clay | 3🐟 | +5 VP if your built structures include at least 1 of each material. |
-| **Heron Watch** | 4 stones, 2 logs | 4🐟 | +1 VP per shoreline card on the table at game end. |
+| **Hidden Cache** | 2 vines, 2 stones, 2 clay | 3🐟 | +3 VP per 2 distinct materials in your built structures (max +9). |
+| **Heron Watch** | 4 stones, 2 logs | 4🐟 | End game: +1 VP per shoreline card on the table, max +7 VP. |
 
 ---
 
