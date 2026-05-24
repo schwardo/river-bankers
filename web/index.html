@@ -1361,6 +1361,16 @@ async function humanVineCurtainRearrange(playerIdx) {
 // wbm._wildPools = [{materials: [primary, alt], count}] — each pool's units
 // may cover either of its two materials at build time. Tracked separately so
 // canBuild doesn't double-count.
+// Total workers this player has placed across river + shoreline (vanilla AND
+// wild cards). Used for "can I trigger an auction?" — supply + placed > 0
+// means the player can recall a worker to fund a bid.
+function totalPlacedWorkers(state, playerIdx) {
+  let n = 0;
+  for (const c of state.riverCards) n += workersOnCard(c, playerIdx);
+  for (const c of state.shorelineCards) n += workersOnCard(c, playerIdx);
+  return n;
+}
+
 function playerWorkersByMaterial(state, playerIdx) {
   const out = {};
   for (const m of MAT_KEYS) out[m] = 0;
@@ -1900,7 +1910,7 @@ function renderRiver() {
     && state.phase === 'choose-action' && !state.gameOver;
   const hasPreriv = state.prerivCards.some(c => c !== null);
   const humanTriggerPool = human
-    ? human.supply + MAT_KEYS.reduce((s, m) => s + playerWorkersByMaterial(state, human.idx)[m], 0)
+    ? human.supply + totalPlacedWorkers(state, human.idx)
     : 0;
   const flushEnabled = isHumanChoosingAction && humanTriggerPool > 0
     && (hasPreriv || state.matDeck.length > 0);
@@ -1977,7 +1987,10 @@ function prerivSlotSelectable(slotIdx) {
   const isHumanTurn = human && state.currentPlayer === human.idx;
   if (state.phase === 'select-preriv-card') return true;
   if (state.phase === 'flush-pick-card') return true;
-  if (state.phase === 'choose-action' && isHumanTurn && human.supply > 0) return true;
+  // Trigger an auction iff at least one worker is available anywhere — supply
+  // or placed (player will recall during pre-auction recall to fund the bid).
+  if (state.phase === 'choose-action' && isHumanTurn
+      && human.supply + totalPlacedWorkers(state, human.idx) > 0) return true;
   return false;
 }
 
@@ -1988,8 +2001,10 @@ function riverCardClickOpts(card) {
   const isHumanTurn = human && state.currentPlayer === human.idx;
   // Click is a shortcut for "Auction river card" — works both during the explicit
   // select-auction-card phase and directly from choose-action (skipping the button).
+  // Trigger gate: any worker available (supply OR placed for pre-auction recall).
   if (state.phase === 'select-auction-card'
-      || (state.phase === 'choose-action' && isHumanTurn && human.supply > 0)) {
+      || (state.phase === 'choose-action' && isHumanTurn
+          && human.supply + totalPlacedWorkers(state, human.idx) > 0)) {
     opts.selectable = true;
     opts.onClick = `humanSelectAuctionCard('${card.id}')`;
   }
@@ -2165,7 +2180,7 @@ function renderActionPanel() {
   panel.classList.remove('hidden');
   let html = '';
   if (state.phase === 'choose-action') {
-    const placed = MAT_KEYS.reduce((s, m) => s + playerWorkersByMaterial(state, cur.idx)[m], 0);
+    const placed = totalPlacedWorkers(state, cur.idx);
     const hasPreriv = state.prerivCards.some(c => c !== null);
     const abilityBtns = [];
     if (hasEffect(cur, 'Heron Roost') && state.matDeck.length > 0 && cur.timePos < ENDGAME_TRACK_END - 1 && hasPreriv) {
@@ -3552,7 +3567,8 @@ function humanSelectPrerivCard(slotIdx) {
   const card = state.prerivCards[slotIdx];
   if (!card) return;
   const human = state.players.find(p => p.isHuman);
-  if (human.supply === 0) return;
+  // Need at least one worker available anywhere (supply or recallable) to trigger.
+  if (human.supply + totalPlacedWorkers(state, human.idx) === 0) return;
   const moveCost = prerivTriggerCost(slotIdx);
   advancePlayer(human.idx, moveCost);
   log(`🎬 ${speciesLabel(human)} spends ${moveCost}🐟 to auction Headwaters ${PRERIV_SLOTS - slotIdx} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}🐟/item).`);
