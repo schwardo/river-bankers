@@ -1081,7 +1081,37 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'At the start of your turn, swap one of your workers on a river card with another worker (yours or an opponent\'s) on a different river card. Pay the source card\'s per-item cost in fish.' },
   { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 7, effect: 'As your main action, place 1–5 workers from your supply onto uncovered icons of one river card. Fish cost escalates 2/3/5/8/13 per successive worker.' },
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game, take a turn immediately after another player takes their turn, even if you are not next on the fish track.' },
+
+  // Species starter structures (asymmetric play, see SPECIES.md). Each player
+  // drafts 1 of their 3 species cards at setup; picked card is pre-built in
+  // their tableau. The `species` flag excludes these from the shared deck.
+  // Beaver (Logs bias)
+  { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 0, species: 'beaver', effect: 'Logs icons cost you 1 less fish per item (min 1).' },
+  { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 0, species: 'beaver', effect: 'At the start of your turn, you may pay 1🐟 to drop a blank on any uncovered icon on a River 1 card.' },
+  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 0, species: 'beaver', effect: 'Your hand size is 4 instead of 3.' },
+  // Sea Otter (Reeds bias)
+  { name: 'Kelp Bed',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Reeds icons cost you 1 less fish per item (min 1).' },
+  { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
+  { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'When building, 1 of your Stones workers may substitute for any other material.' },
+  // Muskrat (Mud bias)
+  { name: 'Mud Burrow',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Mud icons cost you 1 less fish per item (min 1).' },
+  { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'At the start of your turn, you may discard 1 Reed worker from any river card; returns to that player\'s supply without a blank.' },
+  { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
+  // Mink (Clay bias)
+  { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 1 less fish per item (min 1).' },
+  { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed).' },
+  { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3🐟 in compensation.' },
 ];
+
+const SPECIES_KEYS = ['beaver', 'otter', 'muskrat', 'mink'];
+
+// AI draft preference for species starters (higher = more attractive).
+const SPECIES_DRAFT_WEIGHT = {
+  'Lodge Foundation': 5, 'Kelp Bed': 5, 'Mud Burrow': 5, 'Clay Den': 5,
+  'Quick Strike': 5, 'Snare Set': 4,
+  'Stone Tool': 4, 'Rolling Float': 3, 'Tail Slap': 3, 'Channel Clearer': 3,
+  'Cache Burrow': 3, 'Marsh Lookout': 2,
+};
 
 // Cattail Patch end-game schedule, indexed by distinct-material count (0..6).
 const CATTAIL_PATCH_VP = [0, 1, 1, 2, 3, 5, 8];
@@ -1124,11 +1154,19 @@ function totalVP(p, state) {
   return v;
 }
 
-// Reed Bed: per-item cost is 1 less for the player on Reed material cards (min 1).
+// Per-material cost discounters (each -1🐟 per item, min 1): Reed Bed (main
+// deck) and the 4 species-starter discount cards.
+const MATERIAL_DISCOUNT_CARDS = {
+  reeds: ['Reed Bed', 'Kelp Bed'],
+  logs:  ['Lodge Foundation'],
+  mud:   ['Mud Burrow'],
+  clay:  ['Clay Den'],
+};
 function playerCardCost(card, playerIdx) {
   const base = cardCost(card);
   const p = state.players[playerIdx];
-  if (card.material === 'reeds' && hasEffect(p, 'Reed Bed')) return Math.max(1, base - 1);
+  const discounters = MATERIAL_DISCOUNT_CARDS[card.material] || [];
+  if (discounters.some(n => hasEffect(p, n))) return Math.max(1, base - 1);
   return base;
 }
 
@@ -1244,6 +1282,7 @@ async function resolvePendingPackRatSwaps() {
 function buildStructureDeck(numPlayers) {
   let id = 0;
   const templates = STRUCTURE_TEMPLATES.filter(s => {
+    if (s.species) return false; // species starters never enter the shared deck
     if (s.only2P) return numPlayers === 2;
     return true;
   });
@@ -1469,6 +1508,21 @@ function effectiveBuildCost(struct, p, wbm) {
       }
     }
   }
+  // Stone Tool (otter species starter): Charcoal Pit variant — 1 Stones
+  // worker may substitute for any other material on a build.
+  if (hasEffect(p, 'Stone Tool')) {
+    const stoneSlack = (wbm.stones || 0) - (eff.stones || 0);
+    if (stoneSlack >= 1) {
+      for (const m of Object.keys(struct.cost)) {
+        if (m === 'stones') continue;
+        if ((wbm[m] || 0) < eff[m]) {
+          eff[m] -= 1;
+          eff.stones = (eff.stones || 0) + 1;
+          break;
+        }
+      }
+    }
+  }
   // Treaty Stone: once per build, cover 1 missing of one material by paying
   // 2 of a surplus material (any-to-any). Applied after free 1:1 saves so it
   // only fires when a real deficit remains.
@@ -1596,6 +1650,8 @@ function startGame() {
       spyMoundUsed: false,
       tributeStoneUsed: false,
       slipstreamUsed: false,
+      rollingFloatUsed: false,
+      snareSetUsed: false,
     });
   }
 
@@ -1605,6 +1661,21 @@ function startGame() {
   // Initial hands: 3 each
   for (const p of players) {
     for (let i = 0; i < 3; i++) p.hand.push(structDeck.pop());
+  }
+
+  // Species starter draft (see SPECIES.md). AI picks by SPECIES_DRAFT_WEIGHT
+  // with random tiebreaker; human's modal is opened after game state is
+  // initialized (see openHumanSpeciesDraft below). For now, AI pre-builds
+  // their pick immediately so the game state is consistent.
+  for (const p of players) {
+    if (p.isHuman) continue; // human drafts via modal after initial render
+    const speciesCards = STRUCTURE_TEMPLATES
+      .filter(s => s.species === p.species.id)
+      .map((s, i) => ({ ...s, id: 'ss' + p.idx + '_' + i, cost: { ...s.cost } }));
+    const ranked = speciesCards
+      .map(c => ({ c, w: (SPECIES_DRAFT_WEIGHT[c.name] || 1) + Math.random() }))
+      .sort((a, b) => b.w - a.w);
+    p.built.push(ranked[0].c);
   }
 
   // No starting river cards — the river populates as cards are pulled out of the upstream queue.
@@ -1655,7 +1726,35 @@ function startGame() {
 
   render();
   startSimTimeTicker();
-  scheduleTurn();
+  // Human species draft (if any) before the first turn fires.
+  if (humanPlays) {
+    runHumanSpeciesDraft().then(() => scheduleTurn());
+  } else {
+    scheduleTurn();
+  }
+}
+
+// Show the human their 3 species starter options and let them pick. Resolves
+// after the picked card is appended to their built[].
+async function runHumanSpeciesDraft() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human) return;
+  const speciesCards = STRUCTURE_TEMPLATES
+    .filter(s => s.species === human.species.id)
+    .map((s, i) => ({ ...s, id: 'ss' + human.idx + '_' + i, cost: { ...s.cost } }));
+  const picked = await pickFromList(
+    `${human.species.emoji} ${human.species.name} — pick your starter`,
+    `Pick one of three ${human.species.name}-themed starter structures to build for free. ` +
+      `The other two are removed from the game.`,
+    speciesCards,
+    (c) => `<b>${c.name}</b><br><span style="font-size:11px;color:#666;">${c.effect}</span>`,
+    { cancelable: false }
+  );
+  if (picked) {
+    human.built.push(picked);
+    log(`${human.species.emoji} ${speciesLabel(human)} drafts <b>${picked.name}</b>.`);
+    render();
+  }
 }
 
 // =============================================================================
@@ -2094,7 +2193,7 @@ function renderPlayers() {
       builtList = html2;
     }
     let lookoutPeek = '';
-    if (p.isHuman && hasEffect(p, 'Lookout Tree') && state.matDeck.length > 0) {
+    if (p.isHuman && (hasEffect(p, 'Lookout Tree') || hasEffect(p, 'Marsh Lookout')) && state.matDeck.length > 0) {
       const top = state.matDeck[state.matDeck.length - 1];
       lookoutPeek = `<div class="lookout-peek">🔭 Top of deck: <span style="color:${MATERIALS[top.material].color}">${MATERIALS[top.material].emoji} ${MATERIALS[top.material].name}</span> · ${top.totalIcons} icons</div>`;
     }
@@ -2504,15 +2603,34 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   const slotLbl = card.slot === 'pre' ? 'Headwaters' : `River ${card.slot + 1}`;
   log(`🎲 Auction begins on ${m.emoji} ${m.name} at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
 
-  // Spy Mound: holders can defer their bid until after others reveal.
-  //   - AIs auto-defer if eligible.
-  //   - Human is prompted up-front (modal) so they can decide whether to spend the once-per-game charge.
+  // Spy Mound / Quick Strike: holders can defer their bid until after others
+  // reveal. AIs auto-defer if eligible AND the card's material matches at
+  // least one hand structure (so the once-per-game Spy Mound isn't wasted).
+  //   - Spy Mound: once per game.
+  //   - Quick Strike (mink species starter): unlimited.
+  const wantsMaterial = (p) => {
+    const mats = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+    return p.hand.some(s => mats.some(m => (s.cost[m] || 0) > 0));
+  };
   let deferredAi = -1;
-  for (const p of state.players) {
-    if (p.isHuman) continue;
-    if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out && uncoveredIcons(card) >= 4) {
-      deferredAi = p.idx;
-      break;
+  let deferredAiViaQuickStrike = false;
+  if (uncoveredIcons(card) >= 4) {
+    for (const p of state.players) {
+      if (p.isHuman) continue;
+      if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out && wantsMaterial(p)) {
+        deferredAi = p.idx;
+        break;
+      }
+    }
+    if (deferredAi === -1) {
+      for (const p of state.players) {
+        if (p.isHuman) continue;
+        if (hasEffect(p, 'Quick Strike') && !p.exhausted && !p.out && wantsMaterial(p)) {
+          deferredAi = p.idx;
+          deferredAiViaQuickStrike = true;
+          break;
+        }
+      }
     }
   }
   const human = state.players.find(p => p.isHuman);
@@ -2564,18 +2682,27 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
       }
     }
   }
-  // Spy Mound deferred bid resolves now (after seeing all other reveals).
+  // Spy Mound / Quick Strike deferred bid resolves now (after reveals). Uses
+  // aiDecideBid (which considers material need) capped at remaining room so
+  // we never jam — old "fill to capacity" logic over-bid on materials the
+  // player didn't want, which compounded badly for Quick Strike's unlimited use.
   if (deferredAi !== -1) {
     const sp = state.players[deferredAi];
-    sp.spyMoundUsed = true;
+    if (!deferredAiViaQuickStrike) sp.spyMoundUsed = true;
     const open = uncoveredIcons(card);
     const others = Object.values(bids).reduce((s, b) => s + b, 0);
-    let bid;
-    if (others < open) bid = Math.min(sp.supply, open - others);
-    else bid = (deferredAi === triggerPlayerIdx) ? Math.max(minBidTrigger, 1) : 0;
-    if (deferredAi === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
+    const room = open - others;
+    const minBid = (deferredAi === triggerPlayerIdx) ? minBidTrigger : 0;
+    let bid = aiDecideBid(sp.idx, card, minBid);
+    if (room <= 0) {
+      bid = deferredAi === triggerPlayerIdx ? Math.max(minBidTrigger, 1) : 0;
+    } else {
+      bid = Math.min(bid, room);
+      if (deferredAi === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
+    }
     bids[sp.idx] = bid;
-    log(`🕵 Spy Mound: ${speciesLabel(sp)} bids ${bid} after seeing reveals.`);
+    const label = deferredAiViaQuickStrike ? 'Quick Strike' : 'Spy Mound';
+    log(`🕵 ${label}: ${speciesLabel(sp)} bids ${bid} after seeing reveals.`);
   }
   if (deferredHuman !== -1) {
     const sp = state.players[deferredHuman];
@@ -3313,6 +3440,89 @@ function aiStartOfTurnAbilities(playerIdx) {
     const target = findOtterTrailTarget(playerIdx);
     if (target && p.timePos + cardCost(target.cardA) < ENDGAME_TRACK_END) {
       doOtterTrail(playerIdx, target.cardA.id, target.cardB.id, target.otherIdx);
+    }
+  }
+  // Snare Set (mink species starter): Tribute Stone variant w/ its own flag.
+  if (hasEffect(p, 'Snare Set') && !p.snareSetUsed && p.timePos < ENDGAME_TRACK_END - 10) {
+    const target = findTributeStoneTarget(playerIdx);
+    if (target && target.value >= 3) {
+      // Mirror Tribute Stone logic but mark the snareSetUsed flag.
+      const victim = state.players[target.victimIdx];
+      target.card.workers[target.victimIdx] -= 1;
+      if (target.card.workers[target.victimIdx] === 0) delete target.card.workers[target.victimIdx];
+      if (typeof target.card.slot === 'number') target.card.blanks += 1;
+      victim.supply += 1;
+      victim.timePos = Math.max(0, victim.timePos - 3);
+      p.snareSetUsed = true;
+      log(`🪤 Snare Set: ${speciesLabel(p)} forces ${speciesLabel(victim)} to recall 1 worker; ${speciesLabel(victim)} slides back 3🐟.`);
+    }
+  }
+  // Tail Slap (beaver species starter): pay 1🐟 to drop a blank on a R1 card
+  // whose material we don't need (denies opponents).
+  if (hasEffect(p, 'Tail Slap') && p.timePos < ENDGAME_TRACK_END - 1) {
+    const myMats = new Set();
+    for (const s of p.hand) for (const m in s.cost) myMats.add(m);
+    const cands = state.riverCards
+      .filter(c => c.slot === 0 && uncoveredIcons(c) >= 3 && !myMats.has(c.material));
+    if (cands.length > 0) {
+      const target = cands.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b);
+      target.blanks += 1;
+      p.timePos += 1;
+      log(`🦫 Tail Slap: ${speciesLabel(p)} drops a blank on R1 ${MATERIALS[target.material].name} (+1🐟).`);
+    }
+  }
+  // Channel Clearer (muskrat species starter): discard 1 opponent Reed worker
+  // from any river card. No fish cost, no blank.
+  if (hasEffect(p, 'Channel Clearer')) {
+    let pick = null;
+    for (const c of state.riverCards) {
+      if (c.material !== 'reeds') continue;
+      for (const k in c.workers) {
+        const opIdx = parseInt(k);
+        if (opIdx === playerIdx || c.workers[k] <= 0) continue;
+        pick = { card: c, victimIdx: opIdx };
+        break;
+      }
+      if (pick) break;
+    }
+    if (pick) {
+      pick.card.workers[pick.victimIdx] -= 1;
+      if (pick.card.workers[pick.victimIdx] === 0) delete pick.card.workers[pick.victimIdx];
+      state.players[pick.victimIdx].supply += 1;
+      log(`🐭 Channel Clearer: ${speciesLabel(p)} clears 1 Reed worker from ${speciesLabel(state.players[pick.victimIdx])}.`);
+    }
+  }
+  // Rolling Float (otter species starter): once-per-game free same-slot swap.
+  if (hasEffect(p, 'Rolling Float') && !p.rollingFloatUsed) {
+    const wbm = playerWorkersByMaterial(state, playerIdx);
+    const needs = {};
+    for (const m of MAT_KEYS) needs[m] = 0;
+    for (const s of p.hand) for (const m in s.cost) {
+      needs[m] = Math.max(needs[m], Math.max(0, s.cost[m] - (wbm[m] || 0)));
+    }
+    let best = null, bestScore = 0;
+    for (const cardA of state.riverCards) {
+      if (typeof cardA.slot !== 'number') continue;
+      if (workersOnCard(cardA, playerIdx) <= 0) continue;
+      for (const cardB of state.riverCards) {
+        if (cardB.id === cardA.id || cardB.slot !== cardA.slot) continue;
+        for (const k in cardB.workers) {
+          const opIdx = parseInt(k);
+          if (opIdx === playerIdx || cardB.workers[k] <= 0) continue;
+          const score = (needs[cardB.material] || 0) - (needs[cardA.material] || 0);
+          if (score > bestScore) { best = { cardA, cardB, opIdx }; bestScore = score; }
+        }
+      }
+    }
+    if (best) {
+      best.cardA.workers[playerIdx] -= 1;
+      if (best.cardA.workers[playerIdx] === 0) delete best.cardA.workers[playerIdx];
+      best.cardB.workers[best.opIdx] -= 1;
+      if (best.cardB.workers[best.opIdx] === 0) delete best.cardB.workers[best.opIdx];
+      best.cardA.workers[best.opIdx] = (best.cardA.workers[best.opIdx] || 0) + 1;
+      best.cardB.workers[playerIdx] = (best.cardB.workers[playerIdx] || 0) + 1;
+      p.rollingFloatUsed = true;
+      log(`🦦 Rolling Float: ${speciesLabel(p)} swaps a worker on ${MATERIALS[best.cardA.material].name} for ${MATERIALS[best.cardB.material].name} (same slot).`);
     }
   }
 }
