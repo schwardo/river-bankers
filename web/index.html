@@ -2819,25 +2819,60 @@ function aiDecideBid(playerIdx, card, minBid) {
   if (open === 0) return Math.min(totalPool, minBid);
 
   // How many of this material does the AI need overall (across hand structures)?
+  // Wildcards (Driftwood Tangle, Mud Slick): include the alt material's deficit
+  // since a wild worker can fulfill either.
   const wbm = playerWorkersByMaterial(state, playerIdx);
+  const matsForNeed = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
   let need = 0;
+  let maxNeed = 0;
   for (const s of p.hand) {
-    const want = s.cost[card.material] || 0;
-    const have = wbm[card.material] || 0;
-    if (want > have) need += (want - have);
+    let cardNeed = 0;
+    for (const m of matsForNeed) {
+      const want = s.cost[m] || 0;
+      const have = wbm[m] || 0;
+      if (want > have) cardNeed += (want - have);
+    }
+    need += cardNeed;
+    if (cardNeed > maxNeed) maxNeed = cardNeed;
   }
-  // Some materials show up across multiple structures; cap at "pick the most useful structure"
-  const maxNeed = Math.max(0, ...p.hand.map(s => Math.max(0, (s.cost[card.material] || 0) - (wbm[card.material] || 0))));
   // Blend of total-need and best-single-need
   let target = Math.round((need + maxNeed) / 2);
 
   // Cap by safe pool, open, and 4 — never auto-disrupt builds for marginal contention.
   target = Math.min(target, safePool, open, 4);
 
-  // Cost penalty: at higher per-item cost, the risk of paying for a bid that jams
-  // is bigger, so trim more aggressively.
-  if (cardCost(card) >= 3 && target > 1) target = Math.max(1, target - 1);
-  if (cardCost(card) >= 4 && target > 1) target = Math.max(1, target - 1);
+  // Effect-aware per-item cost:
+  //  - Old Growth at R3/R4 doubles per-worker yield → effective cost halved.
+  //  - Hidden Inlet solo bonus: if no opponent here, expect +1 fish-track refund
+  //    per worker placed → effective cost -1.
+  let effCost = cardCost(card);
+  if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) {
+    effCost = Math.max(1, Math.ceil(effCost / 2));
+  }
+  if (card.effect === 'solo-bonus') {
+    const opponentPresent = Object.entries(card.workers).some(
+      ([idx, n]) => parseInt(idx) !== playerIdx && n > 0
+    );
+    if (!opponentPresent) effCost = Math.max(1, effCost - 1);
+  }
+  if (effCost >= 3 && target > 1) target = Math.max(1, target - 1);
+  if (effCost >= 4 && target > 1) target = Math.max(1, target - 1);
+
+  // Most-workers race (Mud Wallow, Cattail Cluster): chase opponent's max+1
+  // when the bonus roughly covers the extra fish.
+  if (card.effect === 'most-workers') {
+    const myHere = workersOnCard(card, playerIdx);
+    const oppMax = Math.max(0, ...Object.entries(card.workers)
+      .filter(([idx]) => parseInt(idx) !== playerIdx)
+      .map(([, n]) => n));
+    const toWin = Math.max(0, oppMax + 1 - myHere);
+    const bonusFish = (card.effectSpec && card.effectSpec.flatBonus) || 0;
+    const extra = Math.max(0, toWin - target);
+    if (extra > 0 && extra * effCost <= bonusFish + 1
+        && toWin <= safePool && toWin <= open) {
+      target = toWin;
+    }
+  }
 
   // Random tweak for unpredictability
   const r = Math.random();

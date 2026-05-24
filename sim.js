@@ -903,19 +903,58 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   if (open === 0) return Math.min(totalPool, minBid);
 
   const wbm = playerWorkersByMaterial(state, playerIdx);
+  // Wildcards (Driftwood Tangle, Mud Slick): include the alt material's
+  // deficit when computing need, since a wild worker can fulfill either.
+  const matsForNeed = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
   let need = 0;
+  let maxNeed = 0;
   for (const s of p.hand) {
-    const want = s.cost[card.material] || 0;
-    const have = wbm[card.material] || 0;
-    if (want > have) need += (want - have);
+    let cardNeed = 0;
+    for (const m of matsForNeed) {
+      const want = s.cost[m] || 0;
+      const have = wbm[m] || 0;
+      if (want > have) cardNeed += (want - have);
+    }
+    need += cardNeed;
+    if (cardNeed > maxNeed) maxNeed = cardNeed;
   }
-  const maxNeed = Math.max(0, ...p.hand.map(s => Math.max(0, (s.cost[card.material] || 0) - (wbm[card.material] || 0))));
   let target = Math.round((need + maxNeed) / 2);
   target = Math.min(target, safePool, open, 4);
   // Use the player-specific per-item cost so Reed Bed makes reed auctions more attractive.
-  const myCost = playerCardCost(state, card, playerIdx);
+  let myCost = playerCardCost(state, card, playerIdx);
+  // Old Growth at River 3/4: each worker yields 2x material, halving the
+  // effective per-item cost in fish-per-material terms.
+  if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) {
+    myCost = Math.max(1, Math.ceil(myCost / 2));
+  }
+  // Hidden Inlet solo bonus: if no opponent has workers on this card, expect
+  // +1 fish-track refund per worker placed (effective cost -1).
+  if (card.effect === 'solo-bonus') {
+    const opponentPresent = Object.entries(card.workers).some(
+      ([idx, n]) => parseInt(idx) !== playerIdx && n > 0
+    );
+    if (!opponentPresent) myCost = Math.max(1, myCost - 1);
+  }
   if (myCost >= 3 && target > 1) target = Math.max(1, target - 1);
   if (myCost >= 4 && target > 1) target = Math.max(1, target - 1);
+  // Most-workers race (Mud Wallow, Cattail Cluster): if winning by 1 worker
+  // is reachable within budget and the bonus pays for the extra fish, push
+  // the target to (opponent's max + 1).
+  if (card.effect === 'most-workers') {
+    const myHere = workersOnCard(card, playerIdx);
+    const oppMax = Math.max(0, ...Object.entries(card.workers)
+      .filter(([idx]) => parseInt(idx) !== playerIdx)
+      .map(([, n]) => n));
+    const toWin = Math.max(0, oppMax + 1 - myHere);
+    const bonusFish = (card.effectSpec && card.effectSpec.flatBonus) || 0;
+    // Extra workers above our base target each cost ~myCost fish; only chase
+    // the race when the bonus roughly covers it.
+    const extra = Math.max(0, toWin - target);
+    if (extra > 0 && extra * myCost <= bonusFish + 1
+        && toWin <= safePool && toWin <= open) {
+      target = toWin;
+    }
+  }
   const r = Math.random();
   if (r < 0.15 && target > 0) target -= 1;
   else if (r > 0.85 && target < safePool && target < open) target += 1;
