@@ -54,7 +54,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
 | **Pier** | 3 logs, 2 stones | 3🐟 | End game: +2 VP per shoreline card with at least one of your workers on it (max +6). |
-| **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End game: +3 VP per built structure of yours that uses Vines. |
+| **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End game: +4 VP per built structure of yours that uses Vines. |
 | **Cattail Patch** | 3 reeds, 2 mud | 3🐟 | End game: 1/1/2/3/5/8 VP for 1/2/3/4/5/6 distinct materials across your built structures. |
 
 ---
@@ -96,7 +96,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
 | **Hidden Cache** | 2 vines, 2 stones, 2 clay | 3🐟 | +3 VP per 2 distinct materials in your built structures (max +9). |
-| **Heron Watch** | 4 stones, 2 logs | 4🐟 | End game: +1 VP per shoreline card on the table, max +7 VP. |
+| **Heron Watch** | 4 stones, 2 logs | 4🐟 | End game: +1 VP per shoreline card on the table, max +9 VP. |
 
 ---
 
