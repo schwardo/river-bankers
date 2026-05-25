@@ -1079,6 +1079,11 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 4, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
   { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 7, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
   { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End game: +4 VP per built structure of yours that uses Vines.' },
+  { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 0, effect: 'When you build a structure that uses Vines, slide back 1 fish on the fish track. End game: +1 VP per built structure of yours that uses Vines (max +6).' },
+  { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 0, effect: 'When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +1 VP per built structure of yours that uses Stones (max +6).' },
+  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +1 VP per built structure of yours that uses Reeds (max +6).' },
+  { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +1 VP per built structure of yours that uses Clay (max +6).' },
+  { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 2, vp: 0, effect: 'When you build a structure that uses Mud, move one of your workers from any river card to another river card containing at least one of your workers (you may replace a blank instead of taking an uncovered icon). End game: +1 VP per built structure of yours that uses Mud (max +6).' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'At the start of your turn you may pay 1🐟 to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 2, clay: 2 },  time: 3, vp: 0, effect: 'End game: +3 VP per 2 distinct materials in your built structures (max +9).' },
@@ -1159,6 +1164,31 @@ function vpBreakdown(p, state) {
   if (hasEffect(p, 'Vine Ladder')) {
     const n = p.built.filter(b => (b.cost.vines || 0) > 0).length;
     bonuses.push({ name: 'Vine Ladder', vp: 4 * n, detail: `4★ × ${n} built structure${n === 1 ? '' : 's'} using vines` });
+  }
+  if (hasEffect(p, 'Vine Trellis')) {
+    const n = p.built.filter(b => (b.cost.vines || 0) > 0).length;
+    const vp = Math.min(6, n);
+    bonuses.push({ name: 'Vine Trellis', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using vines (max 6)` });
+  }
+  if (hasEffect(p, 'Stone Causeway')) {
+    const n = p.built.filter(b => (b.cost.stones || 0) > 0).length;
+    const vp = Math.min(6, n);
+    bonuses.push({ name: 'Stone Causeway', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using stones (max 6)` });
+  }
+  if (hasEffect(p, 'Reed Walkway')) {
+    const n = p.built.filter(b => (b.cost.reeds || 0) > 0).length;
+    const vp = Math.min(6, n);
+    bonuses.push({ name: 'Reed Walkway', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using reeds (max 6)` });
+  }
+  if (hasEffect(p, 'Clay Vault')) {
+    const n = p.built.filter(b => (b.cost.clay || 0) > 0).length;
+    const vp = Math.min(6, n);
+    bonuses.push({ name: 'Clay Vault', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using clay (max 6)` });
+  }
+  if (hasEffect(p, 'Burrow Network')) {
+    const n = p.built.filter(b => (b.cost.mud || 0) > 0).length;
+    const vp = Math.min(6, n);
+    bonuses.push({ name: 'Burrow Network', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using mud (max 6)` });
   }
   if (hasEffect(p, 'Hidden Cache')) {
     const mats = new Set();
@@ -3181,6 +3211,33 @@ function aiEffectValue(struct, p, state) {
     const handVine = p.hand.filter(s => (s.cost.vines || 0) > 0).length;
     return 4 * (builtVine + Math.min(handVine, 2));
   }
+  if (struct.name === 'Vine Trellis') {
+    const builtVine = p.built.filter(b => (b.cost.vines || 0) > 0).length;
+    const handVine = p.hand.filter(s => (s.cost.vines || 0) > 0).length;
+    // End-game: +1 per Vine-cost build (incl. self), cap 6. Tempo: ~1 VP-eq for
+    // the per-build slide-back (comparable to Otter Slide's fixed 2 across all builds).
+    return Math.min(6, builtVine + 1 + Math.min(handVine, 2)) + 1;
+  }
+  if (struct.name === 'Stone Causeway') {
+    const builtStone = p.built.filter(b => (b.cost.stones || 0) > 0).length;
+    const handStone = p.hand.filter(s => (s.cost.stones || 0) > 0).length;
+    return Math.min(6, builtStone + 1 + Math.min(handStone, 2)) + 1.5;
+  }
+  if (struct.name === 'Reed Walkway') {
+    const builtReed = p.built.filter(b => (b.cost.reeds || 0) > 0).length;
+    const handReed = p.hand.filter(s => (s.cost.reeds || 0) > 0).length;
+    return Math.min(6, builtReed + 1 + Math.min(handReed, 2)) + 2;
+  }
+  if (struct.name === 'Clay Vault') {
+    const builtClay = p.built.filter(b => (b.cost.clay || 0) > 0).length;
+    const handClay = p.hand.filter(s => (s.cost.clay || 0) > 0).length;
+    return Math.min(6, builtClay + 1 + Math.min(handClay, 2)) + 1;
+  }
+  if (struct.name === 'Burrow Network') {
+    const builtMud = p.built.filter(b => (b.cost.mud || 0) > 0).length;
+    const handMud = p.hand.filter(s => (s.cost.mud || 0) > 0).length;
+    return Math.min(6, builtMud + 1 + Math.min(handMud, 2)) + 1;
+  }
   if (struct.name === 'Hidden Cache') {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
@@ -4274,7 +4331,288 @@ async function performBuild(playerIdx, handIdx) {
   while (p.hand.length < maxHandSize(p) && structAvailable(state) > 0) {
     p.hand.push(popStructDeck(state));
   }
+  // Passive build-triggered effects keyed off the builder's tableau (fire when
+  // ANY structure with the matching material is built). Runs after the refill so
+  // Stone Causeway's extra draw goes over the hand limit before re-filtering.
+  await firePassiveBuildEffects(playerIdx, struct);
   cleanupShoreline();
+}
+
+async function firePassiveBuildEffects(playerIdx, struct) {
+  const p = state.players[playerIdx];
+  if (hasEffect(p, 'Vine Trellis') && (struct.cost.vines || 0) > 0) {
+    const before = p.timePos;
+    p.timePos = Math.max(0, p.timePos - 1);
+    if (p.timePos < before) {
+      log(`🪜 ${speciesLabel(p)} slides back ${before - p.timePos} on the fish track (Vine Trellis).`);
+    }
+  }
+  if (hasEffect(p, 'Stone Causeway') && (struct.cost.stones || 0) > 0) {
+    if (p.isHuman) await humanStoneCausewayDraw(playerIdx);
+    else aiStoneCausewayDraw(playerIdx);
+  }
+  if (hasEffect(p, 'Reed Walkway') && (struct.cost.reeds || 0) > 0) {
+    if (p.isHuman) await humanReedWalkwayPlace(playerIdx);
+    else aiReedWalkwayPlace(playerIdx);
+  }
+  if (hasEffect(p, 'Clay Vault') && (struct.cost.clay || 0) > 0) {
+    if (p.isHuman) await humanClayVaultSwap(playerIdx);
+    else aiClayVaultSwap(playerIdx);
+  }
+  if (hasEffect(p, 'Burrow Network') && (struct.cost.mud || 0) > 0) {
+    if (p.isHuman) await humanBurrowNetworkMove(playerIdx);
+    else aiBurrowNetworkMove(playerIdx);
+  }
+}
+
+// Human modal — pick which card to discard after Stone Causeway's draw.
+async function humanStoneCausewayDraw(playerIdx) {
+  const p = state.players[playerIdx];
+  if (structAvailable(state) === 0) return;
+  const drawn = popStructDeck(state);
+  if (!drawn) return;
+  p.hand.push(drawn);
+  log(`🪨 Stone Causeway draws ${drawn.name}. Pick a card to discard.`);
+  render();
+  if (p.hand.length <= maxHandSize(p)) return;
+  const items = p.hand.map((s, i) => ({ s, i }));
+  const pick = await pickFromList(
+    '🪨 Stone Causeway — discard a card',
+    `You drew <b>${drawn.name}</b> on top of your normal refill. Pick one card from your hand to discard.`,
+    items,
+    x => `${x.s.name} — ${x.s.vp}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}`,
+    { cancelable: false }
+  );
+  const idx = pick ? pick.i : (p.hand.length - 1); // fallback: discard the drawn card
+  const dropped = p.hand.splice(idx, 1)[0];
+  state.structDiscard.push(dropped);
+  log(`🪨 Stone Causeway: discarded ${dropped.name}.`);
+  render();
+}
+
+// Human modal — pick which R1 card to place the free Reed Walkway worker on.
+async function humanReedWalkwayPlace(playerIdx) {
+  const p = state.players[playerIdx];
+  if (p.supply === 0) return;
+  const cands = state.riverCards.filter(c => c.slot === 0 && uncoveredIcons(c) > 0);
+  if (cands.length === 0) return;
+  const items = cands.map(c => ({ card: c }));
+  const pick = await pickFromList(
+    '🌾 Reed Walkway — place a free worker on River 1',
+    'Place 1 worker from your supply onto an uncovered icon on a River 1 card. (Free; you may skip.)',
+    items,
+    x => `River 1 (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} — ${uncoveredIcons(x.card)} uncovered`,
+    { declineLabel: 'Skip', cancelable: false }
+  );
+  if (!pick || pick === PICKER_DECLINE) {
+    log(`🌾 Reed Walkway: skipped.`);
+    return;
+  }
+  p.supply -= 1;
+  pick.card.workers[playerIdx] = (pick.card.workers[playerIdx] || 0) + 1;
+  log(`🌾 Reed Walkway: places 1 free worker on ${MATERIALS[pick.card.material].name} (R1).`);
+  render();
+}
+
+// Human modal — peek deck top; offer swap with a hand card or keep.
+async function humanClayVaultSwap(playerIdx) {
+  const p = state.players[playerIdx];
+  if (structAvailable(state) === 0) return;
+  if (state.structDeck.length === 0) {
+    if (state.structDiscard.length === 0) return;
+    state.structDeck = shuffle(state.structDiscard);
+    state.structDiscard = [];
+    log(`📚 Structure deck empty — discard pile reshuffled (Clay Vault peek).`);
+  }
+  if (state.structDeck.length === 0) return;
+  const top = state.structDeck[state.structDeck.length - 1];
+  const yes = await confirmModal(
+    '🏺 Clay Vault — peek deck top',
+    `Top of the structure deck is <b>${top.name}</b> (${top.vp}★ · ${top.time}🐟 · ${Object.entries(top.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}). Swap it for one card from your hand?`,
+    'Swap', 'Keep hand'
+  );
+  if (!yes) {
+    log(`🏺 Clay Vault: peeks ${top.name}; keeps hand.`);
+    return;
+  }
+  const items = p.hand.map((s, i) => ({ s, i }));
+  const pick = await pickFromList(
+    '🏺 Clay Vault — discard one card from hand',
+    `Discard which card? You'll take <b>${top.name}</b> in exchange.`,
+    items,
+    x => `${x.s.name} — ${x.s.vp}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}`,
+    { cancelable: false }
+  );
+  if (!pick) return;
+  state.structDeck.pop();
+  const dropped = p.hand.splice(pick.i, 1)[0];
+  state.structDiscard.push(dropped);
+  p.hand.push(top);
+  log(`🏺 Clay Vault: swaps ${dropped.name} ↔ ${top.name}.`);
+  render();
+}
+
+// Human modal — pick source then destination for Burrow Network's worker move.
+async function humanBurrowNetworkMove(playerIdx) {
+  const p = state.players[playerIdx];
+  const mine = state.riverCards.filter(c => workersOnCard(c, playerIdx) > 0);
+  if (mine.length < 2) return;
+  // Valid destinations need ≥1 your worker AND (uncovered icon OR a blank).
+  const validDest = mine.filter(c => uncoveredIcons(c) > 0 || c.blanks > 0);
+  if (validDest.length === 0) return;
+  const sourceItems = mine.map(c => ({ card: c }));
+  const sourcePick = await pickFromList(
+    '🕳 Burrow Network — pick source worker',
+    'Move 1 of your workers from this card to another card where you already have at least 1 worker. (You may replace a blank.)',
+    sourceItems,
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} — you have ${workersOnCard(x.card, playerIdx)}`,
+    { declineLabel: 'Skip', cancelable: false }
+  );
+  if (!sourcePick || sourcePick === PICKER_DECLINE) {
+    log(`🕳 Burrow Network: skipped.`);
+    return;
+  }
+  const destItems = validDest
+    .filter(c => c.id !== sourcePick.card.id)
+    .map(c => ({ card: c }));
+  if (destItems.length === 0) {
+    log(`🕳 Burrow Network: no valid destination.`);
+    return;
+  }
+  const destPick = await pickFromList(
+    '🕳 Burrow Network — pick destination',
+    `Worker moves from ${MATERIALS[sourcePick.card.material].name} (R${sourcePick.card.slot + 1}).`,
+    destItems,
+    x => {
+      const open = uncoveredIcons(x.card);
+      const bl = x.card.blanks;
+      const tag = (open > 0 && bl > 0) ? `${open} uncovered, ${bl} blank` : (open > 0 ? `${open} uncovered` : `${bl} blank`);
+      return `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} — ${tag}`;
+    },
+    { cancelable: false }
+  );
+  if (!destPick) return;
+  // If destination has both an uncovered icon and a blank, ask which to take.
+  let useBlank;
+  if (uncoveredIcons(destPick.card) > 0 && destPick.card.blanks > 0) {
+    useBlank = await confirmModal(
+      '🕳 Burrow Network — replace a blank?',
+      `${MATERIALS[destPick.card.material].name} has both uncovered icons and ${destPick.card.blanks} blank${destPick.card.blanks === 1 ? '' : 's'}. Replace a blank instead of taking an uncovered icon?`,
+      'Replace blank', 'Take uncovered'
+    );
+  } else {
+    useBlank = destPick.card.blanks > 0; // forced
+  }
+  sourcePick.card.workers[playerIdx] -= 1;
+  if (sourcePick.card.workers[playerIdx] === 0) delete sourcePick.card.workers[playerIdx];
+  if (useBlank) destPick.card.blanks -= 1;
+  destPick.card.workers[playerIdx] = (destPick.card.workers[playerIdx] || 0) + 1;
+  const what = useBlank ? 'replacing a blank' : 'onto an uncovered icon';
+  log(`🕳 Burrow Network: moves 1 worker from ${MATERIALS[sourcePick.card.material].name} (R${sourcePick.card.slot + 1}) to ${MATERIALS[destPick.card.material].name} (R${destPick.card.slot + 1}) — ${what}.`);
+  render();
+}
+
+function aiStoneCausewayDraw(playerIdx) {
+  const p = state.players[playerIdx];
+  if (structAvailable(state) === 0) return;
+  const drawn = popStructDeck(state);
+  if (!drawn) return;
+  p.hand.push(drawn);
+  if (p.hand.length <= maxHandSize(p)) {
+    log(`🪨 Stone Causeway: ${speciesLabel(p)} draws ${drawn.name}.`);
+    return;
+  }
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const score = (s) => {
+    let deficit = 0;
+    for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
+    return s.vp + aiEffectValue(s, p, state) - deficit * 1.5;
+  };
+  const scored = p.hand.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => a.sc - b.sc);
+  const dropped = p.hand.splice(scored[0].i, 1)[0];
+  state.structDiscard.push(dropped);
+  log(`🪨 Stone Causeway: ${speciesLabel(p)} draws ${drawn.name}, discards ${dropped.name}.`);
+}
+
+function aiReedWalkwayPlace(playerIdx) {
+  const p = state.players[playerIdx];
+  if (p.supply === 0) return;
+  const cands = state.riverCards.filter(c => c.slot === 0 && uncoveredIcons(c) > 0);
+  if (cands.length === 0) return;
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
+  cands.sort((a, b) => {
+    const na = need(a.material), nb = need(b.material);
+    if (na !== nb) return nb - na;
+    return uncoveredIcons(b) - uncoveredIcons(a);
+  });
+  const target = cands[0];
+  p.supply -= 1;
+  target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
+  log(`🌾 Reed Walkway: ${speciesLabel(p)} places 1 free worker on ${target.name} (R1).`);
+}
+
+function aiClayVaultSwap(playerIdx) {
+  const p = state.players[playerIdx];
+  if (structAvailable(state) === 0) return;
+  if (state.structDeck.length === 0) {
+    if (state.structDiscard.length === 0) return;
+    state.structDeck = shuffle(state.structDiscard);
+    state.structDiscard = [];
+  }
+  if (state.structDeck.length === 0) return;
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const score = (s) => {
+    let deficit = 0;
+    for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
+    return s.vp + aiEffectValue(s, p, state) - deficit * 1.5;
+  };
+  const top = state.structDeck[state.structDeck.length - 1];
+  const topScore = score(top);
+  const scored = p.hand.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => a.sc - b.sc);
+  const worst = scored[0];
+  if (topScore > worst.sc) {
+    state.structDeck.pop();
+    const dropped = p.hand.splice(worst.i, 1)[0];
+    state.structDiscard.push(dropped);
+    p.hand.push(top);
+    log(`🏺 Clay Vault: ${speciesLabel(p)} swaps ${dropped.name} ↔ ${top.name} (deck top).`);
+  } else {
+    log(`🏺 Clay Vault: ${speciesLabel(p)} peeks deck top (${top.name}); keeps hand unchanged.`);
+  }
+}
+
+function aiBurrowNetworkMove(playerIdx) {
+  const p = state.players[playerIdx];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
+  const mine = state.riverCards.filter(c => workersOnCard(c, playerIdx) > 0);
+  if (mine.length < 2) return;
+  let best = null, bestScore = 0;
+  for (const src of mine) {
+    for (const dst of mine) {
+      if (dst.id === src.id) continue;
+      const open = uncoveredIcons(dst) > 0;
+      const blanked = dst.blanks > 0;
+      if (!open && !blanked) continue;
+      const useBlank = blanked;
+      const blankBonus = useBlank ? 0.5 : 0;
+      const score = need(dst.material) - need(src.material) + blankBonus;
+      if (score > bestScore) {
+        bestScore = score;
+        best = { src, dst, useBlank };
+      }
+    }
+  }
+  if (!best) return;
+  best.src.workers[playerIdx] -= 1;
+  if (best.src.workers[playerIdx] === 0) delete best.src.workers[playerIdx];
+  if (best.useBlank) {
+    best.dst.blanks -= 1;
+  }
+  best.dst.workers[playerIdx] = (best.dst.workers[playerIdx] || 0) + 1;
+  const what = best.useBlank ? 'replacing a blank' : 'onto an uncovered icon';
+  log(`🕳 Burrow Network: ${speciesLabel(p)} moves 1 worker from ${best.src.name} to ${best.dst.name} (${what}).`);
 }
 
 // One-time on-build effects fire here (web). Each card's effect is triggered by name.

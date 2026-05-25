@@ -55,6 +55,11 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 |------|------|------|--------|
 | **Pier** | 3 logs, 2 stones | 3🐟 | End game: +2 VP per shoreline card with at least one of your workers on it (max +6). |
 | **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End game: +4 VP per built structure of yours that uses Vines. |
+| **Vine Trellis** | 3 vines, 1 stone | 2🐟 | When you build a structure that uses Vines, slide back 1🐟 on the fish track. End game: +1 VP per built structure of yours that uses Vines (max +6). |
+| **Stone Causeway** | 3 stones, 2 logs | 3🐟 | When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +1 VP per built structure of yours that uses Stones (max +6). |
+| **Reed Walkway** | 4 reeds, 1 mud | 3🐟 | When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +1 VP per built structure of yours that uses Reeds (max +6). |
+| **Clay Vault** | 3 clay, 2 vines | 3🐟 | When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +1 VP per built structure of yours that uses Clay (max +6). |
+| **Burrow Network** | 3 mud, 2 reeds | 2🐟 | When you build a structure that uses Mud, move 1 of your workers from any river card to another river card containing at least 1 of your workers. You may replace a blank instead of an uncovered icon. End game: +1 VP per built structure of yours that uses Mud (max +6). |
 | **Cattail Patch** | 3 reeds, 2 mud | 3🐟 | End game: 1/1/2/3/5/8 VP for 1/2/3/4/5/6 distinct materials across your built structures. |
 
 ---
