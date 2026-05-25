@@ -54,7 +54,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
 | **Pier** | 3 logs, 2 stones | 3🐟 | End game: +2 VP per shoreline card with at least one of your workers on it (max +6). |
-| **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End game: +4 VP per built structure of yours that uses Vines. |
+| **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End game: +3 VP per built structure of yours that uses Vines. |
 | **Vine Trellis** | 3 vines, 1 stone | 2🐟 | When you build a structure that uses Vines, slide back 1🐟 on the fish track. End game: +1 VP per built structure of yours that uses Vines (max +6). |
 | **Stone Causeway** | 3 stones, 2 logs | 3🐟 | When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +1 VP per built structure of yours that uses Stones (max +6). |
 | **Reed Walkway** | 4 reeds, 1 mud | 3🐟 | When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +1 VP per built structure of yours that uses Reeds (max +6). |
@@ -94,14 +94,14 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 |------|------|------|--------|
 | **Beaver Dam** | 4 logs, 2 mud | 2🐟 | Wash **one** River 1 card of your choice to the shoreline (workers carry along). Slide back 2🐟 on the fish track. |
 | **Mud Levee** | 3 mud, 2 stones | 3🐟 | Drop 2 blanks on any uncovered icons in the river. |
-| **Flush Channel** | 4 mud, 1 reed | 2🐟 | Discard 1 Headwaters card of your choice (out of game). Refill that slot from the top of the material deck. No auction. |
+| **Flush Channel** | 3 mud, 1 reed | 2🐟 | Discard 1 Headwaters card of your choice (out of game). Refill that slot from the top of the material deck. No auction. |
 
 ### Conditional VP (resolved at game end)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Hidden Cache** | 2 vines, 2 stones, 2 clay | 3🐟 | +3 VP per 2 distinct materials in your built structures (max +9). |
-| **Heron Watch** | 4 stones, 2 logs | 4🐟 | End game: +1 VP per shoreline card on the table, max +9 VP. |
+| **Hidden Cache** | 2 vines, 3 stones, 2 clay | 3🐟 | +3 VP per 2 distinct materials in your built structures (max +9). |
+| **Heron Watch** | 4 stones, 2 logs | 4🐟 | End game: +1 VP per shoreline card on the table, max +6 VP. |
 
 ---
 
