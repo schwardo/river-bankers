@@ -7,9 +7,9 @@ A 2–4 player card game in which rival semi-aquatic mammals — **beavers, sea 
 - 1 game board (with the Headwaters, river, shoreline, and 60-space fish track)
 - 24 material cards (6 materials × 4 cards each: 4-, 5-, 7-, and 8-icon variants)
 - 32 structure cards
-- 32 worker discs — 8 in each of 4 species colors (brown beaver, blue sea otter, gray muskrat, purple mink)
-- 4 fish-track pawns (one per species)
-- 28 blank chits
+- 32 worker discs (0.63" diameter × 0.4" thick) — 8 in each of 4 species colors: **brown beaver, red sea otter, green muskrat, purple mink**
+- 4 fish-track pawns — one 0.63" disc per species, same colors as that species' workers
+- 28 blank chits (0.75" diameter, printed)
 - 1 rulebook
 
 ## Game Elements
@@ -20,7 +20,7 @@ A 2–4 player card game in which rival semi-aquatic mammals — **beavers, sea 
 - **River track.** Four spaces. Each river space has a fixed *per-item cost*: **River 1 = 2🐟/item, River 2 = 3🐟/item, River 3 = 4🐟/item, River 4 = 5🐟/item.** That's how many fish each worker you win on a card costs you — cards drifting farther downriver demand longer swims and bigger meals. Cards enter the river at space 1 (after a Headwaters move). **Multiple cards can occupy the same space** — they pile up there. A card only moves when *it itself* is auctioned and still has uncovered icons afterward: it slides one space downriver, where the per-item cost is one higher. New cards arriving from the Headwaters don't push the cards already in the river. Past the fourth (last) space is the **shoreline**.
 - **Shoreline.** A column past the river where graduated cards collect. Shoreline cards can't be auctioned; their icon counts no longer matter. Workers still on them can be spent on builds. A shoreline card with no workers left is removed.
 - **Structure deck.** Cards each show a structure, the materials required to build it, the fish cost to build, and a victory-point value. Discarded structure cards form a face-up discard pile next to the deck; whenever the deck runs out, shuffle the discard pile to form a new deck.
-- **Worker tokens.** Each player gets **8 disc workers** of their species color (0.75" diameter, sized to fully cover one icon on a material card). The premium edition swaps these for sculpted miniatures with the same 0.75" base footprint, so they slot onto icons identically.
+- **Worker tokens.** Each player gets **8 disc workers** of their species color (0.63" diameter, sized to fully cover one icon on a material card). The premium edition swaps these for sculpted miniatures with the same 0.63" base footprint, so they slot onto icons identically.
 - **Fish track.** A 60-space loop with one pawn per player. Pawns advance forward, wrapping back to 0 after space 59. If a pawn is *lapped* (caught up to from behind by another pawn), it gets flipped over and **exhausted** — it sits out, can't take turns, and can't bid in auctions, until the lapper passes it again (a second time around). The next "pass" wakes it back up.
 
 ## Setup

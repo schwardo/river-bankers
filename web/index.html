@@ -296,7 +296,11 @@
     flex: 1;
   }
 
-  /* ================= MATERIAL CARD ================= */
+  /* ================= MATERIAL CARD =================
+     Card is poker landscape (3.5" × 2.5"). Icons match the physical
+     0.63" worker disc → 0.63"/3.5" ≈ 18% of card width. Container
+     query units (cqw = 1% of mat-card width) keep that ratio at
+     every render size. */
   .mat-card {
     background: var(--paper);
     border: 2px solid var(--bank);
@@ -305,6 +309,7 @@
     font-size: 11px;
     width: 100%;
     aspect-ratio: 3.5 / 2.5;
+    container-type: inline-size;
     display: flex; flex-direction: column;
     gap: 2px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
@@ -361,21 +366,22 @@
     letter-spacing: 0.5px;
   }
   .mat-card .icons-row {
-    display: flex; flex-direction: column; gap: 3px;
-    padding: 4px 0;
+    display: flex; flex-direction: column; gap: 1cqw;
+    padding: 1cqw 0;
     justify-content: center;
     background: rgba(0,0,0,0.04);
     border-radius: 3px;
     min-height: 32px;
     align-items: center;
   }
-  .icon-sub-row { display: flex; gap: 2px; justify-content: center; }
+  .icon-sub-row { display: flex; gap: 1cqw; justify-content: center; }
   .icon-slot {
-    width: 22px; height: 22px;
+    /* 0.63" disc on a 3.5" card = 18% — set slightly under so gap fits. */
+    width: 17cqw; height: 17cqw;
     border-radius: 50%;
     border: 1.5px solid var(--bank);
     display: flex; align-items: center; justify-content: center;
-    font-size: 11px;
+    font-size: 9cqw;
     background: #fff;
   }
   .icon-slot.icon-open { background: #fff; }
@@ -385,6 +391,11 @@
     border-style: dashed;
   }
   .icon-slot.icon-worker { color: #fff; font-weight: 700; }
+  /* Shoreline cards don't auction — open icons aren't shown and the
+     remaining worker discs are just inventory, so shrink them to fit
+     a tighter row. */
+  .mat-card.shore .icon-slot { width: 12cqw; height: 12cqw; font-size: 7cqw; }
+  .mat-card.shore .icons-row { min-height: 0; }
   .mat-card .mat-foot {
     font-size: 14px;
     color: var(--ink-soft);
@@ -973,8 +984,8 @@
 // =============================================================================
 const SPECIES = [
   { id: 'beaver',  name: 'Beaver',    emoji: '🦫', color: '#8b4513' },
-  { id: 'otter',   name: 'Sea Otter', emoji: '🦦', color: '#2a6b8f' },
-  { id: 'muskrat', name: 'Muskrat',   emoji: '🐭', color: '#6b6b5a' },
+  { id: 'otter',   name: 'Sea Otter', emoji: '🦦', color: '#b8362a' },
+  { id: 'muskrat', name: 'Muskrat',   emoji: '🐭', color: '#4a7a3a' },
   { id: 'mink',    name: 'Mink',      emoji: '🦡', color: '#4b2a5b' },
 ];
 
@@ -2061,6 +2072,7 @@ function renderMatCard(card, opts = {}) {
     icons = `<div class="icon-sub-row">${iconSlots.join('')}</div>`;
   }
   const cls = ['mat-card'];
+  if (isShore)         cls.push('shore');
   if (opts.selectable) cls.push('selectable');
   if (opts.selected)   cls.push('selected');
   if (opts.dimmed)     cls.push('dimmed');
