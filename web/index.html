@@ -320,41 +320,42 @@
   .mat-card.selected { outline: 3px solid yellow; outline-offset: 1px; }
   .mat-card.dimmed { opacity: 0.5; }
   .mat-card .mat-head {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 6px;
+  }
+  .mat-card .mat-name {
+    font-size: 13px;
     font-weight: 700;
     color: var(--ink);
+    line-height: 1.1;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .mat-card .mat-name { font-size: 12px; }
-  .mat-card .mat-remaining {
+  .mat-card .mat-material {
     font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .mat-card .mat-remaining {
+    font-size: 10px;
     color: var(--ink-soft);
     font-weight: 500;
     margin-left: 2px;
   }
-  .mat-card .mat-cost {
-    background: var(--water-deep);
-    color: #fff;
+  .mat-card .mat-effect-box {
+    background: rgba(42, 42, 92, 0.08);
+    border: 1px solid rgba(42, 42, 92, 0.3);
     border-radius: 3px;
-    padding: 1px 5px;
+    padding: 4px 6px;
     font-size: 11px;
-  }
-  .mat-card .mat-effect-badge {
-    background: #2a2a5c;
-    color: #f0e3a3;
-    border-radius: 3px;
-    padding: 1px 4px;
-    font-size: 10px;
-    font-weight: 600;
     line-height: 1.3;
-    align-self: flex-start;
-    margin-top: 1px;
-  }
-  .mat-card .mat-effect-text {
-    font-size: 9px;
-    line-height: 1.2;
     color: #2a2a5c;
     font-style: italic;
-    margin-top: 1px;
+  }
+  .mat-card .mat-effect-box b {
+    font-style: normal;
+    font-weight: 700;
   }
   .mat-card .mat-shore-tag {
     background: var(--bank);
@@ -364,6 +365,7 @@
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    margin-left: 4px;
   }
   .mat-card .icons-row {
     display: flex; flex-direction: column; gap: 1cqw;
@@ -373,6 +375,7 @@
     border-radius: 3px;
     min-height: 32px;
     align-items: center;
+    flex: 1;
   }
   .icon-sub-row { display: flex; gap: 1cqw; justify-content: center; }
   .icon-slot {
@@ -393,9 +396,15 @@
   .icon-slot.icon-worker { color: #fff; font-weight: 700; }
   /* Shoreline cards don't auction — open icons aren't shown and the
      remaining worker discs are just inventory, so shrink them to fit
-     a tighter row. */
+     a tighter row. The narrower card needs smaller header text too,
+     and the effect box is dropped since every effect either fires
+     while in-river or at the moment of reaching shore. */
   .mat-card.shore .icon-slot { width: 12cqw; height: 12cqw; font-size: 7cqw; }
   .mat-card.shore .icons-row { min-height: 0; }
+  .mat-card.shore .mat-name { font-size: 11px; }
+  .mat-card.shore .mat-material { font-size: 9px; }
+  .mat-card.shore .mat-shore-tag { font-size: 8px; padding: 1px 3px; }
+  .mat-card.shore .mat-effect-box { display: none; }
   .mat-card .mat-foot {
     font-size: 14px;
     color: var(--ink-soft);
@@ -1029,6 +1038,33 @@ function effectSpecFor(material, icons) {
   return EFFECT_CARDS.find(e => e.material === material && e.icons === icons) || null;
 }
 
+// Names for the 16 non-effect (material, icons) slots. Effect cards
+// (Driftwood Tangle, Old Growth, etc.) carry their own name on EFFECT_CARDS.
+// Together these cover all 24 deck combos so every material card has a unique name.
+const VANILLA_NAMES = {
+  'logs-4':   'Fallen Limb',
+  'logs-7':   'Logjam',
+  'stones-4': 'Cairn',
+  'stones-5': 'Rocky Shoal',
+  'stones-7': 'Boulder Field',
+  'stones-8': 'Quarry Bank',
+  'reeds-5':  'Reed Stand',
+  'reeds-7':  'Marsh Edge',
+  'mud-5':    'Mud Flat',
+  'mud-7':    'Silt Bank',
+  'mud-8':    'Floodplain',
+  'vines-5':  'Trailing Vine',
+  'vines-7':  'Vine Thicket',
+  'vines-8':  'Strangler Knot',
+  'clay-4':   'Clay Seep',
+  'clay-5':   'Clay Bank',
+};
+function cardNameFor(material, icons) {
+  const eff = effectSpecFor(material, icons);
+  if (eff) return eff.name;
+  return VANILLA_NAMES[`${material}-${icons}`] || MATERIALS[material].name;
+}
+
 function buildMaterialDeck(numPlayers) {
   const iconCounts = ALWAYS_ICONS
     .concat(numPlayers >= 3 ? TIER_3PLUS_ICONS : [])
@@ -1042,6 +1078,7 @@ function buildMaterialDeck(numPlayers) {
         id: 'm' + (id++),
         material: m,
         totalIcons: icons,
+        name: cardNameFor(m, icons),
         slot: null,         // 0..3 in river, 'pre' in pre-river, 'shore', or null in deck
         workers: {},        // playerIdx -> count
         blanks: 0,
@@ -2077,24 +2114,23 @@ function renderMatCard(card, opts = {}) {
   if (opts.selected)   cls.push('selected');
   if (opts.dimmed)     cls.push('dimmed');
   const onclick = opts.onClick ? `onclick="${opts.onClick}"` : '';
-  // Cost is determined entirely by the card's slot — no per-card cost badge.
-  const remainingTag = isShore ? '' : ` <span class="mat-remaining">(${open}/${card.totalIcons})</span>`;
-  const head = isShore
-    ? `<span class="mat-name" style="color:${m.color}">${m.emoji} ${m.name}</span><span class="mat-shore-tag">shoreline</span>`
-    : `<span class="mat-name" style="color:${m.color}">${m.emoji} ${m.name}${remainingTag}</span>`;
-  // Effect printed on the card: a small name pill plus the rules text below.
-  const effectBadge = card.effectSpec
-    ? `<div class="mat-effect-badge">✦ ${card.effectSpec.name}</div>
-       <div class="mat-effect-text">${effectDescription(card)}</div>`
+  // Header: card name (left) · material + (open/total) or shoreline tag (right).
+  const cardName = card.name || m.name;
+  const matLabel = isShore
+    ? `<span class="mat-material" style="color:${m.color}">${m.emoji} ${m.name}</span><span class="mat-shore-tag">shore</span>`
+    : `<span class="mat-material" style="color:${m.color}">${m.emoji} ${m.name} <span class="mat-remaining">(${open}/${card.totalIcons})</span></span>`;
+  // Effect rules text printed full-width across the bottom of the card.
+  const effectBox = card.effectSpec
+    ? `<div class="mat-effect-box"><b>${card.effectSpec.name}.</b> ${effectDescription(card)}</div>`
     : '';
-  // Footer: shoreline shows worker count only; river-card footer is no longer needed (count moved up).
-  const foot = isShore
-    ? `${totalWorkers} worker${totalWorkers === 1 ? '' : 's'} on it`
-    : (opts.note || '');
+  const foot = !isShore && opts.note ? opts.note : '';
   return `<div class="${cls.join(' ')}" ${onclick}>
-    <div class="mat-head">${head}</div>
-    ${effectBadge}
+    <div class="mat-head">
+      <span class="mat-name">${cardName}</span>
+      ${matLabel}
+    </div>
     <div class="icons-row">${icons}</div>
+    ${effectBox}
     ${foot ? `<div class="mat-foot">${foot}</div>` : ''}
   </div>`;
 }
@@ -2274,7 +2310,7 @@ function renderPlayers() {
     let lookoutPeek = '';
     if (p.isHuman && (hasEffect(p, 'Lookout Tree') || hasEffect(p, 'Marsh Lookout')) && state.matDeck.length > 0) {
       const top = state.matDeck[state.matDeck.length - 1];
-      lookoutPeek = `<div class="lookout-peek">🔭 Top of deck: <span style="color:${MATERIALS[top.material].color}">${MATERIALS[top.material].emoji} ${MATERIALS[top.material].name}</span> · ${top.totalIcons} icons</div>`;
+      lookoutPeek = `<div class="lookout-peek">🔭 Top of deck: <span style="color:${MATERIALS[top.material].color}">${MATERIALS[top.material].emoji} ${top.name}</span> · ${top.totalIcons} icons</div>`;
     }
     html += `<div class="${cls.join(' ')}">
       <div class="player-head">
@@ -2550,7 +2586,7 @@ function moveCardToShoreline(card) {
   }
   card.slot = 'shore';
   state.shorelineCards.push(card);
-  log(`📍 ${MATERIALS[card.material].emoji} ${MATERIALS[card.material].name} card drifts to the shoreline.`);
+  log(`📍 ${MATERIALS[card.material].emoji} ${card.name} drifts to the shoreline.`);
 }
 
 // End-of-life effect dispatcher: fires when a card moves from river → shoreline.
@@ -2606,7 +2642,7 @@ function jamCardDownriver(card) {
     card.slot = (card.effect === 'slipping-sandbar') ? 3 : 0;
     state.riverCards.push(card);
     if (idx !== -1) refillPreriv(idx);
-    log(`💨 ${MATERIALS[card.material].emoji} ${MATERIALS[card.material].name} jams from the Headwaters into River ${card.slot + 1} (${riverSlotCost(card.slot)}🐟/item).`);
+    log(`💨 ${MATERIALS[card.material].emoji} ${card.name} jams from the Headwaters into River ${card.slot + 1} (${riverSlotCost(card.slot)}🐟/item).`);
     return;
   }
   // Cost is slot-based: jamming to a higher slot raises the per-item cost automatically.
@@ -2616,7 +2652,7 @@ function jamCardDownriver(card) {
     return;
   }
   card.slot = newSlot;
-  log(`💨 ${MATERIALS[card.material].emoji} ${MATERIALS[card.material].name} jams to River ${newSlot + 1} (${riverSlotCost(newSlot)}🐟/item).`);
+  log(`💨 ${MATERIALS[card.material].emoji} ${card.name} jams to River ${newSlot + 1} (${riverSlotCost(newSlot)}🐟/item).`);
 }
 
 // =============================================================================

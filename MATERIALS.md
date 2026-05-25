@@ -1,6 +1,19 @@
-# River Bankers — Material Card Effects
+# River Bankers — Material Cards
 
-Design notes for the **8 effect-bearing material cards** that replace plain variants in the 24-card material deck (see `RULES.md`). The remaining 16 cards stay vanilla — they yield one material per claimed icon, no extras.
+Every (material, icon-count) slot in the 24-card material deck (see `RULES.md`) carries a unique card name so cards are easy to reference in playtest notes, the action log, and the rules PDF. **Eight slots are effect-bearing** (listed in the tier tables below); the remaining sixteen are vanilla — they yield one material per claimed icon, no extras.
+
+## Full naming table
+
+| Material | 4 icons       | 5 icons             | 7 icons              | 8 icons              |
+|----------|---------------|---------------------|----------------------|----------------------|
+| Logs     | Fallen Limb   | **Driftwood Tangle** | Logjam              | **Old Growth**       |
+| Stones   | Cairn         | Rocky Shoal         | Boulder Field        | Quarry Bank          |
+| Reeds    | **Hidden Inlet** | Reed Stand       | Marsh Edge           | **Cattail Cluster**  |
+| Mud      | **Mud Wallow** | Mud Flat           | Silt Bank            | Floodplain           |
+| Vines    | **Vine Curtain** | Trailing Vine    | Vine Thicket         | Strangler Knot       |
+| Clay     | Clay Seep     | Clay Bank           | **Mud Slick**        | **Slipping Sandbar** |
+
+**Bold** = effect-bearing card (8 of 24). Deck inclusion by player count: 5- and 7-icon cards always; 4-icon cards added at 3+ players; 8-icon cards added at 4 players (12 / 18 / 24 cards by player count).
 
 > **Goal.** Repurpose existing deck slots without changing total card count (12/18/24 for 2P/3P/4P), so game length stays where it is. Effects are placed at the same tier as the card they replace, so 2P only sees effects that work without a crowded board.
 
