@@ -903,6 +903,9 @@
     </select>
   </div>
   <div class="setup-row">
+    <label><input type="checkbox" id="use-starters" checked> Use species starter cards</label>
+  </div>
+  <div class="setup-row">
     <button class="primary" onclick="startGame()">Start</button>
   </div>
   <p class="small-note">2–4 players. Up to one human; the rest are AI. Bid workers on materials drifting downstream and build structures along the bank.</p>
@@ -1130,28 +1133,45 @@ function oncePerGameUsed(p, name) {
   return false;
 }
 function maxHandSize(p) { return 3 + (hasEffect(p, 'Cache Burrow') ? 1 : 0); }
-function totalVP(p, state) {
-  let v = p.built.reduce((s, b) => s + b.vp, 0);
+// Returns { base, bonuses: [{name, vp, detail}], total } for end-of-game scoring.
+// `base` is the printed-VP sum of built structures; each bonus describes one
+// end-game scoring effect that fired (positive or zero).
+function vpBreakdown(p, state) {
+  const base = p.built.reduce((s, b) => s + b.vp, 0);
+  const bonuses = [];
   if (hasEffect(p, 'Pier')) {
-    v += Math.min(6, 2 * state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length);
+    const n = state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length;
+    const vp = Math.min(6, 2 * n);
+    bonuses.push({ name: 'Pier', vp, detail: `2★ × ${n} shoreline card${n === 1 ? '' : 's'} with your workers (max 6)` });
   }
   if (hasEffect(p, 'Cattail Patch')) {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
-    v += CATTAIL_PATCH_VP[Math.min(mats.size, CATTAIL_PATCH_VP.length - 1)];
+    const vp = CATTAIL_PATCH_VP[Math.min(mats.size, CATTAIL_PATCH_VP.length - 1)];
+    bonuses.push({ name: 'Cattail Patch', vp, detail: `${mats.size} distinct material${mats.size === 1 ? '' : 's'} across built structures` });
   }
   if (hasEffect(p, 'Vine Ladder')) {
-    v += 4 * p.built.filter(b => (b.cost.vines || 0) > 0).length;
+    const n = p.built.filter(b => (b.cost.vines || 0) > 0).length;
+    bonuses.push({ name: 'Vine Ladder', vp: 4 * n, detail: `4★ × ${n} built structure${n === 1 ? '' : 's'} using vines` });
   }
   if (hasEffect(p, 'Hidden Cache')) {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
-    v += Math.min(9, Math.floor(mats.size / 2) * 3);
+    const pairs = Math.floor(mats.size / 2);
+    const vp = Math.min(9, pairs * 3);
+    bonuses.push({ name: 'Hidden Cache', vp, detail: `3★ × ${pairs} pair${pairs === 1 ? '' : 's'} of distinct materials (${mats.size} total, max 9)` });
   }
   if (hasEffect(p, 'Heron Watch')) {
-    v += Math.min(9, state.shorelineCards.length);
+    const n = state.shorelineCards.length;
+    const vp = Math.min(9, n);
+    bonuses.push({ name: 'Heron Watch', vp, detail: `1★ × ${n} shoreline card${n === 1 ? '' : 's'} on the table (max 9)` });
   }
-  return v;
+  const total = base + bonuses.reduce((s, b) => s + b.vp, 0);
+  return { base, bonuses, total };
+}
+
+function totalVP(p, state) {
+  return vpBreakdown(p, state).total;
 }
 
 // Per-material per-item cost discounters. Each entry: { name: amount }.
@@ -1632,6 +1652,7 @@ function startGame() {
   const numPlayers = parseInt(document.getElementById('num-players').value);
   const humanPlays = document.getElementById('human-plays').checked;
   const humanIdx = humanPlays ? parseInt(document.getElementById('human-species').value) : -1;
+  const useStarters = document.getElementById('use-starters').checked;
   if (humanPlays && humanIdx >= numPlayers) {
     alert('Pick a species number ≤ number of players.');
     return;
@@ -1672,15 +1693,18 @@ function startGame() {
   // with random tiebreaker; human's modal is opened after game state is
   // initialized (see openHumanSpeciesDraft below). For now, AI pre-builds
   // their pick immediately so the game state is consistent.
-  for (const p of players) {
-    if (p.isHuman) continue; // human drafts via modal after initial render
-    const speciesCards = STRUCTURE_TEMPLATES
-      .filter(s => s.species === p.species.id)
-      .map((s, i) => ({ ...s, id: 'ss' + p.idx + '_' + i, cost: { ...s.cost } }));
-    const ranked = speciesCards
-      .map(c => ({ c, w: (SPECIES_DRAFT_WEIGHT[c.name] || 1) + Math.random() }))
-      .sort((a, b) => b.w - a.w);
-    p.built.push(ranked[0].c);
+  // Skipped entirely when the user disables starter cards in setup.
+  if (useStarters) {
+    for (const p of players) {
+      if (p.isHuman) continue; // human drafts via modal after initial render
+      const speciesCards = STRUCTURE_TEMPLATES
+        .filter(s => s.species === p.species.id)
+        .map((s, i) => ({ ...s, id: 'ss' + p.idx + '_' + i, cost: { ...s.cost } }));
+      const ranked = speciesCards
+        .map(c => ({ c, w: (SPECIES_DRAFT_WEIGHT[c.name] || 1) + Math.random() }))
+        .sort((a, b) => b.w - a.w);
+      p.built.push(ranked[0].c);
+    }
   }
 
   // No starting river cards — the river populates as cards are pulled out of the upstream queue.
@@ -1732,7 +1756,8 @@ function startGame() {
   render();
   startSimTimeTicker();
   // Human species draft (if any) before the first turn fires.
-  if (humanPlays) {
+  // Skipped when starter cards are disabled.
+  if (humanPlays && useStarters) {
     runHumanSpeciesDraft().then(() => scheduleTurn());
   } else {
     scheduleTurn();
@@ -2060,7 +2085,7 @@ function renderRiver() {
     ? human.supply + totalPlacedWorkers(state, human.idx)
     : 0;
   const flushEnabled = isHumanChoosingAction && humanTriggerPool > 0
-    && (hasPreriv || state.matDeck.length > 0);
+    && state.matDeck.length > 0;
   const flushBtn = `<button class="deck-flush-btn" onclick="humanChooseAction('flush')" ${flushEnabled ? '' : 'disabled'}>
     🌀 Flush Headwaters (5🐟)
   </button>`;
@@ -2397,7 +2422,7 @@ function renderActionPanel() {
       <div class="action-buttons">
         <button onclick="humanChooseAction('preriv')" ${(triggerPool > 0 && hasPreriv) ? '' : 'disabled'}>1. Auction Headwaters card (2–4🐟)</button>
         <button onclick="humanChooseAction('auction')" ${(triggerPool > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>2. Auction river card (1🐟)</button>
-        <button onclick="humanChooseAction('flush')" ${(triggerPool > 0 && (hasPreriv || state.matDeck.length > 0)) ? '' : 'disabled'}>3. Flush Headwaters (5🐟)</button>
+        <button onclick="humanChooseAction('flush')" ${(triggerPool > 0 && state.matDeck.length > 0) ? '' : 'disabled'}>3. Flush Headwaters (5🐟)</button>
         <button onclick="humanChooseAction('browse')" ${structAvailable(state) > 0 ? '' : 'disabled'}>4. Invent structures (N🐟)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>5. Build a structure</button>
         ${beaverTowAvail ? `<button onclick="humanChooseAction('beaverTow')">6. Beaver Tow (2🐟): slide a river card upstream</button>` : ''}
@@ -3258,9 +3283,10 @@ function aiChooseAction(playerIdx) {
   // 4) Flush upstream when nothing in it matches our needs.
   // Flush triggers an auction on a fresh upstream card, so it requires at least one worker
   // (supply or recallable, since pre-auction recall covers triggers too).
+  // Illegal once the material deck is empty — no fresh cards to draw.
   const upstreamHasNeeded = state.prerivCards.some(c => c && needs[c.material] > 0);
   const upstreamHasAny = state.prerivCards.some(c => c !== null);
-  if (upstreamHasAny && !upstreamHasNeeded && triggerPool > 0) {
+  if (upstreamHasAny && !upstreamHasNeeded && triggerPool > 0 && state.matDeck.length > 0) {
     return { type: 'flush' };
   }
 
@@ -5110,11 +5136,25 @@ function showGameOver() {
   log(`🏆 GAME OVER. Winner: ${speciesLabel(winner)} with ${totalVP(winner, state)}★.`);
   let rows = '';
   ranked.forEach((p, i) => {
-    const vp = totalVP(p, state);
+    const bd = vpBreakdown(p, state);
     rows += `<div class="score-row ${i === 0 ? 'winner' : ''}">
       <span>${i + 1}. ${p.species.emoji} ${p.species.name}${p.isHuman ? ' (you)' : ''}</span>
-      <span><b>${vp}★</b> · ${p.timePos}🐟 · ${p.built.length} structure${p.built.length === 1 ? '' : 's'}</span>
+      <span><b>${bd.total}★</b> · ${p.timePos}🐟 · ${p.built.length} structure${p.built.length === 1 ? '' : 's'}</span>
     </div>`;
+    if (bd.bonuses.length > 0) {
+      const bonusLines = bd.bonuses.map(b =>
+        `<div style="display:flex; justify-content:space-between; padding:2px 14px; font-size:12px; color:var(--ink-soft);">
+          <span>${b.name}: ${b.detail}</span>
+          <span><b>${b.vp >= 0 ? '+' : ''}${b.vp}★</b></span>
+        </div>`).join('');
+      rows += `<div style="margin:-2px 0 6px 0;">
+        <div style="display:flex; justify-content:space-between; padding:2px 14px; font-size:12px; color:var(--ink-soft);">
+          <span><i>Printed structure VP</i></span>
+          <span>${bd.base}★</span>
+        </div>
+        ${bonusLines}
+      </div>`;
+    }
   });
   let humanStat = '';
   if (state.humanTurnCount > 0) {

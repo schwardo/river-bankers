@@ -1277,7 +1277,8 @@ function aiChooseAction(state, playerIdx) {
   const upstreamHasAny = state.prerivCards.some(c => c !== null);
   // Flush includes triggering an auction, which requires at least one worker
   // (supply or recallable, since pre-auction recall covers triggers too).
-  if (upstreamHasAny && !upstreamHasNeeded && triggerPool > 0) {
+  // Illegal once the material deck is empty — no fresh cards to draw.
+  if (upstreamHasAny && !upstreamHasNeeded && triggerPool > 0 && state.matDeck.length > 0) {
     return { type: 'flush' };
   }
   if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(1, structAvailable(state)) };
