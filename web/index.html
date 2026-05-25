@@ -1086,21 +1086,21 @@ const STRUCTURE_TEMPLATES = [
   // drafts 1 of their 3 species cards at setup; picked card is pre-built in
   // their tableau. The `species` flag excludes these from the shared deck.
   // Beaver (Logs bias)
-  { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 0, species: 'beaver', effect: 'Logs icons cost you 1 less fish per item (min 1).' },
-  { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 0, species: 'beaver', effect: 'At the start of your turn, you may pay 1🐟 to drop a blank on any uncovered icon on a River 1 card.' },
-  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 0, species: 'beaver', effect: 'Your hand size is 4 instead of 3.' },
+  { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'When you build a structure that uses Logs, advance 1 fewer fish (min 1).' },
+  { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 2, species: 'beaver', effect: 'At the start of your turn, you may pay 1🐟 to drop a blank on any uncovered icon on a River 1 card.' },
+  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'Your hand size is 4 instead of 3.' },
   // Sea Otter (Reeds bias)
   { name: 'Kelp Bed',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Reeds icons cost you 1 less fish per item (min 1).' },
-  { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
-  { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'When building, 1 of your Stones workers may substitute for any other material.' },
+  { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 1, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
+  { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, when building, 1 of your Stones workers may substitute for any other material.' },
   // Muskrat (Mud bias)
   { name: 'Mud Burrow',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Mud icons cost you 1 less fish per item (min 1).' },
   { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'At the start of your turn, you may discard 1 Reed worker from any river card; returns to that player\'s supply without a blank.' },
-  { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
+  { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 2, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
   // Mink (Clay bias)
-  { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 1 less fish per item (min 1).' },
-  { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed).' },
-  { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3🐟 in compensation.' },
+  { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 2 less fish per item (min 1).' },
+  { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 2, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed).' },
+  { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 1, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3🐟 in compensation.' },
 ];
 
 const SPECIES_KEYS = ['beaver', 'otter', 'muskrat', 'mink'];
@@ -1154,20 +1154,22 @@ function totalVP(p, state) {
   return v;
 }
 
-// Per-material cost discounters (each -1🐟 per item, min 1): Reed Bed (main
-// deck) and the 4 species-starter discount cards.
+// Per-material per-item cost discounters. Each entry: { name: amount }.
+// Lodge Foundation moved to a build-time discount (see performBuild).
 const MATERIAL_DISCOUNT_CARDS = {
-  reeds: ['Reed Bed', 'Kelp Bed'],
-  logs:  ['Lodge Foundation'],
-  mud:   ['Mud Burrow'],
-  clay:  ['Clay Den'],
+  reeds: { 'Reed Bed': 1, 'Kelp Bed': 1 },
+  mud:   { 'Mud Burrow': 1 },
+  clay:  { 'Clay Den': 2 },
 };
 function playerCardCost(card, playerIdx) {
   const base = cardCost(card);
   const p = state.players[playerIdx];
-  const discounters = MATERIAL_DISCOUNT_CARDS[card.material] || [];
-  if (discounters.some(n => hasEffect(p, n))) return Math.max(1, base - 1);
-  return base;
+  const discounters = MATERIAL_DISCOUNT_CARDS[card.material] || {};
+  let total = 0;
+  for (const name in discounters) {
+    if (hasEffect(p, name)) total += discounters[name];
+  }
+  return Math.max(1, base - total);
 }
 
 // Pass-0 freebies fire when a player crosses lap-loop boundary (timePos % LAP_LENGTH wraps).
@@ -1508,9 +1510,10 @@ function effectiveBuildCost(struct, p, wbm) {
       }
     }
   }
-  // Stone Tool (otter species starter): Charcoal Pit variant — 1 Stones
-  // worker may substitute for any other material on a build.
-  if (hasEffect(p, 'Stone Tool')) {
+  // Stone Tool (otter species starter): once-per-game Charcoal-Pit variant
+  // — 1 Stones worker may substitute for any other material on a build.
+  let stoneToolUsed = false;
+  if (hasEffect(p, 'Stone Tool') && !p.stoneToolUsed) {
     const stoneSlack = (wbm.stones || 0) - (eff.stones || 0);
     if (stoneSlack >= 1) {
       for (const m of Object.keys(struct.cost)) {
@@ -1518,6 +1521,7 @@ function effectiveBuildCost(struct, p, wbm) {
         if ((wbm[m] || 0) < eff[m]) {
           eff[m] -= 1;
           eff.stones = (eff.stones || 0) + 1;
+          stoneToolUsed = true;
           break;
         }
       }
@@ -1555,7 +1559,7 @@ function effectiveBuildCost(struct, p, wbm) {
       }
     }
   }
-  return { eff, granaryUsed };
+  return { eff, granaryUsed, stoneToolUsed };
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -1652,6 +1656,7 @@ function startGame() {
       slipstreamUsed: false,
       rollingFloatUsed: false,
       snareSetUsed: false,
+      stoneToolUsed: false,
     });
   }
 
@@ -4127,11 +4132,15 @@ async function performBuild(playerIdx, handIdx) {
     }
   }
   if (suppressGranary) p.granaryUsed = true;
-  const { eff: effCost, granaryUsed } = effectiveBuildCost(struct, p, wbm);
+  const { eff: effCost, granaryUsed, stoneToolUsed } = effectiveBuildCost(struct, p, wbm);
   if (suppressGranary) p.granaryUsed = false;
   if (granaryUsed) {
     p.granaryUsed = true;
     log(`🌾 ${speciesLabel(p)} uses Granary to save 1 worker on this build.`);
+  }
+  if (stoneToolUsed) {
+    p.stoneToolUsed = true;
+    log(`🦪 ${speciesLabel(p)} uses Stone Tool — 1 Stones worker substitutes for any other material.`);
   }
   // Two-pass consumption: vanilla cards first (preserves wild capacity for
   // materials with no vanilla source), wild cards second to cover deficits.
@@ -4206,8 +4215,10 @@ async function performBuild(playerIdx, handIdx) {
     else aiVineCurtainRearrange(playerIdx);
   }
   // Build cost in time — Otter Slide reduces by 3 (min 1) when active. Cards with printed time 0 stay 0.
+  // Lodge Foundation (beaver species starter): -1 fish on Logs-using builds.
   const slideDiscount = hasEffect(p, 'Otter Slide') ? 3 : 0;
-  const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount);
+  const lodgeDiscount = (hasEffect(p, 'Lodge Foundation') && (struct.cost.logs || 0) > 0) ? 1 : 0;
+  const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount - lodgeDiscount);
   advancePlayer(playerIdx, timeCost);
   // Move card from hand to built
   p.hand.splice(handIdx, 1);

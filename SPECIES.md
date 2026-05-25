@@ -23,11 +23,11 @@ Each species (Beaver, Sea Otter, Muskrat, Mink) has a private pool of **3 themat
 
 ## 🦫 Beaver — industrious dam-builder
 
-| Name | Type | Effect |
-|------|------|--------|
-| **Lodge Foundation** ⭐ | Constant — material bonus | Logs icons cost you 1 less fish per item (min 1). |
-| **Tail Slap** | Constant — disruption | At the start of your turn, you may pay 1🐟 to drop a blank on any uncovered icon on a River 1 card. |
-| **Cache Burrow** | Constant — worker logistics | Your hand size is 4 instead of 3. (Same as the main-deck card of the same name.) |
+| Name | VP | Type | Effect |
+|------|----|------|--------|
+| **Lodge Foundation** ⭐ | 1 | Constant — material bonus | When you build a structure that uses Logs, advance 1 fewer fish (min 1). |
+| **Tail Slap** | 2 | Constant — disruption | At the start of your turn, you may pay 1🐟 to drop a blank on any uncovered icon on a River 1 card. |
+| **Cache Burrow** | 1 | Constant — worker logistics | Your hand size is 4 instead of 3. (Same as the main-deck card of the same name.) |
 
 ⭐ = material-bias starter
 
@@ -35,31 +35,33 @@ Each species (Beaver, Sea Otter, Muskrat, Mink) has a private pool of **3 themat
 
 ## 🦦 Sea Otter — playful, tool-using, communal
 
-| Name | Type | Effect |
-|------|------|--------|
-| **Kelp Bed** ⭐ | Constant — material bonus | Reeds icons cost you 1 less fish per item (min 1). |
-| **Rolling Float** | Constant — worker swap | Once per game, swap one of your workers on a river card with another worker (yours or an opponent's) on another card in the **same river slot**. No fish cost. |
-| **Stone Tool** | Constant — build flexibility | When building, 1 of your Stones workers may substitute for any other material. (Mirrors Charcoal Pit's effect for Stones instead of Clay.) |
+| Name | VP | Type | Effect |
+|------|----|------|--------|
+| **Kelp Bed** ⭐ | 0 | Constant — material bonus | Reeds icons cost you 1 less fish per item (min 1). |
+| **Rolling Float** | 1 | Constant — worker swap | Once per game, swap one of your workers on a river card with another worker (yours or an opponent's) on another card in the **same river slot**. No fish cost. |
+| **Stone Tool** | 0 | Constant — build flexibility | Once per game, when building, 1 of your Stones workers may substitute for any other material. (Mirrors Charcoal Pit's effect for Stones, gated to a single use.) |
 
 ---
 
 ## 🐀 Muskrat — marsh-burrower, channel-clearer
 
-| Name | Type | Effect |
-|------|------|--------|
-| **Mud Burrow** ⭐ | Constant — material bonus | Mud icons cost you 1 less fish per item (min 1). |
-| **Channel Clearer** | Constant — soft attack | At the start of your turn, you may discard 1 Reed worker from any river card (yours or an opponent's). The worker returns to that player's supply without a blank. |
-| **Marsh Lookout** | Constant — information | Peek at the top card of the material deck at any time. (Same as the main-deck Lookout Tree card.) |
+| Name | VP | Type | Effect |
+|------|----|------|--------|
+| **Mud Burrow** ⭐ | 0 | Constant — material bonus | Mud icons cost you 1 less fish per item (min 1). |
+| **Channel Clearer** | 0 | Constant — soft attack | At the start of your turn, you may discard 1 Reed worker from any river card (yours or an opponent's). The worker returns to that player's supply without a blank. |
+| **Marsh Lookout** | 2 | Constant — information | Peek at the top card of the material deck at any time. (Same as the main-deck Lookout Tree card.) |
 
 ---
 
 ## 🐺 Mink — agile predator, ambusher
 
-| Name | Type | Effect |
-|------|------|--------|
-| **Clay Den** ⭐ | Constant — material bonus | Clay icons cost you 1 less fish per item (min 1). |
-| **Quick Strike** | Constant — bidding | When you trigger an auction, you may declare your bid last (after all other bids are revealed). |
-| **Snare Set** | Constant — disruption, once-per-game | Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3🐟 in compensation. (Same as the main-deck Tribute Stone card.) |
+| Name | VP | Type | Effect |
+|------|----|------|--------|
+| **Clay Den** ⭐ | 0 | Constant — material bonus | Clay icons cost you 2 less fish per item (min 1). |
+| **Quick Strike** | 2 | Constant — bidding | When you trigger an auction, you may declare your bid last (after all other bids are revealed). |
+| **Snare Set** | 1 | Constant — disruption, once-per-game | Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3🐟 in compensation. (Same as the main-deck Tribute Stone card.) |
+
+> **Printed VP** values were calibrated via per-starter forced-pick ablation. Underperforming cards get bumps; over-target cards stay at 0 VP (since printed VP can't go negative). See "Balance notes" below.
 
 ---
 

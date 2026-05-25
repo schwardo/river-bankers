@@ -65,24 +65,30 @@ const BASE_STRUCTURE_TEMPLATES = [
   // drafts 1 of their 3 species cards at setup; picked card is pre-built in
   // their tableau. The `species` flag excludes these from the shared deck.
   // Beaver (Logs bias)
-  { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 0, species: 'beaver', effect: 'Logs icons cost you 1 less fish per item (min 1).' },
-  { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 0, species: 'beaver', effect: 'At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card.' },
-  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 0, species: 'beaver', effect: 'Your hand size is 4 instead of 3.' },
+  { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'When you build a structure that uses Logs, advance 1 fewer fish (min 1).' },
+  { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 2, species: 'beaver', effect: 'At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card.' },
+  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'Your hand size is 4 instead of 3.' },
   // Sea Otter (Reeds bias)
   { name: 'Kelp Bed',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Reeds icons cost you 1 less fish per item (min 1).' },
-  { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
-  { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'When building, 1 of your Stones workers may substitute for any other material.' },
+  { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 1, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
+  { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, when building, 1 of your Stones workers may substitute for any other material.' },
   // Muskrat (Mud bias)
   { name: 'Mud Burrow',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Mud icons cost you 1 less fish per item (min 1).' },
   { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'At the start of your turn, you may discard 1 Reed worker from any river card; returns to that player\'s supply without a blank.' },
-  { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
+  { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 2, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
   // Mink (Clay bias)
-  { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 1 less fish per item (min 1).' },
-  { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed).' },
-  { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3 fish in compensation.' },
+  { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 2 less fish per item (min 1).' },
+  { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 2, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed).' },
+  { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 1, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3 fish in compensation.' },
 ];
 
 const SPECIES_KEYS = ['beaver', 'otter', 'muskrat', 'mink'];
+
+// Override map: { species → card name }. When set for a species, newGame's
+// draft loop force-picks that card instead of consulting weights. Used by
+// the species-starters sweep to measure cards the AI never drafts on its own.
+let FORCED_SPECIES_STARTER = null;
+function setForcedSpeciesStarter(map) { FORCED_SPECIES_STARTER = map; }
 
 // AI draft preference for species starters (higher = more attractive). Plain
 // per-name weights — keeps the species-draft decision local and avoids
@@ -135,20 +141,24 @@ function totalVP(p, state) {
   return v;
 }
 
-// Per-material cost discounters (each grants -1🐟 per item on its material,
-// min 1): Reed Bed (main deck) and the 4 species-starter discount cards.
+// Per-material per-item cost discounters. Each entry: { name: amount }. The
+// player's effective per-item cost on cards of that material is reduced by
+// the sum of active discounts (clamped at min 1).
+// Lodge Foundation moved to a build-time discount (see performBuild).
 const MATERIAL_DISCOUNT_CARDS = {
-  reeds: ['Reed Bed', 'Kelp Bed'],
-  logs:  ['Lodge Foundation'],
-  mud:   ['Mud Burrow'],
-  clay:  ['Clay Den'],
+  reeds: { 'Reed Bed': 1, 'Kelp Bed': 1 },
+  mud:   { 'Mud Burrow': 1 },
+  clay:  { 'Clay Den': 2 },
 };
 function playerCardCost(state, card, playerIdx) {
   const base = cardCost(card);
   const p = state.players[playerIdx];
-  const discounters = MATERIAL_DISCOUNT_CARDS[card.material] || [];
-  if (discounters.some(n => hasEffect(p, n))) return Math.max(1, base - 1);
-  return base;
+  const discounters = MATERIAL_DISCOUNT_CARDS[card.material] || {};
+  let total = 0;
+  for (const name in discounters) {
+    if (hasEffect(p, name)) total += discounters[name];
+  }
+  return Math.max(1, base - total);
 }
 
 function firePassZeroEffects(state, playerIdx, count) {
@@ -377,9 +387,10 @@ function effectiveBuildCost(struct, p, wbm) {
       }
     }
   }
-  // Stone Tool (otter species starter): Charcoal Pit variant — 1 Stones worker
-  // may substitute for any other material on a build.
-  if (hasEffect(p, 'Stone Tool')) {
+  // Stone Tool (otter species starter): once-per-game Charcoal-Pit variant —
+  // 1 Stones worker may substitute for any other material on a build.
+  let stoneToolUsed = false;
+  if (hasEffect(p, 'Stone Tool') && !p.stoneToolUsed) {
     const stoneSlack = (wbm.stones || 0) - (eff.stones || 0);
     if (stoneSlack >= 1) {
       for (const m of Object.keys(struct.cost)) {
@@ -387,6 +398,7 @@ function effectiveBuildCost(struct, p, wbm) {
         if ((wbm[m] || 0) < eff[m]) {
           eff[m] -= 1;
           eff.stones = (eff.stones || 0) + 1;
+          stoneToolUsed = true;
           break;
         }
       }
@@ -420,7 +432,7 @@ function effectiveBuildCost(struct, p, wbm) {
       }
     }
   }
-  return { eff, granaryUsed };
+  return { eff, granaryUsed, stoneToolUsed };
 }
 
 // Per-material tiers (shift-2 deck — tuned via sweepDeck under rule (c)):
@@ -557,6 +569,7 @@ function newGame(numPlayers, workersPerPlayer = 8) {
       slipstreamUsed: false,
       rollingFloatUsed: false,
       snareSetUsed: false,
+      stoneToolUsed: false,
     });
   }
   const matDeck = buildMaterialDeck(numPlayers);
@@ -566,15 +579,23 @@ function newGame(numPlayers, workersPerPlayer = 8) {
   }
   // Species starter draft: each player picks 1 of their 3 themed cards by
   // weight (tie-break random). Other 2 cards leave the game; the drafted
-  // starter is pre-built in the player's tableau before turn 1.
+  // starter is pre-built in the player's tableau before turn 1. The
+  // FORCED_SPECIES_STARTER override is honored when set (measurement tool).
   for (const p of players) {
     const speciesCards = STRUCTURE_TEMPLATES
       .filter(s => s.species === p.species)
       .map((s, i) => ({ ...s, id: 'ss' + p.idx + '_' + i, cost: { ...s.cost } }));
-    const ranked = speciesCards
-      .map(c => ({ c, w: (SPECIES_DRAFT_WEIGHT[c.name] || 1) + Math.random() }))
-      .sort((a, b) => b.w - a.w);
-    p.built.push(ranked[0].c);
+    let picked = null;
+    if (FORCED_SPECIES_STARTER && FORCED_SPECIES_STARTER[p.species]) {
+      picked = speciesCards.find(c => c.name === FORCED_SPECIES_STARTER[p.species]) || null;
+    }
+    if (!picked) {
+      const ranked = speciesCards
+        .map(c => ({ c, w: (SPECIES_DRAFT_WEIGHT[c.name] || 1) + Math.random() }))
+        .sort((a, b) => b.w - a.w);
+      picked = ranked[0].c;
+    }
+    p.built.push(picked);
   }
   const prerivCards = [null, null, null];
   for (let i = 0; i < PRERIV_SLOTS; i++) {
@@ -1682,8 +1703,9 @@ function performBuild(state, playerIdx, handIdx) {
   const p = state.players[playerIdx];
   const struct = p.hand[handIdx];
   const wbm = playerWorkersByMaterial(state, playerIdx);
-  const { eff: effCost, granaryUsed } = effectiveBuildCost(struct, p, wbm);
+  const { eff: effCost, granaryUsed, stoneToolUsed } = effectiveBuildCost(struct, p, wbm);
   if (granaryUsed) p.granaryUsed = true;
+  if (stoneToolUsed) p.stoneToolUsed = true;
   // Track how many workers we actually pull off cards (for supply refund) —
   // this can differ from effCost when Old Growth doubles a card's yield.
   let workersReturned = 0;
@@ -1750,8 +1772,11 @@ function performBuild(state, playerIdx, handIdx) {
   p.supply += workersReturned;
   if (vineCurtainHit) aiVineCurtainRearrange(state, playerIdx);
   // Otter Slide: build advances 3 fewer fish (min 1). Cards with printed time 0 stay 0.
+  // Lodge Foundation (beaver species starter): build advances 1 fewer fish on
+  // Logs-using structures (stacks with Otter Slide).
   const slideDiscount = hasEffect(p, 'Otter Slide') ? 3 : 0;
-  const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount);
+  const lodgeDiscount = (hasEffect(p, 'Lodge Foundation') && (struct.cost.logs || 0) > 0) ? 1 : 0;
+  const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount - lodgeDiscount);
   advancePlayer(state, playerIdx, timeCost);
   p.hand.splice(handIdx, 1);
   p.built.push(struct);
@@ -2530,6 +2555,213 @@ function sweepAblation(numGamesArg, numPArg, workersArg) {
 // Compare 4-river-slot baseline vs 3-river-slot variant. Cards graduating off
 // the deepest river slot still go to the shoreline as usual; the only change
 // is that the deepest slot is now River 3 (4🐟/item) instead of River 4 (5🐟/item).
+// Win-rate ablation across species. Each game shuffles species assignments,
+// runs to completion, then attributes the win to the species the winning
+// player drafted. Reports games-played and wins per species, plus the gap
+// from a uniform 1/numP baseline (target: ±5%).
+function sweepSpeciesWinRate(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || 8;
+  const numGames = parseInt(numGamesArg) || 5000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
+        const passed = action.type === 'pass';
+        if (reachedEnd || passed) p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  const tally = {};
+  for (const sp of SPECIES_KEYS) tally[sp] = { games: 0, wins: 0, totalVP: 0, starterCounts: {} };
+
+  console.log(`\nRiver Bankers per-species win rate`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games.`);
+  console.log(`Baseline: 1/${numP} = ${(100 / numP).toFixed(1)}% per species; target ±5%.\n`);
+
+  const t0 = Date.now();
+  for (let g = 0; g < numGames; g++) {
+    if ((g + 1) % 250 === 0) process.stderr.write(`\rGames ${g + 1}/${numGames}`);
+    const state = newGame(numP, workers);
+    runOneGame(state);
+    // Find winner: highest totalVP; tie → lowest timePos (cheaper).
+    const scored = state.players.map(p => ({
+      idx: p.idx,
+      species: p.species,
+      vp: totalVP(p, state),
+      timePos: p.timePos,
+      starter: p.built.find(b => b.species) ? p.built.find(b => b.species).name : '(none)',
+    }));
+    scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+    const winner = scored[0];
+    // Tally every species that played this game; flag the winner.
+    for (const s of scored) {
+      tally[s.species].games += 1;
+      tally[s.species].totalVP += s.vp;
+      tally[s.species].starterCounts[s.starter] = (tally[s.species].starterCounts[s.starter] || 0) + 1;
+    }
+    tally[winner.species].wins += 1;
+  }
+  process.stderr.write('\r' + ' '.repeat(60) + '\r');
+
+  const baseline = 100 / numP;
+  console.log(
+    pad('Species', 10) + padL('games', 8) + padL('wins', 8) +
+    padL('win%', 8) + padL('Δ base', 9) + padL('avgVP', 8) + '  starter mix (top 2)'
+  );
+  console.log('-'.repeat(75));
+  for (const sp of SPECIES_KEYS) {
+    const t = tally[sp];
+    const winPct = t.games > 0 ? (100 * t.wins / t.games) : 0;
+    const delta = winPct - baseline;
+    const avgVP = t.games > 0 ? (t.totalVP / t.games) : 0;
+    const starterMix = Object.entries(t.starterCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([n, c]) => `${n} (${(100 * c / t.games).toFixed(0)}%)`)
+      .join(', ');
+    console.log(
+      pad(sp, 10) + padL(t.games, 8) + padL(t.wins, 8) +
+      padL(winPct.toFixed(1) + '%', 8) +
+      padL((delta >= 0 ? '+' : '') + delta.toFixed(1), 9) +
+      padL(avgVP.toFixed(1), 8) + '  ' + starterMix
+    );
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+  console.log('Legend:');
+  console.log('  win%   = wins / games-played for that species');
+  console.log('  Δ base = win% minus uniform baseline (100/numP). Aim for |Δ| ≤ 5.');
+  console.log('  starter mix = top-2 starter cards drafted by AI for that species + %\n');
+}
+
+// totalVP_ alias (the local `totalVP` accumulator inside the next function
+// shadows the global totalVP function, so we grab a fresh reference here).
+const totalVP_ = totalVP;
+
+// Per-starter forced-pick measurement. For each of the 12 species starters,
+// force any player of that species to draft that card (other species still
+// weight-pick), run N games, and report win rate + avg VP for the species
+// holding the forced card. Lets us see how the 6 currently-unpicked starters
+// (Tail Slap, Rolling Float, Stone Tool, Channel Clearer, Marsh Lookout,
+// Snare Set) actually perform when given the slot.
+function sweepSpeciesStarters(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || 8;
+  const numGames = parseInt(numGamesArg) || 2000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
+        const passed = action.type === 'pass';
+        if (reachedEnd || passed) p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  const starters = STRUCTURE_TEMPLATES.filter(s => s.species);
+  const baseline = 100 / numP;
+
+  console.log(`\nRiver Bankers per-starter forced-pick measurement`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games per starter (${starters.length} starters).`);
+  console.log(`Baseline: 1/${numP} = ${baseline.toFixed(1)}% per species; target ±5%.\n`);
+
+  const results = [];
+  const t0 = Date.now();
+  for (let i = 0; i < starters.length; i++) {
+    const card = starters[i];
+    process.stderr.write(`\rCard [${i + 1}/${starters.length}] ${card.name.padEnd(22)} `);
+    setForcedSpeciesStarter({ [card.species]: card.name });
+    let games = 0, wins = 0, totalVP = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      const player = state.players.find(p => p.species === card.species);
+      if (!player) continue; // 3P skips one species; force only takes effect when that species plays
+      runOneGame(state);
+      const scored = state.players.map(p => ({
+        idx: p.idx,
+        vp: totalVP_(p, state),
+        timePos: p.timePos,
+      }));
+      scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+      games += 1;
+      totalVP += scored.find(s => s.idx === player.idx).vp;
+      if (scored[0].idx === player.idx) wins += 1;
+    }
+    results.push({
+      species: card.species,
+      name: card.name,
+      games,
+      wins,
+      winPct: 100 * wins / games,
+      avgVP: totalVP / games,
+    });
+  }
+  setForcedSpeciesStarter(null);
+  process.stderr.write('\r' + ' '.repeat(60) + '\r');
+
+  // Group by species, ordered to match draft pools.
+  const speciesOrder = SPECIES_KEYS;
+  const emoji = { beaver: '🦫', otter: '🦦', muskrat: '🐭', mink: '🦡' };
+  console.log(
+    pad('Starter', 22) + padL('games', 7) + padL('wins', 7) +
+    padL('win%', 8) + padL('Δ base', 9) + padL('avgVP', 8)
+  );
+  console.log('-'.repeat(22 + 7 + 7 + 8 + 9 + 8));
+  for (const sp of speciesOrder) {
+    const rows = results.filter(r => r.species === sp);
+    if (rows.length === 0) continue;
+    rows.sort((a, b) => b.winPct - a.winPct);
+    console.log(`${emoji[sp] || ''} ${sp}`);
+    for (const r of rows) {
+      const delta = r.winPct - baseline;
+      console.log(
+        pad('  ' + r.name, 22) + padL(r.games, 7) + padL(r.wins, 7) +
+        padL(r.winPct.toFixed(1) + '%', 8) +
+        padL((delta >= 0 ? '+' : '') + delta.toFixed(1), 9) +
+        padL(r.avgVP.toFixed(1), 8)
+      );
+    }
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+  console.log('Legend:');
+  console.log('  Each starter is force-picked for its species; other species use weighted draft.');
+  console.log('  win% = wins for the species when this card is its starter / games it played.');
+  console.log('  Δ base = win% minus uniform baseline (100/numP). |Δ| ≤ 5 = healthy.\n');
+}
+
 function sweepRiverSlots() {
   const numMats = 6;
   const workers = 8;
@@ -2646,6 +2878,8 @@ if (require.main === module) {
   else if (mode === 'deck') sweepDeck(process.argv[3]);
   else if (mode === 'uniform') sweepUniform();
   else if (mode === 'ablation') sweepAblation(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'species-winrate') sweepSpeciesWinRate(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'species-starters') sweepSpeciesStarters(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'river-slots') sweepRiverSlots();
   else if (mode === 'blanks') sweepBlanks();
   else sweep();
