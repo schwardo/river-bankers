@@ -2048,14 +2048,29 @@ function fireOnBuildEffect(state, playerIdx, struct) {
   }
   if (struct.name === 'Beaver Dam') {
     const r1 = state.riverCards.filter(c => c.slot === 0);
-    if (r1.length === 0) return;
-    // Pick the R1 card whose removal best frees the river — most uncovered
-    // icons (it's been sitting there blocking new arrivals). Tie-break: fewest
-    // of our own workers (smaller ergonomic cost to us).
+    if (r1.length === 0) {
+      p.timePos = Math.max(0, p.timePos - 2);
+      return;
+    }
+    // Pick the R1 card that's best to wash for the BUILDER:
+    //   + own workers: they carry to shoreline (no-blank recall later, count
+    //     toward Pier/Heron Watch if we built either, still count for endgame
+    //     pair-VP).
+    //   − opponent workers: graduating their workers to shoreline pads their
+    //     Pier/Heron Watch and saves them downstream per-item costs they
+    //     would otherwise pay to drift the card.
+    //   − uncovered icons: these get wasted (no auction opportunity for us
+    //     either, since R1 auctions are cheap at 2🐟/item).
     r1.sort((a, b) => {
-      const ua = uncoveredIcons(a), ub = uncoveredIcons(b);
-      if (ua !== ub) return ub - ua;
-      return workersOnCard(a, playerIdx) - workersOnCard(b, playerIdx);
+      const ownA = workersOnCard(a, playerIdx);
+      const ownB = workersOnCard(b, playerIdx);
+      const totA = Object.values(a.workers).reduce((s, n) => s + n, 0);
+      const totB = Object.values(b.workers).reduce((s, n) => s + n, 0);
+      const oppA = totA - ownA;
+      const oppB = totB - ownB;
+      const scoreA = ownA * 3 - oppA * 2 - uncoveredIcons(a);
+      const scoreB = ownB * 3 - oppB * 2 - uncoveredIcons(b);
+      return scoreB - scoreA;
     });
     moveCardToShoreline(state, r1[0]);
     p.timePos = Math.max(0, p.timePos - 2);
