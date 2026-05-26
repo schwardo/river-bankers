@@ -4100,8 +4100,12 @@ async function humanFlushUpstream() {
   const human = state.players.find(p => p.isHuman);
   advancePlayer(human.idx, 5);
   log(`🌀 ${speciesLabel(human)} spends 5🐟 to flush the Headwaters.`);
-  // 1) Discard upstream cards.
-  for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
+  // 1) Discard upstream cards (we'll return these to the deck below).
+  const flushed = [];
+  for (let i = 0; i < state.prerivCards.length; i++) {
+    if (state.prerivCards[i]) flushed.push(state.prerivCards[i]);
+    state.prerivCards[i] = null;
+  }
   // 2) Refill upstream from deck.
   for (let i = 0; i < PRERIV_SLOTS; i++) {
     if (state.matDeck.length === 0) break;
@@ -4109,7 +4113,18 @@ async function humanFlushUpstream() {
     c.slot = 'pre';
     state.prerivCards[i] = c;
   }
-  // 3) Prompt human to pick one upstream card to auction (free trigger; bid normally).
+  // 3) Return the flushed cards to the material deck and reshuffle.
+  if (flushed.length > 0) {
+    for (const c of flushed) {
+      c.slot = null;
+      c.workers = {};
+      c.blanks = 0;
+      state.matDeck.push(c);
+    }
+    state.matDeck = shuffle(state.matDeck);
+    log(`🔀 ${flushed.length} flushed card${flushed.length === 1 ? '' : 's'} returned to the material deck (reshuffled).`);
+  }
+  // 4) Prompt human to pick one upstream card to auction (free trigger; bid normally).
   if (state.prerivCards.every(c => c === null)) {
     state.phase = 'idle';
     render();
@@ -5456,14 +5471,29 @@ async function executeAIAction(playerIdx, action) {
   if (action.type === 'flush') {
     advancePlayer(playerIdx, 5);
     log(`🌀 ${speciesLabel(p)} spends 5🐟 to flush the Headwaters.`);
-    // Discard upstream
-    for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
+    // Discard upstream (held aside; returned to deck after refill)
+    const flushed = [];
+    for (let i = 0; i < state.prerivCards.length; i++) {
+      if (state.prerivCards[i]) flushed.push(state.prerivCards[i]);
+      state.prerivCards[i] = null;
+    }
     // Refill from deck
     for (let i = 0; i < state.prerivCards.length; i++) {
       if (state.matDeck.length === 0) break;
       const c = state.matDeck.pop();
       c.slot = 'pre';
       state.prerivCards[i] = c;
+    }
+    // Return the flushed cards to the material deck and reshuffle.
+    if (flushed.length > 0) {
+      for (const c of flushed) {
+        c.slot = null;
+        c.workers = {};
+        c.blanks = 0;
+        state.matDeck.push(c);
+      }
+      state.matDeck = shuffle(state.matDeck);
+      log(`🔀 ${flushed.length} flushed card${flushed.length === 1 ? '' : 's'} returned to the material deck (reshuffled).`);
     }
     render();
     await sleep(300);

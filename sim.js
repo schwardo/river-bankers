@@ -284,6 +284,13 @@ function setAllPlentySlides(b) { ALL_PLENTY_SLIDES = b; }
 let PRERIV_PLENTY_SLIDES_TO_RIVER = true;
 function setPrerivPlentySlides(b) { PRERIV_PLENTY_SLIDES_TO_RIVER = b; }
 
+// Live rule: the Flush action returns the 3 displaced Headwaters cards to the
+// material draw pile (and reshuffles) instead of removing them from the game.
+// Keeps the deck-empty endgame trigger from accelerating with every Flush.
+// (Toggle off only for the `flush-deck` rule-comparison sweep.)
+let FLUSH_RETURNS_TO_DECK = true;
+function setFlushReturnsToDeck(b) { FLUSH_RETURNS_TO_DECK = b; }
+
 function prerivTriggerCost(idx) { return PRERIV_SLOTS - idx + 1; }
 function riverSlotCost(slot) { return typeof slot === 'number' ? slot + 2 : 0; }
 function cardCost(card) {
@@ -647,6 +654,7 @@ function newGame(numPlayers, workersPerPlayer = 8) {
       iconsClaimed: 0,
       iconsWastedToShore: 0, // leftover icons when card moved to shoreline
       cardsBuilt: 0,
+      flushes: 0, // count of Flush actions taken across the game
       endgameTriggered: false,
       // River-depth + zero-clinch tracking
       riverExitSlots: [],         // slot (0..3) of each card at the moment it left the river to shoreline
@@ -2139,13 +2147,32 @@ function executeAction(state, playerIdx, action) {
   }
   if (action.type === 'flush') {
     advancePlayer(state, playerIdx, 5);
-    for (let i = 0; i < state.prerivCards.length; i++) state.prerivCards[i] = null;
+    state.metrics.flushes++;
+    const flushed = [];
+    for (let i = 0; i < state.prerivCards.length; i++) {
+      if (state.prerivCards[i]) flushed.push(state.prerivCards[i]);
+      state.prerivCards[i] = null;
+    }
     for (let i = 0; i < state.prerivCards.length; i++) {
       if (state.matDeck.length === 0) break;
       const c = state.matDeck.pop();
       c.slot = 'pre';
       state.prerivCards[i] = c;
       state.metrics.iconsSpawned += c.totalIcons;
+    }
+    if (FLUSH_RETURNS_TO_DECK && flushed.length > 0) {
+      for (const c of flushed) {
+        c.slot = null;
+        c.workers = {};
+        c.blanks = 0;
+        state.matDeck.push(c);
+      }
+      // Reshuffle the whole pile so the returned cards don't sit on top.
+      const d = state.matDeck;
+      for (let i = d.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [d[i], d[j]] = [d[j], d[i]];
+      }
     }
     const targetIdx = aiChooseFlushTarget(state, playerIdx);
     if (targetIdx === -1) return;
@@ -3052,6 +3079,69 @@ function sweepBlanks() {
   console.log('  @max = how many of the N games hit that max (0 = singular outlier)\n');
 }
 
+function sweepFlushDeck(numGamesArg) {
+  // Compare current rule (Flush removes 3 Headwaters cards out of game) vs.
+  // proposed rule (Flush returns them to the matDeck and reshuffles).
+  const numMats = 6;
+  const N = parseInt(numGamesArg) || 1000;
+
+  console.log(`\nFlush rule comparison (${N} games per config, 8 workers)`);
+  console.log(`Baseline: Flush removes 3 Headwaters cards out of game.`);
+  console.log(`Proposed: Flush returns the 3 Headwaters cards to matDeck and reshuffles.\n`);
+
+  console.log(
+    pad('numP', 5) + pad('rule', 9) +
+    padL('turns', 7) + padL('t/p', 6) +
+    padL('aucs', 6) + padL('flush', 7) + padL('flush%', 8) +
+    padL('built/p', 8) + padL('endg%', 7) +
+    padL('winVP', 7) + padL('lastVP', 8) + padL('spread', 8)
+  );
+  console.log('-'.repeat(5+9+7+6+6+7+8+8+7+7+8+8));
+
+  for (const numP of [2, 3, 4]) {
+    const ruleTurns = {};
+    for (const ruleOn of [false, true]) {
+      setFlushReturnsToDeck(ruleOn);
+      const trials = [];
+      for (let t = 0; t < N; t++) trials.push(runGame(numP, numMats, 8));
+      const turns = avg(trials.map(m => m.turns));
+      const auctions = avg(trials.map(m => m.auctions));
+      const flushes = avg(trials.map(m => m.flushes));
+      const flushPct = avg(trials.map(m => pct(m.flushes, m.auctions)));
+      const built = avg(trials.map(m => m.cardsBuilt));
+      const endg = avg(trials.map(m => m.endgameTriggered ? 100 : 0));
+      const winVP = avg(trials.map(m => m.winnerVP));
+      const lastVP = avg(trials.map(m => m.loserVP));
+      const spread = avg(trials.map(m => m.vpSpread));
+      ruleTurns[ruleOn ? 'on' : 'off'] = turns;
+      console.log(
+        pad(numP, 5) + pad(ruleOn ? 'shuffle' : 'baseline', 9) +
+        padL(turns.toFixed(0), 7) + padL((turns / numP).toFixed(1), 6) +
+        padL(auctions.toFixed(1), 6) +
+        padL(flushes.toFixed(2), 7) + padL(flushPct.toFixed(1) + '%', 8) +
+        padL((built / numP).toFixed(1), 8) +
+        padL(endg.toFixed(0) + '%', 7) +
+        padL(winVP.toFixed(1), 7) +
+        padL(lastVP.toFixed(1), 8) +
+        padL(spread.toFixed(1), 8)
+      );
+    }
+    setFlushReturnsToDeck(false);
+    const delta = ruleTurns.on - ruleTurns.off;
+    const deltaPct = ruleTurns.off > 0 ? (delta / ruleTurns.off * 100) : 0;
+    console.log(
+      pad(numP, 5) + pad('Δ', 9) +
+      padL((delta >= 0 ? '+' : '') + delta.toFixed(0), 7) +
+      padL((deltaPct >= 0 ? '+' : '') + deltaPct.toFixed(1) + '%', 8)
+    );
+    console.log();
+  }
+  console.log('Legend:');
+  console.log('  flush   = avg Flush actions per game');
+  console.log('  flush%  = Flush actions as % of total auctions');
+  console.log('  Δ       = (shuffle − baseline) in turns and % of baseline turns\n');
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
@@ -3063,5 +3153,6 @@ if (require.main === module) {
   else if (mode === 'species-starters') sweepSpeciesStarters(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'river-slots') sweepRiverSlots();
   else if (mode === 'blanks') sweepBlanks();
+  else if (mode === 'flush-deck') sweepFlushDeck(process.argv[3]);
   else sweep();
 }
