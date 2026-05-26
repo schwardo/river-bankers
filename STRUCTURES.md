@@ -143,5 +143,5 @@ Brainstormed in `games/board-games.org` ("Design more structure cards with novel
 
 - **Pass-0 triggers** are the cleanest cadence — there's already a clear physical event (your pawn crossing the wrap point) so no extra tracking. Banked pass-0 abilities (e.g. Spy Mound) just refresh on each crossing.
 - **Constant scaling.** Pass-0 effects scale linearly with how aggressively you advance — players who race the fish track get more uses, players who hoard fish get fewer. Price them assuming ~2–4 uses per game.
-- **One-time effects** are easier to balance: they're effectively a discount on a future action. Cheap structures (2–3 VP) can carry the strong-but-narrow ones (Sap Drip, Burrow Run); reserve full board-reset effects (Beaver Dam, Royal Lodge) for the 7–10 VP slots.
+- **One-time effects** are easier to balance: they're effectively a discount on a future action. Cheap structures (2–3 VP) can carry the strong-but-narrow ones (Sap Drip, Burrow Run); reserve full board-reset effects (Royal Lodge) for the 8–10 VP slots.
 - **Watch list.** Royal Lodge and Floodgate are the most dangerous designs — playtest those first.
