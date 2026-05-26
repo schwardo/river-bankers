@@ -158,6 +158,9 @@ function totalVP(p, state) {
   if (hasEffect(p, 'Heron Watch')) {
     v += Math.min(6, state.shorelineCards.length);
   }
+  if (FINAL_PAIR_VP) {
+    v += endgamePairVP(state, p.idx);
+  }
   return v;
 }
 
@@ -290,6 +293,43 @@ function setPrerivPlentySlides(b) { PRERIV_PLENTY_SLIDES_TO_RIVER = b; }
 // (Toggle off only for the `flush-deck` rule-comparison sweep.)
 let FLUSH_RETURNS_TO_DECK = true;
 function setFlushReturnsToDeck(b) { FLUSH_RETURNS_TO_DECK = b; }
+
+// Live rule: at endgame, each player scores 1 VP per pair of same-type
+// workers still on the board (river + shoreline). For each material,
+// floor(workers_of_that_material / 2) VP. Wildcard cards (Driftwood Tangle:
+// logs/reeds; Mud Slick: clay/mud) let each of their workers be assigned to
+// either material; the player picks the split that maximizes total pairs.
+// (Toggle off only for the `pair-vp` rule-comparison sweep.)
+let FINAL_PAIR_VP = true;
+function setFinalPairVP(b) { FINAL_PAIR_VP = b; }
+
+// End-of-game pair-VP for one player. Walks the same data shape as
+// playerWorkersByMaterial: solid material counts in `out[m]` plus a list of
+// wild pools, each with a `count` and a 2-material option list. Returns the
+// VP and (optionally) the per-material breakdown for diagnostics.
+function endgamePairVP(state, playerIdx) {
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const counts = {};
+  for (const m of MAT_KEYS) counts[m] = wbm[m] || 0;
+  // Assign each wild pool's units to maximize total pairs. Pools are
+  // independent in practice (Driftwood Tangle: logs/reeds; Mud Slick:
+  // clay/mud — disjoint), so solve each pool by enumerating the split.
+  for (const pool of (wbm._wildPools || [])) {
+    if (pool.count === 0) continue;
+    const [a, b] = pool.materials;
+    let best = -1, bestX = 0;
+    for (let x = 0; x <= pool.count; x++) {
+      const pairs = Math.floor((counts[a] + x) / 2) +
+                    Math.floor((counts[b] + (pool.count - x)) / 2);
+      if (pairs > best) { best = pairs; bestX = x; }
+    }
+    counts[a] += bestX;
+    counts[b] += pool.count - bestX;
+  }
+  let vp = 0;
+  for (const m of MAT_KEYS) vp += Math.floor(counts[m] / 2);
+  return vp;
+}
 
 function prerivTriggerCost(idx) { return PRERIV_SLOTS - idx + 1; }
 function riverSlotCost(slot) { return typeof slot === 'number' ? slot + 2 : 0; }
@@ -656,6 +696,13 @@ function newGame(numPlayers, workersPerPlayer = 8) {
       cardsBuilt: 0,
       flushes: 0, // count of Flush actions taken across the game
       endgameTriggered: false,
+      // Endgame action breakdown (counted only between triggerEndgame and game end)
+      endgameTurns: 0,
+      endgameBrowses: 0,   // Invent actions during endgame
+      endgameBuilds: 0,    // Builds during endgame
+      endgameAuctions: 0,  // Auctions (river+preriv+flush triggers) during endgame
+      endgamePasses: 0,    // Pass actions during endgame
+      maxBrowseStreak: 0,  // longest consecutive Invent run by a single player during endgame
       // River-depth + zero-clinch tracking
       riverExitSlots: [],         // slot (0..3) of each card at the moment it left the river to shoreline
       preToShoreCards: 0,         // cards that went pre-river → shoreline (skipped river entirely)
@@ -1327,7 +1374,16 @@ function aiChooseAction(state, playerIdx) {
       return { type: 'salmonRun', cardId: target.card.id, workerCount: target.n };
     }
   }
+  // Endgame pair-VP cash-out check: if the rule is live, we're in endgame,
+  // and our leftover workers already pair up to ≥1 VP, prefer passing over
+  // any Invent / flush / no-op continuation — the cash-out beats the gamble.
+  // (The build / auction branches above run first; if either of those was
+  // useful we never reach this code.)
+  const cashOut = FINAL_PAIR_VP && state.endgame &&
+                  endgamePairVP(state, playerIdx) >= 1;
+
   if (totalNeed === 0 || p.hand.length === 0) {
+    if (cashOut) return { type: 'pass' };
     if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(2, structAvailable(state)) };
   }
   const upstreamHasNeeded = state.prerivCards.some(c => c && needs[c.material] > 0);
@@ -1338,6 +1394,7 @@ function aiChooseAction(state, playerIdx) {
   if (upstreamHasAny && !upstreamHasNeeded && triggerPool > 0 && state.matDeck.length > 0) {
     return { type: 'flush' };
   }
+  if (cashOut) return { type: 'pass' };
   if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(1, structAvailable(state)) };
   return { type: 'pass' };
 }
@@ -2230,8 +2287,24 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
     const p = state.players[cur];
     aiStartOfTurnAbilities(state, p.idx);
     const action = aiChooseAction(state, p.idx);
+    const wasEndgame = state.endgame;
     executeAction(state, p.idx, action);
     cleanupShoreline(state);
+
+    if (wasEndgame) {
+      const m = state.metrics;
+      m.endgameTurns++;
+      if (action.type === 'browse') {
+        m.endgameBrowses++;
+        p.browseStreak = (p.browseStreak || 0) + 1;
+        if (p.browseStreak > m.maxBrowseStreak) m.maxBrowseStreak = p.browseStreak;
+      } else {
+        p.browseStreak = 0;
+        if (action.type === 'build') m.endgameBuilds++;
+        else if (action.type === 'pass') m.endgamePasses++;
+        else if (action.type === 'auction' || action.type === 'preriv' || action.type === 'flush') m.endgameAuctions++;
+      }
+    }
 
     if (state.endgame && !p.out) {
       const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
@@ -2243,14 +2316,29 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
     if (checkGameEnd(state)) break;
   }
   // Final per-player VP tally (includes effect bonuses; ablation toggles via STRUCTURE_EFFECT_DISABLED).
-  const vps = state.players.map(p => totalVP(p, state));
-  vps.sort((a, b) => b - a);
+  const vpEntries = state.players.map(p => ({
+    idx: p.idx,
+    vp: totalVP(p, state),
+    pairVP: endgamePairVP(state, p.idx),
+    leftover: (() => {
+      const wbm = playerWorkersByMaterial(state, p.idx);
+      let t = 0;
+      for (const m of MAT_KEYS) t += wbm[m] || 0;
+      for (const pool of (wbm._wildPools || [])) t += pool.count;
+      return t;
+    })(),
+  }));
+  vpEntries.sort((a, b) => b.vp - a.vp);
+  const vps = vpEntries.map(e => e.vp);
   state.metrics.winnerVP = vps[0];
   state.metrics.runnerUpVP = vps.length > 1 ? vps[1] : 0;
   state.metrics.loserVP = vps[vps.length - 1];
   state.metrics.vpSpread = vps[0] - vps[vps.length - 1];
   state.metrics.winMargin = vps.length > 1 ? vps[0] - vps[1] : vps[0];
   state.metrics.totalVP = vps.reduce((s, x) => s + x, 0);
+  state.metrics.avgPairVP = vpEntries.reduce((s, e) => s + e.pairVP, 0) / vpEntries.length;
+  state.metrics.winnerPairVP = vpEntries[0].pairVP;
+  state.metrics.avgLeftoverPerPlayer = vpEntries.reduce((s, e) => s + e.leftover, 0) / vpEntries.length;
   return state.metrics;
 }
 
@@ -3142,6 +3230,73 @@ function sweepFlushDeck(numGamesArg) {
   console.log('  Δ       = (shuffle − baseline) in turns and % of baseline turns\n');
 }
 
+function sweepPairVP(numGamesArg) {
+  // Compare end-of-game scoring with vs. without FINAL_PAIR_VP. Same AI on
+  // both sides — this measures the scoring rule in isolation, not any
+  // behavior change (the AI doesn't consult totalVP mid-game). Behavior
+  // shifts ("retire earlier") would need AI work; this sweep tells us
+  // whether the rule even pushes winner totals into the target band first.
+  const numMats = 6;
+  const N = parseInt(numGamesArg) || 1000;
+
+  console.log(`\nFinal pair-VP rule comparison (${N} games per config, 8 workers)`);
+  console.log(`Baseline: only printed VP + structure effects.`);
+  console.log(`Proposed: + floor(workers_in_material / 2) summed across materials at endgame.\n`);
+
+  console.log(
+    pad('numP', 5) + pad('rule', 9) +
+    padL('turns', 7) +
+    padL('winVP', 7) + padL('lastVP', 8) +
+    padL('egTurn', 7) + padL('egBuild', 8) + padL('egInv', 7) + padL('egAuc', 7) + padL('inv/eg', 8) +
+    padL('maxRun', 7) + padL('avgPair', 9) + padL('winPair', 9)
+  );
+  console.log('-'.repeat(5+9+7+7+8+7+8+7+7+8+7+9+9));
+
+  for (const numP of [2, 3, 4]) {
+    for (const ruleOn of [false, true]) {
+      setFinalPairVP(ruleOn);
+      const trials = [];
+      for (let t = 0; t < N; t++) trials.push(runGame(numP, numMats, 8));
+      const turns = avg(trials.map(m => m.turns));
+      const winVP = avg(trials.map(m => m.winnerVP));
+      const lastVP = avg(trials.map(m => m.loserVP));
+      const egTurns = avg(trials.map(m => m.endgameTurns));
+      const egBuilds = avg(trials.map(m => m.endgameBuilds));
+      const egBrowses = avg(trials.map(m => m.endgameBrowses));
+      const egAucs = avg(trials.map(m => m.endgameAuctions));
+      const invPct = egTurns > 0 ? (egBrowses / egTurns * 100) : 0;
+      const maxRun = avg(trials.map(m => m.maxBrowseStreak));
+      const avgPair = avg(trials.map(m => m.avgPairVP || 0));
+      const winPair = avg(trials.map(m => m.winnerPairVP || 0));
+      console.log(
+        pad(numP, 5) + pad(ruleOn ? 'pair-vp' : 'baseline', 9) +
+        padL(turns.toFixed(0), 7) +
+        padL(winVP.toFixed(1), 7) +
+        padL(lastVP.toFixed(1), 8) +
+        padL(egTurns.toFixed(1), 7) +
+        padL(egBuilds.toFixed(2), 8) +
+        padL(egBrowses.toFixed(2), 7) +
+        padL(egAucs.toFixed(2), 7) +
+        padL(invPct.toFixed(0) + '%', 8) +
+        padL(maxRun.toFixed(2), 7) +
+        padL(avgPair.toFixed(2), 9) +
+        padL(winPair.toFixed(2), 9)
+      );
+    }
+    setFinalPairVP(false);
+    console.log();
+  }
+  console.log('Legend:');
+  console.log('  egTurn  = avg # of player-turns in endgame phase (after deck empties)');
+  console.log('  egBuild = avg builds during endgame');
+  console.log('  egInv   = avg Invent (browse) actions during endgame');
+  console.log('  egAuc   = avg auctions (river/preriv/flush) during endgame');
+  console.log('  inv/eg  = Invents as % of endgame turns');
+  console.log('  maxRun  = avg longest consecutive-Invent streak by a single player in endgame');
+  console.log('  avgPair = avg pair-VP per player at endgame (always computed; 0 score impact under baseline)');
+  console.log('  winPair = avg pair-VP earned by the winner\n');
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
@@ -3154,5 +3309,6 @@ if (require.main === module) {
   else if (mode === 'river-slots') sweepRiverSlots();
   else if (mode === 'blanks') sweepBlanks();
   else if (mode === 'flush-deck') sweepFlushDeck(process.argv[3]);
+  else if (mode === 'pair-vp') sweepPairVP(process.argv[3]);
   else sweep();
 }

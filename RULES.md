@@ -123,4 +123,13 @@ The moment the **material deck runs out**, the endgame begins:
    - they pass (have no productive action) — this typically signals they've used up their hand and material supply.
 4. Retired players don't take turns and don't bid in auctions; their built structures stay on the table for scoring.
 
-The game ends as soon as **every player has retired**. Total the victory points on each player's built structures. Highest total wins; ties broken by fewer spaces the retired pawn ended on (i.e., whoever retired earliest).
+The game ends as soon as **every player has retired**. Total the victory points on each player's built structures, **plus 1★ per pair of same-type leftover workers** on the board (river + shoreline). For each material, count your workers across all your cards of that material and score floor(workers / 2). Singletons score nothing. Wildcard cards (Driftwood Tangle, Mud Slick) let each of their workers count toward either of their two materials — assign each worker individually to maximize your pair count.
+
+Examples (one player's leftover workers):
+- 4 logs, 4 mud → 2★ + 2★ = **4★**
+- 3 logs, 3 reeds → 1★ + 1★ = **2★** (one singleton in each pile)
+- 2 logs, 1 reed, 1 mud, 1 vines, 1 clay → **1★** (only logs pair up)
+- 8 logs (extreme specialist) → **4★**
+- 1 worker on each of 6 materials → **0★** (all singletons)
+
+Highest total wins; ties broken by fewer spaces the retired pawn ended on (i.e., whoever retired earliest).
