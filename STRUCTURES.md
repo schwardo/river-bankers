@@ -126,13 +126,13 @@ Brainstormed in `games/board-games.org` ("Design more structure cards with novel
 |------|------|------|--------|
 | **Otter Trail** | 3 vines, 2 stones | 3🐟 | At the start of your turn, pick one of your workers on a river card A and another worker (yours or an opponent's) on a different river card B. Pay A's per-item cost in fish; swap the two workers. No blanks drop. |
 | **Tribute Stone** | 2 clay, 2 stones | 3🐟 | Once per game, at the start of your turn, force an opponent to recall one of their workers from the river. The opponent slides back 3🐟 in compensation. |
-| **Salmon Run** | 4 logs, 2 vines | 4🐟 | As your main action, place 1–5 workers from your supply onto uncovered icons of a single river card (no auction). Cumulative fish cost for 1/2/3/4/5 workers placed is 2🐟 / 5🐟 / 10🐟 / 18🐟 / 31🐟 (marginal: 2/3/5/8/13). |
+| **Salmon Run** | 4 logs, 2 vines | 4🐟 | As your main action, place 1–5 workers from your supply onto uncovered icons of a single river card (no auction). Cumulative fish cost for 1/2/3/4/5 workers placed is 1🐟 / 3🐟 / 6🐟 / 11🐟 / 19🐟 (marginal: 1/2/3/5/8). |
 | **Beaver Tow** | 4 mud, 2 clay, 1 vine | 4🐟 | As your main action, pay 2🐟 to slide a river card one slot upstream (toward the Headwaters). |
 
 **Pricing anchors:**
 - *Otter Trail* ↔ Heron Roost (3 reeds, 2 vines, 3🐟) — same utility footprint; the per-item cost gates abuse so no per-turn cap is needed in the first draft.
 - *Tribute Stone* ↔ Spy Mound (4 stones, 1 clay, 3🐟) — same once-per-game anti-opponent footprint; slightly cheaper because the 3🐟 compensation softens the attack. Other "mean-with-comp" variants worth simming: discard from hand for 2🐟, steal a Headwaters card for 4🐟.
-- *Salmon Run* ↔ Royal Lodge (6 logs, 2 vines, 5🐟) — one tier down on time/mats because each use is a main action, not a free extra turn. Fibonacci-ish escalation caps practical use at 3–4 workers (10🐟 for 3, 18🐟 for 4).
+- *Salmon Run* ↔ Royal Lodge (6 logs, 2 vines, 5🐟) — one tier down on time/mats because each use is a main action, not a free extra turn. Escalation 1/2/3/5/8 keeps 1–2 worker placements near R1-auction parity but makes 3–4 worker dumps a real bulk-grab at R2+ (6🐟 for 3 workers vs ~10🐟 at R2; 11🐟 for 4 vs ~13🐟 at R2).
 - *Beaver Tow* ↔ Floodgate (4 mud, 3 clay, 4🐟) — repeatable version swaps 1 clay for 1 vine to widen material draw; per-use 2🐟 self-limits.
 
 **Watch list.** Salmon Run and Beaver Tow both bypass core auction tension — sim first; expect retuning.

@@ -1104,7 +1104,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a Headwaters card to River 1 for free; an auction immediately runs on it at 1🐟/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End game: +1 VP per shoreline card on the table (max +6).' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
-  { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 7, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
+  { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
   { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 3 fewer fish (min 1).' },
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built, draw 3 structure cards, keep 1, discard 2.' },
@@ -1115,7 +1115,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'At the start of your turn you may pay 1🐟 to replace a Headwaters card with the top of the material deck.' },
   { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
-  { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 7, effect: 'When you would pass 0 on the fish track, stop at space 1 instead.' },
+  { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 6, effect: 'When you would pass 0 on the fish track, stop at space 1 instead.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5, effect: 'When built, look at the top 5 material cards and rearrange them in any order.' },
   { name: 'Flush Channel',  cost: { mud: 3, reeds: 1 },              time: 2, vp: 6, effect: 'When built, discard 1 Headwaters card of your choice (out of game) and refill that slot from the top of the material deck. No auction.' },
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 4, effect: 'Once per game, your build costs 1 fewer of one listed material (your choice).' },
@@ -1125,14 +1125,14 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 4, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
-  { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 7, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
-  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End game: +3 VP per built structure of yours that uses Vines.' },
-  { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 0, effect: 'When you build a structure that uses Vines, slide back 1 fish on the fish track. End game: +1 VP per built structure of yours that uses Vines (max +6).' },
-  { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 0, effect: 'When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +1 VP per built structure of yours that uses Stones (max +6).' },
-  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +1 VP per built structure of yours that uses Reeds (max +6).' },
-  { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +1 VP per built structure of yours that uses Clay (max +6).' },
-  { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 2, vp: 0, effect: 'When you build a structure that uses Mud, move one of your workers from any river card to another river card containing at least one of your workers (you may replace a blank instead of taking an uncovered icon). End game: +1 VP per built structure of yours that uses Mud (max +6).' },
-  { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 7, effect: 'At the start of your turn you may pay 1🐟 to add a blank to any uncovered icon.' },
+  { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 6, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
+  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 2, effect: 'End game: +3 VP per built structure of yours that uses Vines.' },
+  { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 2, effect: 'When you build a structure that uses Vines, slide back 1 fish on the fish track. End game: +1 VP per built structure of yours that uses Vines (max +6).' },
+  { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 3, effect: 'When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +1 VP per built structure of yours that uses Stones (max +6).' },
+  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 3, effect: 'When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +1 VP per built structure of yours that uses Reeds (max +6).' },
+  { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 4, effect: 'When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +1 VP per built structure of yours that uses Clay (max +6).' },
+  { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 2, vp: 4, effect: 'When you build a structure that uses Mud, move one of your workers from any river card to another river card containing at least one of your workers (you may replace a blank instead of taking an uncovered icon). End game: +1 VP per built structure of yours that uses Mud (max +6).' },
+  { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'At the start of your turn you may pay 1🐟 to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 3, clay: 2 },  time: 3, vp: 0, effect: 'End game: +3 VP per 2 distinct materials in your built structures (max +9).' },
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 4, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
@@ -1141,7 +1141,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game, at the start of your turn, force an opponent to recall one of their workers from a river card (dropping a blank). The opponent slides back 3🐟 in compensation.' },
   { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 9, effect: 'On your turn, instead of a regular action, pay 2🐟 to slide a river card 1 space toward the Headwaters.' },
   { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'At the start of your turn, swap one of your workers on a river card with another worker (yours or an opponent\'s) on a different river card. Pay the source card\'s per-item cost in fish.' },
-  { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 7, effect: 'As your main action, place 1–5 workers from your supply onto uncovered icons of one river card. Fish cost escalates 2/3/5/8/13 per successive worker.' },
+  { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 5, effect: 'As your main action, place 1–5 workers from your supply onto uncovered icons of one river card. Fish cost escalates 1/2/3/5/8 per successive worker.' },
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game, take a turn immediately after another player takes their turn, even if you are not next on the fish track.' },
 
   // Species starter structures (asymmetric play, see SPECIES.md). Each player
@@ -2555,7 +2555,7 @@ function renderActionPanel() {
         <button onclick="humanChooseAction('browse')" ${structAvailable(state) > 0 ? '' : 'disabled'}>4. Invent structures (N🐟)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>5. Build a structure</button>
         ${beaverTowAvail ? `<button onclick="humanChooseAction('beaverTow')">6. Beaver Tow (2🐟): slide a river card upstream</button>` : ''}
-        ${salmonRunAvail ? `<button onclick="humanChooseAction('salmonRun')">7. Salmon Run (2/3/5/8/13🐟): place workers on a single card</button>` : ''}
+        ${salmonRunAvail ? `<button onclick="humanChooseAction('salmonRun')">7. Salmon Run (1/2/3/5/8🐟): place workers on a single card</button>` : ''}
         ${state.endgame ? `<button class="ghost" onclick="humanRetire()">Retire (endgame)</button>` : ''}
       </div>
       ${abilityRow}
@@ -2802,11 +2802,29 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     const mats = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
     return p.hand.some(s => mats.some(m => (s.cost[m] || 0) > 0));
   };
+  // Spy Mound is once-per-game; save it for auctions where perfect info
+  // actually matters. Gate: card has ≥4 uncovered icons AND the player has
+  // ≥2 unmet deficit in this material across some hand card.
+  const spyMoundWorthIt = (p) => {
+    if (uncoveredIcons(card) < 4) return false;
+    const mats = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+    const wbm = playerWorkersByMaterial(state, p.idx);
+    let maxDeficit = 0;
+    for (const s of p.hand) {
+      for (const m of mats) {
+        const need = s.cost[m] || 0;
+        if (need === 0) continue;
+        const deficit = Math.max(0, need - (wbm[m] || 0));
+        if (deficit > maxDeficit) maxDeficit = deficit;
+      }
+    }
+    return maxDeficit >= 2;
+  };
   let deferredAi = -1;
   let deferredAiViaQuickStrike = false;
   for (const p of state.players) {
     if (p.isHuman) continue;
-    if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out && wantsMaterial(p)) {
+    if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out && spyMoundWorthIt(p)) {
       deferredAi = p.idx;
       break;
     }
@@ -3552,7 +3570,7 @@ function findOtterTrailTarget(playerIdx) {
 }
 
 // Salmon Run: marginal fish cost for the 1st/2nd/3rd/4th/5th worker placed.
-const SALMON_RUN_COSTS = [2, 3, 5, 8, 13];
+const SALMON_RUN_COSTS = [1, 2, 3, 5, 8];
 function salmonRunCumulativeCost(n) {
   let total = 0;
   for (let i = 0; i < n && i < SALMON_RUN_COSTS.length; i++) total += SALMON_RUN_COSTS[i];
@@ -3596,6 +3614,10 @@ function findSalmonRunTarget(playerIdx, needs) {
       best = { card: c, n: bestN, gain: bestGain };
     }
   }
+  // Opportunity-cost floor: a main action is worth ~3🐟 of board progress
+  // (could otherwise auction, build, etc.). Don't burn it on marginal Salmon
+  // Run gains — e.g. 1 worker on R1 saves only 1🐟 vs. a regular bid.
+  if (best && best.gain < 3) return null;
   return best;
 }
 
