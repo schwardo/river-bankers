@@ -1014,6 +1014,47 @@
   }
   .setup-row { margin: 10px 0; display: flex; align-items: center; gap: 10px; }
   .setup-row label { font-weight: 600; }
+  /* Species chooser — one row per species, each with an Off / You / AI
+     selector. Designed so a single grid handles "pick 2–4 of the 4
+     species + decide who's in the seat" without a separate player count. */
+  .species-pickers {
+    display: flex; flex-direction: column; gap: 6px;
+    margin: 14px 0;
+    border: 1px solid var(--bank-light);
+    border-radius: 6px;
+    padding: 8px;
+    background: rgba(0,0,0,0.025);
+  }
+  .species-picker {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 4px;
+    transition: background 0.1s;
+  }
+  .species-picker.off { opacity: 0.55; }
+  .species-picker.you { background: rgba(74,128,86,0.10); }
+  .species-picker .species-emoji { font-size: 22px; text-align: center; }
+  .species-picker .species-name  { font-weight: 700; color: var(--ink); }
+  .species-picker .role-toggle   { display: flex; gap: 0; border: 1px solid var(--bank); border-radius: 5px; overflow: hidden; }
+  .species-picker .role-toggle input[type="radio"] { display: none; }
+  .species-picker .role-toggle label {
+    padding: 4px 12px;
+    font-weight: 600; font-size: 12px;
+    cursor: pointer;
+    background: #fff;
+    color: var(--ink-soft);
+    border-left: 1px solid var(--bank-light);
+  }
+  .species-picker .role-toggle label:first-of-type { border-left: none; }
+  .species-picker .role-toggle input:checked + label {
+    background: var(--bank);
+    color: #fff;
+  }
+  .species-picker .role-toggle input[value="you"]:checked + label  { background: var(--forest); }
+  .species-picker .role-toggle input[value="ai"]:checked  + label  { background: var(--water-deep); }
   .scoreboard { margin-top: 10px; }
   .score-row {
     display: flex; justify-content: space-between;
@@ -1038,33 +1079,15 @@
 <!-- ============================================ SETUP ============================================ -->
 <div id="setup-screen" class="setup-screen">
   <h2>New game</h2>
-  <div class="setup-row">
-    <label>Players:</label>
-    <select id="num-players">
-      <option value="2">2</option>
-      <option value="3" selected>3</option>
-      <option value="4">4</option>
-    </select>
-  </div>
-  <div class="setup-row">
-    <label><input type="checkbox" id="human-plays" checked> I'm playing</label>
-  </div>
-  <div class="setup-row" id="species-row">
-    <label>I play as:</label>
-    <select id="human-species">
-      <option value="0">🦫 Beaver</option>
-      <option value="1">🦦 Sea Otter</option>
-      <option value="2">🐭 Muskrat</option>
-      <option value="3">🦡 Mink</option>
-    </select>
-  </div>
+  <p class="small-note">Pick 2–4 species. Each one's <em>You</em> or <em>AI</em>; the rest are <em>Off</em>. Species have asymmetric powers — see their starter cards.</p>
+  <div class="species-pickers" id="species-pickers"></div>
   <div class="setup-row">
     <label><input type="checkbox" id="use-starters" checked> Use species starter cards</label>
   </div>
   <div class="setup-row">
     <button class="primary" onclick="startGame()">Start</button>
   </div>
-  <p class="small-note">2–4 players. Up to one human; the rest are AI. Bid workers on materials drifting downstream and build structures along the bank.</p>
+  <p id="setup-hint" class="small-note"></p>
 </div>
 
 <!-- ============================================ GAME ============================================ -->
@@ -1906,22 +1929,62 @@ function startSimTimeTicker() {
 // =============================================================================
 let state = null;
 
+function readSpeciesPicks() {
+  // Returns the role ('off' / 'you' / 'ai') for every species, in SPECIES order.
+  return SPECIES.map(sp => {
+    const checked = document.querySelector(`input[name="role-${sp.id}"]:checked`);
+    return checked ? checked.value : 'off';
+  });
+}
+
+function updateSetupHint() {
+  // Re-paint per-row "off / you / dimmed" styling + Start button enablement.
+  const picks = readSpeciesPicks();
+  const active = picks.filter(r => r !== 'off').length;
+  const humans = picks.filter(r => r === 'you').length;
+  SPECIES.forEach((sp, i) => {
+    const row = document.querySelector(`.species-picker[data-species="${sp.id}"]`);
+    if (!row) return;
+    row.classList.toggle('off', picks[i] === 'off');
+    row.classList.toggle('you', picks[i] === 'you');
+  });
+  const hint = document.getElementById('setup-hint');
+  const btn = document.querySelector('#setup-screen button.primary');
+  let msg = '', ok = true;
+  if (active < 2)          { msg = 'Pick at least 2 species to play.'; ok = false; }
+  else if (active > 4)     { msg = 'At most 4 species can be in play.'; ok = false; }
+  else if (humans > 1)     { msg = 'Only one species can be "You".'; ok = false; }
+  else if (humans === 0)   { msg = `All-AI game with ${active} species.`; }
+  else                     { msg = `You + ${active - 1} AI opponent${active === 2 ? '' : 's'}.`; }
+  if (hint) hint.textContent = msg;
+  if (btn) btn.disabled = !ok;
+}
+
 function startGame() {
-  const numPlayers = parseInt(document.getElementById('num-players').value);
-  const humanPlays = document.getElementById('human-plays').checked;
-  const humanIdx = humanPlays ? parseInt(document.getElementById('human-species').value) : -1;
+  const picks = readSpeciesPicks();
   const useStarters = document.getElementById('use-starters').checked;
-  if (humanPlays && humanIdx >= numPlayers) {
-    alert('Pick a species number ≤ number of players.');
+  const seats = SPECIES
+    .map((sp, i) => ({ sp, role: picks[i] }))
+    .filter(s => s.role !== 'off');
+  const humanCount = seats.filter(s => s.role === 'you').length;
+  if (seats.length < 2 || seats.length > 4) {
+    alert('Pick 2–4 species to play.');
     return;
   }
+  if (humanCount > 1) {
+    alert('Only one species can be "You".');
+    return;
+  }
+  const humanPlays = humanCount === 1;
+  const humanIdx = seats.findIndex(s => s.role === 'you');
+  const numPlayers = seats.length;
 
   const players = [];
   for (let i = 0; i < numPlayers; i++) {
     players.push({
       idx: i,
-      species: SPECIES[i],
-      isHuman: i === humanIdx,
+      species: seats[i].sp,
+      isHuman: seats[i].role === 'you',
       supply: 8,
       timePos: 0,
       hand: [],
@@ -5889,16 +5952,34 @@ function showGameOver() {
 // =============================================================================
 // INIT
 // =============================================================================
-document.getElementById('human-plays').addEventListener('change', e => {
-  document.getElementById('species-row').style.display = e.target.checked ? '' : 'none';
-});
-document.getElementById('num-players').addEventListener('change', () => {
-  // Clamp species choice if needed
-  const n = parseInt(document.getElementById('num-players').value);
-  const sel = document.getElementById('human-species');
-  for (const opt of sel.options) opt.disabled = parseInt(opt.value) >= n;
-  if (parseInt(sel.value) >= n) sel.value = '0';
-});
+// Populate the species-picker rows once on load. Each row is a small
+// segmented control over the three roles: Off / You / AI. Default seed
+// gives a 3-player game (you + 2 AI) so a single click on Start runs.
+(function initSpeciesPickers() {
+  const wrap = document.getElementById('species-pickers');
+  if (!wrap) return;
+  const DEFAULT_ROLES = { beaver: 'you', otter: 'ai', muskrat: 'ai', mink: 'off' };
+  wrap.innerHTML = SPECIES.map(sp => {
+    const def = DEFAULT_ROLES[sp.id] || 'off';
+    const roleInput = (role, label) => {
+      const id = `role-${sp.id}-${role}`;
+      const checked = role === def ? 'checked' : '';
+      return `<input type="radio" id="${id}" name="role-${sp.id}" value="${role}" ${checked}>` +
+             `<label for="${id}">${label}</label>`;
+    };
+    return `<div class="species-picker" data-species="${sp.id}">
+      <span class="species-emoji" style="background:${sp.color};color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;">${sp.emoji}</span>
+      <span class="species-name">${sp.name}</span>
+      <span class="role-toggle">
+        ${roleInput('off', 'Off')}
+        ${roleInput('you', 'You')}
+        ${roleInput('ai',  'AI')}
+      </span>
+    </div>`;
+  }).join('');
+  wrap.addEventListener('change', updateSetupHint);
+  updateSetupHint();
+})();
 </script>
 </body>
 </html>
