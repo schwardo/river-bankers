@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  River Bankers — Material Card template
+  ======================================
+  Poker landscape: 3.5" × 2.5" trim, 0.125" bleed → 3.75" × 2.75" full.
+  Coordinate system: pt (1 pt = 1/72 inch), matching TGC poker-card.svg
+  template (rotated to landscape).
+
+    Full canvas (bleed): 0,0 -> 270,198   (3.75" x 2.75")
+    Trim line:           9,9 -> 261,189   (3.5"  x 2.5")
+    Safe area:          18,18 -> 252,180  (3.25" x 2.25")
+
+  Worker tokens are 0.63"-diameter discs → 45.36 pt at 72 DPI.
+  Item icons on the card MUST match that physical footprint
+  (graphics/material-deck/board-games.org spec).
+
+  The generator script (generate.py) substitutes {{TOKENS}}
+  below with per-card values. Open this file in Inkscape to
+  tweak layout / typography; tokens render as literal text
+  until run through the generator.
+
+  Toggle the #guides layer's display attribute to "inline" in
+  Inkscape's XML editor to see bleed/trim/safe outlines.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.0.dtd"
+     width="3.75in" height="2.75in"
+     viewBox="0 0 270 198"
+     version="1.1">
+
+  <defs>
+    <style type="text/css"><![CDATA[
+      .card-name   { font-family: 'DejaVu Serif', serif; font-weight: 700; font-size: 13pt; fill: #2c1f15; }
+      .mat-label   { font-family: 'DejaVu Sans', sans-serif; font-weight: 700; font-size: 7.5pt; }
+      .icons-tag   { font-family: 'DejaVu Sans', sans-serif; font-weight: 500; font-size: 6.5pt; fill: #5a4a36; }
+      .icon-glyph  { font-family: 'Noto Color Emoji', 'DejaVu Sans', sans-serif;
+                     font-size: 22pt; text-anchor: middle; dominant-baseline: central; }
+      .effect-text { font-family: 'DejaVu Sans', sans-serif; font-style: italic; font-size: 6pt; fill: #2a2a5c; }
+    ]]></style>
+  </defs>
+
+  <!-- ============ CARD FACE ============ -->
+  <!-- Full bleed: the border color extends to the canvas edge so the
+       printed card retains a clean colored frame after TGC trims.
+       (The web post-process crops to the trim line + rounds the corners.) -->
+  <rect x="0" y="0" width="270" height="198" fill="#6b5436"/>
+
+  <!-- Paper inset 5pt past the trim line → 5pt visible brown frame. -->
+  <rect x="14" y="14" width="242" height="170" rx="6" ry="6" fill="#faf3e3"/>
+
+  <!-- Header band tinted in the material color (translucent). -->
+  <rect x="18" y="18" width="234" height="22" rx="3" ry="3"
+        fill="{{MAT_COLOR}}" fill-opacity="0.18"
+        stroke="{{MAT_COLOR}}" stroke-opacity="0.55" stroke-width="0.6"/>
+
+  <!-- Card title (left side). -->
+  <text x="22" y="35" class="card-name">{{CARD_NAME}}</text>
+
+  <!-- Material name × icon count (right side). -->
+  <text x="248" y="32" text-anchor="end"
+        class="mat-label" fill="{{MAT_COLOR_INK}}">{{MAT_NAME}} <tspan class="icons-tag">×{{ICONS}}</tspan></text>
+
+  <!-- ============ ICON GRID ============
+       Discs sized to the physical 0.63" worker token (45.36 pt diameter)
+       — see board-games.org "Design / choose worker tokens" (2026-05-25)
+       and RULES.md Components. Generator places circles + emoji glyphs. -->
+  {{ICON_GRID}}
+
+  <!-- ============ EFFECT BLOCK (effect-bearing cards only) ============ -->
+  {{EFFECT_BLOCK}}
+
+  <!-- ============ GUIDES (hidden) ============
+       Toggle display="inline" in Inkscape to inspect bleed/trim/safe areas. -->
+  <g id="guides" display="none" inkscape:label="Guides" inkscape:groupmode="layer">
+    <rect x="0" y="0" width="270" height="198" fill="none" stroke="#929497" stroke-width="0.5"/>
+    <rect x="9" y="9" width="252" height="180" rx="9" ry="9"
+          fill="none" stroke="#EC1E28" stroke-width="0.5"/>
+    <rect x="18" y="18" width="234" height="162" rx="6" ry="6"
+          fill="none" stroke="#2BA6DE" stroke-width="0.5" stroke-dasharray="2 2"/>
+  </g>
+</svg>

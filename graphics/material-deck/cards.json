@@ -1,0 +1,58 @@
+{
+  "_comment": "River Bankers material-deck card data. 24 cards = 6 materials × 4 icon-count tiers (4/5/7/8). 8 of 24 are effect-bearing. Names mirror MATERIALS.md. Effect prose mirrors web/index.html effectDescription() verbatim.",
+  "materials": {
+    "logs":   { "name": "Logs",   "color": "#8b5a2b", "ink": "#5a3a18", "glyph": "🪵" },
+    "stones": { "name": "Stones", "color": "#6e6e6e", "ink": "#3f3f3f", "glyph": "🪨" },
+    "reeds":  { "name": "Reeds",  "color": "#5a8e3a", "ink": "#365821", "glyph": "🌾" },
+    "mud":    { "name": "Mud",    "color": "#5c3a1f", "ink": "#3c2410", "glyph": "🟫" },
+    "vines":  { "name": "Vines",  "color": "#3a6b2f", "ink": "#244419", "glyph": "🌿" },
+    "clay":   { "name": "Clay",   "color": "#c97c4a", "ink": "#7a4422", "glyph": "🏺" }
+  },
+  "cards": [
+    { "name": "Fallen Limb",       "material": "logs",   "icons": 4 },
+    { "name": "Driftwood Tangle",  "material": "logs",   "icons": 5,
+      "effect_name": "Driftwood Tangle",
+      "effect_text": "Wild: each claimed icon yields Logs OR Reeds (chosen at build time)." },
+    { "name": "Logjam",            "material": "logs",   "icons": 7 },
+    { "name": "Old Growth",        "material": "logs",   "icons": 8,
+      "effect_name": "Old Growth",
+      "effect_text": "If this card is at River 3 or 4, each worker you retrieve yields 2 Logs instead of 1." },
+
+    { "name": "Cairn",             "material": "stones", "icons": 4 },
+    { "name": "Rocky Shoal",       "material": "stones", "icons": 5 },
+    { "name": "Boulder Field",     "material": "stones", "icons": 7 },
+    { "name": "Quarry Bank",       "material": "stones", "icons": 8 },
+
+    { "name": "Hidden Inlet",      "material": "reeds",  "icons": 4,
+      "effect_name": "Hidden Inlet",
+      "effect_text": "If exactly one player has workers on this card when it reaches shoreline, that player moves back 1 space on the fish track per worker." },
+    { "name": "Reed Stand",        "material": "reeds",  "icons": 5 },
+    { "name": "Marsh Edge",        "material": "reeds",  "icons": 7 },
+    { "name": "Cattail Cluster",   "material": "reeds",  "icons": 8,
+      "effect_name": "Cattail Cluster",
+      "effect_text": "When this card reaches shoreline, the player with the most workers moves back 3 spaces on the fish track. Ties: nobody." },
+
+    { "name": "Mud Wallow",        "material": "mud",    "icons": 4,
+      "effect_name": "Mud Wallow",
+      "effect_text": "When this card reaches shoreline, the player with the most workers moves back 2 spaces on the fish track. Ties: nobody." },
+    { "name": "Mud Flat",          "material": "mud",    "icons": 5 },
+    { "name": "Silt Bank",         "material": "mud",    "icons": 7 },
+    { "name": "Floodplain",        "material": "mud",    "icons": 8 },
+
+    { "name": "Vine Curtain",      "material": "vines",  "icons": 4,
+      "effect_name": "Vine Curtain",
+      "effect_text": "When you build using workers from this card, peek at the top 2 material cards and rearrange them." },
+    { "name": "Trailing Vine",     "material": "vines",  "icons": 5 },
+    { "name": "Vine Thicket",      "material": "vines",  "icons": 7 },
+    { "name": "Strangler Knot",    "material": "vines",  "icons": 8 },
+
+    { "name": "Clay Seep",         "material": "clay",   "icons": 4 },
+    { "name": "Clay Bank",         "material": "clay",   "icons": 5 },
+    { "name": "Mud Slick",         "material": "clay",   "icons": 7,
+      "effect_name": "Mud Slick",
+      "effect_text": "Wild: each claimed icon yields Mud OR Clay (chosen at build time)." },
+    { "name": "Slipping Sandbar",  "material": "clay",   "icons": 8,
+      "effect_name": "Slipping Sandbar",
+      "effect_text": "Enters the river at River 4. After any auction with workers placed here, slides one slot upstream. At River 1 with leftover icons, retires to shoreline." }
+  ]
+}
