@@ -552,6 +552,36 @@
   .built-effect-card .head .vp { color: var(--forest); font-weight: 700; font-size: 11px; }
   .built-effect-card .effect-text { font-style: italic; color: #5a4a1f; font-size: 10px; margin-top: 2px; line-height: 1.25; }
 
+  /* Built-structure thumbnails — small portrait card images in the player
+     tile, one per structure the player has built. Hover via title= shows
+     name / VP / effect prose. Once-per-game cards that have already fired
+     get a desaturated wash + faint "×" marker. */
+  .built-thumbs {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 4px;
+    max-height: 336px;
+    overflow-y: auto;
+  }
+  .built-thumb {
+    width: 112px;
+    aspect-ratio: 2.5 / 3.5;
+    background: center / cover no-repeat;
+    border-radius: 4px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .built-thumb.used { filter: grayscale(0.55) brightness(0.85); }
+  .built-thumb.used::after {
+    content: '×';
+    position: absolute;
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(180,40,40,0.8);
+    font-size: 36px; font-weight: 700;
+    text-shadow: 0 0 2px #fff;
+    pointer-events: none;
+  }
+
   /* ================= HAND ================= */
   .hand-area {
     background: var(--paper);
@@ -604,6 +634,26 @@
   .struct-card.selectable:hover { transform: translateY(-2px); box-shadow: 0 3px 6px rgba(0,0,0,0.3); }
   .struct-card.buildable { border-color: var(--forest); border-width: 3px; }
   .struct-card.selected { outline: 3px solid yellow; }
+  /* "has-art" = card body is the rendered structure-deck PNG (title, costs,
+     VP, and effect prose are baked into the image). The dynamic affordability
+     pills are kept in the DOM but hidden so the PNG isn't double-drawn —
+     CAN-BUILD signal still comes through via the .buildable green border. */
+  .struct-card.has-art {
+    background-color: transparent;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  .struct-card.has-art .header,
+  .struct-card.has-art .reqs,
+  .struct-card.has-art .small-note { display: none; }
+  /* Buildable / selected outlines on has-art cards still need to be visible. */
+  .struct-card.has-art.buildable { outline: 3px solid var(--forest); outline-offset: -3px; }
+  .struct-card.has-art.selected { outline: 3px solid yellow; outline-offset: -3px; }
   .struct-card.keep-selected {
     outline: 3px solid var(--forest);
     box-shadow: 0 0 8px rgba(74,128,86,0.5);
@@ -2441,20 +2491,17 @@ function renderPlayers() {
     if (p.supply === 0) supplyIcons = `<span class="small-note">all placed</span>`;
     let builtList = '';
     if (p.built.length > 0) {
-      const effectCards = p.built.filter(b => b.effect);
-      const plainCards = p.built.filter(b => !b.effect);
-      let html2 = '';
-      for (const b of effectCards) {
-        const usedTag = oncePerGameUsed(p, b.name);
-        html2 += `<div class="built-effect-card">
-          <div class="head"><b>${b.name}${usedTag ? ' <span class="small-note">(used)</span>' : ''}</b><span class="vp">${b.vp}★</span></div>
-          <div class="effect-text">${b.effect}</div>
-        </div>`;
-      }
-      if (plainCards.length > 0) {
-        html2 += `<div class="built-list">${plainCards.map(b => `<span class="built-chip" title="${b.name} – ${b.vp}vp">${b.name} ${b.vp}★</span>`).join('')}</div>`;
-      }
-      builtList = html2;
+      const thumbs = p.built.map(b => {
+        const used = oncePerGameUsed(p, b.name);
+        const slug = b.name.replace(/[^A-Za-z0-9]/g, '');
+        const titleParts = [`${b.name} — ${b.vp}★`];
+        if (used) titleParts.push('(used)');
+        if (b.effect) titleParts.push(b.effect);
+        const title = titleParts.join('\n').replace(/"/g, '&quot;');
+        const cls = used ? 'built-thumb used' : 'built-thumb';
+        return `<div class="${cls}" style="background-image:url('../structure-deck/${slug}.png')" title="${title}"></div>`;
+      }).join('');
+      builtList = `<div class="built-thumbs">${thumbs}</div>`;
     }
     let lookoutPeek = '';
     if (p.isHuman && (hasEffect(p, 'Lookout Tree') || hasEffect(p, 'Marsh Lookout')) && state.matDeck.length > 0) {
@@ -2520,7 +2567,7 @@ function renderHand() {
       const ok = have >= n;
       return `<span class="req-pill ${ok ? 'satisfied' : ''}">${MATERIALS[m].emoji}${have}/${n}</span>`;
     }).join('');
-    const cls = ['struct-card'];
+    const cls = ['struct-card', 'has-art'];
     if (buildable) cls.push('buildable');
     const isHumanTurn = state.currentPlayer === human.idx;
     // Click on a buildable structure builds it directly — works in both the explicit
@@ -2539,7 +2586,9 @@ function renderHand() {
     if (buildClickable) onClick = `onclick="humanSelectBuild(${i})"`;
     if (state.phase === 'browse-keep') onClick = `onclick="toggleBrowseSelect('h${i}')"`;
     const effectLine = s.effect ? `<div class="small-note" style="font-style:italic;font-size:11px;margin-top:2px;">${s.effect}</div>` : '';
-    html += `<div class="${cls.join(' ')}" ${onClick}>
+    const slug = s.name.replace(/[^A-Za-z0-9]/g, '');
+    const bgStyle = `style="background-image:url('../structure-deck/${slug}.png')"`;
+    html += `<div class="${cls.join(' ')}" ${bgStyle} ${onClick}>
       <div class="header">
         <span class="cost">${s.time}🐟</span>
         <span class="name">${s.name}</span>
@@ -2557,11 +2606,13 @@ function renderHand() {
         const ok = have >= n;
         return `<span class="req-pill ${ok ? 'satisfied' : ''}">${MATERIALS[m].emoji}${have}/${n}</span>`;
       }).join('');
-      const cls = ['struct-card', 'selectable'];
+      const cls = ['struct-card', 'has-art', 'selectable'];
       const isKeep = state.browseSelected && state.browseSelected.has('d' + i);
       cls.push(isKeep ? 'keep-selected' : 'will-discard');
       const effectLine = s.effect ? `<div class="small-note" style="font-style:italic;font-size:11px;margin-top:2px;">${s.effect}</div>` : '';
-      html += `<div class="${cls.join(' ')}" onclick="toggleBrowseSelect('d${i}')">
+      const slug = s.name.replace(/[^A-Za-z0-9]/g, '');
+      const bgStyle = `style="background-image:url('../structure-deck/${slug}.png')"`;
+      html += `<div class="${cls.join(' ')}" ${bgStyle} onclick="toggleBrowseSelect('d${i}')">
         <div class="header">
           <span class="cost">${s.time}🐟</span>
           <span class="name">${s.name} <span class="small-note">(new)</span></span>
