@@ -319,6 +319,51 @@
   .mat-card.selectable:hover { transform: translateY(-2px); box-shadow: 0 3px 6px rgba(0,0,0,0.4); }
   .mat-card.selected { outline: 3px solid yellow; outline-offset: 1px; }
   .mat-card.dimmed { opacity: 0.5; }
+  /* "has-art" = card body is the rendered material-deck PNG (header text
+     and effect prose are baked into the image). Dynamic state — workers
+     placed, blanks dropped — still overlays via .icons-row. */
+  .mat-card.has-art {
+    position: relative;
+    /* The PNG itself carries the card body, brown border, and rounded
+       corners (transparent outside the card shape). Strip the div's own
+       paper fill + brown stroke + drop shadow so the PNG's transparent
+       corners actually show through. No clipping needed — the rounded
+       look is baked into the image. */
+    background-color: transparent;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  .mat-card.has-art .mat-head,
+  .mat-card.has-art .mat-effect-box { display: none; }
+  /* Icons-row spans the whole card so each .icon-slot can absolute-position
+     itself at the PNG's matching circle (see pngIconPositions() in JS). */
+  .mat-card.has-art .icons-row {
+    background: transparent;
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: 0;
+    min-height: 0;
+  }
+  .mat-card.has-art .icon-slot {
+    position: absolute;
+    width: 18cqw;    /* 0.63"/3.5" = 18% of card width (square via cqw) */
+    height: 18cqw;
+    border: none;
+    background: transparent;
+    font-size: 9cqw;
+  }
+  /* Worker discs keep their species fill; we override only the geometry above. */
+  .mat-card.has-art .icon-slot.icon-worker { border: 1.5px solid rgba(0,0,0,0.4); }
+  .mat-card.has-art .icon-slot.icon-blank { background: #ccc; color: #888; border: 1.5px dashed var(--bank); }
+  /* Invisible spacers preserve positional indices for the "open" icons that
+     are already drawn on the PNG. */
+  .mat-card.has-art .icon-slot.icon-open { visibility: hidden; }
   .mat-card .mat-head {
     display: flex; justify-content: space-between; align-items: baseline;
     gap: 6px;
@@ -399,12 +444,18 @@
      a tighter row. The narrower card needs smaller header text too,
      and the effect box is dropped since every effect either fires
      while in-river or at the moment of reaching shore. */
-  .mat-card.shore .icon-slot { width: 12cqw; height: 12cqw; font-size: 7cqw; }
-  .mat-card.shore .icons-row { min-height: 0; }
-  .mat-card.shore .mat-name { font-size: 11px; }
-  .mat-card.shore .mat-material { font-size: 9px; }
-  .mat-card.shore .mat-shore-tag { font-size: 8px; padding: 1px 3px; }
-  .mat-card.shore .mat-effect-box { display: none; }
+  /* Shoreline cards: same PNG art, but rendered smaller. They've graduated
+     out of the river — workers are inventory, not bid targets — so they
+     don't need the full footprint. cqw units inside scale with width, so
+     icons and workers shrink proportionally with the card. */
+  .mat-card.shore { width: 65%; align-self: center; }
+  /* Pre-PNG fallback (image failed to load) — keeps the old compact look. */
+  .mat-card.shore:not(.has-art) .icon-slot { width: 12cqw; height: 12cqw; font-size: 7cqw; }
+  .mat-card.shore:not(.has-art) .icons-row { min-height: 0; }
+  .mat-card.shore:not(.has-art) .mat-name { font-size: 11px; }
+  .mat-card.shore:not(.has-art) .mat-material { font-size: 9px; }
+  .mat-card.shore:not(.has-art) .mat-shore-tag { font-size: 8px; padding: 1px 3px; }
+  .mat-card.shore:not(.has-art) .mat-effect-box { display: none; }
   .mat-card .mat-foot {
     font-size: 14px;
     color: var(--ink-soft);
@@ -2117,6 +2168,53 @@ function renderTimeTrack() {
 // Track now shows a fixed LAP_LENGTH cells; no scrolling needed.
 function scrollTimeTrackToLeftmost() { /* no-op */ }
 
+// Compute each icon's center position on the printed PNG, expressed as
+// % of the trimmed card (252×180 pt cropped from the 270×198 pt bleed).
+// Mirrors generate.py's layout: 4→[4], 5→[3,2], 7→[4,3], 8→[4,4]; icon
+// area runs y=44→154 for effect cards and y=44→178 for vanilla, all in
+// canvas coords. Returned positions are slot top-left in %, since the
+// slot is a square of width/height = 18cqw (= 0.63"/3.5" ≈ 18% wide;
+// equivalent vertical % depends on the card aspect).
+function pngIconPositions(card) {
+  const n = card.totalIcons;
+  let rows;
+  if      (n === 4) rows = [4];
+  else if (n === 5) rows = [3, 2];
+  else if (n === 7) rows = [4, 3];
+  else if (n === 8) rows = [4, 4];
+  else return [];
+  const DIAM = 45.36, RADIUS = 22.68, GAP = 6;
+  const CROP_W = 252, CROP_H = 180;
+  const CROP_OFFSET = 9;
+  const cardCenterX = 135 - CROP_OFFSET; // 126
+  const areaTop    = 44 - CROP_OFFSET;   // 35
+  const areaBot    = (card.effectSpec ? 154 : 178) - CROP_OFFSET; // 145 / 169
+  // Slot is 18cqw square (= 18% of card width = 18 × CROP_W/CROP_H % of
+  // card height ≈ 25.2%). We need both because the slot is square in
+  // pixels, but the card isn't.
+  const slotWPct = 100 * DIAM / CROP_W;             // 18
+  const slotVertPct = slotWPct * CROP_W / CROP_H;   // 25.2
+  const rowsH = rows.length === 1 ? DIAM : rows.length * DIAM + (rows.length - 1) * GAP;
+  const cyTop = areaTop + (areaBot - areaTop - rowsH) / 2 + RADIUS;
+  const positions = [];
+  for (let r = 0; r < rows.length; r++) {
+    const cy = cyTop + r * (DIAM + GAP);
+    const count = rows[r];
+    const rowW = count * DIAM + (count - 1) * GAP;
+    const xFirst = cardCenterX - rowW / 2 + RADIUS;
+    for (let i = 0; i < count; i++) {
+      const cx = xFirst + i * (DIAM + GAP);
+      // Slot top-left = center − half-slot. The slot is square in px,
+      // so half-width and half-height in % differ (card isn't square).
+      positions.push({
+        left: 100 * cx / CROP_W - slotWPct / 2,
+        top:  100 * cy / CROP_H - slotVertPct / 2,
+      });
+    }
+  }
+  return positions;
+}
+
 function renderMatCard(card, opts = {}) {
   const m = MATERIALS[card.material];
   const isShore = card.slot === 'shore';
@@ -2135,40 +2233,47 @@ function renderMatCard(card, opts = {}) {
   for (let i = 0; i < card.blanks; i++) {
     iconSlots.push(`<div class="icon-slot icon-blank" title="sold">·</div>`);
   }
-  // Open icons — only relevant on the river. Shoreline cards' open counts no longer matter.
+  // Open icons — drawn on the printed PNG, so the overlay slot is an
+  // invisible placeholder (CSS: .icon-slot.icon-open { visibility:hidden }).
+  // We keep one per open icon so worker[0] / blank[0] line up with PNG
+  // icon #0, and so on. On shoreline cards there are no blanks but the
+  // open count still reflects which PNG positions are unoccupied.
   const open = card.totalIcons - totalWorkers - card.blanks;
-  if (!isShore) {
-    for (let i = 0; i < open; i++) {
-      iconSlots.push(`<div class="icon-slot icon-open" style="background:${m.color}26;border-color:${m.color}" title="open"><span class="icon-emoji">${m.emoji}</span></div>`);
-    }
+  for (let i = 0; i < open; i++) {
+    iconSlots.push(`<div class="icon-slot icon-open" title="open"></div>`);
   }
-  // Balance icons across two rows when there are more than 3:
-  // top row gets ceil(n/2) (at most 1 more than the bottom).
-  let icons;
-  if (iconSlots.length > 3) {
-    const topCount = Math.ceil(iconSlots.length / 2);
-    icons = `<div class="icon-sub-row">${iconSlots.slice(0, topCount).join('')}</div>` +
-            `<div class="icon-sub-row">${iconSlots.slice(topCount).join('')}</div>`;
-  } else {
-    icons = `<div class="icon-sub-row">${iconSlots.join('')}</div>`;
-  }
-  const cls = ['mat-card'];
-  if (isShore)         cls.push('shore');
+  // Absolute-position each slot at its matching PNG icon — works for
+  // river, headwaters, AND shoreline cards (they all share the same art).
+  const positions = pngIconPositions(card);
+  const icons = iconSlots.map((html, i) => {
+    const p = positions[i];
+    if (!p) return html;
+    const inj = `position:absolute;left:${p.left.toFixed(2)}%;top:${p.top.toFixed(2)}%;`;
+    return html.includes('style="')
+      ? html.replace('style="', `style="${inj}`)
+      : html.replace('<div ', `<div style="${inj}" `);
+  }).join('');
+  const cls = ['mat-card', 'has-art'];   // every material card uses the PNG art
+  if (isShore)         cls.push('shore'); // shoreline cards inherit a narrower column
   if (opts.selectable) cls.push('selectable');
   if (opts.selected)   cls.push('selected');
   if (opts.dimmed)     cls.push('dimmed');
   const onclick = opts.onClick ? `onclick="${opts.onClick}"` : '';
-  // Header: card name (left) · material + (open/total) or shoreline tag (right).
+  // Header markup is kept as a fallback if the image fails to load;
+  // CSS hides it whenever .has-art is on.
   const cardName = card.name || m.name;
   const matLabel = isShore
-    ? `<span class="mat-material" style="color:${m.color}">${m.emoji} ${m.name}</span><span class="mat-shore-tag">shore</span>`
+    ? `<span class="mat-material" style="color:${m.color}">${m.emoji} ${m.name}</span>`
     : `<span class="mat-material" style="color:${m.color}">${m.emoji} ${m.name} <span class="mat-remaining">(${open}/${card.totalIcons})</span></span>`;
   // Effect rules text printed full-width across the bottom of the card.
   const effectBox = card.effectSpec
     ? `<div class="mat-effect-box"><b>${card.effectSpec.name}.</b> ${effectDescription(card)}</div>`
     : '';
   const foot = !isShore && opts.note ? opts.note : '';
-  return `<div class="${cls.join(' ')}" ${onclick}>
+  // Background image: material-deck/<Slug>.png (slug matches generate.py).
+  const slug = cardName.replace(/[^A-Za-z0-9]/g, '');
+  const bgStyle = `style="background-image:url('../material-deck/${slug}.png')"`;
+  return `<div class="${cls.join(' ')}" ${bgStyle} ${onclick}>
     <div class="mat-head">
       <span class="mat-name">${cardName}</span>
       ${matLabel}
