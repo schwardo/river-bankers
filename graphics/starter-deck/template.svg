@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  River Bankers — Species Starter Card template
+  =============================================
+  Poker portrait: 2.5" × 3.5" trim, 0.125" bleed → 2.75" × 3.75" full.
+  Same canvas as structure-deck/template.svg, minus the cost row — every
+  starter is pre-built in the tableau, no fish or material cost.
+
+    Full canvas (bleed): 0,0 -> 198,270   (2.75" x 3.75")
+    Trim line:           9,9 -> 189,261   (2.5"  x 3.5")
+    Safe area:          18,18 -> 180,252  (2.25" x 3.25")
+
+  Zone layout (pt, inside safe area):
+    Header band  y=18..46           title (left) + "N★" VP (right)
+    Effect box   top=52, auto-sized italic prose, top-anchored just
+                                    below the header (no cost row)
+
+  The generator script (generate.py) substitutes {{TOKENS}}; tokens
+  render as literal text if you open this file directly in Inkscape.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.0.dtd"
+     width="2.75in" height="3.75in"
+     viewBox="0 0 198 270"
+     version="1.1">
+
+  <defs>
+    <style type="text/css"><![CDATA[
+      /* card-name font-size is set per-card by generate.py. */
+      .card-name      { font-family: 'DejaVu Serif', serif; font-weight: 700; fill: #2c1f15; }
+      .vp-text        { font-family: 'DejaVu Serif', serif; font-weight: 700; font-size: 11pt; fill: #a07a30; }
+      .species-tag    { font-family: 'DejaVu Sans', sans-serif; font-weight: 700; font-size: 8pt; text-transform: uppercase; letter-spacing: 1.5pt; text-anchor: middle; }
+      .effect-text    { font-family: 'DejaVu Sans', sans-serif; font-style: italic; font-size: 6.5pt; fill: #2a2a5c; }
+    ]]></style>
+  </defs>
+
+  <!-- Full bleed: border color extends to canvas edge. -->
+  <rect x="0" y="0" width="198" height="270" fill="#6b5436"/>
+
+  <!-- Paper inset 5pt past trim → 5pt visible brown frame after die-cut. -->
+  <rect x="14" y="14" width="170" height="242" rx="6" ry="6" fill="#faf3e3"/>
+
+  <!-- Header band tinted in the species color. -->
+  <rect x="18" y="18" width="162" height="28" rx="3" ry="3"
+        fill="{{SPECIES_COLOR}}" fill-opacity="0.22"
+        stroke="{{SPECIES_COLOR}}" stroke-opacity="0.55" stroke-width="0.6"/>
+
+  <!-- Card title (auto-fit per card, see generate.py). -->
+  {{TITLE_BLOCK}}
+
+  <!-- VP indicator (right side of header). Format: "N ★". -->
+  {{VP_BLOCK}}
+
+  <!-- Species name in small caps, centered below the header band with
+       18pt of room between header bottom and the tag baseline. -->
+  <text x="99" y="64" class="species-tag" fill="{{SPECIES_COLOR}}">{{SPECIES_NAME}}</text>
+
+  <!-- Effect box, top-anchored just below the species tag. -->
+  {{EFFECT_BLOCK}}
+
+  <!-- Guides (hidden). -->
+  <g id="guides" display="none" inkscape:label="Guides" inkscape:groupmode="layer">
+    <rect x="0" y="0" width="198" height="270" fill="none" stroke="#929497" stroke-width="0.5"/>
+    <rect x="9" y="9" width="180" height="252" rx="9" ry="9"
+          fill="none" stroke="#EC1E28" stroke-width="0.5"/>
+    <rect x="18" y="18" width="162" height="234" rx="6" ry="6"
+          fill="none" stroke="#2BA6DE" stroke-width="0.5" stroke-dasharray="2 2"/>
+  </g>
+</svg>

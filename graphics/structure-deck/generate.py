@@ -182,7 +182,12 @@ def render_vp_block(card):
     floating off with a full word-space. vp=0 prints '?★' (scoring is
     computed at end of game; effect text spells it out)."""
     vp = card.get("vp", 0)
-    label = "? ★" if vp == 0 else f"{vp} ★"
+    effect = card.get("effect") or ""
+    if vp == 0:
+        has_endgame = bool(re.search(r"End [Gg]ame", effect))
+        label = "? ★" if has_endgame else "0 ★"
+    else:
+        label = f"{vp} ★"
     return (
         f'<text x="{VP_X}" y="{VP_Y}" text-anchor="end" class="vp-text">'
         f'{html.escape(label)}</text>'

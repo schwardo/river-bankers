@@ -448,7 +448,7 @@
      out of the river — workers are inventory, not bid targets — so they
      don't need the full footprint. cqw units inside scale with width, so
      icons and workers shrink proportionally with the card. */
-  .mat-card.shore { width: 65%; align-self: center; }
+  .mat-card.shore { width: 78%; align-self: center; }
   /* Pre-PNG fallback (image failed to load) — keeps the old compact look. */
   .mat-card.shore:not(.has-art) .icon-slot { width: 12cqw; height: 12cqw; font-size: 7cqw; }
   .mat-card.shore:not(.has-art) .icons-row { min-height: 0; }
@@ -487,9 +487,22 @@
   }
   .player-head {
     display: flex; justify-content: space-between; align-items: center;
+    gap: 8px;
     margin-bottom: 4px;
   }
-  .player-title { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .player-title { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  /* Material-inventory summary on the player-head row. Bigger emoji than
+     the old separate stats row so the count is glanceable from across the
+     table. */
+  .player-mat-summary {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 18px;
+    color: var(--ink-soft);
+    flex: 1;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .player-mat-summary span { white-space: nowrap; }
   .player-pawn-mini {
     width: 22px; height: 22px;
     border-radius: 50%;
@@ -908,6 +921,9 @@
 
   /* ================= EFFECT-PICKER MODALS ================= */
   .picker-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+  /* Horizontal variant — used by the species-starter draft so all 3 card
+     images line up side-by-side instead of stacking. */
+  .picker-list.horizontal { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 10px; }
   .picker-btn {
     padding: 8px 10px; text-align: left; border-radius: 6px;
     background: var(--shore-light); border: 2px solid var(--bank);
@@ -915,6 +931,19 @@
     font-family: inherit; line-height: 1.35;
   }
   .picker-btn:hover { background: #fef6e7; }
+  /* Horizontal picker shows full card images — drop the button chrome so
+     the cards' rounded corners + bleed border stand on their own. Hover
+     still gives a subtle lift cue. */
+  .picker-list.horizontal .picker-btn {
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+  }
+  .picker-list.horizontal .picker-btn:hover {
+    background: transparent;
+    transform: translateY(-2px);
+  }
   .reorder-list { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
   .reorder-row {
     display: flex; justify-content: space-between; align-items: center;
@@ -2006,8 +2035,11 @@ async function runHumanSpeciesDraft() {
     `Pick one of three ${human.species.name}-themed starter structures to build for free. ` +
       `The other two are removed from the game.`,
     speciesCards,
-    (c) => `<b>${c.name}</b><br><span style="font-size:11px;color:#666;">${c.effect}</span>`,
-    { cancelable: false }
+    (c) => {
+      const slug = c.name.replace(/[^A-Za-z0-9]/g, '');
+      return `<img src="../starter-deck/${slug}.png" alt="${c.name}" style="width:195px;height:auto;display:block;">`;
+    },
+    { cancelable: false, horizontal: true }
   );
   if (picked) {
     human.built.push(picked);
@@ -2494,12 +2526,14 @@ function renderPlayers() {
       const thumbs = p.built.map(b => {
         const used = oncePerGameUsed(p, b.name);
         const slug = b.name.replace(/[^A-Za-z0-9]/g, '');
+        // Species-starter cards live in their own deck folder (no cost row).
+        const deckDir = b.species ? 'starter-deck' : 'structure-deck';
         const titleParts = [`${b.name} — ${b.vp}★`];
         if (used) titleParts.push('(used)');
         if (b.effect) titleParts.push(b.effect);
         const title = titleParts.join('\n').replace(/"/g, '&quot;');
         const cls = used ? 'built-thumb used' : 'built-thumb';
-        return `<div class="${cls}" style="background-image:url('../structure-deck/${slug}.png')" title="${title}"></div>`;
+        return `<div class="${cls}" style="background-image:url('../${deckDir}/${slug}.png')" title="${title}"></div>`;
       }).join('');
       builtList = `<div class="built-thumbs">${thumbs}</div>`;
     }
@@ -2514,12 +2548,12 @@ function renderPlayers() {
           <span class="player-pawn-mini" style="background:${p.species.color}">${p.species.emoji}</span>
           ${p.species.name}${p.isHuman ? ' (you)' : ''}
         </div>
+        <div class="player-mat-summary">${matSummary}</div>
         <div class="vp" style="color:var(--forest);font-weight:700;">${totalVPVal}★</div>
       </div>
       <div class="player-stats">
         <span class="worker-supply">${supplyIcons}</span>
       </div>
-      <div class="player-stats" style="margin-top:4px;">${matSummary}</div>
       ${builtList}
       ${lookoutPeek}
     </div>`;
@@ -5282,10 +5316,11 @@ function pickFromList(title, intro, items, renderItem, opts = {}) {
         resolve(null);
       }});
     }
+    const listClass = opts.horizontal ? 'picker-list horizontal' : 'picker-list';
     showModal({
       title,
       body: () => `<p class="small-note">${intro}</p>
-        <div class="picker-list">
+        <div class="${listClass}">
           ${items.map((it, i) => `<button class="picker-btn" onclick="window['${fnName}'](${i})">${renderItem(it, i)}</button>`).join('')}
         </div>`,
       actions,
