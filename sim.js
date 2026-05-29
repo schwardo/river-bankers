@@ -61,7 +61,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
   { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile.' },
   { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game, at the start of your turn, force an opponent to recall one of their workers from a river card (dropping a blank). The opponent slides back 3 fish in compensation.' },
-  { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 9, effect: 'On your turn, instead of a regular action, pay 2 fish to slide a river card 1 space toward the Headwaters.' },
+  { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'On your turn, instead of a regular action, pay 2 fish to slide a river card 1 space toward the Headwaters.' },
   { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'At the start of your turn, swap one of your workers on a river card with another worker (yours or an opponent\'s) on a different river card. Pay the source card\'s per-item cost in fish.' },
   { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 5, effect: 'As your main action, place 1-5 workers from your supply onto uncovered icons of one river card. Fish cost escalates 1/2/3/5/8 per successive worker.' },
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game, take a turn immediately after another player takes their turn, even if you are not next on the fish track.' },
@@ -1631,11 +1631,33 @@ function doBeaverTow(state, playerIdx, cardId) {
 }
 
 function findBeaverTowTarget(state, playerIdx, needs) {
+  const p = state.players[playerIdx];
+  // Beaver Tow's slide makes the card cheaper for *everyone* who auctions
+  // it next, so we should only tow when the builder is the dominant
+  // beneficiary. Two gates:
+  //   (1) No opponent has any hand structure that needs this material —
+  //       so the slid card's discount won't subsidize their auction.
+  //   (2) Builder has trigger pool to auction the slid card themselves.
+  // Without these, towing is a public-good action that costs the builder
+  // 2🐟 + a main action and disproportionately helps opponents.
+  const triggerPool = aiTriggerPool(state, playerIdx);
+  if (triggerPool === 0) return null;
+  const opponentNeedsMaterial = (mat) => {
+    for (const op of state.players) {
+      if (op.idx === playerIdx || op.exhausted || op.out) continue;
+      for (const s of op.hand) {
+        if ((s.cost[mat] || 0) > 0) return true;
+      }
+    }
+    return false;
+  };
   let best = null;
   for (const c of state.riverCards) {
     if (typeof c.slot !== 'number' || c.slot === 0) continue;
-    if ((needs[c.material] || 0) === 0) continue;
+    const own = needs[c.material] || 0;
+    if (own < 2) continue; // builder needs ≥2 of this material for the tow to pay off
     if (uncoveredIcons(c) < 4) continue;
+    if (opponentNeedsMaterial(c.material)) continue;
     if (!best || c.slot > best.slot || (c.slot === best.slot && uncoveredIcons(c) > uncoveredIcons(best))) best = c;
   }
   return best;
