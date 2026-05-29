@@ -566,9 +566,9 @@
   .built-effect-card .effect-text { font-style: italic; color: #5a4a1f; font-size: 10px; margin-top: 2px; line-height: 1.25; }
 
   /* Built-structure thumbnails — small portrait card images in the player
-     tile, one per structure the player has built. Hover via title= shows
-     name / VP / effect prose. Once-per-game cards that have already fired
-     get a desaturated wash + faint "×" marker. */
+     tile, one per structure the player has built. Hover shows a large
+     popup of the card (see .card-popup). Once-per-game cards that have
+     already fired get a desaturated wash + faint "×" marker. */
   .built-thumbs {
     display: flex; flex-wrap: wrap; gap: 6px;
     margin-top: 4px;
@@ -1068,6 +1068,34 @@
   .small-note { font-size: 11px; color: var(--ink-soft); }
   .hidden { display: none !important; }
   .icon-emoji { font-style: normal; }
+
+  /* ================= CARD HOVER POPUP ================= */
+  /* Large preview that appears whenever the cursor is over any element
+     carrying data-card-img. Tracks the cursor, stays inside the viewport,
+     and uses pointer-events:none so hover/click on the underlying card
+     keeps working. Populated and positioned by the script near </body>. */
+  .card-popup {
+    position: fixed;
+    pointer-events: none;
+    width: 320px;
+    aspect-ratio: 2.5 / 3.5;
+    /* No background colour — the PNGs are masked with transparent corners,
+       and any fill here would peek through the rounded die-cut edges. */
+    background: transparent center / contain no-repeat;
+    /* drop-shadow follows the PNG's alpha channel, so the shadow hugs the
+       card silhouette instead of a rectangle. */
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.55));
+    z-index: 9999;
+    display: none;
+  }
+  /* Material-deck cards are printed landscape (252×180 ≈ 1.4:1); the
+     popup rotates its footprint so the preview matches the card's
+     actual orientation instead of letterboxing inside a portrait box. */
+  .card-popup.landscape {
+    width: 448px;
+    aspect-ratio: 3.5 / 2.5;
+  }
+  .card-popup.visible { display: block; }
 </style>
 </head>
 <body>
@@ -2417,8 +2445,9 @@ function renderMatCard(card, opts = {}) {
   const foot = !isShore && opts.note ? opts.note : '';
   // Background image: material-deck/<Slug>.png (slug matches generate.py).
   const slug = cardName.replace(/[^A-Za-z0-9]/g, '');
-  const bgStyle = `style="background-image:url('../material-deck/${slug}.png')"`;
-  return `<div class="${cls.join(' ')}" ${bgStyle} ${onclick}>
+  const imgUrl = `../material-deck/${slug}.png`;
+  const bgStyle = `style="background-image:url('${imgUrl}')"`;
+  return `<div class="${cls.join(' ')}" ${bgStyle} data-card-img="${imgUrl}" ${onclick}>
     <div class="mat-head">
       <span class="mat-name">${cardName}</span>
       ${matLabel}
@@ -2591,12 +2620,9 @@ function renderPlayers() {
         const slug = b.name.replace(/[^A-Za-z0-9]/g, '');
         // Species-starter cards live in their own deck folder (no cost row).
         const deckDir = b.species ? 'starter-deck' : 'structure-deck';
-        const titleParts = [`${b.name} — ${b.vp}★`];
-        if (used) titleParts.push('(used)');
-        if (b.effect) titleParts.push(b.effect);
-        const title = titleParts.join('\n').replace(/"/g, '&quot;');
         const cls = used ? 'built-thumb used' : 'built-thumb';
-        return `<div class="${cls}" style="background-image:url('../${deckDir}/${slug}.png')" title="${title}"></div>`;
+        const imgUrl = `../${deckDir}/${slug}.png`;
+        return `<div class="${cls}" style="background-image:url('${imgUrl}')" data-card-img="${imgUrl}"></div>`;
       }).join('');
       builtList = `<div class="built-thumbs">${thumbs}</div>`;
     }
@@ -2684,8 +2710,9 @@ function renderHand() {
     if (state.phase === 'browse-keep') onClick = `onclick="toggleBrowseSelect('h${i}')"`;
     const effectLine = s.effect ? `<div class="small-note" style="font-style:italic;font-size:11px;margin-top:2px;">${s.effect}</div>` : '';
     const slug = s.name.replace(/[^A-Za-z0-9]/g, '');
-    const bgStyle = `style="background-image:url('../structure-deck/${slug}.png')"`;
-    html += `<div class="${cls.join(' ')}" ${bgStyle} ${onClick}>
+    const imgUrl = `../structure-deck/${slug}.png`;
+    const bgStyle = `style="background-image:url('${imgUrl}')"`;
+    html += `<div class="${cls.join(' ')}" ${bgStyle} data-card-img="${imgUrl}" ${onClick}>
       <div class="header">
         <span class="cost">${s.time}🐟</span>
         <span class="name">${s.name}</span>
@@ -2708,8 +2735,9 @@ function renderHand() {
       cls.push(isKeep ? 'keep-selected' : 'will-discard');
       const effectLine = s.effect ? `<div class="small-note" style="font-style:italic;font-size:11px;margin-top:2px;">${s.effect}</div>` : '';
       const slug = s.name.replace(/[^A-Za-z0-9]/g, '');
-      const bgStyle = `style="background-image:url('../structure-deck/${slug}.png')"`;
-      html += `<div class="${cls.join(' ')}" ${bgStyle} onclick="toggleBrowseSelect('d${i}')">
+      const imgUrl = `../structure-deck/${slug}.png`;
+      const bgStyle = `style="background-image:url('${imgUrl}')"`;
+      html += `<div class="${cls.join(' ')}" ${bgStyle} data-card-img="${imgUrl}" onclick="toggleBrowseSelect('d${i}')">
         <div class="header">
           <span class="cost">${s.time}🐟</span>
           <span class="name">${s.name} <span class="small-note">(new)</span></span>
@@ -5979,6 +6007,64 @@ function showGameOver() {
   }).join('');
   wrap.addEventListener('change', updateSetupHint);
   updateSetupHint();
+})();
+</script>
+
+<!-- ====== Card hover popup ======================================
+     A single floating element that shows a large version of any card
+     with [data-card-img] when the cursor is over it. Event delegation
+     keeps this independent of the various render paths. -->
+<div id="card-popup" class="card-popup" aria-hidden="true"></div>
+<script>
+(function() {
+  const popup = document.getElementById('card-popup');
+  let activeCard = null;
+  const PAD = 16;
+  const OFFSET = 24;
+
+  function positionCardPopup(x, y) {
+    const w = popup.offsetWidth;
+    const h = popup.offsetHeight;
+    let left = x + OFFSET;
+    let top = y + OFFSET;
+    if (left + w + PAD > window.innerWidth) left = x - w - OFFSET;
+    if (left < PAD) left = PAD;
+    if (top + h + PAD > window.innerHeight) top = window.innerHeight - h - PAD;
+    if (top < PAD) top = PAD;
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+  }
+
+  function showCardPopup(url, x, y) {
+    popup.style.backgroundImage = `url('${url}')`;
+    popup.classList.toggle('landscape', url.includes('/material-deck/'));
+    popup.classList.add('visible');
+    positionCardPopup(x, y);
+  }
+
+  function hideCardPopup() {
+    popup.classList.remove('visible');
+  }
+
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('[data-card-img]');
+    if (el === activeCard) return;
+    activeCard = el;
+    if (el) showCardPopup(el.dataset.cardImg, e.clientX, e.clientY);
+    else hideCardPopup();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!activeCard) return;
+    positionCardPopup(e.clientX, e.clientY);
+  });
+
+  // Mouse left the window entirely — hide the popup.
+  document.addEventListener('mouseout', e => {
+    if (e.relatedTarget) return;
+    activeCard = null;
+    hideCardPopup();
+  });
 })();
 </script>
 </body>

@@ -276,14 +276,14 @@ def svg_to_png(kind, exe, svg_path: Path, png_path: Path, dpi: int):
         )
 
 
-WEB_DPI = 72
+WEB_DPI = 300
 
 
 def make_web_png(print_png: Path, web_png: Path, source_dpi: int, output_dpi: int = WEB_DPI):
     """Crop the full-bleed print PNG to the trim line (252×180 pt), apply a
     rounded-corner alpha mask so the area outside the card shape is
-    transparent, then downsample to `output_dpi` (default 72 → 252×180 px)
-    for cheap loading in the web prototype."""
+    transparent, then resample to `output_dpi` (default 300 → 1050×750 px)
+    so HiDPI/zoomed-in displays render the popup preview without blur."""
     src_px = source_dpi / 72.0
     trim_w_src = round(252 * src_px)
     trim_h_src = round(180 * src_px)
