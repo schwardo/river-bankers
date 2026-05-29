@@ -92,7 +92,7 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Beaver Dam** | 4 logs, 2 mud | 2🐟 | Wash **one** River 1 card of your choice to the shoreline (workers carry along). Slide back 2🐟 on the fish track. |
+| **Beaver Dam** | 4 logs, 2 mud | 0🐟 | Wash **one** River 1 card of your choice to the shoreline (workers carry along). |
 | **Mud Levee** | 3 mud, 2 stones | 3🐟 | Drop 2 blanks on any uncovered icons in the river. |
 | **Flush Channel** | 3 mud, 1 reed | 2🐟 | Discard 1 Headwaters card of your choice (out of game). Refill that slot from the top of the material deck. No auction. |
 

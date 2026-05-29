@@ -21,7 +21,7 @@ let MAT_KEYS = ORIG_MATERIALS.slice();
 // Hooks are keyed off the structure name in helpers below.
 // Disable a single card's effect for ablation via setStructureEffectDisabled.
 const BASE_STRUCTURE_TEMPLATES = [
-  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 2, vp: 6, effect: 'When built, wash one card of your choice from River 1 to the shoreline (workers carry along), and slide back 2 fish.' },
+  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built, wash one card of your choice from River 1 to the shoreline (workers carry along).' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a Headwaters card to River 1 for free; an auction immediately runs on it at 1 fish/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End game: +1 VP per shoreline card on the table (max +6).' },
@@ -2093,10 +2093,7 @@ function fireOnBuildEffect(state, playerIdx, struct) {
   }
   if (struct.name === 'Beaver Dam') {
     const r1 = state.riverCards.filter(c => c.slot === 0);
-    if (r1.length === 0) {
-      p.timePos = Math.max(0, p.timePos - 2);
-      return;
-    }
+    if (r1.length === 0) return;
     // Pick the R1 card that's best to wash for the BUILDER:
     //   + own workers: they carry to shoreline (no-blank recall later, count
     //     toward Pier/Heron Watch if we built either, still count for endgame
@@ -2118,7 +2115,6 @@ function fireOnBuildEffect(state, playerIdx, struct) {
       return scoreB - scoreA;
     });
     moveCardToShoreline(state, r1[0]);
-    p.timePos = Math.max(0, p.timePos - 2);
     return;
   }
   if (struct.name === 'Mud Levee') {

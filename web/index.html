@@ -1150,7 +1150,7 @@ function buildMaterialDeck(numPlayers) {
 //   decorative. For human play, add a small persistent peek widget (e.g., a "🔭 Top of deck:
 //   <material> <icons>" indicator) that's visible whenever the human has Lookout Tree built.
 const STRUCTURE_TEMPLATES = [
-  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 2, vp: 6, effect: 'When built, wash one card of your choice from River 1 to the shoreline (workers carry along), and slide back 2🐟.' },
+  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built, wash one card of your choice from River 1 to the shoreline (workers carry along).' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a Headwaters card to River 1 for free; an auction immediately runs on it at 1🐟/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End game: +1 VP per shoreline card on the table (max +6).' },
@@ -4898,16 +4898,14 @@ async function fireOnBuildEffect(playerIdx, struct) {
   if (struct.name === 'Beaver Dam') {
     const r1 = state.riverCards.filter(c => c.slot === 0);
     if (r1.length === 0) {
-      const before = p.timePos;
-      p.timePos = Math.max(0, p.timePos - 2);
-      log(`🦫 Beaver Dam: no River 1 cards to wash; ${speciesLabel(p)} slides back ${before - p.timePos}🐟.`);
+      log(`🦫 Beaver Dam: no River 1 cards to wash.`);
       return;
     }
     let target;
     if (isHuman) {
       target = await pickFromList(
         '🦫 Beaver Dam — wash a River 1 card',
-        'Pick one River 1 card to wash to the shoreline (workers carry along). You slide back 2🐟 regardless of choice.',
+        'Pick one River 1 card to wash to the shoreline (workers carry along).',
         r1,
         c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} · ${uncoveredIcons(c)} open · ${Object.values(c.workers).reduce((s, n) => s + n, 0)} worker${Object.values(c.workers).reduce((s, n) => s + n, 0) === 1 ? '' : 's'}`,
         { cancelable: false }
@@ -4931,9 +4929,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
       target = sorted[0];
     }
     moveCardToShoreline(target);
-    const before = p.timePos;
-    p.timePos = Math.max(0, p.timePos - 2);
-    log(`🦫 Beaver Dam washes ${MATERIALS[target.material].name} (R1) to the shoreline; ${speciesLabel(p)} slides back ${before - p.timePos}🐟.`);
+    log(`🦫 Beaver Dam washes ${MATERIALS[target.material].name} (R1) to the shoreline.`);
     return;
   }
   if (struct.name === 'Mud Levee') {
