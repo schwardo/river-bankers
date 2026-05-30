@@ -247,6 +247,66 @@
     text-align: center;
     margin-bottom: 4px;
   }
+  /* ================= DECK STACK (card-back stack with count overlay) =================
+     Visual: portrait card back with 0–2 shifted copies behind, suggesting a stack.
+     A big count overlays the top card. --back-img is the card-back PNG URL. */
+  .deck-stack {
+    position: relative;
+    aspect-ratio: 2.5 / 3.5;
+    width: 100%;
+    max-width: 110px;
+    margin: 4px auto;
+    isolation: isolate;
+  }
+  .deck-stack.empty { opacity: 0.5; }
+  .deck-stack-bg {
+    position: absolute;
+    inset: 0;
+    border-radius: 6px;
+    background-image: var(--back-img);
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.55);
+  }
+  .deck-stack-bg.b1 { z-index: 3; }
+  .deck-stack-bg.b2 { z-index: 2; transform: translate(3px, 3px); filter: brightness(0.92); }
+  .deck-stack-bg.b3 { z-index: 1; transform: translate(6px, 6px); filter: brightness(0.84); }
+  .deck-stack-empty {
+    position: absolute; inset: 0;
+    border: 2px dashed rgba(255,255,255,0.4);
+    border-radius: 6px;
+    background: rgba(0,0,0,0.15);
+    z-index: 1;
+  }
+  .deck-stack-count {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-weight: 900;
+    font-size: 34px;
+    letter-spacing: -1px;
+    text-shadow:
+      0 0 8px rgba(0,0,0,1),
+      0 2px 5px rgba(0,0,0,0.95),
+      0 0 2px rgba(0,0,0,1);
+    pointer-events: none;
+    line-height: 1;
+  }
+  .deck-stack-count .deck-stack-total {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-left: 3px;
+    font-weight: 700;
+  }
+  /* Material deck variant: landscape orientation (cards are 3.5×2.5). */
+  .deck-stack.landscape { aspect-ratio: 3.5 / 2.5; max-width: 150px; }
+  /* Struct-piles variant: panel is 130px wide. */
+  #struct-deck-stack { width: 100%; }
+  .struct-piles .deck-stack { max-width: 100px; margin: 2px auto; }
+  .struct-piles .deck-stack-count { font-size: 28px; }
+  .struct-piles .deck-stack-count .deck-stack-total { font-size: 12px; }
   .deck-flush-btn {
     margin-top: auto;
     padding: 6px 8px;
@@ -746,7 +806,7 @@
   .hand-and-action-row .action-panel { flex: 1; margin-bottom: 0; }
   .hand-and-action-row .hand-area { flex: 1; margin-bottom: 0; }
   .struct-piles {
-    flex: 0 0 110px;
+    flex: 0 0 130px;
     background: var(--paper);
     border: 2px solid var(--bank);
     border-radius: 8px;
@@ -1148,7 +1208,7 @@
       <div class="struct-pile-title">📚 Structures</div>
       <div class="struct-pile-row">
         <div class="struct-pile-label">Deck</div>
-        <div id="struct-deck-count" class="struct-pile-count">0</div>
+        <div id="struct-deck-stack"></div>
       </div>
       <div class="struct-pile-row">
         <div class="struct-pile-label">Discard</div>
@@ -2478,6 +2538,29 @@ function effectDescription(card) {
   }
 }
 
+// Stack-of-card-backs visual with a remaining/total count overlay.
+// 0 cards → outlined empty rectangle; 1–2 cards → 1 back; 3–9 → 2 backs; 10+ → 3 backs.
+function renderDeckStack(remaining, total, backImg, opts = {}) {
+  const layers = remaining === 0 ? 0 : remaining < 3 ? 1 : remaining < 10 ? 2 : 3;
+  let bgs = '';
+  if (layers === 0) {
+    bgs = `<div class="deck-stack-empty"></div>`;
+  } else {
+    // Render back-to-front so b3 (deepest) is first in DOM, b1 (top) is last.
+    for (let n = layers; n >= 1; n--) bgs += `<div class="deck-stack-bg b${n}"></div>`;
+  }
+  const countHtml = total > 0
+    ? `${remaining}<span class="deck-stack-total">/${total}</span>`
+    : `${remaining}`;
+  const classes = ['deck-stack'];
+  if (remaining === 0) classes.push('empty');
+  if (opts.landscape) classes.push('landscape');
+  return `<div class="${classes.join(' ')}" style="--back-img: url('${backImg}')">
+    ${bgs}
+    <div class="deck-stack-count">${countHtml}</div>
+  </div>`;
+}
+
 function renderRiver() {
   const wrap = document.getElementById('board');
   // ===================== Row 1: Material Deck + Headwaters 1/2/3 =====================
@@ -2499,8 +2582,7 @@ function renderRiver() {
   </button>`;
   const deckTile = `<div class="slot-tile deck-tile">
     <div class="slot-tile-header">Material Deck</div>
-    <div class="deck-count-large">${remaining}<span style="font-size:18px; opacity:0.7;"> / ${total}</span></div>
-    <div class="deck-count-small">cards remaining</div>
+    ${renderDeckStack(remaining, total, '../material-deck/_back.png', { landscape: true })}
     ${flushBtn}
   </div>`;
   let prerivTiles = '';
@@ -2662,9 +2744,12 @@ function renderHand() {
   wrap.classList.remove('hidden');
   if (piles) {
     piles.classList.remove('hidden');
-    const dc = document.getElementById('struct-deck-count');
+    const ds = document.getElementById('struct-deck-stack');
     const xc = document.getElementById('struct-discard-count');
-    if (dc) dc.textContent = state.structDeck.length;
+    if (ds) {
+      const structTotal = state.structDeck.length + state.structDiscard.length;
+      ds.innerHTML = renderDeckStack(state.structDeck.length, structTotal, '../structure-deck/_back.png');
+    }
     if (xc) xc.textContent = state.structDiscard.length;
   }
   // Invent button: enabled only on the human's choose-action phase with cards in the structure deck.
