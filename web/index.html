@@ -369,7 +369,7 @@
     }
     /* Stack the bottom row vertically; reorder so the Structures
        deck panel sits directly below the "Your turn" action panel
-       and pushes "Your structures" to the bottom. Inside struct-piles
+       and pushes "Your hand" to the bottom. Inside struct-piles
        (now full width), put Deck and Discard side-by-side under a
        shared title to avoid wasted vertical space.
        Specificity bumped to `.hand-and-action-row .struct-piles` so
@@ -761,7 +761,10 @@
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    border: none;
+    /* Explicit border-width:0 so a later .will-discard rule that flips
+       border-style to "dashed" doesn't suddenly reveal the 3px default
+       browser border-width and resize the card. */
+    border: 0 none;
     border-radius: 0;
     padding: 0;
     box-shadow: none;
@@ -823,6 +826,13 @@
   .struct-card.keep-selected {
     outline: 3px solid var(--forest);
     box-shadow: 0 0 8px rgba(74,128,86,0.5);
+  }
+  /* Non-art cards (fallback when the PNG hasn't loaded) get a green
+     gradient tint to mark them as kept. has-art cards must avoid the
+     `background:` shorthand — it would reset background-size/position
+     from cover/center, leaving the PNG at its natural 750×1050 size
+     and showing only the top-left corner zoomed in. */
+  .struct-card.keep-selected:not(.has-art) {
     background: linear-gradient(180deg, #ddf0dd 0%, #c5e3c5 100%);
   }
   .struct-card.keep-selected::before {
@@ -908,6 +918,11 @@
     gap: 6px;
     margin-bottom: 0;
   }
+  /* Breathing room between the deck-back stack and the "Discard" label
+     below it — without this they crowded each other vertically. Only
+     applies to the desktop stacked layout; the mobile grid puts Deck
+     and Discard side-by-side and supplies its own column gap. */
+  .struct-piles .struct-pile-row + .struct-pile-row { margin-top: 18px; }
   .struct-pile-title {
     font-weight: 700;
     font-size: 13px;
@@ -939,6 +954,10 @@
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 10px;
+    /* Reserve enough vertical room that the bid / auction-result body fits
+       without making the row jump when the panel grows or shrinks. Keeps
+       the structure cards on the right at a stable size between phases. */
+    min-height: 260px;
   }
   .action-panel-title {
     font-weight: 700;
@@ -948,6 +967,46 @@
   }
   .action-buttons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .action-hint { font-size: 12px; color: var(--ink-soft); margin-top: 6px; font-style: italic; }
+  /* "Waiting" status shown in the action panel while an AI is taking
+     their turn — kept short but large so the player can read it at a
+     glance without it crowding the rest of the row. */
+  .ai-turn-status {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px;
+    padding: 24px 12px;
+    text-align: center;
+  }
+  .ai-turn-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .ai-turn-sub {
+    font-size: 18px;
+    color: var(--ink-soft);
+    line-height: 1.2;
+  }
+  /* Bidding state: the action panel becomes the bid dialog. A pulsing glow
+     + heavier title draw the eye and signal that the game is waiting on
+     the player to confirm their bid. */
+  .action-panel.bidding {
+    border-color: var(--forest);
+    animation: bidPanelPulse 1.6s ease-in-out infinite;
+  }
+  .action-panel.bidding .action-panel-title {
+    font-size: 16px;
+    background: var(--forest);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin: -10px -10px 10px;
+  }
+  @keyframes bidPanelPulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(74,128,86,0.45), 0 0 14px rgba(74,128,86,0.45); }
+    50%      { box-shadow: 0 0 0 8px rgba(74,128,86,0.75), 0 0 28px rgba(74,128,86,0.7); }
+  }
 
   /* ================= MODAL ================= */
   .modal-backdrop {
@@ -1275,25 +1334,12 @@
 <div id="game-screen" class="hidden">
   <div id="players-row" class="players-row"></div>
 
-  <div class="fish-track-wrap">
-    <div class="fish-track-label">
-      <h2>🐟 Fish Track</h2>
-      <span class="small-note">Pawn farthest back acts next; ties broken by stack (top first).</span>
-      <span id="sim-time" class="sim-time" title="Simulated game time. Counts real wall-clock time during your input; AI turns add a hardcoded amount."><span class="sim-time-label">Sim</span><span id="sim-time-value">0:00</span></span>
-    </div>
-    <div id="fish-track" class="fish-track"></div>
-  </div>
-
-  <div class="river-wrap">
-    <div id="board" class="board"></div>
-  </div>
-
   <div class="hand-and-action-row">
     <div id="action-panel" class="action-panel hidden"></div>
     <div id="hand-area" class="hand-area hidden">
       <div class="hand-header">
-        <h2>🃏 Your structures</h2>
-        <button id="hand-invent-btn" class="hand-invent-btn" onclick="humanChooseAction('browse')">📜 Invent (N🐟)</button>
+        <h2>🃏 Your hand</h2>
+        <button id="hand-invent-btn" class="hand-invent-btn" onclick="humanChooseAction('browse')">📜 Draw structure cards (N🐟)</button>
       </div>
       <div id="hand-cards" class="hand-cards"></div>
     </div>
@@ -1308,6 +1354,19 @@
         <div id="struct-discard-count" class="struct-pile-count">0</div>
       </div>
     </div>
+  </div>
+
+  <div class="fish-track-wrap">
+    <div class="fish-track-label">
+      <h2>🐟 Fish Track</h2>
+      <span class="small-note">Pawn farthest back acts next; ties broken by stack (top first).</span>
+      <span id="sim-time" class="sim-time" title="Simulated game time. Counts real wall-clock time during your input; AI turns add a hardcoded amount."><span class="sim-time-label">Sim</span><span id="sim-time-value">0:00</span></span>
+    </div>
+    <div id="fish-track" class="fish-track"></div>
+  </div>
+
+  <div class="river-wrap">
+    <div id="board" class="board"></div>
   </div>
 
   <div>
@@ -2963,12 +3022,52 @@ function renderHand() {
 function renderActionPanel() {
   const panel = document.getElementById('action-panel');
   const cur = state.players[state.currentPlayer];
-  if (state.gameOver || !cur || !cur.isHuman || state.phase === 'idle') {
+  // The bid + auction-result UI must show even when state.currentPlayer
+  // points at an AI — an AI-triggered auction still requires the human
+  // to bid and to see the resolution. Treat both phases as panel-visible
+  // regardless of whose turn it is. The panel stays in the layout (just
+  // with blank content) for all other non-human phases too, so its
+  // min-height keeps the surrounding row from collapsing and resizing
+  // the structure cards.
+  const inHumanBid = state.phase === 'human-bidding' && !!state.humanBidContext;
+  const inAuctionResult = state.phase === 'human-auction-result' && !!state.humanAuctionResult;
+  const forceShow = inHumanBid || inAuctionResult;
+  if (state.gameOver) {
+    panel.classList.remove('bidding');
     panel.classList.add('hidden');
     panel.innerHTML = '';
     return;
   }
   panel.classList.remove('hidden');
+  if (!forceShow && (!cur || !cur.isHuman || state.phase === 'idle')) {
+    // Not the human's turn (and we're not blocking on a bid/result prompt).
+    // Keep the panel in the row so hand-area's horizontal share stays
+    // stable, but show a brief, large "waiting" status — who is acting
+    // and how far behind in turn order the human is.
+    panel.classList.remove('bidding');
+    const human = state.players.find(p => p.isHuman);
+    let body = '';
+    if (cur && !cur.isHuman) {
+      const turnLine = `${cur.species.emoji} ${cur.species.name} is taking their turn.`;
+      let trackLine = '';
+      if (human && !human.out) {
+        // timePos counts forward (lapping bumps by LAP_LENGTH). The player
+        // with the lowest timePos acts next, so when an AI is acting the
+        // human's pos is >= the AI's; the diff is how many fish the human
+        // is "behind in turn order".
+        const ahead = Math.max(0, human.timePos - cur.timePos);
+        trackLine = ahead === 0
+          ? `You're tied with ${cur.species.name} in turn order.`
+          : `You are ${ahead}🐟 ahead in turn order.`;
+      }
+      body = `<div class="ai-turn-status">
+        <div class="ai-turn-title">${turnLine}</div>
+        ${trackLine ? `<div class="ai-turn-sub">${trackLine}</div>` : ''}
+      </div>`;
+    }
+    panel.innerHTML = body;
+    return;
+  }
   let html = '';
   if (state.phase === 'choose-action') {
     const placed = totalPlacedWorkers(state, cur.idx);
@@ -3042,7 +3141,7 @@ function renderActionPanel() {
         <button onclick="humanChooseAction('preriv')" ${(triggerPool > 0 && hasPreriv) ? '' : 'disabled'}>1. Auction Headwaters card (2–4🐟)</button>
         <button onclick="humanChooseAction('auction')" ${(triggerPool > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>2. Auction river card (1🐟)</button>
         <button onclick="humanChooseAction('flush')" ${(triggerPool > 0 && state.matDeck.length > 0) ? '' : 'disabled'}>3. Flush Headwaters (5🐟)</button>
-        <button onclick="humanChooseAction('browse')" ${structAvailable(state) > 0 ? '' : 'disabled'}>4. Invent structures (N🐟)</button>
+        <button onclick="humanChooseAction('browse')" ${structAvailable(state) > 0 ? '' : 'disabled'}>4. Draw structure cards (N🐟)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>5. Build a structure</button>
         ${beaverTowAvail ? `<button onclick="humanChooseAction('beaverTow')">6. Beaver Tow (2🐟): slide a river card upstream</button>` : ''}
         ${salmonRunAvail ? `<button onclick="humanChooseAction('salmonRun')">7. Salmon Run (1/2/3/5/8🐟): place workers on a single card</button>` : ''}
@@ -3074,13 +3173,19 @@ function renderActionPanel() {
         <button class="ghost" onclick="humanCancelAction()">Cancel</button>
       </div>`;
   } else if (state.phase === 'browse-N') {
-    html = `<div class="action-panel-title">Invent structures — how many cards?</div>
-      <div class="action-buttons">
-        <span>N: <input id="browse-n" type="number" value="1" min="1" max="5"></span>
+    html = `<div class="action-panel-title">Draw structure cards — how many?</div>
+      <div class="bid-slider-row">
+        <span class="small-note">1</span>
+        <input id="browse-n" class="bid-slider" type="range" min="1" max="5" value="1"
+               oninput="document.getElementById('browse-n-current').textContent = this.value">
+        <span class="small-note">5</span>
+        <div id="browse-n-current" class="bid-current">1</div>
+      </div>
+      <div class="action-buttons" style="margin-top:8px;">
         <button class="primary" onclick="humanConfirmBrowseN()">Draw N, then discard N</button>
         <button class="ghost" onclick="humanCancelAction()">Cancel</button>
-        <span class="action-hint">Costs N🐟. You'll discard the same number you drew.</span>
-      </div>`;
+      </div>
+      <div class="action-hint">Costs N🐟. You'll discard the same number you drew.</div>`;
   } else if (state.phase === 'browse-keep') {
     const keep = state.browseKeepCount;
     const have = state.browseSelected.size;
@@ -3092,9 +3197,161 @@ function renderActionPanel() {
         <button class="primary" onclick="humanConfirmBrowseKeep()" ${have === keep ? '' : 'disabled'}>Confirm</button>
       </div>`;
   } else if (state.phase === 'human-bidding') {
-    // Modal handles bid input
-    html = `<div class="action-panel-title">Auction in progress…</div><div class="action-hint">Submit your bid in the popup.</div>`;
+    // Inline bid UI — replaces the "Your turn — choose an action" content.
+    // humanBidForAuction() stashed all the derived data on state.humanBidContext
+    // so we can rebuild the body whenever render() fires (e.g., after an
+    // adjustBidRecall click chain that didn't go through innerHTML).
+    const ctx = state.humanBidContext;
+    if (!ctx) {
+      html = `<div class="action-panel-title">Auction in progress…</div>`;
+    } else {
+      const initRecall = humanBidRecallTotal();
+      const initBid = ctx.initBid;
+      const initNeedRecall = Math.max(0, initBid - ctx.baseSupply);
+
+      let revealHtml = '';
+      if (ctx.opts && ctx.opts.revealedBids) {
+        const rows = state.players
+          .filter(p => p.idx !== ctx.human.idx && p.idx in ctx.opts.revealedBids)
+          .map(p => {
+            const b = ctx.opts.revealedBids[p.idx] | 0;
+            return `<div class="bidder-row">
+              <span class="bidder-name">${p.species.emoji} ${p.species.name}${p.exhausted ? ' 💤' : ''}</span>
+              <span><b>${b}</b> worker${b === 1 ? '' : 's'}</span>
+            </div>`;
+          }).join('');
+        revealHtml = `<p class="small-note" style="margin-top:0;">🕵 Spy Mound — you've seen everyone else's bids:</p>
+          <div class="auction-bidders">${rows}</div>`;
+      }
+
+      let recallHtml = '';
+      if (ctx.recallCards.length > 0 && humanBidRecallState) {
+        const rows = ctx.recallCards.map(({ c, river }) => {
+          const w = humanBidRecallState.maxByCard[c.id] || 0;
+          const where = river ? `River ${c.slot + 1}` : 'Shoreline';
+          const blankNote = river ? '(drops a blank)' : '(no blank)';
+          const v = humanBidRecallState.plan[c.id] || 0;
+          return `<div class="bidder-row">
+            <span class="bidder-name">${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} <span class="small-note">${where} ${blankNote}</span></span>
+            <span style="display:inline-flex; align-items:center; gap:6px;">
+              <button type="button" onclick="adjustBidRecall('${c.id}', -1)" style="width:24px;">−</button>
+              <span id="bid-recall-${c.id}" style="min-width:22px; text-align:center;"><b>${v}</b></span>
+              <button type="button" onclick="adjustBidRecall('${c.id}', 1)" style="width:24px;">+</button>
+              <span class="small-note">/ ${w}</span>
+            </span>
+          </div>`;
+        }).join('');
+        recallHtml = `
+          <div id="bid-recall-section" style="margin-top:10px; padding:8px; border:1px solid var(--bank); border-radius:4px; display:${initNeedRecall > 0 ? '' : 'none'};">
+            <div id="bid-recall-header" class="small-note" style="margin-bottom:6px;"></div>
+            <div class="auction-bidders">${rows}</div>
+          </div>
+        `;
+      }
+
+      html = `<div class="action-panel-title">🎲 Your bid — ${ctx.m.emoji} ${ctx.card.name} <span style="opacity:0.85; font-weight:600;">(${ctx.m.name})</span> at ${ctx.slotLbl}</div>
+        ${revealHtml}
+        <p>${ctx.open} icon${ctx.open === 1 ? '' : 's'} open · ${ctx.cost}🐟 per item · minimum bid <b>${ctx.minBid}</b>${ctx.minBid > 0 ? ' (you triggered)' : ''} · maximum <b>${ctx.sliderMax}</b> ${ctx.sliderMax === ctx.open ? '(open icons)' : `(${ctx.baseSupply} supply + up to ${ctx.totalRecallable} recall)`}.</p>
+        <div class="bid-slider-row">
+          <span class="small-note">${ctx.minBid}</span>
+          <input id="human-bid" class="bid-slider" type="range" min="${ctx.minBid}" max="${ctx.sliderMax}" value="${initBid}" oninput="updateBidPreview()">
+          <span class="small-note">${ctx.sliderMax}</span>
+          <div id="bid-current" class="bid-current">${initBid}</div>
+        </div>
+        <div class="bid-stats">
+          <div class="bid-stat">
+            <div class="bid-stat-label">Supply</div>
+            <div class="bid-stat-vals">
+              <span class="bid-stat-before">${ctx.baseSupply}</span>
+              <span class="bid-stat-arrow">→</span>
+              <span class="bid-stat-after" id="bid-workers-after">${ctx.baseSupply + initRecall - initBid}</span>
+            </div>
+            <div class="bid-stat-delta" id="bid-workers-delta">${initRecall > 0 || initBid > 0 ? [initRecall > 0 ? `+${initRecall} recalled` : null, initBid > 0 ? `−${initBid} placed` : null].filter(x => x).join(', ') : 'no change'}</div>
+          </div>
+          <div class="bid-stat">
+            <div class="bid-stat-label">Fish</div>
+            <div class="bid-stat-vals">
+              <span class="bid-stat-before">${ctx.baseTime}</span>
+              <span class="bid-stat-arrow">→</span>
+              <span class="bid-stat-after" id="bid-time-after">${ctx.baseTime + initBid * ctx.cost}</span>
+            </div>
+            <div class="bid-stat-delta" id="bid-time-delta">${initBid > 0 ? '+' + (initBid * ctx.cost) + '🐟 (max — less if jam)' : 'no fish spent'}</div>
+          </div>
+        </div>
+        ${recallHtml}
+        <div class="action-buttons" style="margin-top:10px;">
+          <button id="bid-submit-btn" class="primary" onclick="state.humanBidContext && state.humanBidContext.submit()">Submit bid</button>
+        </div>`;
+    }
+  } else if (state.phase === 'human-auction-result') {
+    // Auction result UI — also inline (used to be a modal).
+    const ctx = state.humanAuctionResult;
+    if (!ctx) {
+      html = `<div class="action-panel-title">Auction complete</div>`;
+    } else {
+      const { result, m } = ctx;
+      let rows = '';
+      for (const p of state.players) {
+        if (!(p.idx in result.bids)) continue;
+        const bid = result.bids[p.idx];
+        const took = result.takings[p.idx] || 0;
+        const time = result.timeAdvances[p.idx] || 0;
+        const dim = bid === 0 ? ' style="opacity:0.5"' : '';
+        let outcomeStr;
+        if (bid === 0) outcomeStr = `<span class="small-note">passed</span>`;
+        else if (took === 0) outcomeStr = `bid <b>${bid}</b> → <span style="color:#a33">won 0</span>`;
+        else if (took === bid) outcomeStr = `bid <b>${bid}</b> → <span style="color:var(--forest)">won <b>${took}</b></span> (+${time}🐟)`;
+        else outcomeStr = `bid <b>${bid}</b> → won <b>${took}</b> (+${time}🐟)`;
+        rows += `<div class="bidder-row"${dim}>
+          <span class="bidder-name">
+            <span class="player-pawn-mini" style="background:${p.species.color}">${p.species.emoji}</span>
+            ${p.species.name}${p.isHuman ? ' (you)' : ''}
+          </span>
+          <span>${outcomeStr}</span>
+        </div>`;
+      }
+      let outcomeBox = '';
+      if (result.outcome === 'no-bids') {
+        outcomeBox = `<div class="result-box info">
+          <p><b>No one bid.</b> The card stays where it was — nothing moves.</p>
+        </div>`;
+      } else if (result.outcome === 'plenty') {
+        const leftover = result.leftover;
+        let fateLine;
+        if (result.cardFate === 'plenty-slid') {
+          fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The card <b>drifts into River ${result.cardNewSlot + 1}</b> with its leftover icons, where it can be auctioned again at <b>${result.cardNewCost}🐟</b> per item.</p>`;
+        } else if (result.cardFate === 'shoreline-graduated') {
+          fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The card was already on the last river space, so it <b>graduates to the shoreline</b> with its workers.</p>`;
+        } else {
+          fateLine = `<p>Every open icon was claimed — the card has nothing left to auction and <b>drifts to the shoreline</b>.</p>`;
+        }
+        outcomeBox = `<div class="result-box plenty">
+          <p><b>🌟 Plenty to go around.</b> Total bid ${result.totalBid} ≤ ${result.openBefore} open icons, so every bidder took exactly what they bid.</p>
+          ${fateLine}
+        </div>`;
+      } else { // jam
+        let fateLine;
+        if (result.cardFate === 'shoreline-graduated') {
+          fateLine = `<p>The card was already on the last river space, so it <b>graduates to the shoreline</b> with its workers. ${result.leftover} unclaimed icon${result.leftover === 1 ? '' : 's'} no longer matter — shoreline cards can't be auctioned.</p>`;
+        } else {
+          fateLine = `<p>${result.leftover} icon${result.leftover === 1 ? '' : 's'} stay${result.leftover === 1 ? 's' : ''} uncovered. The card <b>slides to River ${result.cardNewSlot + 1}</b>, where its per-item cost is <b>${result.cardNewCost}🐟</b>.</p>`;
+        }
+        outcomeBox = `<div class="result-box jam">
+          <p><b>🌊 River jams.</b> Total bid (${result.totalBid}) exceeded ${result.openBefore} open icons. Each bidder took <code>max(0, ${result.openBefore} − others' bids)</code>, capped at their own bid. <b>Every worker you bid still costs you fish</b> even if it didn't clinch an icon — workers that didn't win return to your supply.</p>
+          ${fateLine}
+        </div>`;
+      }
+      html = `<div class="action-panel-title">🎲 ${m.emoji} ${result.cardName || m.name} <span style="opacity:0.85; font-weight:600;">(${m.name})</span> — auction result</div>
+        <p class="small-note">${result.openBefore} open icon${result.openBefore === 1 ? '' : 's'} going in · ${result.costAtAuction}🐟 per item</p>
+        <div class="auction-bidders">${rows}</div>
+        ${outcomeBox}
+        <div class="action-buttons" style="margin-top:10px;">
+          <button class="primary" onclick="state.humanAuctionResult && state.humanAuctionResult.dismiss()">Dismiss</button>
+        </div>`;
+    }
   }
+  // Toggle the pulsing-glow "bidding" treatment on the panel itself.
+  panel.classList.toggle('bidding', state.phase === 'human-bidding');
   panel.innerHTML = html;
 }
 
@@ -3281,7 +3538,7 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   state.phase = 'auction-bidding';
   const m = MATERIALS[card.material];
   const slotLbl = card.slot === 'pre' ? 'Headwaters' : `River ${card.slot + 1}`;
-  log(`🎲 Auction begins on ${m.emoji} ${m.name} at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
+  log(`🎲 Auction begins on ${m.emoji} ${card.name} (${m.name}) at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
 
   // Spy Mound / Quick Strike: holders can defer their bid until after others
   // reveal. AIs auto-defer if eligible AND the card's material matches at
@@ -3460,6 +3717,7 @@ function resolveAuction(card, bids) {
 
   const result = {
     cardMaterial: card.material,
+    cardName: card.name,
     costAtAuction: cardCost(card),
     openBefore: open,
     totalBid,
@@ -3569,77 +3827,32 @@ function resolveAuction(card, bids) {
   return result;
 }
 
+// Auction outcome — also rendered inline in the action panel rather than a
+// modal. renderActionPanel('human-auction-result') reads
+// state.humanAuctionResult to build the body; Dismiss clears the slot and
+// the panel falls through to empty content (action-panel.min-height keeps
+// surrounding layout from jumping).
 async function showAuctionResult(result) {
-  // No human present → skip the modal.
   if (!state.players.some(p => p.isHuman)) return;
-  const m = MATERIALS[result.cardMaterial];
-
-  // Bid/take rows for every player who participated
-  let rows = '';
-  for (const p of state.players) {
-    if (!(p.idx in result.bids)) continue;
-    const bid = result.bids[p.idx];
-    const took = result.takings[p.idx] || 0;
-    const time = result.timeAdvances[p.idx] || 0;
-    const dim = bid === 0 ? ' style="opacity:0.5"' : '';
-    let outcomeStr;
-    if (bid === 0) outcomeStr = `<span class="small-note">passed</span>`;
-    else if (took === 0) outcomeStr = `bid <b>${bid}</b> → <span style="color:#a33">won 0</span>`;
-    else if (took === bid) outcomeStr = `bid <b>${bid}</b> → <span style="color:var(--forest)">won <b>${took}</b></span> (+${time}🐟)`;
-    else outcomeStr = `bid <b>${bid}</b> → won <b>${took}</b> (+${time}🐟)`;
-    rows += `<div class="bidder-row"${dim}>
-      <span class="bidder-name">
-        <span class="player-pawn-mini" style="background:${p.species.color}">${p.species.emoji}</span>
-        ${p.species.name}${p.isHuman ? ' (you)' : ''}
-      </span>
-      <span>${outcomeStr}</span>
-    </div>`;
-  }
-
-  // Outcome explanation
-  let outcomeBox = '';
-  if (result.outcome === 'no-bids') {
-    outcomeBox = `<div class="result-box info">
-      <p><b>No one bid.</b> The card stays where it was — nothing moves.</p>
-    </div>`;
-  } else if (result.outcome === 'plenty') {
-    const leftover = result.leftover;
-    let fateLine;
-    if (result.cardFate === 'plenty-slid') {
-      fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The card <b>drifts into River ${result.cardNewSlot + 1}</b> with its leftover icons, where it can be auctioned again at <b>${result.cardNewCost}🐟</b> per item.</p>`;
-    } else if (result.cardFate === 'shoreline-graduated') {
-      fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The card was already on the last river space, so it <b>graduates to the shoreline</b> with its workers.</p>`;
-    } else {
-      fateLine = `<p>Every open icon was claimed — the card has nothing left to auction and <b>drifts to the shoreline</b>.</p>`;
-    }
-    outcomeBox = `<div class="result-box plenty">
-      <p><b>🌟 Plenty to go around.</b> Total bid ${result.totalBid} ≤ ${result.openBefore} open icons, so every bidder took exactly what they bid.</p>
-      ${fateLine}
-    </div>`;
-  } else { // jam
-    let fateLine;
-    if (result.cardFate === 'shoreline-graduated') {
-      fateLine = `<p>The card was already on the last river space, so it <b>graduates to the shoreline</b> with its workers. ${result.leftover} unclaimed icon${result.leftover === 1 ? '' : 's'} no longer matter — shoreline cards can't be auctioned.</p>`;
-    } else {
-      fateLine = `<p>${result.leftover} icon${result.leftover === 1 ? '' : 's'} stay${result.leftover === 1 ? 's' : ''} uncovered. The card <b>slides to River ${result.cardNewSlot + 1}</b>, where its per-item cost is <b>${result.cardNewCost}🐟</b>.</p>`;
-    }
-    outcomeBox = `<div class="result-box jam">
-      <p><b>🌊 River jams.</b> Total bid (${result.totalBid}) exceeded ${result.openBefore} open icons. Each bidder took <code>max(0, ${result.openBefore} − others' bids)</code>, capped at their own bid. <b>Every worker you bid still costs you fish</b> even if it didn't clinch an icon — workers that didn't win return to your supply.</p>
-      ${fateLine}
-    </div>`;
-  }
-
   return new Promise(resolve => {
-    showModal({
-      title: `🎲 ${m.emoji} ${m.name} — auction result`,
-      body: () => `
-        <p class="small-note">${result.openBefore} open icon${result.openBefore === 1 ? '' : 's'} going in · ${result.costAtAuction}🐟 per item</p>
-        <div class="auction-bidders">${rows}</div>
-        ${outcomeBox}
-      `,
-      actions: [
-        { label: 'Continue', primary: true, onClick: () => { closeModal(); resolve(); } },
-      ],
+    state.humanAuctionResult = {
+      result,
+      m: MATERIALS[result.cardMaterial],
+      dismiss: () => {
+        state.humanAuctionResult = null;
+        // Park in 'auction-bidding' so the action panel goes blank rather
+        // than reverting to "Your turn" (the outer auction loop sets the
+        // real next phase after we resolve).
+        state.phase = 'auction-bidding';
+        resolve();
+        render();
+      },
+    };
+    state.phase = 'human-auction-result';
+    render();
+    requestAnimationFrame(() => {
+      const panel = document.getElementById('action-panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
   });
 }
@@ -5734,8 +5947,11 @@ function updateBidPreview() {
     }
   }
 
-  // Submit disabled while there's a deficit.
-  const submitBtn = document.getElementById('modal-btn-0');
+  // Submit disabled while there's a deficit. The button lives in the
+  // action-panel (id="bid-submit-btn"); fall back to the legacy modal id
+  // in case any path still uses showModal for the bid (e.g., tests).
+  const submitBtn = document.getElementById('bid-submit-btn')
+    || document.getElementById('modal-btn-0');
   if (submitBtn) submitBtn.disabled = deficit > 0;
 }
 
@@ -5805,108 +6021,57 @@ async function humanBidForAuction(card, human, minBid, opts = {}) {
     const initBid = Math.min(Math.max(minBid, 0), sliderMax);
     const initNeedRecall = Math.max(0, initBid - baseSupply);
 
-    let revealHtml = '';
-    if (opts.revealedBids) {
-      const rows = state.players
-        .filter(p => p.idx !== human.idx && p.idx in opts.revealedBids)
-        .map(p => {
-          const b = opts.revealedBids[p.idx] | 0;
-          return `<div class="bidder-row">
-            <span class="bidder-name">${p.species.emoji} ${p.species.name}${p.exhausted ? ' 💤' : ''}</span>
-            <span><b>${b}</b> worker${b === 1 ? '' : 's'}</span>
-          </div>`;
-        }).join('');
-      revealHtml = `<p class="small-note" style="margin-top:0;">🕵 Spy Mound — you've seen everyone else's bids:</p>
-        <div class="auction-bidders">${rows}</div>`;
-    }
+    // The bid UI used to live in a modal. It now renders inline in the
+    // action panel (the same place that normally shows "Your turn — choose
+    // an action"). We stash all the derived state on state.humanBidContext
+    // so renderActionPanel() can rebuild the body, and resolve() the
+    // promise when the user submits.
+    state.humanBidContext = {
+      card, human, opts,
+      m, slotLbl,
+      sliderMax, baseSupply, baseTime, cost, open, totalRecallable,
+      minBid, initBid,
+      recallCards,
+      submit: () => {
+        const slider = document.getElementById('human-bid');
+        const v = parseInt(slider.value);
+        const recall = humanBidRecallTotal();
+        const needRecall = Math.max(0, v - baseSupply);
+        if (isNaN(v) || v < minBid || v > sliderMax) {
+          alert(`Bid must be between ${minBid} and ${sliderMax}.`);
+          return;
+        }
+        if (recall < needRecall) {
+          alert(`You need to recall ${needRecall - recall} more worker(s) to support this bid.`);
+          return;
+        }
+        // Apply pre-auction recall first (drops blanks on river cards).
+        const spec = [];
+        for (const cardId of Object.keys(humanBidRecallState.plan)) {
+          const n = humanBidRecallState.plan[cardId];
+          if (n > 0) spec.push({ cardId, count: n });
+        }
+        if (spec.length > 0) callWorkersHome(human.idx, spec);
+        humanBidRecallState = null;
+        state.humanBidContext = null;
+        // Restore auction-bidding so the action panel hides until the next
+        // human turn. resolveAuction → showAuctionResolution (later in the
+        // turn loop) re-renders again.
+        state.phase = 'auction-bidding';
+        resolve(v);
+        render();
+      },
+    };
+    state.phase = 'human-bidding';
+    render();
 
-    let recallHtml = '';
-    if (recallCards.length > 0) {
-      const rows = recallCards.map(({ c, river }) => {
-        const w = maxByCard[c.id];
-        const where = river ? `River ${c.slot + 1}` : 'Shoreline';
-        const blankNote = river ? '(drops a blank)' : '(no blank)';
-        const v = plan[c.id] || 0;
-        return `<div class="bidder-row">
-          <span class="bidder-name">${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} <span class="small-note">${where} ${blankNote}</span></span>
-          <span style="display:inline-flex; align-items:center; gap:6px;">
-            <button type="button" onclick="adjustBidRecall('${c.id}', -1)" style="width:24px;">−</button>
-            <span id="bid-recall-${c.id}" style="min-width:22px; text-align:center;"><b>${v}</b></span>
-            <button type="button" onclick="adjustBidRecall('${c.id}', 1)" style="width:24px;">+</button>
-            <span class="small-note">/ ${w}</span>
-          </span>
-        </div>`;
-      }).join('');
-      recallHtml = `
-        <div id="bid-recall-section" style="margin-top:10px; padding:8px; border:1px solid var(--border, #333); border-radius:4px; display:${initNeedRecall > 0 ? '' : 'none'};">
-          <div id="bid-recall-header" class="small-note" style="margin-bottom:6px;"></div>
-          <div class="auction-bidders">${rows}</div>
-        </div>
-      `;
-    }
-
-    showModal({
-      title: `🎲 Auction: ${m.emoji} ${m.name} at ${slotLbl}`,
-      body: () => `
-        ${revealHtml}
-        <p>${open} icon${open === 1 ? '' : 's'} open · ${cost}🐟 per item · minimum bid <b>${minBid}</b>${minBid > 0 ? ' (you triggered)' : ''} · maximum <b>${sliderMax}</b> ${sliderMax === open ? '(open icons)' : `(${baseSupply} supply + up to ${totalRecallable} recall)`}.</p>
-        <div class="bid-slider-row">
-          <span class="small-note">${minBid}</span>
-          <input id="human-bid" class="bid-slider" type="range" min="${minBid}" max="${sliderMax}" value="${initBid}" oninput="updateBidPreview()">
-          <span class="small-note">${sliderMax}</span>
-          <div id="bid-current" class="bid-current">${initBid}</div>
-        </div>
-        <div class="bid-stats">
-          <div class="bid-stat">
-            <div class="bid-stat-label">Supply</div>
-            <div class="bid-stat-vals">
-              <span class="bid-stat-before">${baseSupply}</span>
-              <span class="bid-stat-arrow">→</span>
-              <span class="bid-stat-after" id="bid-workers-after">${baseSupply + initRecall - initBid}</span>
-            </div>
-            <div class="bid-stat-delta" id="bid-workers-delta">${initRecall > 0 || initBid > 0 ? [initRecall > 0 ? `+${initRecall} recalled` : null, initBid > 0 ? `−${initBid} placed` : null].filter(x => x).join(', ') : 'no change'}</div>
-          </div>
-          <div class="bid-stat">
-            <div class="bid-stat-label">Fish</div>
-            <div class="bid-stat-vals">
-              <span class="bid-stat-before">${baseTime}</span>
-              <span class="bid-stat-arrow">→</span>
-              <span class="bid-stat-after" id="bid-time-after">${baseTime + initBid * cost}</span>
-            </div>
-            <div class="bid-stat-delta" id="bid-time-delta">${initBid > 0 ? '+' + (initBid * cost) + '🐟 (max — less if jam)' : 'no fish spent'}</div>
-          </div>
-        </div>
-        ${recallHtml}
-      `,
-      actions: [
-        { label: 'Submit bid', primary: true, onClick: () => {
-          const slider = document.getElementById('human-bid');
-          const v = parseInt(slider.value);
-          const recall = humanBidRecallTotal();
-          const needRecall = Math.max(0, v - baseSupply);
-          if (isNaN(v) || v < minBid || v > sliderMax) {
-            alert(`Bid must be between ${minBid} and ${sliderMax}.`);
-            return;
-          }
-          if (recall < needRecall) {
-            alert(`You need to recall ${needRecall - recall} more worker(s) to support this bid.`);
-            return;
-          }
-          closeModal();
-          // Apply pre-auction recall first (drops blanks on river cards).
-          const spec = [];
-          for (const cardId of Object.keys(humanBidRecallState.plan)) {
-            const n = humanBidRecallState.plan[cardId];
-            if (n > 0) spec.push({ cardId, count: n });
-          }
-          if (spec.length > 0) callWorkersHome(human.idx, spec);
-          humanBidRecallState = null;
-          resolve(v);
-        }},
-      ],
+    // Smooth-scroll the action panel into view + initialise the preview /
+    // submit-button disabled state once the new DOM is in place.
+    requestAnimationFrame(() => {
+      const panel = document.getElementById('action-panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      updateBidPreview();
     });
-    // Initialize header text + submit-disabled state for the just-rendered modal.
-    updateBidPreview();
   });
 }
 
