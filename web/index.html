@@ -376,14 +376,14 @@
        the rule beats the later `.struct-piles` defaults. */
     .hand-and-action-row { flex-direction: column; }
     .hand-and-action-row .action-panel { order: 1; flex: 1 1 auto; }
+    .hand-and-action-row .hand-area { order: 2; flex: 1 1 auto; }
     .hand-and-action-row .struct-piles {
-      order: 2; flex: 1 1 auto; width: 100%;
+      order: 3; flex: 1 1 auto; width: 100%;
       display: grid;
       grid-template-columns: 1fr 1fr;
       column-gap: 12px;
     }
     .hand-and-action-row .struct-piles .struct-pile-title { grid-column: 1 / -1; }
-    .hand-and-action-row .hand-area { order: 3; flex: 1 1 auto; }
   }
 
   /* ================= MATERIAL CARD =================
