@@ -1,13 +1,13 @@
 # River Bankers
 
-A 2–4 player card game in which rival semi-aquatic mammals — **beavers, sea otters, muskrats, and minks** — bid workers on materials drifting downriver and spend them to build structures along the bank. Every action costs **fish** — workers eat them to swim against the current — paid out on a shared track, and the player furthest *back* on the track always acts next.
+A 2–4 player card game in which rival semi-aquatic mammals — **beavers, river otters, muskrats, and minks** — bid workers on materials drifting downriver and spend them to build structures along the bank. Every action costs **fish** — workers eat them to swim against the current — paid out on a shared track, and the player furthest *back* on the track always acts next.
 
 ## Components
 
 - 1 game board (with the Headwaters, river, shoreline, and 60-space fish track)
 - 24 material cards (6 materials × 4 cards each: 4-, 5-, 7-, and 8-icon variants)
 - 32 structure cards
-- 32 worker discs (0.63" diameter × 0.4" thick) — 8 in each of 4 species colors: **brown beaver, red sea otter, green muskrat, purple mink**
+- 32 worker discs (0.63" diameter × 0.4" thick) — 8 in each of 4 species colors: **brown beaver, red river otter, green muskrat, purple mink**
 - 4 fish-track pawns — one 0.63" disc per species, same colors as that species' workers
 - 28 blank chits (0.75" diameter, printed)
 - 1 rulebook

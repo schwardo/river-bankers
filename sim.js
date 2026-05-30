@@ -73,7 +73,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'When you build a structure that uses Logs, advance 1 fewer fish (min 1).' },
   { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 2, species: 'beaver', effect: 'At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card.' },
   { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'Your hand size is 4 instead of 3.' },
-  // Sea Otter (Reeds bias)
+  // River Otter (Reeds bias)
   { name: 'Kelp Bed',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Reeds icons cost you 1 less fish per item (min 1).' },
   { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 1, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
   { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, when building, 1 of your Stones workers may substitute for any other material.' },

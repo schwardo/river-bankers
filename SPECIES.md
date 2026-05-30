@@ -4,7 +4,7 @@ Design notes for **asymmetric play** via species-specific starter structures.
 
 ## Overview
 
-Each species (Beaver, Sea Otter, Muskrat, Mink) has a private pool of **3 thematic structure cards**. At game start, each player drafts **1 of their 3** to begin the game with that structure already built in their tableau (in addition to their normal 3-card starting hand of regular structures). The other 2 species cards go out of game.
+Each species (Beaver, River Otter, Muskrat, Mink) has a private pool of **3 thematic structure cards**. At game start, each player drafts **1 of their 3** to begin the game with that structure already built in their tableau (in addition to their normal 3-card starting hand of regular structures). The other 2 species cards go out of game.
 
 > **Print convention.** Species starter cards are physically distinct from the main structure deck — they're handed to each player as a personal mini-pool at setup, never shuffled into the shared structure deck.
 
@@ -13,7 +13,7 @@ Each species (Beaver, Sea Otter, Muskrat, Mink) has a private pool of **3 themat
 | Species | Bonus material | Theme link |
 |---|---|---|
 | **Beaver** | Logs | Dam construction |
-| **Sea Otter** | Reeds | Kelp wrapping |
+| **River Otter** | Reeds | Kelp wrapping |
 | **Muskrat** | Mud | Burrows |
 | **Mink** | Clay | Den-making |
 
@@ -33,7 +33,7 @@ Each species (Beaver, Sea Otter, Muskrat, Mink) has a private pool of **3 themat
 
 ---
 
-## 🦦 Sea Otter — playful, tool-using, communal
+## 🦦 River Otter — playful, tool-using, communal
 
 | Name | VP | Type | Effect |
 |------|----|------|--------|
