@@ -1623,13 +1623,13 @@ async function resolvePendingPackRatSwaps() {
         `<label class="bidder-row" style="cursor:pointer;">
           <input type="radio" name="prb-hand" value="${i}" ${i === 0 ? 'checked' : ''}>
           <span class="bidder-name">${s.name}</span>
-          <span class="small-note">${s.vp}★ · ${s.time}🐟</span>
+          <span class="small-note">${vpDisplay(s)}★ · ${s.time}🐟</span>
         </label>`).join('');
       const discardRows = state.structDiscard.map((s, i) =>
         `<label class="bidder-row" style="cursor:pointer;">
           <input type="radio" name="prb-disc" value="${i}" ${i === 0 ? 'checked' : ''}>
           <span class="bidder-name">${s.name}</span>
-          <span class="small-note">${s.vp}★ · ${s.time}🐟</span>
+          <span class="small-note">${vpDisplay(s)}★ · ${s.time}🐟</span>
         </label>`).join('');
       showModal({
         title: '🐀 Pack Rat Burrow — swap a structure',
@@ -2586,6 +2586,19 @@ function effectDescription(card) {
   }
 }
 
+// Mirror the printed-card VP convention (graphics/structure-deck/generate.py
+// render_vp_block). Cards whose end-game effect mints points should not be
+// labelled "0★" — that's misleading. Pair with a literal '★' at the callsite.
+//   vp=0, no end-game effect  → '0'
+//   vp=0, end-game effect     → '?'
+//   vp=N, no end-game effect  → 'N'
+//   vp=N, end-game effect     → 'N+?'  (fixed base plus variable bonus)
+function vpDisplay(s) {
+  const eg = !!(s && s.effect && /End [Gg]ame/.test(s.effect));
+  if (!s || s.vp === 0) return eg ? '?' : '0';
+  return eg ? `${s.vp}+?` : `${s.vp}`;
+}
+
 // Stack-of-card-backs visual with a remaining/total count overlay.
 // 0 cards → outlined empty rectangle; 1–2 cards → 1 back; 3–9 → 2 backs; 10+ → 3 backs.
 function renderDeckStack(remaining, total, backImg, opts = {}) {
@@ -2849,7 +2862,7 @@ function renderHand() {
       <div class="header">
         <span class="cost">${s.time}🐟</span>
         <span class="name">${s.name}</span>
-        <span class="vp">${s.vp}★</span>
+        <span class="vp">${vpDisplay(s)}★</span>
       </div>
       <div class="reqs">${reqs}</div>
       ${effectLine}
@@ -2874,7 +2887,7 @@ function renderHand() {
         <div class="header">
           <span class="cost">${s.time}🐟</span>
           <span class="name">${s.name} <span class="small-note">(new)</span></span>
-          <span class="vp">${s.vp}★</span>
+          <span class="vp">${vpDisplay(s)}★</span>
         </div>
         <div class="reqs">${reqs}</div>
         ${effectLine}
@@ -4950,7 +4963,7 @@ async function humanStoneCausewayDraw(playerIdx) {
     '🪨 Stone Causeway — discard a card',
     `You drew <b>${drawn.name}</b> on top of your normal refill. Pick one card from your hand to discard.`,
     items,
-    x => `${x.s.name} — ${x.s.vp}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}`,
+    x => `${x.s.name} — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}`,
     { cancelable: false }
   );
   const idx = pick ? pick.i : (p.hand.length - 1); // fallback: discard the drawn card
@@ -4998,7 +5011,7 @@ async function humanClayVaultSwap(playerIdx) {
   const top = state.structDeck[state.structDeck.length - 1];
   const yes = await confirmModal(
     '🏺 Clay Vault — peek deck top',
-    `Top of the structure deck is <b>${top.name}</b> (${top.vp}★ · ${top.time}🐟 · ${Object.entries(top.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}). Swap it for one card from your hand?`,
+    `Top of the structure deck is <b>${top.name}</b> (${vpDisplay(top)}★ · ${top.time}🐟 · ${Object.entries(top.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}). Swap it for one card from your hand?`,
     'Swap', 'Keep hand'
   );
   if (!yes) {
@@ -5010,7 +5023,7 @@ async function humanClayVaultSwap(playerIdx) {
     '🏺 Clay Vault — discard one card from hand',
     `Discard which card? You'll take <b>${top.name}</b> in exchange.`,
     items,
-    x => `${x.s.name} — ${x.s.vp}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}`,
+    x => `${x.s.name} — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}`,
     { cancelable: false }
   );
   if (!pick) return;
@@ -5392,7 +5405,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
             return `${MATERIALS[m].emoji}${have}/${n}`;
           }).join(' ');
           const eff = s.effect ? `<br><i>${s.effect}</i>` : '';
-          return `<b>${s.name}</b> · ${s.time}🐟 · ${s.vp}★<br>${reqs}${eff}`;
+          return `<b>${s.name}</b> · ${s.time}🐟 · ${vpDisplay(s)}★<br>${reqs}${eff}`;
         },
         { cancelable: false }
       );
@@ -5456,7 +5469,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
           ${o.hand.length === 0
             ? ' <span class="small-note">(empty hand)</span>'
             : '<ul style="margin:4px 0 0 18px;padding:0;">' + o.hand.map(s =>
-                `<li>${s.name} <span class="small-note">(${Object.entries(s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')} · ${s.time}🐟 · ${s.vp}★)</span></li>`
+                `<li>${s.name} <span class="small-note">(${Object.entries(s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')} · ${s.time}🐟 · ${vpDisplay(s)}★)</span></li>`
               ).join('') + '</ul>'}
         </div>
       `).join('');

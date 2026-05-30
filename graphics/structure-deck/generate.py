@@ -178,14 +178,22 @@ def render_title_block(card):
 
 def render_vp_block(card):
     """Right-aligned 'N★' in the header band — separated by a thin space
-    (U+2009) so the number sits visually close to the star instead of
-    floating off with a full word-space. vp=0 prints '?★' (scoring is
-    computed at end of game; effect text spells it out)."""
+    (U+2009) so the number sits visually close to the star.
+
+    End-game scoring is reflected in the label so the printed VP isn't
+    misleading on cards that grow during scoring:
+      vp=0, no end-game effect   →  '0 ★'
+      vp=0, end-game effect      →  '? ★'
+      vp=N, no end-game effect   →  'N ★'
+      vp=N, end-game effect      →  'N+? ★' (fixed base plus variable bonus)
+    """
     vp = card.get("vp", 0)
     effect = card.get("effect") or ""
+    has_endgame = bool(re.search(r"End [Gg]ame", effect))
     if vp == 0:
-        has_endgame = bool(re.search(r"End [Gg]ame", effect))
         label = "? ★" if has_endgame else "0 ★"
+    elif has_endgame:
+        label = f"{vp}+? ★"
     else:
         label = f"{vp} ★"
     return (
