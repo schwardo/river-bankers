@@ -355,6 +355,19 @@
     display: flex; flex-direction: column; gap: 4px;
     flex: 1;
   }
+  /* ================= MOBILE: shoreline below river as a tile grid =================
+     Below 768px the board flips from row to column and the shoreline
+     stretches full width. Its cards render in a 2-up grid instead of
+     a single vertical stack so they don't waste horizontal space. */
+  @media (max-width: 768px) {
+    .board { flex-direction: column; }
+    .board-shoreline { flex: 1 1 auto; width: 100%; }
+    .shoreline-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+  }
 
   /* ================= MATERIAL CARD =================
      Card is poker landscape (3.5" × 2.5"). Icons match the physical
@@ -2363,8 +2376,26 @@ function renderTimeTrack() {
     oldRects[el.dataset.pawn] = el.getBoundingClientRect();
   }
   // The track loops every LAP_LENGTH cells (0..LAP_LENGTH-1). Display position = timePos mod LAP_LENGTH.
+  // Mobile: trim the track to a window that just contains every active pawn,
+  // padded by 1 cell on each side, with a minimum width of 10 cells. Desktop
+  // (and the species-draft / pre-game state with no pawns yet) shows the full track.
+  let startCell = 0, endCell = LAP_LENGTH - 1;
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    const positions = state.players.filter(p => !p.out).map(p => p.timePos % LAP_LENGTH);
+    if (positions.length > 0) {
+      const minPos = Math.min(...positions);
+      const maxPos = Math.max(...positions);
+      startCell = Math.max(0, minPos - 1);
+      endCell = maxPos + 1;
+      if (endCell - startCell + 1 < 10) endCell = startCell + 9;
+      if (endCell > LAP_LENGTH - 1) {
+        endCell = LAP_LENGTH - 1;
+        startCell = Math.max(0, endCell - 9);
+      }
+    }
+  }
   let html = '';
-  for (let i = 0; i < LAP_LENGTH; i++) {
+  for (let i = startCell; i <= endCell; i++) {
     const occupants = state.stackOrder.filter(idx => !state.players[idx].out && (state.players[idx].timePos % LAP_LENGTH) === i);
     // Exhausted pawns render first → they sit at the bottom of the visual stack (behind active pawns).
     occupants.sort((a, b) => Number(state.players[b].exhausted) - Number(state.players[a].exhausted));
@@ -6151,6 +6182,12 @@ function showGameOver() {
     hideCardPopup();
   });
 })();
+
+// Viewport changes (rotation, resize across the 768px breakpoint) need to
+// re-render the fish track so the mobile-trim window recomputes.
+window.addEventListener('resize', () => {
+  if (typeof state !== 'undefined' && state && state.players) renderTimeTrack();
+});
 </script>
 </body>
 </html>
