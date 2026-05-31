@@ -619,7 +619,10 @@ function buildStructureDeck(numPlayers) {
 // =============================================================================
 // STATE / TURN ORDER
 // =============================================================================
-function newGame(numPlayers, workersPerPlayer = 8) {
+function defaultWorkersPerPlayer(numPlayers) { return numPlayers >= 4 ? 7 : 8; }
+
+function newGame(numPlayers, workersPerPlayer = null) {
+  if (workersPerPlayer == null) workersPerPlayer = defaultWorkersPerPlayer(numPlayers);
   const players = [];
   // Assign each player a distinct species (shuffled). Used for species
   // starter drafting and any future species-keyed effects.
@@ -2349,7 +2352,8 @@ function checkGameEnd(state) {
 // =============================================================================
 // RUN ONE GAME
 // =============================================================================
-function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer = 8) {
+function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer = null) {
+  if (workersPerPlayer == null) workersPerPlayer = defaultWorkersPerPlayer(numPlayers);
   configureMaterials(numMats);
   const state = newGame(numPlayers, workersPerPlayer);
   // initial spawned icons (3 upstream)
