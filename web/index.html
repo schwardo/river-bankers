@@ -988,6 +988,22 @@
     color: var(--ink-soft);
     line-height: 1.2;
   }
+  /* "↶ Undo last move" — appears in the AI-turn status while the player
+     still has a window to roll their move back (snapshot is alive until
+     the AI commits its action). Outline-only so it doesn't compete with
+     the primary action buttons during the player's own turn. */
+  .undo-last-btn {
+    margin-top: 4px;
+    padding: 6px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    background: transparent;
+    color: var(--forest);
+    border: 2px solid var(--forest);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .undo-last-btn:hover { background: rgba(74,128,86,0.08); }
   /* Bidding state: the action panel becomes the bid dialog. A pulsing glow
      + heavier title draw the eye and signal that the game is waiting on
      the player to confirm their bid. */
@@ -3059,6 +3075,9 @@ function renderActionPanel() {
           ? `You're tied with ${cur.species.name} in turn order.`
           : `You are ${ahead}🐟 ahead in turn order.`;
       }
+      // No Undo button while it's an AI's turn — once the AI has started
+      // acting we can't safely rewind without a race against its in-flight
+      // promises. Undo is only offered during the human's own action phases.
       body = `<div class="ai-turn-status">
         <div class="ai-turn-title">${turnLine}</div>
         ${trackLine ? `<div class="ai-turn-sub">${trackLine}</div>` : ''}
@@ -3152,24 +3171,25 @@ function renderActionPanel() {
     html = `<div class="action-panel-title">Pick a river card to auction</div>
       <div class="action-buttons">
         <span class="action-hint">Click a card with open icons.</span>
-        <button class="ghost" onclick="humanCancelAction()">Cancel</button>
+        <button class="ghost" onclick="humanUndoLastMove()">↶ Undo</button>
       </div>`;
   } else if (state.phase === 'select-preriv-card') {
     html = `<div class="action-panel-title">Pick a Headwaters card to auction</div>
       <div class="action-buttons">
         <span class="action-hint">Click a Headwaters card. Move cost depends on the slot (4🐟 / 3🐟 / 2🐟).</span>
-        <button class="ghost" onclick="humanCancelAction()">Cancel</button>
+        <button class="ghost" onclick="humanUndoLastMove()">↶ Undo</button>
       </div>`;
   } else if (state.phase === 'flush-pick-card') {
     html = `<div class="action-panel-title">Pick which fresh Headwaters card to auction</div>
       <div class="action-buttons">
         <span class="action-hint">Headwaters just refilled. Click any of the new cards to auction it for free (1🐟/item).</span>
+        ${state._undoSnapshot ? `<button class="undo-last-btn" onclick="humanUndoLastMove()">↶ Undo</button>` : ''}
       </div>`;
   } else if (state.phase === 'select-build') {
     html = `<div class="action-panel-title">Pick a structure to build</div>
       <div class="action-buttons">
         <span class="action-hint">Click a green-bordered card in your hand.</span>
-        <button class="ghost" onclick="humanCancelAction()">Cancel</button>
+        <button class="ghost" onclick="humanUndoLastMove()">↶ Undo</button>
       </div>`;
   } else if (state.phase === 'browse-N') {
     html = `<div class="action-panel-title">Draw structure cards — how many?</div>
@@ -3182,7 +3202,7 @@ function renderActionPanel() {
       </div>
       <div class="action-buttons" style="margin-top:8px;">
         <button class="primary" onclick="humanConfirmBrowseN()">Draw N, then discard N</button>
-        <button class="ghost" onclick="humanCancelAction()">Cancel</button>
+        <button class="ghost" onclick="humanUndoLastMove()">↶ Undo</button>
       </div>
       <div class="action-hint">Costs N🐟. You'll discard the same number you drew.</div>`;
   } else if (state.phase === 'browse-keep') {
@@ -3194,6 +3214,7 @@ function renderActionPanel() {
       <div class="action-buttons">
         <span class="action-hint">Click cards (existing hand + new draws) to keep them. Unselected cards (${willDiscard} so far) will be discarded.</span>
         <button class="primary" onclick="humanConfirmBrowseKeep()" ${have === keep ? '' : 'disabled'}>Confirm</button>
+        ${state._undoSnapshot ? `<button class="undo-last-btn" onclick="humanUndoLastMove()">↶ Undo</button>` : ''}
       </div>`;
   } else if (state.phase === 'human-bidding') {
     // Inline bid UI — replaces the "Your turn — choose an action" content.
@@ -3280,6 +3301,7 @@ function renderActionPanel() {
         ${recallHtml}
         <div class="action-buttons" style="margin-top:10px;">
           <button id="bid-submit-btn" class="primary" onclick="state.humanBidContext && state.humanBidContext.submit()">Submit bid</button>
+          ${state._undoSnapshot ? `<button class="undo-last-btn" onclick="humanUndoLastMove()">↶ Undo (back to your turn)</button>` : ''}
         </div>`;
     }
   } else if (state.phase === 'human-auction-result') {
@@ -5179,8 +5201,8 @@ async function performBuild(playerIdx, handIdx) {
   // If an on-build modal flagged the build for cancellation, restore the
   // pre-build state in-place (so any outside references to `state` itself stay
   // valid) and bail before drawing replacements.
-  if (state._buildCancelled) {
-    delete state._buildCancelled;
+  if (state._abortMove) {
+    delete state._abortMove;
     for (const k of Object.keys(state)) delete state[k];
     Object.assign(state, buildSnapshot);
     log(`🚫 ${speciesLabel(state.players[playerIdx])} cancelled the ${struct.name} build — workers, materials, and time refunded.`);
@@ -5615,7 +5637,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
       );
       if (result === PICKER_DECLINE) return;
       if (!result) {
-        state._buildCancelled = true;
+        state._abortMove = true;
         return;
       }
       target = result;
@@ -6080,17 +6102,74 @@ async function humanBidForAuction(card, human, minBid, opts = {}) {
 // TURN LOOP
 // =============================================================================
 let turnPending = false;
+// Pending scheduleTurn() timeout — we keep the handle so humanUndoLastMove()
+// can cancel the next turn cleanly before restoring the snapshot.
+let pendingTurnTimeoutId = null;
 function scheduleTurn() {
   if (turnPending) return;
   turnPending = true;
-  setTimeout(async () => {
+  pendingTurnTimeoutId = setTimeout(async () => {
     turnPending = false;
+    pendingTurnTimeoutId = null;
     await runOneTurn();
   }, 300);
 }
 
+// =============================================================================
+// UNDO LAST MOVE
+// =============================================================================
+// BGA-style "↶ Undo last move" affordance. A snapshot of the full state is
+// taken at the start of each human turn; the player can roll back to it
+// until the next AI commits an action (we sleep ~2.4s after the human's move
+// to keep that window open). turnEpoch invalidates any in-flight runOneTurn
+// whose state would clobber the restored snapshot.
+let turnEpoch = 0;
+function takeUndoSnapshot() {
+  const snap = JSON.parse(JSON.stringify(state));
+  delete snap._undoSnapshot;
+  delete snap._abortMove;
+  state._undoSnapshot = snap;
+}
+function clearUndoSnapshot() { delete state._undoSnapshot; }
+function restoreUndoSnapshot() {
+  const snap = state._undoSnapshot;
+  if (!snap) return false;
+  for (const k of Object.keys(state)) delete state[k];
+  Object.assign(state, snap);
+  return true;
+}
+function humanUndoLastMove() {
+  if (!state._undoSnapshot) return;
+  // Cancel the pending next-turn timer so it doesn't run after restore.
+  if (pendingTurnTimeoutId) {
+    clearTimeout(pendingTurnTimeoutId);
+    pendingTurnTimeoutId = null;
+    turnPending = false;
+  }
+  if (!restoreUndoSnapshot()) return;
+  // Invalidate any runOneTurn currently mid-await (e.g. the AI's pre-commit
+  // sleep, the human's awaitHuman, runAuction's bid await). Its post-await
+  // epoch check will see the bump and bail.
+  turnEpoch++;
+  // Wake any suspended awaitHuman() so its runOneTurn can finish and hit
+  // the epoch check. (Async work further down — e.g. an in-flight
+  // runAuction waiting on a bid Promise from the now-cleared
+  // humanBidContext — gets orphaned but stays detached from the restored
+  // state, so it can't pollute what the player sees from here on.)
+  if (humanResolver) {
+    const r = humanResolver;
+    humanResolver = null;
+    r();
+  }
+  const human = state.players.find(p => p.isHuman);
+  log(`↶ ${speciesLabel(human)} undoes their last move.`);
+  render();
+  scheduleTurn();
+}
+
 async function runOneTurn() {
   if (state.gameOver) return;
+  const myEpoch = ++turnEpoch;
   // Endgame trigger: when the material deck empties, snap pawns to spaces 1..N.
   if (!state.endgame && state.matDeck.length === 0) {
     triggerEndgame();
@@ -6108,6 +6187,9 @@ async function runOneTurn() {
 
   let actionType = null;
   if (p.isHuman) {
+    // Capture the pre-action snapshot for "↶ Undo last move". Persists
+    // through this human's turn AND into the next AI's pre-commit sleep.
+    takeUndoSnapshot();
     state.humanTurnCount++;
     state.phase = 'choose-action';
     state.lastHumanActionType = null;
@@ -6118,13 +6200,20 @@ async function runOneTurn() {
     } finally {
       stopHumanTimer();
     }
+    if (myEpoch !== turnEpoch) return; // undo fired while we were awaiting
     actionType = state.lastHumanActionType;
   } else {
+    // Once the AI is acting we drop the undo snapshot — the player can't
+    // rewind across an AI's move (race-prone, and the AI's choice would
+    // depend on now-stale assumptions about the human's prior action).
+    clearUndoSnapshot();
     aiStartOfTurnAbilities(p.idx);
     const action = aiChooseAction(p.idx);
     render();
     await sleep(500);
+    if (myEpoch !== turnEpoch) return;
     await executeAIAction(p.idx, action);
+    if (myEpoch !== turnEpoch) return;
     addAiTurnTime();
     actionType = action.type;
   }
