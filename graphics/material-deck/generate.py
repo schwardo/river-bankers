@@ -302,12 +302,46 @@ def render_header_block(card, materials):
     )
 
 
+# Player-count tier badge: cards with 4 icons join the deck only at 3P+,
+# 8-icon cards only at 4P. Mirrors ALWAYS_ICONS / TIER_3PLUS_ICONS /
+# TIER_4PLUS_ICONS in web/index.html — keep the two in sync if the tier
+# split ever changes.
+TIER_BY_ICONS = {4: ("3+", "#c1701c"),  # orange  → 3P+ only
+                 8: ("4P", "#a52a2a")}  # red     → 4P only
+
+
+def render_tier_badge(card):
+    spec = TIER_BY_ICONS.get(card["icons"])
+    if not spec:
+        return ""
+    label, color = spec
+    # Badge hangs off the right edge of the safe area into the brown frame,
+    # just below the header. The 8-icon "4P" cards (Cattail Cluster, Old
+    # Growth etc.) have their top-row disc ending at x≈234.7, so the badge
+    # has to start past that or it collides. Sitting it at x=240..264
+    # straddles the safe-area/frame boundary at x=252, reading as a tab
+    # clipped to the brown ridge.
+    x, y, w, h = 240, 44, 24, 14
+    text_x = x + w / 2
+    text_y = y + h - 4
+    return (
+        f'<g id="tier-badge" inkscape:label="Tier badge">\n'
+        f'  <rect x="{x}" y="{y}" width="{w}" height="{h}" rx="3" ry="3" '
+        f'fill="{color}" stroke="#faf3e3" stroke-width="0.8"/>\n'
+        f'  <text x="{text_x}" y="{text_y}" text-anchor="middle" '
+        f'font-family="DejaVu Sans" font-weight="700" font-size="7pt" '
+        f'fill="#ffffff">{label}</text>\n'
+        f'</g>'
+    )
+
+
 def render_card_svg(template: str, card, materials):
     mat = materials[card["material"]]
     out = template
     out = out.replace("{{MAT_COLOR}}", mat["color"])
     out = out.replace("{{MAT_COLOR_INK}}", mat["ink"])
     out = out.replace("{{HEADER_BLOCK}}", render_header_block(card, materials))
+    out = out.replace("{{TIER_BADGE}}", render_tier_badge(card))
     out = out.replace("{{ICON_GRID}}", render_icon_grid(card, mat, materials))
     out = out.replace("{{EFFECT_BLOCK}}", render_effect_block(card))
     return out

@@ -59,6 +59,11 @@
        than vanilla "Logs", so the title font has to auto-shrink to fit. -->
   {{HEADER_BLOCK}}
 
+  <!-- Player-count tier badge — empty for 5/7-icon "always" cards that
+       are in every deck; orange "3+" or red "4P" tab on the right edge
+       for cards that only join higher-count games. -->
+  {{TIER_BADGE}}
+
   <!-- ============ ICON GRID ============
        Discs sized to the physical 0.63" worker token (45.36 pt diameter)
        — see board-games.org "Design / choose worker tokens" (2026-05-25)
