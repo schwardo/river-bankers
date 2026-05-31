@@ -54,12 +54,10 @@
         fill="{{MAT_COLOR}}" fill-opacity="0.18"
         stroke="{{MAT_COLOR}}" stroke-opacity="0.55" stroke-width="0.6"/>
 
-  <!-- Card title (left side). -->
-  <text x="22" y="35" class="card-name">{{CARD_NAME}}</text>
-
-  <!-- Material name × icon count (right side). -->
-  <text x="248" y="32" text-anchor="end"
-        class="mat-label" fill="{{MAT_COLOR_INK}}">{{MAT_NAME}} <tspan class="icons-tag">×{{ICONS}}</tspan></text>
+  <!-- Title (left) + material label (right). Generator emits both as a
+       single block because wild cards' "Logs / Reeds" label is wider
+       than vanilla "Logs", so the title font has to auto-shrink to fit. -->
+  {{HEADER_BLOCK}}
 
   <!-- ============ ICON GRID ============
        Discs sized to the physical 0.63" worker token (45.36 pt diameter)

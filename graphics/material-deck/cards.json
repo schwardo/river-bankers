@@ -10,7 +10,7 @@
   },
   "cards": [
     { "name": "Fallen Limb",       "material": "logs",   "icons": 4 },
-    { "name": "Driftwood Tangle",  "material": "logs",   "icons": 5,
+    { "name": "Driftwood Tangle",  "material": "logs",   "icons": 5, "wildAlt": "reeds",
       "effect_name": "Driftwood Tangle",
       "effect_text": "Wild: each claimed icon yields Logs OR Reeds (chosen at build time)." },
     { "name": "Logjam",            "material": "logs",   "icons": 7 },
@@ -48,7 +48,7 @@
 
     { "name": "Clay Seep",         "material": "clay",   "icons": 4 },
     { "name": "Clay Bank",         "material": "clay",   "icons": 5 },
-    { "name": "Mud Slick",         "material": "clay",   "icons": 7,
+    { "name": "Mud Slick",         "material": "clay",   "icons": 7, "wildAlt": "mud",
       "effect_name": "Mud Slick",
       "effect_text": "Wild: each claimed icon yields Mud OR Clay (chosen at build time)." },
     { "name": "Slipping Sandbar",  "material": "clay",   "icons": 8,

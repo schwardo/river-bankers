@@ -145,24 +145,64 @@ def _row_positions(count: int, cy: float):
     ]
 
 
-def render_icon_grid(card, mat, material_key):
-    """SVG fragment with disc + shared-source glyph per icon."""
+# Wild-card disc layout: each disc shows two half-size silhouettes side
+# by side (primary on the left, alt material on the right) so a player
+# reads "logs OR reeds" at a glance without needing the effect text.
+WILD_GLYPH_SCALE = 0.55
+WILD_GLYPH_DX = 10.0
+
+
+def render_icon_grid(card, mat, materials):
+    """SVG fragment with disc + shared-source glyph per icon. Wild cards
+    (cards.json `wildAlt`) draw both materials' silhouettes inside each
+    disc and ring the right half of the disc in the alt material's color
+    so the dual yield is unmistakable."""
     has_effect = bool(card.get("effect_text"))
     positions = icon_positions(card["icons"], has_effect)
+    primary_key = card["material"]
+    alt_key = card.get("wildAlt")
     color = mat["color"]
-    glyph_svg = MATERIAL_GLYPHS[material_key]
+    primary_glyph = MATERIAL_GLYPHS[primary_key]
+    alt_glyph = MATERIAL_GLYPHS[alt_key] if alt_key else None
+    alt_color = materials[alt_key]["color"] if alt_key else None
 
     pieces = ['<g id="icon-grid" inkscape:label="Icons">']
     for cx, cy in positions:
-        pieces.append(
-            f'  <circle cx="{cx:.3f}" cy="{cy:.3f}" r="{ICON_RADIUS_PT:.3f}" '
-            f'fill="#ffffff" stroke="{color}" stroke-width="1.2"/>'
-        )
-        pieces.append(
-            f'  <g transform="translate({cx:.3f} {cy:.3f})">\n'
-            f'    {glyph_svg}\n'
-            f'  </g>'
-        )
+        if alt_key:
+            r = ICON_RADIUS_PT
+            # White fill + primary-color left half; right half stroked in the
+            # alt material's color so the disc rim itself signals "wild".
+            pieces.append(
+                f'  <circle cx="{cx:.3f}" cy="{cy:.3f}" r="{r:.3f}" '
+                f'fill="#ffffff" stroke="{color}" stroke-width="1.6"/>'
+            )
+            pieces.append(
+                f'  <path d="M {cx:.3f} {cy - r:.3f} '
+                f'a {r:.3f} {r:.3f} 0 0 1 0 {2 * r:.3f}" '
+                f'fill="none" stroke="{alt_color}" stroke-width="1.6"/>'
+            )
+            pieces.append(
+                f'  <g transform="translate({cx - WILD_GLYPH_DX:.3f} {cy:.3f}) '
+                f'scale({WILD_GLYPH_SCALE})">\n'
+                f'    {primary_glyph}\n'
+                f'  </g>'
+            )
+            pieces.append(
+                f'  <g transform="translate({cx + WILD_GLYPH_DX:.3f} {cy:.3f}) '
+                f'scale({WILD_GLYPH_SCALE})">\n'
+                f'    {alt_glyph}\n'
+                f'  </g>'
+            )
+        else:
+            pieces.append(
+                f'  <circle cx="{cx:.3f}" cy="{cy:.3f}" r="{ICON_RADIUS_PT:.3f}" '
+                f'fill="#ffffff" stroke="{color}" stroke-width="1.2"/>'
+            )
+            pieces.append(
+                f'  <g transform="translate({cx:.3f} {cy:.3f})">\n'
+                f'    {primary_glyph}\n'
+                f'  </g>'
+            )
     pieces.append("</g>")
     return "\n  ".join(pieces)
 
@@ -220,14 +260,55 @@ def render_effect_block(card):
     )
 
 
-def render_card_svg(template: str, card, mat):
+def render_header_block(card, materials):
+    """Title (left) + material label (right) inside the colored header band.
+    Title auto-shrinks if the right-side label (longer for wild cards) would
+    otherwise overlap. DejaVu Serif Bold averages ~0.62 × font-size per char
+    for upper/lower mix, DejaVu Sans Bold ~0.55."""
+    mat = materials[card["material"]]
+    alt_key = card.get("wildAlt")
+    if alt_key:
+        mat_label_text = f'{mat["name"]} / {materials[alt_key]["name"]}'
+    else:
+        mat_label_text = mat["name"]
+    icons_tag = f' ×{card["icons"]}'
+
+    # Approximate widths to pick a title font that won't collide with the
+    # right-side label. Header runs x=22..248 (226pt usable). DejaVu Serif
+    # Bold renders ~0.95 × font-size per char as drawn by Inkscape (wider
+    # than nominal); DejaVu Sans Bold ~0.65. We add 12pt of breathing
+    # room between title and label so they don't kiss.
+    label_w = len(mat_label_text) * 7.5 * 0.65 + len(icons_tag) * 6.5 * 0.65
+    title = card["name"]
+    for size in (13, 12, 11, 10, 9, 8):
+        title_w = len(title) * size * 0.95
+        if title_w + label_w + 12 <= 226:
+            break
+    # Baseline y nudges with font so caps stay vertically centered in the
+    # 18..40 header band (center y ≈ 31).
+    title_y = {13: 35, 12: 35, 11: 34, 10: 34, 9: 33}[size]
+    # Inkscape's CSS engine treats class-based font-size as more specific
+    # than the style attribute, so we inline the font properties directly
+    # (matching `.card-name` minus the class-bound size).
+    return (
+        f'<text x="22" y="{title_y}" font-family="DejaVu Serif" '
+        f'font-weight="700" font-size="{size}pt" fill="#2c1f15">'
+        f'{html.escape(title)}</text>\n'
+        f'  <text x="248" y="32" text-anchor="end" '
+        f'class="mat-label" fill="{mat["ink"]}">'
+        f'{html.escape(mat_label_text)} '
+        f'<tspan class="icons-tag">{html.escape(icons_tag.strip())}</tspan>'
+        f'</text>'
+    )
+
+
+def render_card_svg(template: str, card, materials):
+    mat = materials[card["material"]]
     out = template
-    out = out.replace("{{CARD_NAME}}", html.escape(card["name"]))
     out = out.replace("{{MAT_COLOR}}", mat["color"])
     out = out.replace("{{MAT_COLOR_INK}}", mat["ink"])
-    out = out.replace("{{MAT_NAME}}", html.escape(mat["name"]))
-    out = out.replace("{{ICONS}}", str(card["icons"]))
-    out = out.replace("{{ICON_GRID}}", render_icon_grid(card, mat, card["material"]))
+    out = out.replace("{{HEADER_BLOCK}}", render_header_block(card, materials))
+    out = out.replace("{{ICON_GRID}}", render_icon_grid(card, mat, materials))
     out = out.replace("{{EFFECT_BLOCK}}", render_effect_block(card))
     return out
 
@@ -337,8 +418,7 @@ def main():
     print(f"renderer: {kind} ({exe})  dpi: {args.dpi}")
 
     for card in cards:
-        mat = materials[card["material"]]
-        svg = render_card_svg(template, card, mat)
+        svg = render_card_svg(template, card, materials)
 
         slug = safe_filename(card["name"])
         png_path = PRINT_DIR / f"{slug}.png"

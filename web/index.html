@@ -541,6 +541,33 @@
     vertical-align: -0.2em;
     flex-shrink: 0;
   }
+  /* Wild-card marker: a small "WILD" pill next to the dual material label,
+     plus a goldenrod outline on the card so the dual yield is unmistakable
+     even at a glance from across the table. Pairs with the printed PNG's
+     two-tone disc rim + side-by-side icons. */
+  .wild-pill {
+    display: inline-block;
+    background: #e8b932;
+    color: #3a2a08;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    vertical-align: 1px;
+  }
+  .mat-card.wild { outline: 2px solid #e8b932; outline-offset: -2px; }
+  /* Wild-pool chip in the player tile's material summary: two icons +
+     count, framed in goldenrod to mirror the .mat-card.wild outline. */
+  .wild-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    padding: 0 4px;
+    border: 1px solid #e8b932;
+    border-radius: 6px;
+    background: rgba(232, 185, 50, 0.12);
+  }
   /* Shoreline cards don't auction — open icons aren't shown and the
      remaining worker discs are just inventory, so shrink them to fit
      a tighter row. The narrower card needs smaller header text too,
@@ -1924,6 +1951,22 @@ function cardYieldMultiplier(card) {
   return 1;
 }
 
+// Returns the icon+label string used to refer to a card's material(s) in
+// log lines and auction prompts. Wild cards (Driftwood Tangle, Mud Slick)
+// surface both materials so the bid context makes the dual yield clear.
+function cardMatIcons(card) {
+  const m = MATERIALS[card.material];
+  if (!card.wildAlt) return m.icon;
+  // Slash between the two icons reads as "logs OR reeds" — same separator
+  // we use on the printed PNG's header label and the wild-chip below.
+  return `${m.icon}/${MATERIALS[card.wildAlt].icon}`;
+}
+function cardMatLabel(card) {
+  const m = MATERIALS[card.material];
+  if (!card.wildAlt) return m.name;
+  return `${m.name}/${MATERIALS[card.wildAlt].name} wild`;
+}
+
 // Fish-track move helper. Backward = good (act sooner). Clamps at 0; does NOT
 // trigger pass-0 effects (those only fire on forward laps).
 function moveBackward(state, playerIdx, spaces) {
@@ -2098,6 +2141,45 @@ function canBuild(structure, workersByMat, p = null) {
   }
   if (totalDeficit === 0) return true;
   return canCoverWithWild(deficits, workersByMat._wildPools || []);
+}
+
+// Per-material "have" count after greedily assigning wild pool units to the
+// material with the largest remaining deficit — same algorithm canBuild's
+// canCoverWithWild uses. Used by the affordability pills so a player who has
+// wild workers covering a deficit sees "2+1/3" satisfied instead of "2/3"
+// red while the card outline says READY ✓.
+function effectiveCoverage(targetCost, workersByMat) {
+  const have = {};
+  for (const m in targetCost) have[m] = workersByMat[m] || 0;
+  for (const pool of (workersByMat._wildPools || [])) {
+    let avail = pool.count;
+    if (avail === 0) continue;
+    const relevant = pool.materials.filter(m => m in targetCost);
+    relevant.sort((a, b) => (targetCost[b] - have[b]) - (targetCost[a] - have[a]));
+    for (const m of relevant) {
+      if (avail === 0) break;
+      const deficit = Math.max(0, targetCost[m] - have[m]);
+      if (deficit === 0) continue;
+      const take = Math.min(avail, deficit);
+      have[m] += take;
+      avail -= take;
+    }
+  }
+  return have;
+}
+
+function affordabilityPills(structure, workersByMat) {
+  const haveByMat = effectiveCoverage(structure.cost, workersByMat);
+  return Object.entries(structure.cost).map(([m, n]) => {
+    const pure = workersByMat[m] || 0;
+    const have = haveByMat[m] || 0;
+    const wildAdd = have - pure;
+    const ok = have >= n;
+    const label = wildAdd > 0
+      ? `${MATERIALS[m].icon}${pure}+${wildAdd}/${n}`
+      : `${MATERIALS[m].icon}${have}/${n}`;
+    return `<span class="req-pill ${ok ? 'satisfied' : ''}">${label}</span>`;
+  }).join('');
 }
 
 // Effective per-material recall counts after applying Cattail Marsh / Charcoal Pit / Granary.
@@ -2730,6 +2812,7 @@ function renderMatCard(card, opts = {}) {
   }).join('');
   const cls = ['mat-card', 'has-art'];   // every material card uses the PNG art
   if (isShore)         cls.push('shore'); // shoreline cards inherit a narrower column
+  if (card.wildAlt)    cls.push('wild');  // dual-yield marker (border tint)
   if (opts.selectable) cls.push('selectable');
   if (opts.selected)   cls.push('selected');
   if (opts.dimmed)     cls.push('dimmed');
@@ -2737,9 +2820,15 @@ function renderMatCard(card, opts = {}) {
   // Header markup is kept as a fallback if the image fails to load;
   // CSS hides it whenever .has-art is on.
   const cardName = card.name || m.name;
+  // Wild cards: show both material icons + names + a "WILD" pill so the
+  // dual yield is obvious at a glance (matches the printed PNG art).
+  const altMat = card.wildAlt ? MATERIALS[card.wildAlt] : null;
+  const matIcons = altMat ? `${m.icon}/${altMat.icon}` : m.icon;
+  const matNames = altMat ? `${m.name} / ${altMat.name}` : m.name;
+  const wildPill = altMat ? ' <span class="wild-pill">WILD</span>' : '';
   const matLabel = isShore
-    ? `<span class="mat-material" style="color:${m.color}">${m.icon} ${m.name}</span>`
-    : `<span class="mat-material" style="color:${m.color}">${m.icon} ${m.name} <span class="mat-remaining">(${open}/${card.totalIcons})</span></span>`;
+    ? `<span class="mat-material" style="color:${m.color}">${matIcons} ${matNames}${wildPill}</span>`
+    : `<span class="mat-material" style="color:${m.color}">${matIcons} ${matNames}${wildPill} <span class="mat-remaining">(${open}/${card.totalIcons})</span></span>`;
   // Effect rules text printed full-width across the bottom of the card.
   const effectBox = card.effectSpec
     ? `<div class="mat-effect-box"><b>${card.effectSpec.name}.</b> ${effectDescription(card)}</div>`
@@ -2940,10 +3029,22 @@ function renderPlayers() {
     if (p.idx === state.currentPlayer && !state.gameOver) cls.push('active');
     if (p.isHuman) cls.push('human');
     const wbm = playerWorkersByMaterial(state, p.idx);
-    const matSummary = MAT_KEYS
+    const pureChips = MAT_KEYS
       .filter(m => wbm[m] > 0)
-      .map(m => `<span title="${MATERIALS[m].name}">${MATERIALS[m].icon}${wbm[m]}</span>`)
-      .join(' ') || '<span class="small-note">none</span>';
+      .map(m => `<span title="${MATERIALS[m].name}">${MATERIALS[m].icon}${wbm[m]}</span>`);
+    // Wild pools are workers on a Driftwood Tangle / Mud Slick; each
+    // worker yields either material at build time, so render them as a
+    // combined "[icon-a][icon-b]N" chip rather than hiding them.
+    const wildChips = (wbm._wildPools || [])
+      .filter(pool => pool.count > 0)
+      .map(pool => {
+        const [a, b] = pool.materials;
+        const ma = MATERIALS[a], mb = MATERIALS[b];
+        return `<span class="wild-chip" title="${ma.name} or ${mb.name} (wildcard)">`
+          + `${ma.icon}/${mb.icon}${pool.count}</span>`;
+      });
+    const matSummary = [...pureChips, ...wildChips].join(' ')
+      || '<span class="small-note">none</span>';
     const totalVPVal = totalVP(p, state);
     let supplyIcons = '';
     for (let i = 0; i < p.supply; i++) {
@@ -3025,11 +3126,7 @@ function renderHand() {
   let html = '';
   human.hand.forEach((s, i) => {
     const buildable = canBuild(s, wbm, human);
-    const reqs = Object.entries(s.cost).map(([m, n]) => {
-      const have = wbm[m] || 0;
-      const ok = have >= n;
-      return `<span class="req-pill ${ok ? 'satisfied' : ''}">${MATERIALS[m].icon}${have}/${n}</span>`;
-    }).join('');
+    const reqs = affordabilityPills(s, wbm);
     const cls = ['struct-card', 'has-art'];
     if (buildable) cls.push('buildable');
     const isHumanTurn = state.currentPlayer === human.idx;
@@ -3065,11 +3162,7 @@ function renderHand() {
   // Browse drawn cards (each with same keep/discard styling)
   if (state.phase === 'browse-keep' && state.browseDrawn) {
     state.browseDrawn.forEach((s, i) => {
-      const reqs = Object.entries(s.cost).map(([m, n]) => {
-        const have = wbm[m] || 0;
-        const ok = have >= n;
-        return `<span class="req-pill ${ok ? 'satisfied' : ''}">${MATERIALS[m].icon}${have}/${n}</span>`;
-      }).join('');
+      const reqs = affordabilityPills(s, wbm);
       const cls = ['struct-card', 'has-art', 'selectable'];
       const isKeep = state.browseSelected && state.browseSelected.has('d' + i);
       cls.push(isKeep ? 'keep-selected' : 'will-discard');
@@ -3119,7 +3212,9 @@ function renderActionPanel() {
     panel.classList.remove('bidding');
     const human = state.players.find(p => p.isHuman);
     let body = '';
-    if (cur && !cur.isHuman) {
+    // All-AI games have no human watching for "ahead in turn order" cues, so
+    // the turn-indicator card just churns. Leave the action panel empty.
+    if (cur && !cur.isHuman && human) {
       const turnLine = `${cur.species.emoji} ${cur.species.name} is taking their turn.`;
       let trackLine = '';
       if (human && !human.out) {
@@ -3141,6 +3236,9 @@ function renderActionPanel() {
       </div>`;
     }
     panel.innerHTML = body;
+    // Collapse the wrapper when there's nothing to show (all-AI mode), so
+    // the empty panel doesn't reserve vertical space below the player row.
+    panel.classList.toggle('hidden', !body);
     return;
   }
   let html = '';
@@ -3326,7 +3424,7 @@ function renderActionPanel() {
         `;
       }
 
-      html = `<div class="action-panel-title">🎲 Your bid — ${ctx.m.icon} ${ctx.card.name} <span style="opacity:0.85; font-weight:600;">(${ctx.m.name})</span> at ${ctx.slotLbl}</div>
+      html = `<div class="action-panel-title">🎲 Your bid — ${cardMatIcons(ctx.card)} ${ctx.card.name} <span style="opacity:0.85; font-weight:600;">(${cardMatLabel(ctx.card)})</span> at ${ctx.slotLbl}</div>
         ${revealHtml}
         <p>${ctx.open} icon${ctx.open === 1 ? '' : 's'} open · ${ctx.cost}🐟 per item · minimum bid <b>${ctx.minBid}</b>${ctx.minBid > 0 ? ' (you triggered)' : ''} · maximum <b>${ctx.sliderMax}</b> ${ctx.sliderMax === ctx.open ? '(open icons)' : `(${ctx.baseSupply} supply + up to ${ctx.totalRecallable} recall)`}.</p>
         <div class="bid-slider-row">
@@ -3419,7 +3517,8 @@ function renderActionPanel() {
           ${fateLine}
         </div>`;
       }
-      html = `<div class="action-panel-title">🎲 ${m.icon} ${result.cardName || m.name} <span style="opacity:0.85; font-weight:600;">(${m.name})</span> — auction result</div>
+      const resultCardShape = { material: result.cardMaterial, wildAlt: result.cardWildAlt };
+      html = `<div class="action-panel-title">🎲 ${cardMatIcons(resultCardShape)} ${result.cardName || m.name} <span style="opacity:0.85; font-weight:600;">(${cardMatLabel(resultCardShape)})</span> — auction result</div>
         <p class="small-note">${result.openBefore} open icon${result.openBefore === 1 ? '' : 's'} going in · ${result.costAtAuction}🐟 per item</p>
         <div class="auction-bidders">${rows}</div>
         ${outcomeBox}
@@ -3616,7 +3715,7 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   state.phase = 'auction-bidding';
   const m = MATERIALS[card.material];
   const slotLbl = card.slot === 'pre' ? 'Headwaters' : `River ${card.slot + 1}`;
-  log(`🎲 Auction begins on ${m.icon} ${card.name} (${m.name}) at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
+  log(`🎲 Auction begins on ${cardMatIcons(card)} ${card.name} (${cardMatLabel(card)}) at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
 
   // Spy Mound / Quick Strike: holders can defer their bid until after others
   // reveal. AIs auto-defer if eligible AND the card's material matches at
@@ -3795,6 +3894,7 @@ function resolveAuction(card, bids) {
 
   const result = {
     cardMaterial: card.material,
+    cardWildAlt: card.wildAlt || null,
     cardName: card.name,
     costAtAuction: cardCost(card),
     openBefore: open,
@@ -6238,7 +6338,7 @@ async function runOneTurn() {
   if (state.currentPlayer === -1) { showGameOver(); return; }
   const p = state.players[state.currentPlayer];
   const space = p.timePos;
-  log(`— ${speciesLabel(p)} steps up at ${space}🐟.`);
+  log(`— ${speciesLabel(p)} advances to ${space}🐟 on the fish track.`);
   render();
   scrollTimeTrackToLeftmost();
 
