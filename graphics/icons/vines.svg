@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Canonical "vines" silhouette: pointed leaf with central stem. Colors
+     baked from MATERIALS.vines (color #3a6b2f, ink #244419). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -15 30 30">
+  <path d="M -3 13 Q -10 1 -1 -11 Q 11 1 4 13 Z"
+        fill="#3a6b2f" stroke="#244419" stroke-width="1.2"/>
+  <path d="M 1 13 Q 0 1 -1 -9" stroke="#244419" stroke-width="0.9" fill="none"/>
+</svg>

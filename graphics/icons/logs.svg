@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Canonical "logs" silhouette: end-on log with three concentric growth rings.
+     viewBox is -15..15 on both axes so the icon can drop into any disc by
+     scaling. Color/ink baked from MATERIALS.logs (color #8b5a2b, ink #5a3a18).
+     Edit this file once and both Python generators (material-deck /
+     structure-deck) plus the web prototype pick up the change. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -15 30 30">
+  <ellipse cx="0" cy="0" rx="14" ry="9" fill="#8b5a2b" stroke="#5a3a18" stroke-width="1.5"/>
+  <ellipse cx="0" cy="0" rx="9"  ry="5.5" fill="none" stroke="#5a3a18" stroke-width="0.8"/>
+  <ellipse cx="0" cy="0" rx="4"  ry="2.5" fill="none" stroke="#5a3a18" stroke-width="0.7"/>
+</svg>

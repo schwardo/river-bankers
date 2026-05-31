@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Canonical "clay" silhouette: narrow-mouthed pot/urn. Colors baked from
+     MATERIALS.clay (color #c97c4a, ink #7a4422). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -15 30 30">
+  <path d="M -8 -10 L 8 -10 L 9 -8 L 6.5 -7
+           Q 13 0 11 7 Q 9 13 0 13 Q -9 13 -11 7 Q -13 0 -6.5 -7 L -9 -8 Z"
+        fill="#c97c4a" stroke="#7a4422" stroke-width="1.2"/>
+  <ellipse cx="0" cy="-9" rx="9" ry="1.6" fill="#7a4422"/>
+</svg>

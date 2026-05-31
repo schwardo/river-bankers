@@ -89,43 +89,35 @@ _FONT_DESCENDER = 1.5
 
 
 # --------------------- material glyphs ---------------------
-# Same vector silhouettes as graphics/material-deck/generate.py — vector
-# instead of color emoji because Inkscape/rsvg can't render Noto Color
-# Emoji reliably. Glyph is drawn centered on (0,0), scaled to fit a
-# ~22pt-diameter disc with a small count-overlay in the lower-right.
-MATERIAL_GLYPHS = {
-    "logs": """\
-<ellipse cx="0" cy="0" rx="9" ry="6" fill="{COLOR}" stroke="{INK}" stroke-width="1.0"/>
-<ellipse cx="0" cy="0" rx="5.5" ry="3.5" fill="none" stroke="{INK}" stroke-width="0.6"/>
-<ellipse cx="0" cy="0" rx="2.2" ry="1.4" fill="none" stroke="{INK}" stroke-width="0.5"/>""",
-    "stones": """\
-<ellipse cx="-4" cy="2.5" rx="3.5" ry="3" fill="{COLOR}" stroke="{INK}" stroke-width="0.8"/>
-<ellipse cx="4"  cy="2.5" rx="3.5" ry="3" fill="{COLOR}" stroke="{INK}" stroke-width="0.8"/>
-<ellipse cx="0"  cy="-3"  rx="4"   ry="3.5" fill="{COLOR}" stroke="{INK}" stroke-width="0.8"/>""",
-    "reeds": """\
-<g stroke="{INK}" stroke-width="1.0" stroke-linecap="round">
-  <line x1="-5" y1="8" x2="-5" y2="-1"/>
-  <line x1="0"  y1="9" x2="0"  y2="-4"/>
-  <line x1="5"  y1="8" x2="5"  y2="-1"/>
-</g>
-<ellipse cx="-5" cy="-3" rx="2" ry="4" fill="{COLOR}" stroke="{INK}" stroke-width="0.8"/>
-<ellipse cx="0"  cy="-6" rx="2" ry="4.5" fill="{COLOR}" stroke="{INK}" stroke-width="0.8"/>
-<ellipse cx="5"  cy="-3" rx="2" ry="4" fill="{COLOR}" stroke="{INK}" stroke-width="0.8"/>""",
-    "mud": """\
-<path d="M -9 -1 q 1 -6 9 -5 q 8 -1 9 5 q -1 6 -9 5 q -8 1 -9 -5 Z"
-      fill="{COLOR}" stroke="{INK}" stroke-width="0.9"/>
-<ellipse cx="-3" cy="-1" rx="1.4" ry="0.8" fill="{INK}"/>
-<ellipse cx="4"  cy="1.5" rx="1.3" ry="0.8" fill="{INK}"/>""",
-    "vines": """\
-<path d="M -2 8 Q -6 1 -1 -7 Q 7 1 3 8 Z"
-      fill="{COLOR}" stroke="{INK}" stroke-width="0.9"/>
-<path d="M 1 8 Q 0 1 -1 -6" stroke="{INK}" stroke-width="0.6" fill="none"/>""",
-    "clay": """\
-<path d="M -5 -6 L 5 -6 L 6 -5 L 4 -4
-         Q 8 0 7 4.5 Q 6 8 0 8 Q -6 8 -7 4.5 Q -8 0 -4 -4 L -6 -5 Z"
-      fill="{COLOR}" stroke="{INK}" stroke-width="0.9"/>
-<ellipse cx="0" cy="-5.5" rx="5.5" ry="1.0" fill="{INK}"/>""",
-}
+# Same canonical silhouettes as graphics/icons/<material>.svg — the source
+# of truth shared with material-deck/generate.py and the web prototype.
+# Each source SVG uses viewBox="-15 -15 30 30" with shapes occupying ~±14
+# units; we shrink them to ~70% (COST_GLYPH_SCALE) so they fit the smaller
+# 32pt cost disc with a count badge tucked into the lower-right corner.
+# Edit graphics/icons/<material>.svg (not this code) to change the art.
+ICONS_DIR = HERE.parent / "icons"
+_SVG_TAG_RE = re.compile(r"<svg\b[^>]*>(.*?)</svg>", re.DOTALL)
+# Shared silhouettes are authored at ~28pt extent (±14 in their viewBox).
+# We want them at ~27pt visual extent (±13.5pt) — same as the pre-shared
+# inline copy used here — so they fill the 32pt disc with a sliver of
+# inner padding and the lower-right count badge clips the silhouette by
+# only a hair (intentional: badge always sits on top).
+COST_GLYPH_SCALE = 0.95
+
+
+def _load_icon_body(material_key: str) -> str:
+    path = ICONS_DIR / f"{material_key}.svg"
+    text = path.read_text()
+    text = re.sub(r"<\?xml[^?]*\?>", "", text)
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+    m = _SVG_TAG_RE.search(text)
+    if not m:
+        sys.exit(f"error: no <svg> body in {path}")
+    return m.group(1).strip()
+
+
+MATERIAL_GLYPHS = {key: _load_icon_body(key)
+                   for key in ("logs", "stones", "reeds", "mud", "vines", "clay")}
 
 
 # --------------------- helpers ---------------------
@@ -244,11 +236,11 @@ def _render_material_slot(mat_key: str, count: int, mat_spec: dict, cx: float, c
     r = COST_DISC_RADIUS_PT
     color = mat_spec["color"]
     ink = mat_spec["ink"]
-    glyph_svg = MATERIAL_GLYPHS[mat_key].replace("{COLOR}", color).replace("{INK}", ink)
+    glyph_svg = MATERIAL_GLYPHS[mat_key]
     return (
         f'  <circle cx="{cx:.2f}" cy="{cy}" r="{r}" fill="#ffffff" '
         f'stroke="{color}" stroke-width="1.6"/>\n'
-        f'  <g transform="translate({cx:.2f} {cy}) scale(1.5)">\n'
+        f'  <g transform="translate({cx:.2f} {cy}) scale({COST_GLYPH_SCALE})">\n'
         f'    {glyph_svg}\n'
         f'  </g>\n'
         f'  <circle cx="{cx + 9:.2f}" cy="{cy + 9:.2f}" r="6" '

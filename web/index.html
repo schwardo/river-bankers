@@ -529,6 +529,18 @@
     border-style: dashed;
   }
   .icon-slot.icon-worker { color: #fff; font-weight: 700; }
+  /* Inline material-icon SVG used everywhere we used to print a Unicode
+     emoji (req pills, auction log, hand-card labels, structure-card costs).
+     Sized ~1.1× the surrounding text and visually centered on the baseline.
+     Sources: graphics/icons/<material>.svg (same shapes the printed cards
+     render — change the SVG file, this CSS scales it). */
+  .mat-icon {
+    width: 1.1em;
+    height: 1.1em;
+    display: inline-block;
+    vertical-align: -0.2em;
+    flex-shrink: 0;
+  }
   /* Shoreline cards don't auction — open icons aren't shown and the
      remaining worker discs are just inventory, so shrink them to fit
      a tighter row. The narrower card needs smaller header text too,
@@ -1407,13 +1419,58 @@ const SPECIES = [
   { id: 'mink',    name: 'Mink',      emoji: '🦡', color: '#4b2a5b' },
 ];
 
+// Material-icon SVG bodies — mirror graphics/icons/<material>.svg (the
+// canonical source shared with both Python print pipelines). Same shapes
+// and colors as the printed material/structure cards so a player sees the
+// same silhouette in the auction log, on a hand card, and on the table.
+// If you edit graphics/icons/*.svg, update these strings to match.
+const MAT_ICON_SVG = {
+  logs: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
+    + '<ellipse cx="0" cy="0" rx="14" ry="9" fill="#8b5a2b" stroke="#5a3a18" stroke-width="1.5"/>'
+    + '<ellipse cx="0" cy="0" rx="9"  ry="5.5" fill="none" stroke="#5a3a18" stroke-width="0.8"/>'
+    + '<ellipse cx="0" cy="0" rx="4"  ry="2.5" fill="none" stroke="#5a3a18" stroke-width="0.7"/>'
+    + '</svg>',
+  stones: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
+    + '<ellipse cx="-7" cy="4"  rx="6" ry="5" fill="#6e6e6e" stroke="#3f3f3f" stroke-width="1.0"/>'
+    + '<ellipse cx="7"  cy="4"  rx="6" ry="5" fill="#6e6e6e" stroke="#3f3f3f" stroke-width="1.0"/>'
+    + '<ellipse cx="0"  cy="-5" rx="7" ry="6" fill="#6e6e6e" stroke="#3f3f3f" stroke-width="1.0"/>'
+    + '</svg>',
+  reeds: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
+    + '<g stroke="#365821" stroke-width="1.5" stroke-linecap="round">'
+    +   '<line x1="-8" y1="13" x2="-8" y2="-2"/>'
+    +   '<line x1="0"  y1="14" x2="0"  y2="-6"/>'
+    +   '<line x1="8"  y1="13" x2="8"  y2="-2"/>'
+    + '</g>'
+    + '<ellipse cx="-8" cy="-5" rx="3" ry="6"   fill="#5a8e3a" stroke="#365821" stroke-width="1.0"/>'
+    + '<ellipse cx="0"  cy="-9" rx="3" ry="6.5" fill="#5a8e3a" stroke="#365821" stroke-width="1.0"/>'
+    + '<ellipse cx="8"  cy="-5" rx="3" ry="6"   fill="#5a8e3a" stroke="#365821" stroke-width="1.0"/>'
+    + '</svg>',
+  mud: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
+    + '<path d="M -14 -2 q 1 -9 14 -8 q 13 -1 14 8 q -1 9 -14 8 q -13 1 -14 -8 Z"'
+    + ' fill="#5c3a1f" stroke="#3c2410" stroke-width="1.2"/>'
+    + '<ellipse cx="-5" cy="-2" rx="2.2" ry="1.3" fill="#3c2410"/>'
+    + '<ellipse cx="6"  cy="2"  rx="2.0" ry="1.2" fill="#3c2410"/>'
+    + '</svg>',
+  vines: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
+    + '<path d="M -3 13 Q -10 1 -1 -11 Q 11 1 4 13 Z"'
+    + ' fill="#3a6b2f" stroke="#244419" stroke-width="1.2"/>'
+    + '<path d="M 1 13 Q 0 1 -1 -9" stroke="#244419" stroke-width="0.9" fill="none"/>'
+    + '</svg>',
+  clay: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
+    + '<path d="M -8 -10 L 8 -10 L 9 -8 L 6.5 -7'
+    + ' Q 13 0 11 7 Q 9 13 0 13 Q -9 13 -11 7 Q -13 0 -6.5 -7 L -9 -8 Z"'
+    + ' fill="#c97c4a" stroke="#7a4422" stroke-width="1.2"/>'
+    + '<ellipse cx="0" cy="-9" rx="9" ry="1.6" fill="#7a4422"/>'
+    + '</svg>',
+};
+
 const MATERIALS = {
-  logs:   { name: 'Logs',   color: '#8b5a2b', emoji: '🪵' },
-  stones: { name: 'Stones', color: '#6e6e6e', emoji: '🪨' },
-  reeds:  { name: 'Reeds',  color: '#5a8e3a', emoji: '🌾' },
-  mud:    { name: 'Mud',    color: '#5c3a1f', emoji: '🟫' },
-  vines:  { name: 'Vines',  color: '#3a6b2f', emoji: '🌿' },
-  clay:   { name: 'Clay',   color: '#c97c4a', emoji: '🏺' },
+  logs:   { name: 'Logs',   color: '#8b5a2b', icon: MAT_ICON_SVG.logs },
+  stones: { name: 'Stones', color: '#6e6e6e', icon: MAT_ICON_SVG.stones },
+  reeds:  { name: 'Reeds',  color: '#5a8e3a', icon: MAT_ICON_SVG.reeds },
+  mud:    { name: 'Mud',    color: '#5c3a1f', icon: MAT_ICON_SVG.mud },
+  vines:  { name: 'Vines',  color: '#3a6b2f', icon: MAT_ICON_SVG.vines },
+  clay:   { name: 'Clay',   color: '#c97c4a', icon: MAT_ICON_SVG.clay },
 };
 const MAT_KEYS = Object.keys(MATERIALS);
 
@@ -1707,7 +1764,7 @@ function firePassZeroEffects(playerIdx, count) {
         target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
         // 1 fish cost — direct increment to skip nested lap-shadow recomputation.
         p.timePos += 1;
-        log(`🪵 Wood Pile: ${speciesLabel(p)} claims 1 log icon (+1🐟).`);
+        log(`${MATERIALS.logs.icon} Wood Pile: ${speciesLabel(p)} claims 1 log icon (+1🐟).`);
       }
     }
     if (hasEffect(p, 'Hollowed-out Log')) {
@@ -1716,7 +1773,7 @@ function firePassZeroEffects(playerIdx, count) {
         target.workers[playerIdx] -= 1;
         if (target.workers[playerIdx] === 0) delete target.workers[playerIdx];
         p.supply += 1;
-        log(`🪵 Hollowed-out Log: ${speciesLabel(p)} recalls 1 worker (no blank).`);
+        log(`${MATERIALS.logs.icon} Hollowed-out Log: ${speciesLabel(p)} recalls 1 worker (no blank).`);
       }
     }
     if (hasEffect(p, 'Pack Rat Burrow') && p.hand.length > 0 && state.structDiscard.length > 0) {
@@ -1915,7 +1972,7 @@ async function humanVineCurtainRearrange(playerIdx) {
     '✦ Vine Curtain — peek + rearrange',
     'Next 2 material cards to be drawn from the deck. Re-order with ▲/▼; #1 enters the Headwaters first.',
     [top, second],
-    (c) => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} · ${c.totalIcons} icons`
+    (c) => `${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} · ${c.totalIcons} icons`
   );
   if (!reordered) return; // user cancelled (no change)
   // Write back: index 0 of reordered = top of deck = matDeck[length-1].
@@ -2681,8 +2738,8 @@ function renderMatCard(card, opts = {}) {
   // CSS hides it whenever .has-art is on.
   const cardName = card.name || m.name;
   const matLabel = isShore
-    ? `<span class="mat-material" style="color:${m.color}">${m.emoji} ${m.name}</span>`
-    : `<span class="mat-material" style="color:${m.color}">${m.emoji} ${m.name} <span class="mat-remaining">(${open}/${card.totalIcons})</span></span>`;
+    ? `<span class="mat-material" style="color:${m.color}">${m.icon} ${m.name}</span>`
+    : `<span class="mat-material" style="color:${m.color}">${m.icon} ${m.name} <span class="mat-remaining">(${open}/${card.totalIcons})</span></span>`;
   // Effect rules text printed full-width across the bottom of the card.
   const effectBox = card.effectSpec
     ? `<div class="mat-effect-box"><b>${card.effectSpec.name}.</b> ${effectDescription(card)}</div>`
@@ -2885,7 +2942,7 @@ function renderPlayers() {
     const wbm = playerWorkersByMaterial(state, p.idx);
     const matSummary = MAT_KEYS
       .filter(m => wbm[m] > 0)
-      .map(m => `<span title="${MATERIALS[m].name}">${MATERIALS[m].emoji}${wbm[m]}</span>`)
+      .map(m => `<span title="${MATERIALS[m].name}">${MATERIALS[m].icon}${wbm[m]}</span>`)
       .join(' ') || '<span class="small-note">none</span>';
     const totalVPVal = totalVP(p, state);
     let supplyIcons = '';
@@ -2909,7 +2966,7 @@ function renderPlayers() {
     let lookoutPeek = '';
     if (p.isHuman && (hasEffect(p, 'Lookout Tree') || hasEffect(p, 'Marsh Lookout')) && state.matDeck.length > 0) {
       const top = state.matDeck[state.matDeck.length - 1];
-      lookoutPeek = `<div class="lookout-peek">🔭 Top of deck: <span style="color:${MATERIALS[top.material].color}">${MATERIALS[top.material].emoji} ${top.name}</span> · ${top.totalIcons} icons</div>`;
+      lookoutPeek = `<div class="lookout-peek">🔭 Top of deck: <span style="color:${MATERIALS[top.material].color}">${MATERIALS[top.material].icon} ${top.name}</span> · ${top.totalIcons} icons</div>`;
     }
     html += `<div class="${cls.join(' ')}">
       <div class="player-head">
@@ -2971,7 +3028,7 @@ function renderHand() {
     const reqs = Object.entries(s.cost).map(([m, n]) => {
       const have = wbm[m] || 0;
       const ok = have >= n;
-      return `<span class="req-pill ${ok ? 'satisfied' : ''}">${MATERIALS[m].emoji}${have}/${n}</span>`;
+      return `<span class="req-pill ${ok ? 'satisfied' : ''}">${MATERIALS[m].icon}${have}/${n}</span>`;
     }).join('');
     const cls = ['struct-card', 'has-art'];
     if (buildable) cls.push('buildable');
@@ -3011,7 +3068,7 @@ function renderHand() {
       const reqs = Object.entries(s.cost).map(([m, n]) => {
         const have = wbm[m] || 0;
         const ok = have >= n;
-        return `<span class="req-pill ${ok ? 'satisfied' : ''}">${MATERIALS[m].emoji}${have}/${n}</span>`;
+        return `<span class="req-pill ${ok ? 'satisfied' : ''}">${MATERIALS[m].icon}${have}/${n}</span>`;
       }).join('');
       const cls = ['struct-card', 'has-art', 'selectable'];
       const isKeep = state.browseSelected && state.browseSelected.has('d' + i);
@@ -3096,12 +3153,12 @@ function renderActionPanel() {
     }
     if (hasEffect(cur, 'Driftwood Snag') && cur.timePos < ENDGAME_TRACK_END - 1) {
       const anyOpen = [...state.riverCards, ...state.prerivCards.filter(c => c)].some(c => uncoveredIcons(c) > 0);
-      if (anyOpen) abilityBtns.push(`<button class="ability-btn" onclick="humanUseDriftwoodSnag()">🪵 Driftwood Snag (1🐟): drop blank</button>`);
+      if (anyOpen) abilityBtns.push(`<button class="ability-btn" onclick="humanUseDriftwoodSnag()">${MATERIALS.logs.icon} Driftwood Snag (1🐟): drop blank</button>`);
     }
     if (hasEffect(cur, 'Tribute Stone') && !cur.tributeStoneUsed) {
       const anyOpponentWorker = state.riverCards.some(c =>
         Object.keys(c.workers).some(k => parseInt(k) !== cur.idx && c.workers[k] > 0));
-      if (anyOpponentWorker) abilityBtns.push(`<button class="ability-btn" onclick="humanUseTributeStone()">🪨 Tribute Stone (once per game): force opponent recall</button>`);
+      if (anyOpponentWorker) abilityBtns.push(`<button class="ability-btn" onclick="humanUseTributeStone()">${MATERIALS.stones.icon} Tribute Stone (once per game): force opponent recall</button>`);
     }
     if (hasEffect(cur, 'Otter Trail')) {
       const haveMine = state.riverCards.some(c => typeof c.slot === 'number' && workersOnCard(c, cur.idx) > 0);
@@ -3252,7 +3309,7 @@ function renderActionPanel() {
           const blankNote = river ? '(drops a blank)' : '(no blank)';
           const v = humanBidRecallState.plan[c.id] || 0;
           return `<div class="bidder-row">
-            <span class="bidder-name">${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} <span class="small-note">${where} ${blankNote}</span></span>
+            <span class="bidder-name">${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} <span class="small-note">${where} ${blankNote}</span></span>
             <span style="display:inline-flex; align-items:center; gap:6px;">
               <button type="button" onclick="adjustBidRecall('${c.id}', -1)" style="width:24px;">−</button>
               <span id="bid-recall-${c.id}" style="min-width:22px; text-align:center;"><b>${v}</b></span>
@@ -3269,7 +3326,7 @@ function renderActionPanel() {
         `;
       }
 
-      html = `<div class="action-panel-title">🎲 Your bid — ${ctx.m.emoji} ${ctx.card.name} <span style="opacity:0.85; font-weight:600;">(${ctx.m.name})</span> at ${ctx.slotLbl}</div>
+      html = `<div class="action-panel-title">🎲 Your bid — ${ctx.m.icon} ${ctx.card.name} <span style="opacity:0.85; font-weight:600;">(${ctx.m.name})</span> at ${ctx.slotLbl}</div>
         ${revealHtml}
         <p>${ctx.open} icon${ctx.open === 1 ? '' : 's'} open · ${ctx.cost}🐟 per item · minimum bid <b>${ctx.minBid}</b>${ctx.minBid > 0 ? ' (you triggered)' : ''} · maximum <b>${ctx.sliderMax}</b> ${ctx.sliderMax === ctx.open ? '(open icons)' : `(${ctx.baseSupply} supply + up to ${ctx.totalRecallable} recall)`}.</p>
         <div class="bid-slider-row">
@@ -3362,7 +3419,7 @@ function renderActionPanel() {
           ${fateLine}
         </div>`;
       }
-      html = `<div class="action-panel-title">🎲 ${m.emoji} ${result.cardName || m.name} <span style="opacity:0.85; font-weight:600;">(${m.name})</span> — auction result</div>
+      html = `<div class="action-panel-title">🎲 ${m.icon} ${result.cardName || m.name} <span style="opacity:0.85; font-weight:600;">(${m.name})</span> — auction result</div>
         <p class="small-note">${result.openBefore} open icon${result.openBefore === 1 ? '' : 's'} going in · ${result.costAtAuction}🐟 per item</p>
         <div class="auction-bidders">${rows}</div>
         ${outcomeBox}
@@ -3398,7 +3455,7 @@ function moveCardToShoreline(card) {
   }
   card.slot = 'shore';
   state.shorelineCards.push(card);
-  log(`📍 ${MATERIALS[card.material].emoji} ${card.name} drifts to the shoreline.`);
+  log(`📍 ${MATERIALS[card.material].icon} ${card.name} drifts to the shoreline.`);
 }
 
 // End-of-life effect dispatcher: fires when a card moves from river → shoreline.
@@ -3454,7 +3511,7 @@ function jamCardDownriver(card) {
     card.slot = (card.effect === 'slipping-sandbar') ? 3 : 0;
     state.riverCards.push(card);
     if (idx !== -1) refillPreriv(idx);
-    log(`💨 ${MATERIALS[card.material].emoji} ${card.name} jams from the Headwaters into River ${card.slot + 1} (${riverSlotCost(card.slot)}🐟/item).`);
+    log(`💨 ${MATERIALS[card.material].icon} ${card.name} jams from the Headwaters into River ${card.slot + 1} (${riverSlotCost(card.slot)}🐟/item).`);
     return;
   }
   // Cost is slot-based: jamming to a higher slot raises the per-item cost automatically.
@@ -3464,7 +3521,7 @@ function jamCardDownriver(card) {
     return;
   }
   card.slot = newSlot;
-  log(`💨 ${MATERIALS[card.material].emoji} ${card.name} jams to River ${newSlot + 1} (${riverSlotCost(newSlot)}🐟/item).`);
+  log(`💨 ${MATERIALS[card.material].icon} ${card.name} jams to River ${newSlot + 1} (${riverSlotCost(newSlot)}🐟/item).`);
 }
 
 // =============================================================================
@@ -3481,7 +3538,7 @@ function refillPreriv(emptiedIdx) {
     const c = state.matDeck.pop();
     c.slot = 'pre';
     state.prerivCards[0] = c;
-    log(`⬇ ${MATERIALS[c.material].emoji} new ${MATERIALS[c.material].name} card enters Headwaters 3 (move: ${prerivTriggerCost(0)}🐟).`);
+    log(`⬇ ${MATERIALS[c.material].icon} new ${MATERIALS[c.material].name} card enters Headwaters 3 (move: ${prerivTriggerCost(0)}🐟).`);
   }
 }
 
@@ -3559,7 +3616,7 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   state.phase = 'auction-bidding';
   const m = MATERIALS[card.material];
   const slotLbl = card.slot === 'pre' ? 'Headwaters' : `River ${card.slot + 1}`;
-  log(`🎲 Auction begins on ${m.emoji} ${card.name} (${m.name}) at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
+  log(`🎲 Auction begins on ${m.icon} ${card.name} (${m.name}) at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
 
   // Spy Mound / Quick Strike: holders can defer their bid until after others
   // reveal. AIs auto-defer if eligible AND the card's material matches at
@@ -3788,7 +3845,7 @@ function resolveAuction(card, bids) {
         jamCardDownriver(card);
       }
       if (card.slot === 'shore' || (!sandbarDrift && wasOnLastSlot)) {
-        log(`🌊 ${result.leftover} icon${result.leftover === 1 ? '' : 's'} unbid — ${m.emoji} ${m.name} card graduates to the shoreline.`);
+        log(`🌊 ${result.leftover} icon${result.leftover === 1 ? '' : 's'} unbid — ${m.icon} ${m.name} card graduates to the shoreline.`);
         result.cardFate = 'shoreline-graduated';
       } else {
         result.cardFate = 'plenty-slid';
@@ -4223,7 +4280,7 @@ function doTributeStone(playerIdx, victimIdx, card) {
   const before = victim.timePos;
   victim.timePos = Math.max(0, victim.timePos - 3);
   p.tributeStoneUsed = true;
-  log(`🪨 Tribute Stone: ${speciesLabel(p)} forces ${speciesLabel(victim)} to recall a worker from ${MATERIALS[card.material].name}; ${speciesLabel(victim)} slides back ${before - victim.timePos}🐟.`);
+  log(`${MATERIALS.stones.icon} Tribute Stone: ${speciesLabel(p)} forces ${speciesLabel(victim)} to recall a worker from ${MATERIALS[card.material].name}; ${speciesLabel(victim)} slides back ${before - victim.timePos}🐟.`);
   return true;
 }
 
@@ -4437,7 +4494,7 @@ function aiStartOfTurnAbilities(playerIdx) {
       const target = cands.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b);
       target.blanks += 1;
       p.timePos += 1;
-      log(`🪵 Driftwood Snag: ${speciesLabel(p)} drops a blank on ${MATERIALS[target.material].name} (+1🐟).`);
+      log(`${MATERIALS.logs.icon} Driftwood Snag: ${speciesLabel(p)} drops a blank on ${MATERIALS[target.material].name} (+1🐟).`);
     }
   }
   // Tribute Stone: fire when there's a high-value opponent worker (per-item cost ≥ 3)
@@ -4635,7 +4692,7 @@ async function humanUseHeronRoost() {
     '🦩 Heron Roost — replace Headwaters card',
     'Pick which Headwaters card to discard. The top of the material deck replaces it. Costs 1🐟.',
     cands,
-    x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} (${x.card.totalIcons} icons)`
+    x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${x.card.totalIcons} icons)`
   );
   if (!pick) return;
   const newCard = state.matDeck.pop();
@@ -4656,15 +4713,15 @@ async function humanUseDriftwoodSnag() {
   ].filter(x => uncoveredIcons(x.card) > 0);
   if (cands.length === 0) return;
   const pick = await pickFromList(
-    '🪵 Driftwood Snag — drop a blank',
+    `${MATERIALS.logs.icon} Driftwood Snag — drop a blank`,
     'Pick any river or Headwaters card with an uncovered icon. One icon becomes blocked. Costs 1🐟.',
     cands,
-    x => `${x.where}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open)`
+    x => `${x.where}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open)`
   );
   if (!pick) return;
   pick.card.blanks += 1;
   human.timePos += 1;
-  log(`🪵 Driftwood Snag: ${speciesLabel(human)} drops a blank on ${MATERIALS[pick.card.material].name} (+1🐟).`);
+  log(`${MATERIALS.logs.icon} Driftwood Snag: ${speciesLabel(human)} drops a blank on ${MATERIALS[pick.card.material].name} (+1🐟).`);
   render();
 }
 
@@ -4680,7 +4737,7 @@ async function humanUseOtterTrail() {
     '🦦 Otter Trail — pick YOUR worker to swap out',
     'Pick the river card whose worker you want to move. You will pay this card\'s per-item cost in fish.',
     sourceCands,
-    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name}`
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
   );
   if (!sourcePick) return;
   // Step 2: pick target worker (any worker on a different river card).
@@ -4698,7 +4755,7 @@ async function humanUseOtterTrail() {
     '🦦 Otter Trail — pick the worker to swap IN',
     `That worker will move to ${MATERIALS[sourcePick.card.material].name}; your worker takes its place.`,
     targetCands,
-    x => `${speciesLabel(state.players[x.otherIdx])} on River ${x.card.slot + 1}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name}`
+    x => `${speciesLabel(state.players[x.otherIdx])} on River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
   );
   if (!targetPick) return;
   doOtterTrail(human.idx, sourcePick.card.id, targetPick.card.id, targetPick.otherIdx);
@@ -4719,10 +4776,10 @@ async function humanUseTributeStone() {
   }
   if (cands.length === 0) return;
   const pick = await pickFromList(
-    '🪨 Tribute Stone — force an opponent recall',
+    `${MATERIALS.stones.icon} Tribute Stone — force an opponent recall`,
     `Pick an opponent's worker on a river card. That worker returns to their supply (blank dropped). The opponent slides back 3🐟 in compensation. Once per game.`,
     cands,
-    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name}`
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
   );
   if (!pick) return;
   doTributeStone(human.idx, pick.victimIdx, pick.card);
@@ -4746,7 +4803,7 @@ async function humanUseSnareSet() {
     '🪤 Snare Set — force an opponent recall',
     `Pick an opponent's worker on a river card. That worker returns to their supply (blank dropped). The opponent slides back 3🐟 in compensation. Once per game.`,
     cands,
-    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name}`
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
   );
   if (!pick) return;
   const victim = state.players[pick.victimIdx];
@@ -4770,7 +4827,7 @@ async function humanUseTailSlap() {
     '🦫 Tail Slap — drop a blank',
     `Pay 1🐟 to drop a blank on any uncovered icon on a River 1 card. May be used once per turn.`,
     cands,
-    c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} (River 1, ${uncoveredIcons(c)} open)`
+    c => `${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (River 1, ${uncoveredIcons(c)} open)`
   );
   if (!pick) return;
   pick.blanks += 1;
@@ -4796,7 +4853,7 @@ async function humanUseChannelClearer() {
     '🐭 Channel Clearer — discard a Reed worker',
     `Pick 1 opponent's Reed worker on a river card. It returns to their supply (no blank, no fish compensation). Free; once per turn.`,
     cands,
-    x => `River ${x.card.slot + 1}: ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name}`
+    x => `River ${x.card.slot + 1}: ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
   );
   if (!pick) return;
   const victim = state.players[pick.victimIdx];
@@ -4828,7 +4885,7 @@ async function humanUseRollingFloat() {
     '🦦 Rolling Float — swap workers in the same slot',
     `Pick a (your worker, opponent worker) pair from cards sharing a river slot. The two swap. No fish cost. Once per game.`,
     pairs,
-    p => `River ${p.a.slot + 1}: your worker on ${MATERIALS[p.a.material].emoji} ${MATERIALS[p.a.material].name} ↔ ${speciesLabel(state.players[p.opIdx])}'s on ${MATERIALS[p.b.material].emoji} ${MATERIALS[p.b.material].name}`
+    p => `River ${p.a.slot + 1}: your worker on ${MATERIALS[p.a.material].icon} ${MATERIALS[p.a.material].name} ↔ ${speciesLabel(state.players[p.opIdx])}'s on ${MATERIALS[p.b.material].icon} ${MATERIALS[p.b.material].name}`
   );
   if (!pick) return;
   pick.a.workers[human.idx] -= 1;
@@ -4876,7 +4933,7 @@ async function humanSalmonRun() {
     '🐟 Salmon Run — pick a river card',
     'Workers come from your supply. Pay escalating fish cost per worker placed (2/3/5/8/13).',
     cardCands,
-    c => `River ${c.slot + 1}: ${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} (${uncoveredIcons(c)} open)`,
+    c => `River ${c.slot + 1}: ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${uncoveredIcons(c)} open)`,
     { cancelable: false }
   );
   if (!cardPick) return;
@@ -4909,7 +4966,7 @@ async function humanBeaverTow() {
     '🦫 Beaver Tow — slide a river card upstream',
     'Pick a river card to slide one slot toward the Headwaters (cheaper per-item cost). Costs 2🐟.',
     cands,
-    c => `River ${c.slot + 1} → River ${c.slot} (${riverSlotCost(c.slot)}🐟 → ${riverSlotCost(c.slot - 1)}🐟/item): ${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} (${uncoveredIcons(c)} open)`,
+    c => `River ${c.slot + 1} → River ${c.slot} (${riverSlotCost(c.slot)}🐟 → ${riverSlotCost(c.slot - 1)}🐟/item): ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${uncoveredIcons(c)} open)`,
     { cancelable: false }
   );
   if (!pick) return;
@@ -5095,7 +5152,7 @@ async function performBuild(playerIdx, handIdx) {
       p.granaryUsed = savedFlag;
       if (buildableWithout) {
         const useNow = await confirmModal(
-          '🌾 Use Granary?',
+          `${MATERIALS.reeds.icon} Use Granary?`,
           'Save 1 worker on this build, or save Granary for a future build? (Once per game.)',
           'Use now', 'Save for later'
         );
@@ -5108,7 +5165,7 @@ async function performBuild(playerIdx, handIdx) {
   if (suppressGranary) p.granaryUsed = false;
   if (granaryUsed) {
     p.granaryUsed = true;
-    log(`🌾 ${speciesLabel(p)} uses Granary to save 1 worker on this build.`);
+    log(`${MATERIALS.reeds.icon} ${speciesLabel(p)} uses Granary to save 1 worker on this build.`);
   }
   if (stoneToolUsed) {
     p.stoneToolUsed = true;
@@ -5254,21 +5311,21 @@ async function humanStoneCausewayDraw(playerIdx) {
   const drawn = popStructDeck(state);
   if (!drawn) return;
   p.hand.push(drawn);
-  log(`🪨 Stone Causeway draws ${drawn.name}. Pick a card to discard.`);
+  log(`${MATERIALS.stones.icon} Stone Causeway draws ${drawn.name}. Pick a card to discard.`);
   render();
   if (p.hand.length <= maxHandSize(p)) return;
   const items = p.hand.map((s, i) => ({ s, i }));
   const pick = await pickFromList(
-    '🪨 Stone Causeway — discard a card',
+    `${MATERIALS.stones.icon} Stone Causeway — discard a card`,
     `You drew <b>${drawn.name}</b> on top of your normal refill. Pick one card from your hand to discard.`,
     items,
-    x => `${x.s.name} — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}`,
+    x => `${x.s.name} — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')}`,
     { cancelable: false }
   );
   const idx = pick ? pick.i : (p.hand.length - 1); // fallback: discard the drawn card
   const dropped = p.hand.splice(idx, 1)[0];
   state.structDiscard.push(dropped);
-  log(`🪨 Stone Causeway: discarded ${dropped.name}.`);
+  log(`${MATERIALS.stones.icon} Stone Causeway: discarded ${dropped.name}.`);
   render();
 }
 
@@ -5280,19 +5337,19 @@ async function humanReedWalkwayPlace(playerIdx) {
   if (cands.length === 0) return;
   const items = cands.map(c => ({ card: c }));
   const pick = await pickFromList(
-    '🌾 Reed Walkway — place a free worker on River 1',
+    `${MATERIALS.reeds.icon} Reed Walkway — place a free worker on River 1`,
     'Place 1 worker from your supply onto an uncovered icon on a River 1 card. (Free; you may skip.)',
     items,
-    x => `River 1 (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} — ${uncoveredIcons(x.card)} uncovered`,
+    x => `River 1 (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} — ${uncoveredIcons(x.card)} uncovered`,
     { declineLabel: 'Skip', cancelable: false }
   );
   if (!pick || pick === PICKER_DECLINE) {
-    log(`🌾 Reed Walkway: skipped.`);
+    log(`${MATERIALS.reeds.icon} Reed Walkway: skipped.`);
     return;
   }
   p.supply -= 1;
   pick.card.workers[playerIdx] = (pick.card.workers[playerIdx] || 0) + 1;
-  log(`🌾 Reed Walkway: places 1 free worker on ${MATERIALS[pick.card.material].name} (R1).`);
+  log(`${MATERIALS.reeds.icon} Reed Walkway: places 1 free worker on ${MATERIALS[pick.card.material].name} (R1).`);
   render();
 }
 
@@ -5310,7 +5367,7 @@ async function humanClayVaultSwap(playerIdx) {
   const top = state.structDeck[state.structDeck.length - 1];
   const yes = await confirmModal(
     '🏺 Clay Vault — peek deck top',
-    `Top of the structure deck is <b>${top.name}</b> (${vpDisplay(top)}★ · ${top.time}🐟 · ${Object.entries(top.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}). Swap it for one card from your hand?`,
+    `Top of the structure deck is <b>${top.name}</b> (${vpDisplay(top)}★ · ${top.time}🐟 · ${Object.entries(top.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')}). Swap it for one card from your hand?`,
     'Swap', 'Keep hand'
   );
   if (!yes) {
@@ -5322,7 +5379,7 @@ async function humanClayVaultSwap(playerIdx) {
     '🏺 Clay Vault — discard one card from hand',
     `Discard which card? You'll take <b>${top.name}</b> in exchange.`,
     items,
-    x => `${x.s.name} — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')}`,
+    x => `${x.s.name} — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')}`,
     { cancelable: false }
   );
   if (!pick) return;
@@ -5347,7 +5404,7 @@ async function humanBurrowNetworkMove(playerIdx) {
     '🕳 Burrow Network — pick source worker',
     'Move 1 of your workers from this card to another card where you already have at least 1 worker. (You may replace a blank.)',
     sourceItems,
-    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} — you have ${workersOnCard(x.card, playerIdx)}`,
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} — you have ${workersOnCard(x.card, playerIdx)}`,
     { declineLabel: 'Skip', cancelable: false }
   );
   if (!sourcePick || sourcePick === PICKER_DECLINE) {
@@ -5369,7 +5426,7 @@ async function humanBurrowNetworkMove(playerIdx) {
       const open = uncoveredIcons(x.card);
       const bl = x.card.blanks;
       const tag = (open > 0 && bl > 0) ? `${open} uncovered, ${bl} blank` : (open > 0 ? `${open} uncovered` : `${bl} blank`);
-      return `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} — ${tag}`;
+      return `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} — ${tag}`;
     },
     { cancelable: false }
   );
@@ -5401,7 +5458,7 @@ function aiStoneCausewayDraw(playerIdx) {
   if (!drawn) return;
   p.hand.push(drawn);
   if (p.hand.length <= maxHandSize(p)) {
-    log(`🪨 Stone Causeway: ${speciesLabel(p)} draws ${drawn.name}.`);
+    log(`${MATERIALS.stones.icon} Stone Causeway: ${speciesLabel(p)} draws ${drawn.name}.`);
     return;
   }
   const wbm = playerWorkersByMaterial(state, playerIdx);
@@ -5413,7 +5470,7 @@ function aiStoneCausewayDraw(playerIdx) {
   const scored = p.hand.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => a.sc - b.sc);
   const dropped = p.hand.splice(scored[0].i, 1)[0];
   state.structDiscard.push(dropped);
-  log(`🪨 Stone Causeway: ${speciesLabel(p)} draws ${drawn.name}, discards ${dropped.name}.`);
+  log(`${MATERIALS.stones.icon} Stone Causeway: ${speciesLabel(p)} draws ${drawn.name}, discards ${dropped.name}.`);
 }
 
 function aiReedWalkwayPlace(playerIdx) {
@@ -5431,7 +5488,7 @@ function aiReedWalkwayPlace(playerIdx) {
   const target = cands[0];
   p.supply -= 1;
   target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
-  log(`🌾 Reed Walkway: ${speciesLabel(p)} places 1 free worker on ${target.name} (R1).`);
+  log(`${MATERIALS.reeds.icon} Reed Walkway: ${speciesLabel(p)} places 1 free worker on ${target.name} (R1).`);
 }
 
 function aiClayVaultSwap(playerIdx) {
@@ -5528,7 +5585,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         '🦫 Beaver Dam — wash a River 1 card',
         'Pick one River 1 card to wash to the shoreline (workers carry along).',
         r1,
-        c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} · ${uncoveredIcons(c)} open · ${Object.values(c.workers).reduce((s, n) => s + n, 0)} worker${Object.values(c.workers).reduce((s, n) => s + n, 0) === 1 ? '' : 's'}`,
+        c => `${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} · ${uncoveredIcons(c)} open · ${Object.values(c.workers).reduce((s, n) => s + n, 0)} worker${Object.values(c.workers).reduce((s, n) => s + n, 0) === 1 ? '' : 's'}`,
         { cancelable: false }
       );
     } else {
@@ -5563,10 +5620,10 @@ async function fireOnBuildEffect(playerIdx, struct) {
         ].filter(x => uncoveredIcons(x.card) > 0);
         if (cands.length === 0) break;
         const pick = await pickFromList(
-          `🧱 Mud Levee — drop blank ${drop + 1}/2`,
+          `${MATERIALS.mud.icon} Mud Levee — drop blank ${drop + 1}/2`,
           'Pick a card to block one uncovered icon.',
           cands,
-          x => `${x.where}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} open`
+          x => `${x.where}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} open`
         );
         if (!pick) break;
         pick.card.blanks++;
@@ -5582,7 +5639,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         if (dropped >= 2) break;
       }
     }
-    log(`🧱 Mud Levee drops ${dropped} blank${dropped === 1 ? '' : 's'}.`);
+    log(`${MATERIALS.mud.icon} Mud Levee drops ${dropped} blank${dropped === 1 ? '' : 's'}.`);
     return;
   }
   if (struct.name === 'Flush Channel') {
@@ -5599,7 +5656,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         '🌀 Flush Channel — discard 1 Headwaters card',
         'Pick a Headwaters card to discard out of game. Its slot refills from the top of the deck. No auction.',
         cands,
-        x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
+        x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
         { cancelable: false }
       );
     } else {
@@ -5632,7 +5689,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
           `<b>Decline</b> to keep the structure built but skip placing workers. ` +
           `<b>Cancel</b> to undo the entire Sap Drip build.`,
         cands,
-        c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} · River ${c.slot + 1} · ${uncoveredIcons(c)} open`,
+        c => `${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} · River ${c.slot + 1} · ${uncoveredIcons(c)} open`,
         { declineLabel: 'Decline (skip placement)', cancelLabel: 'Cancel (undo build)' }
       );
       if (result === PICKER_DECLINE) return;
@@ -5674,7 +5731,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         '🪤 Snag Pile — pull Headwaters card',
         'Pick which Headwaters card to pull. An auction immediately runs on it at 1🐟/item; you must bid at least 1 worker.',
         cands,
-        x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].emoji} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
+        x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
         { cancelable: false }
       );
     } else {
@@ -5695,13 +5752,13 @@ async function fireOnBuildEffect(playerIdx, struct) {
     let keep;
     if (isHuman) {
       keep = await pickFromList(
-        `🌿 Vine Lattice — keep 1 of ${drawn.length}`,
+        `${MATERIALS.vines.icon} Vine Lattice — keep 1 of ${drawn.length}`,
         `Pick the structure card to keep. The other ${drawn.length - 1} will be discarded.`,
         drawn,
         s => {
           const reqs = Object.entries(s.cost).map(([m, n]) => {
             const have = wbm[m] || 0;
-            return `${MATERIALS[m].emoji}${have}/${n}`;
+            return `${MATERIALS[m].icon}${have}/${n}`;
           }).join(' ');
           const eff = s.effect ? `<br><i>${s.effect}</i>` : '';
           return `<b>${s.name}</b> · ${s.time}🐟 · ${vpDisplay(s)}★<br>${reqs}${eff}`;
@@ -5720,7 +5777,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
     const discard = drawn.filter(s => s !== keep);
     p.hand.push(keep);
     for (const d of discard) state.structDiscard.push(d);
-    log(`🌿 Vine Lattice: ${speciesLabel(p)} drew ${drawn.length}, kept <b>${keep.name}</b>, discarded ${discard.length}.`);
+    log(`${MATERIALS.vines.icon} Vine Lattice: ${speciesLabel(p)} drew ${drawn.length}, kept <b>${keep.name}</b>, discarded ${discard.length}.`);
     return;
   }
   if (struct.name === 'Stone Pool') {
@@ -5733,7 +5790,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         `💧 Stone Pool — reorder next ${drawOrder.length} material cards`,
         'Top of the list will be drawn first. Use ▲/▼ to rearrange.',
         drawOrder,
-        c => `${MATERIALS[c.material].emoji} ${MATERIALS[c.material].name} (${c.totalIcons} icons)`
+        c => `${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${c.totalIcons} icons)`
       );
       if (reordered) {
         const stackOrder = reordered.slice().reverse();
@@ -5768,7 +5825,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
           ${o.hand.length === 0
             ? ' <span class="small-note">(empty hand)</span>'
             : '<ul style="margin:4px 0 0 18px;padding:0;">' + o.hand.map(s =>
-                `<li>${s.name} <span class="small-note">(${Object.entries(s.cost).map(([m, n]) => MATERIALS[m].emoji + n).join(' ')} · ${s.time}🐟 · ${vpDisplay(s)}★)</span></li>`
+                `<li>${s.name} <span class="small-note">(${Object.entries(s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')} · ${s.time}🐟 · ${vpDisplay(s)}★)</span></li>`
               ).join('') + '</ul>'}
         </div>
       `).join('');

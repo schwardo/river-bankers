@@ -72,44 +72,29 @@ _FONT_ASCENDER = 5.0
 _FONT_DESCENDER = 1.5
 
 
-# Per-material icon glyphs — vector path silhouettes (printer-safe; color
-# emoji like 🪵/🪨 don't render through Inkscape/rsvg without a color-emoji-
-# capable Pango build). All glyphs are drawn centered on (0,0) and scaled
-# to sit inside a 45.36 pt (0.63") disc with ~6 pt of inner padding.
-# {COLOR} and {INK} get substituted with the per-material palette.
-MATERIAL_GLYPHS = {
-    "logs": """\
-<ellipse cx="0" cy="0" rx="14" ry="9" fill="{COLOR}" stroke="{INK}" stroke-width="1.5"/>
-<ellipse cx="0" cy="0" rx="9"  ry="5.5" fill="none" stroke="{INK}" stroke-width="0.8"/>
-<ellipse cx="0" cy="0" rx="4"  ry="2.5" fill="none" stroke="{INK}" stroke-width="0.7"/>""",
-    "stones": """\
-<ellipse cx="-7" cy="4"  rx="6" ry="5" fill="{COLOR}" stroke="{INK}" stroke-width="1.0"/>
-<ellipse cx="7"  cy="4"  rx="6" ry="5" fill="{COLOR}" stroke="{INK}" stroke-width="1.0"/>
-<ellipse cx="0"  cy="-5" rx="7" ry="6" fill="{COLOR}" stroke="{INK}" stroke-width="1.0"/>""",
-    "reeds": """\
-<g stroke="{INK}" stroke-width="1.5" stroke-linecap="round">
-  <line x1="-8" y1="13" x2="-8" y2="-2"/>
-  <line x1="0"  y1="14" x2="0"  y2="-6"/>
-  <line x1="8"  y1="13" x2="8"  y2="-2"/>
-</g>
-<ellipse cx="-8" cy="-5" rx="3" ry="6"  fill="{COLOR}" stroke="{INK}" stroke-width="1.0"/>
-<ellipse cx="0"  cy="-9" rx="3" ry="6.5" fill="{COLOR}" stroke="{INK}" stroke-width="1.0"/>
-<ellipse cx="8"  cy="-5" rx="3" ry="6"  fill="{COLOR}" stroke="{INK}" stroke-width="1.0"/>""",
-    "mud": """\
-<path d="M -14 -2 q 1 -9 14 -8 q 13 -1 14 8 q -1 9 -14 8 q -13 1 -14 -8 Z"
-      fill="{COLOR}" stroke="{INK}" stroke-width="1.2"/>
-<ellipse cx="-5" cy="-2" rx="2.2" ry="1.3" fill="{INK}"/>
-<ellipse cx="6"  cy="2"  rx="2.0" ry="1.2" fill="{INK}"/>""",
-    "vines": """\
-<path d="M -3 13 Q -10 1 -1 -11 Q 11 1 4 13 Z"
-      fill="{COLOR}" stroke="{INK}" stroke-width="1.2"/>
-<path d="M 1 13 Q 0 1 -1 -9" stroke="{INK}" stroke-width="0.9" fill="none"/>""",
-    "clay": """\
-<path d="M -8 -10 L 8 -10 L 9 -8 L 6.5 -7
-         Q 13 0 11 7 Q 9 13 0 13 Q -9 13 -11 7 Q -13 0 -6.5 -7 L -9 -8 Z"
-      fill="{COLOR}" stroke="{INK}" stroke-width="1.2"/>
-<ellipse cx="0" cy="-9" rx="9" ry="1.6" fill="{INK}"/>""",
-}
+# Per-material icon glyphs — pulled from graphics/icons/<material>.svg, the
+# single canonical source shared with structure-deck/generate.py and the
+# web prototype. Each source SVG uses viewBox="-15 -15 30 30" with the
+# silhouette occupying roughly ±14 units; rendering at native scale fills
+# the 45.36 pt (0.63") disc with ~7 pt of inner padding. Edit the SVG
+# files (not this code) to change the glyph art.
+ICONS_DIR = HERE.parent / "icons"
+_SVG_TAG_RE = re.compile(r"<svg\b[^>]*>(.*?)</svg>", re.DOTALL)
+
+
+def _load_icon_body(material_key: str) -> str:
+    path = ICONS_DIR / f"{material_key}.svg"
+    text = path.read_text()
+    text = re.sub(r"<\?xml[^?]*\?>", "", text)
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+    m = _SVG_TAG_RE.search(text)
+    if not m:
+        sys.exit(f"error: no <svg> body in {path}")
+    return m.group(1).strip()
+
+
+MATERIAL_GLYPHS = {key: _load_icon_body(key)
+                   for key in ("logs", "stones", "reeds", "mud", "vines", "clay")}
 
 
 def safe_filename(name: str) -> str:
@@ -161,13 +146,11 @@ def _row_positions(count: int, cy: float):
 
 
 def render_icon_grid(card, mat, material_key):
-    """SVG fragment with disc + vector glyph per icon."""
+    """SVG fragment with disc + shared-source glyph per icon."""
     has_effect = bool(card.get("effect_text"))
     positions = icon_positions(card["icons"], has_effect)
     color = mat["color"]
-    ink = mat["ink"]
-    glyph_template = MATERIAL_GLYPHS[material_key]
-    glyph_svg = glyph_template.replace("{COLOR}", color).replace("{INK}", ink)
+    glyph_svg = MATERIAL_GLYPHS[material_key]
 
     pieces = ['<g id="icon-grid" inkscape:label="Icons">']
     for cx, cy in positions:

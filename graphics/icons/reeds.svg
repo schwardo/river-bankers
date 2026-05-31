@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Canonical "reeds" silhouette: three stalks with seed heads. Colors baked
+     from MATERIALS.reeds (color #5a8e3a, ink #365821). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -15 30 30">
+  <g stroke="#365821" stroke-width="1.5" stroke-linecap="round">
+    <line x1="-8" y1="13" x2="-8" y2="-2"/>
+    <line x1="0"  y1="14" x2="0"  y2="-6"/>
+    <line x1="8"  y1="13" x2="8"  y2="-2"/>
+  </g>
+  <ellipse cx="-8" cy="-5" rx="3" ry="6"   fill="#5a8e3a" stroke="#365821" stroke-width="1.0"/>
+  <ellipse cx="0"  cy="-9" rx="3" ry="6.5" fill="#5a8e3a" stroke="#365821" stroke-width="1.0"/>
+  <ellipse cx="8"  cy="-5" rx="3" ry="6"   fill="#5a8e3a" stroke="#365821" stroke-width="1.0"/>
+</svg>
