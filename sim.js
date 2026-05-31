@@ -48,12 +48,12 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 4, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
   { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 6, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
-  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 2, effect: 'End game: +3 VP per built structure of yours that uses Vines.' },
-  { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 2, effect: 'When you build a structure that uses Vines, slide back 1 fish on the fish track. End game: +1 VP per built structure of yours that uses Vines (max +6).' },
-  { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 3, effect: 'When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +1 VP per built structure of yours that uses Stones (max +6).' },
-  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 3, effect: 'When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +1 VP per built structure of yours that uses Reeds (max +6).' },
-  { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 4, effect: 'When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +1 VP per built structure of yours that uses Clay (max +6).' },
-  { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 2, vp: 4, effect: 'When you build a structure that uses Mud, move one of your workers from any river card to another river card containing at least one of your workers (you may replace a blank instead of taking an uncovered icon). End game: +1 VP per built structure of yours that uses Mud (max +6).' },
+  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End game: +4 VP per built structure of yours that uses Vines (max +12).' },
+  { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 0, effect: 'When you build a structure that uses Vines, slide back 1 fish on the fish track. End game: +2 VP per built structure of yours that uses Vines.' },
+  { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 0, effect: 'When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +2 VP per built structure of yours that uses Stones (max +8).' },
+  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +2 VP per built structure of yours that uses Reeds.' },
+  { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +3 VP per built structure of yours that uses Clay (max +12).' },
+  { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 2, vp: 0, effect: 'When you build a structure that uses Mud, move one of your workers from any river card to another river card containing at least one of your workers (you may replace a blank instead of taking an uncovered icon). End game: +3 VP per built structure of yours that uses Mud (max +9).' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'At the start of your turn you may pay 1 fish to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 3, clay: 2 },  time: 3, vp: 0, effect: 'End game: +3 VP per 2 distinct materials in your built structures (max +9).' },
@@ -121,6 +121,20 @@ function setStructureEffectDisabled(name, disabled) {
 }
 function effectActive(name) { return STRUCTURE_EFFECT_DISABLED[name] !== true; }
 function hasEffect(p, name) { return effectActive(name) && p.built.some(s => s.name === name); }
+
+// Per-card end-game scoring overrides used by sweepVpRework. Empty by
+// default → the helper falls back to each card's hard-coded multiplier/cap
+// so live scoring is unchanged. Override entries take the shape
+// VP_OVERRIDES['Vine Ladder'] = { mult: 2, cap: Infinity }.
+const VP_OVERRIDES = {};
+function matEndGameVP(p, cardName, defaultMult, defaultCap, materialKey) {
+  if (!hasEffect(p, cardName)) return 0;
+  const o = VP_OVERRIDES[cardName];
+  const mult = (o && o.mult !== undefined) ? o.mult : defaultMult;
+  const cap = (o && o.cap !== undefined) ? o.cap : defaultCap;
+  const count = p.built.filter(b => (b.cost[materialKey] || 0) > 0).length;
+  return Math.min(cap, mult * count);
+}
 function maxHandSize(p) { return 3 + (hasEffect(p, 'Cache Burrow') ? 1 : 0); }
 function totalVP(p, state) {
   let v = p.built.reduce((s, b) => s + b.vp, 0);
@@ -132,24 +146,15 @@ function totalVP(p, state) {
     for (const b of p.built) for (const m in b.cost) mats.add(m);
     v += CATTAIL_PATCH_VP[Math.min(mats.size, CATTAIL_PATCH_VP.length - 1)];
   }
-  if (hasEffect(p, 'Vine Ladder')) {
-    v += 3 * p.built.filter(b => (b.cost.vines || 0) > 0).length;
-  }
-  if (hasEffect(p, 'Vine Trellis')) {
-    v += Math.min(6, p.built.filter(b => (b.cost.vines || 0) > 0).length);
-  }
-  if (hasEffect(p, 'Stone Causeway')) {
-    v += Math.min(6, p.built.filter(b => (b.cost.stones || 0) > 0).length);
-  }
-  if (hasEffect(p, 'Reed Walkway')) {
-    v += Math.min(6, p.built.filter(b => (b.cost.reeds || 0) > 0).length);
-  }
-  if (hasEffect(p, 'Clay Vault')) {
-    v += Math.min(6, p.built.filter(b => (b.cost.clay || 0) > 0).length);
-  }
-  if (hasEffect(p, 'Burrow Network')) {
-    v += Math.min(6, p.built.filter(b => (b.cost.mud || 0) > 0).length);
-  }
+  // VP_OVERRIDES per-card hooks let sweepVpRework swap the end-game
+  // multiplier/cap without editing the function body. Defaults match the
+  // current live shape (printed vp:0 + the matEndGameVP terms).
+  v += matEndGameVP(p, 'Vine Ladder',    4, 12, 'vines');
+  v += matEndGameVP(p, 'Vine Trellis',   2, Infinity, 'vines');
+  v += matEndGameVP(p, 'Stone Causeway', 2, 8,  'stones');
+  v += matEndGameVP(p, 'Reed Walkway',   2, Infinity, 'reeds');
+  v += matEndGameVP(p, 'Clay Vault',     3, 12, 'clay');
+  v += matEndGameVP(p, 'Burrow Network', 3, 9,  'mud');
   if (hasEffect(p, 'Hidden Cache')) {
     const mats = new Set();
     for (const b of p.built) for (const m in b.cost) mats.add(m);
@@ -1269,41 +1274,59 @@ function aiEffectValue(struct, p, state) {
     }
     return CATTAIL_PATCH_VP[Math.min(projected, CATTAIL_PATCH_VP.length - 1)];
   }
+  // The 6 fixed-base + end-game-bonus cards. Multiplier and cap are sourced
+  // from VP_OVERRIDES when present (used by sweepVpRework) so the AI's
+  // draw/Invent valuation tracks the swapped scoring shape; defaults match
+  // the live game. Tempo bonuses on Vine Trellis / Stone Causeway / Reed
+  // Walkway / Clay Vault / Burrow Network represent the *non-VP* perk
+  // (slide-back, draw-and-filter, free worker, hand-sculpt, worker-move).
   if (struct.name === 'Vine Ladder') {
+    const o = VP_OVERRIDES['Vine Ladder'];
+    const mult = (o && o.mult !== undefined) ? o.mult : 4;
+    const cap = (o && o.cap !== undefined) ? o.cap : 12;
     const builtVine = p.built.filter(b => (b.cost.vines || 0) > 0).length;
     const handVine = p.hand.filter(s => (s.cost.vines || 0) > 0).length;
-    return 3 * (builtVine + Math.min(handVine, 2));
+    return Math.min(cap, mult * (builtVine + Math.min(handVine, 2)));
   }
   if (struct.name === 'Vine Trellis') {
+    const o = VP_OVERRIDES['Vine Trellis'];
+    const mult = (o && o.mult !== undefined) ? o.mult : 2;
+    const cap = (o && o.cap !== undefined) ? o.cap : Infinity;
     const builtVine = p.built.filter(b => (b.cost.vines || 0) > 0).length;
     const handVine = p.hand.filter(s => (s.cost.vines || 0) > 0).length;
-    // End-game: +1 per Vine-cost build (incl. self), cap 6. Tempo: ~1 VP-eq for
-    // the per-build slide-back (comparable to Otter Slide's fixed 2 across all builds).
-    return Math.min(6, builtVine + 1 + Math.min(handVine, 2)) + 1;
+    return Math.min(cap, mult * (builtVine + 1 + Math.min(handVine, 2))) + 1;
   }
   if (struct.name === 'Stone Causeway') {
+    const o = VP_OVERRIDES['Stone Causeway'];
+    const mult = (o && o.mult !== undefined) ? o.mult : 2;
+    const cap = (o && o.cap !== undefined) ? o.cap : 8;
     const builtStone = p.built.filter(b => (b.cost.stones || 0) > 0).length;
     const handStone = p.hand.filter(s => (s.cost.stones || 0) > 0).length;
-    // End-game + draw-filter tempo (~1.5 VP-eq; draws are stronger than slide-back).
-    return Math.min(6, builtStone + 1 + Math.min(handStone, 2)) + 1.5;
+    return Math.min(cap, mult * (builtStone + 1 + Math.min(handStone, 2))) + 1.5;
   }
   if (struct.name === 'Reed Walkway') {
+    const o = VP_OVERRIDES['Reed Walkway'];
+    const mult = (o && o.mult !== undefined) ? o.mult : 2;
+    const cap = (o && o.cap !== undefined) ? o.cap : Infinity;
     const builtReed = p.built.filter(b => (b.cost.reeds || 0) > 0).length;
     const handReed = p.hand.filter(s => (s.cost.reeds || 0) > 0).length;
-    // End-game + free-worker tempo (~2 VP-eq; free R1 workers are strong).
-    return Math.min(6, builtReed + 1 + Math.min(handReed, 2)) + 2;
+    return Math.min(cap, mult * (builtReed + 1 + Math.min(handReed, 2))) + 2;
   }
   if (struct.name === 'Clay Vault') {
+    const o = VP_OVERRIDES['Clay Vault'];
+    const mult = (o && o.mult !== undefined) ? o.mult : 3;
+    const cap = (o && o.cap !== undefined) ? o.cap : 12;
     const builtClay = p.built.filter(b => (b.cost.clay || 0) > 0).length;
     const handClay = p.hand.filter(s => (s.cost.clay || 0) > 0).length;
-    // End-game + hand-sculpt tempo (~1 VP-eq; weaker than full draw).
-    return Math.min(6, builtClay + 1 + Math.min(handClay, 2)) + 1;
+    return Math.min(cap, mult * (builtClay + 1 + Math.min(handClay, 2))) + 1;
   }
   if (struct.name === 'Burrow Network') {
+    const o = VP_OVERRIDES['Burrow Network'];
+    const mult = (o && o.mult !== undefined) ? o.mult : 3;
+    const cap = (o && o.cap !== undefined) ? o.cap : 9;
     const builtMud = p.built.filter(b => (b.cost.mud || 0) > 0).length;
     const handMud = p.hand.filter(s => (s.cost.mud || 0) > 0).length;
-    // End-game + worker-move tempo (~1 VP-eq; situational — needs 2+ worked cards).
-    return Math.min(6, builtMud + 1 + Math.min(handMud, 2)) + 1;
+    return Math.min(cap, mult * (builtMud + 1 + Math.min(handMud, 2))) + 1;
   }
   if (struct.name === 'Hidden Cache') {
     const mats = new Set();
@@ -3353,6 +3376,250 @@ function sweepPairVP(numGamesArg) {
   console.log('  winPair = avg pair-VP earned by the winner\n');
 }
 
+// =============================================================================
+// VP REWORK SWEEP
+// =============================================================================
+// For the 6 "fixed-base + end-game-bonus" structure cards (Vine Ladder,
+// Vine Trellis, Stone Causeway, Reed Walkway, Clay Vault, Burrow Network),
+// test variants that drop the printed base VP to 0 and bump the per-matching-
+// structure multiplier / cap. Goal: find a shape that keeps the card's
+// average builder VP (and AI build-rate) in line with the current version
+// while letting the printed face show a clean "?★" instead of "N+?★".
+function sweepVpRework(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || 8;
+  const numGames = parseInt(numGamesArg) || 5000;
+  configureMaterials(6);
+
+  const CARDS = [
+    { name: 'Vine Ladder',    mat: 'vines',  baseVp: 2, baseMult: 3, baseCap: Infinity },
+    { name: 'Vine Trellis',   mat: 'vines',  baseVp: 2, baseMult: 1, baseCap: 6 },
+    { name: 'Stone Causeway', mat: 'stones', baseVp: 3, baseMult: 1, baseCap: 6 },
+    { name: 'Reed Walkway',   mat: 'reeds',  baseVp: 3, baseMult: 1, baseCap: 6 },
+    { name: 'Clay Vault',     mat: 'clay',   baseVp: 4, baseMult: 1, baseCap: 6 },
+    { name: 'Burrow Network', mat: 'mud',    baseVp: 4, baseMult: 1, baseCap: 6 },
+  ];
+
+  function variantsFor(card) {
+    return [
+      { label: `BASE vp=${card.baseVp} ×${card.baseMult}${isFinite(card.baseCap) ? ` cap${card.baseCap}` : ' nocap'}`,
+        vp: card.baseVp, mult: card.baseMult, cap: card.baseCap },
+      { label: `vp=0 ×${card.baseMult}${isFinite(card.baseCap) ? ` cap${card.baseCap}` : ' nocap'}`,
+        vp: 0,           mult: card.baseMult, cap: card.baseCap },
+      { label: 'vp=0 ×2 nocap',  vp: 0, mult: 2, cap: Infinity },
+      { label: 'vp=0 ×2 cap8',   vp: 0, mult: 2, cap: 8 },
+      { label: 'vp=0 ×3 cap9',   vp: 0, mult: 3, cap: 9 },
+      { label: 'vp=0 ×3 cap12',  vp: 0, mult: 3, cap: 12 },
+    ];
+  }
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
+        const passed = action.type === 'pass';
+        if (reachedEnd || passed) p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  function runVariant(card, variant) {
+    const tpl = BASE_STRUCTURE_TEMPLATES.find(s => s.name === card.name);
+    const origVp = tpl.vp;
+    tpl.vp = variant.vp;
+    configureMaterials(6);
+    VP_OVERRIDES[card.name] = { mult: variant.mult, cap: variant.cap };
+
+    let builders = 0, builderVPsum = 0, builderWinsAcc = 0;
+    let avgFieldVPsum = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      const finalVPs = state.players.map(p => totalVP(p, state));
+      const maxVp = Math.max(...finalVPs);
+      avgFieldVPsum += finalVPs.reduce((s, v) => s + v, 0) / finalVPs.length;
+      for (let i = 0; i < state.players.length; i++) {
+        const p = state.players[i];
+        if (p.built.some(b => b.name === card.name)) {
+          builders++;
+          builderVPsum += finalVPs[i];
+          if (finalVPs[i] === maxVp) builderWinsAcc++;
+        }
+      }
+    }
+
+    tpl.vp = origVp;
+    delete VP_OVERRIDES[card.name];
+    configureMaterials(6);
+
+    return {
+      builds: builders,
+      buildRate: builders / (numGames * numP),
+      avgVP: builders ? builderVPsum / builders : NaN,
+      winRate: builders ? builderWinsAcc / builders : NaN,
+      avgFieldVP: avgFieldVPsum / numGames,
+    };
+  }
+
+  console.log(`\nRiver Bankers — fixed-base + end-game-bonus rework sweep`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games per variant.`);
+  console.log(`Looking for variants where vp=0 keeps avgVP & buildRate close to BASELINE.\n`);
+
+  const tStart = Date.now();
+  for (let ci = 0; ci < CARDS.length; ci++) {
+    const card = CARDS[ci];
+    console.log(`\n=== ${card.name} (matches ${card.mat}) ===`);
+    console.log(
+      pad('Variant', 28) + padL('builds', 9) + padL('build%', 9) +
+      padL('avgVP', 9) + padL('vsField', 10) + padL('winRate', 10)
+    );
+    console.log('-'.repeat(28 + 9 + 9 + 9 + 10 + 10));
+    const variants = variantsFor(card);
+    for (let vi = 0; vi < variants.length; vi++) {
+      const v = variants[vi];
+      process.stderr.write(`\r[${ci + 1}/${CARDS.length}] ${card.name.padEnd(18)} ${v.label.padEnd(22)}`);
+      const r = runVariant(card, v);
+      const vsField = isNaN(r.avgVP) ? '-' : (r.avgVP - r.avgFieldVP >= 0 ? '+' : '') + (r.avgVP - r.avgFieldVP).toFixed(2);
+      const avgVP   = isNaN(r.avgVP)   ? '-' : r.avgVP.toFixed(2);
+      const winRate = isNaN(r.winRate) ? '-' : (r.winRate * 100).toFixed(1) + '%';
+      const buildPct = (r.buildRate * 100).toFixed(1) + '%';
+      console.log(
+        pad(v.label, 28) + padL(r.builds, 9) + padL(buildPct, 9) +
+        padL(avgVP, 9) + padL(vsField, 10) + padL(winRate, 10)
+      );
+    }
+  }
+  process.stderr.write('\r' + ' '.repeat(70) + '\r');
+  console.log(`\nElapsed: ${((Date.now() - tStart) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  builds      = total player-instances that built this card across all games');
+  console.log('  build%      = of all player-slots, the share that built this card');
+  console.log('  avgVP       = average final totalVP for those builders');
+  console.log('  vsField     = avgVP minus the average totalVP across all players (baseline = winnable lift)');
+  console.log('  winRate     = share of builders who tied/won the game (4P baseline ≈ 25%)');
+  console.log('  BASELINE row is the current configuration; subsequent rows test vp=0 alternatives.');
+}
+
+// Vine Ladder follow-up: zoom in on the one card whose baseline (vp=2 +
+// 3/vines uncapped, vsField +7.20) the original vp-rework sweep couldn't
+// match. Tests bigger multipliers and several caps to find a vp=0
+// equivalent.
+function sweepVineLadder(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || 8;
+  const numGames = parseInt(numGamesArg) || 5000;
+  configureMaterials(6);
+
+  const VARIANTS = [
+    { label: 'BASE vp=2 ×3 nocap', vp: 2, mult: 3, cap: Infinity },
+    { label: 'vp=0 ×3 nocap',      vp: 0, mult: 3, cap: Infinity },
+    { label: 'vp=0 ×4 nocap',      vp: 0, mult: 4, cap: Infinity },
+    { label: 'vp=0 ×4 cap12',      vp: 0, mult: 4, cap: 12 },
+    { label: 'vp=0 ×4 cap16',      vp: 0, mult: 4, cap: 16 },
+    { label: 'vp=0 ×5 nocap',      vp: 0, mult: 5, cap: Infinity },
+    { label: 'vp=0 ×5 cap15',      vp: 0, mult: 5, cap: 15 },
+    { label: 'vp=0 ×5 cap20',      vp: 0, mult: 5, cap: 20 },
+  ];
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
+        const passed = action.type === 'pass';
+        if (reachedEnd || passed) p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  function runVariant(v) {
+    const tpl = BASE_STRUCTURE_TEMPLATES.find(s => s.name === 'Vine Ladder');
+    const origVp = tpl.vp;
+    tpl.vp = v.vp;
+    configureMaterials(6);
+    VP_OVERRIDES['Vine Ladder'] = { mult: v.mult, cap: v.cap };
+
+    let builders = 0, builderVPsum = 0, builderWinsAcc = 0, avgFieldVPsum = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      const finalVPs = state.players.map(p => totalVP(p, state));
+      const maxVp = Math.max(...finalVPs);
+      avgFieldVPsum += finalVPs.reduce((s, v) => s + v, 0) / finalVPs.length;
+      for (let i = 0; i < state.players.length; i++) {
+        const p = state.players[i];
+        if (p.built.some(b => b.name === 'Vine Ladder')) {
+          builders++;
+          builderVPsum += finalVPs[i];
+          if (finalVPs[i] === maxVp) builderWinsAcc++;
+        }
+      }
+    }
+
+    tpl.vp = origVp;
+    delete VP_OVERRIDES['Vine Ladder'];
+    configureMaterials(6);
+
+    return {
+      builds: builders,
+      buildRate: builders / (numGames * numP),
+      avgVP: builders ? builderVPsum / builders : NaN,
+      winRate: builders ? builderWinsAcc / builders : NaN,
+      avgFieldVP: avgFieldVPsum / numGames,
+    };
+  }
+
+  console.log(`\nVine Ladder rework — zoom-in sweep`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games per variant.\n`);
+  console.log(
+    pad('Variant', 22) + padL('builds', 9) + padL('build%', 9) +
+    padL('avgVP', 9) + padL('vsField', 10) + padL('winRate', 10)
+  );
+  console.log('-'.repeat(22 + 9 + 9 + 9 + 10 + 10));
+  const tStart = Date.now();
+  for (let i = 0; i < VARIANTS.length; i++) {
+    const v = VARIANTS[i];
+    process.stderr.write(`\r[${i + 1}/${VARIANTS.length}] ${v.label.padEnd(22)}`);
+    const r = runVariant(v);
+    const vsField = isNaN(r.avgVP) ? '-' : (r.avgVP - r.avgFieldVP >= 0 ? '+' : '') + (r.avgVP - r.avgFieldVP).toFixed(2);
+    console.log(
+      pad(v.label, 22) + padL(r.builds, 9) +
+      padL((r.buildRate * 100).toFixed(1) + '%', 9) +
+      padL(r.avgVP.toFixed(2), 9) + padL(vsField, 10) +
+      padL((r.winRate * 100).toFixed(1) + '%', 10)
+    );
+  }
+  process.stderr.write('\r' + ' '.repeat(60) + '\r');
+  console.log(`\nElapsed: ${((Date.now() - tStart) / 1000).toFixed(1)}s.`);
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
@@ -3366,5 +3633,7 @@ if (require.main === module) {
   else if (mode === 'blanks') sweepBlanks();
   else if (mode === 'flush-deck') sweepFlushDeck(process.argv[3]);
   else if (mode === 'pair-vp') sweepPairVP(process.argv[3]);
+  else if (mode === 'vp-rework') sweepVpRework(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'vine-ladder') sweepVineLadder(process.argv[3], process.argv[4], process.argv[5]);
   else sweep();
 }

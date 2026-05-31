@@ -1519,12 +1519,12 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 4, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
   { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 6, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
-  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 2, effect: 'End game: +3 VP per built structure of yours that uses Vines.' },
-  { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 2, effect: 'When you build a structure that uses Vines, slide back 1 fish on the fish track. End game: +1 VP per built structure of yours that uses Vines (max +6).' },
-  { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 3, effect: 'When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +1 VP per built structure of yours that uses Stones (max +6).' },
-  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 3, effect: 'When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +1 VP per built structure of yours that uses Reeds (max +6).' },
-  { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 4, effect: 'When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +1 VP per built structure of yours that uses Clay (max +6).' },
-  { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 2, vp: 4, effect: 'When you build a structure that uses Mud, move one of your workers from any river card to another river card containing at least one of your workers (you may replace a blank instead of taking an uncovered icon). End game: +1 VP per built structure of yours that uses Mud (max +6).' },
+  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End game: +4 VP per built structure of yours that uses Vines (max +12).' },
+  { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 0, effect: 'When you build a structure that uses Vines, slide back 1 fish on the fish track. End game: +2 VP per built structure of yours that uses Vines.' },
+  { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 0, effect: 'When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +2 VP per built structure of yours that uses Stones (max +8).' },
+  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +2 VP per built structure of yours that uses Reeds.' },
+  { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +3 VP per built structure of yours that uses Clay (max +12).' },
+  { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 2, vp: 0, effect: 'When you build a structure that uses Mud, move one of your workers from any river card to another river card containing at least one of your workers (you may replace a blank instead of taking an uncovered icon). End game: +3 VP per built structure of yours that uses Mud (max +9).' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'At the start of your turn you may pay 1🐟 to add a blank to any uncovered icon.' },
   { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 3, clay: 2 },  time: 3, vp: 0, effect: 'End game: +3 VP per 2 distinct materials in your built structures (max +9).' },
@@ -1604,32 +1604,31 @@ function vpBreakdown(p, state) {
   }
   if (hasEffect(p, 'Vine Ladder')) {
     const n = p.built.filter(b => (b.cost.vines || 0) > 0).length;
-    bonuses.push({ name: 'Vine Ladder', vp: 3 * n, detail: `3★ × ${n} built structure${n === 1 ? '' : 's'} using vines` });
+    const vp = Math.min(12, 4 * n);
+    bonuses.push({ name: 'Vine Ladder', vp, detail: `4★ × ${n} built structure${n === 1 ? '' : 's'} using vines (max 12)` });
   }
   if (hasEffect(p, 'Vine Trellis')) {
     const n = p.built.filter(b => (b.cost.vines || 0) > 0).length;
-    const vp = Math.min(6, n);
-    bonuses.push({ name: 'Vine Trellis', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using vines (max 6)` });
+    bonuses.push({ name: 'Vine Trellis', vp: 2 * n, detail: `2★ × ${n} built structure${n === 1 ? '' : 's'} using vines` });
   }
   if (hasEffect(p, 'Stone Causeway')) {
     const n = p.built.filter(b => (b.cost.stones || 0) > 0).length;
-    const vp = Math.min(6, n);
-    bonuses.push({ name: 'Stone Causeway', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using stones (max 6)` });
+    const vp = Math.min(8, 2 * n);
+    bonuses.push({ name: 'Stone Causeway', vp, detail: `2★ × ${n} built structure${n === 1 ? '' : 's'} using stones (max 8)` });
   }
   if (hasEffect(p, 'Reed Walkway')) {
     const n = p.built.filter(b => (b.cost.reeds || 0) > 0).length;
-    const vp = Math.min(6, n);
-    bonuses.push({ name: 'Reed Walkway', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using reeds (max 6)` });
+    bonuses.push({ name: 'Reed Walkway', vp: 2 * n, detail: `2★ × ${n} built structure${n === 1 ? '' : 's'} using reeds` });
   }
   if (hasEffect(p, 'Clay Vault')) {
     const n = p.built.filter(b => (b.cost.clay || 0) > 0).length;
-    const vp = Math.min(6, n);
-    bonuses.push({ name: 'Clay Vault', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using clay (max 6)` });
+    const vp = Math.min(12, 3 * n);
+    bonuses.push({ name: 'Clay Vault', vp, detail: `3★ × ${n} built structure${n === 1 ? '' : 's'} using clay (max 12)` });
   }
   if (hasEffect(p, 'Burrow Network')) {
     const n = p.built.filter(b => (b.cost.mud || 0) > 0).length;
-    const vp = Math.min(6, n);
-    bonuses.push({ name: 'Burrow Network', vp, detail: `1★ × ${n} built structure${n === 1 ? '' : 's'} using mud (max 6)` });
+    const vp = Math.min(9, 3 * n);
+    bonuses.push({ name: 'Burrow Network', vp, detail: `3★ × ${n} built structure${n === 1 ? '' : 's'} using mud (max 9)` });
   }
   if (hasEffect(p, 'Hidden Cache')) {
     const mats = new Set();
@@ -4016,37 +4015,39 @@ function aiEffectValue(struct, p, state) {
     }
     return CATTAIL_PATCH_VP[Math.min(projected, CATTAIL_PATCH_VP.length - 1)];
   }
+  // The 6 "vp=0 + end-game-bonus" cards. Multipliers/caps match the live
+  // scoring shape; tempo bonuses (+1, +1.5, +2, +1, +1) represent the
+  // non-VP perk (slide-back, draw/filter, free worker, hand-sculpt,
+  // worker-move).
   if (struct.name === 'Vine Ladder') {
     const builtVine = p.built.filter(b => (b.cost.vines || 0) > 0).length;
     const handVine = p.hand.filter(s => (s.cost.vines || 0) > 0).length;
-    return 3 * (builtVine + Math.min(handVine, 2));
+    return Math.min(12, 4 * (builtVine + Math.min(handVine, 2)));
   }
   if (struct.name === 'Vine Trellis') {
     const builtVine = p.built.filter(b => (b.cost.vines || 0) > 0).length;
     const handVine = p.hand.filter(s => (s.cost.vines || 0) > 0).length;
-    // End-game: +1 per Vine-cost build (incl. self), cap 6. Tempo: ~1 VP-eq for
-    // the per-build slide-back (comparable to Otter Slide's fixed 2 across all builds).
-    return Math.min(6, builtVine + 1 + Math.min(handVine, 2)) + 1;
+    return 2 * (builtVine + 1 + Math.min(handVine, 2)) + 1;
   }
   if (struct.name === 'Stone Causeway') {
     const builtStone = p.built.filter(b => (b.cost.stones || 0) > 0).length;
     const handStone = p.hand.filter(s => (s.cost.stones || 0) > 0).length;
-    return Math.min(6, builtStone + 1 + Math.min(handStone, 2)) + 1.5;
+    return Math.min(8, 2 * (builtStone + 1 + Math.min(handStone, 2))) + 1.5;
   }
   if (struct.name === 'Reed Walkway') {
     const builtReed = p.built.filter(b => (b.cost.reeds || 0) > 0).length;
     const handReed = p.hand.filter(s => (s.cost.reeds || 0) > 0).length;
-    return Math.min(6, builtReed + 1 + Math.min(handReed, 2)) + 2;
+    return 2 * (builtReed + 1 + Math.min(handReed, 2)) + 2;
   }
   if (struct.name === 'Clay Vault') {
     const builtClay = p.built.filter(b => (b.cost.clay || 0) > 0).length;
     const handClay = p.hand.filter(s => (s.cost.clay || 0) > 0).length;
-    return Math.min(6, builtClay + 1 + Math.min(handClay, 2)) + 1;
+    return Math.min(12, 3 * (builtClay + 1 + Math.min(handClay, 2))) + 1;
   }
   if (struct.name === 'Burrow Network') {
     const builtMud = p.built.filter(b => (b.cost.mud || 0) > 0).length;
     const handMud = p.hand.filter(s => (s.cost.mud || 0) > 0).length;
-    return Math.min(6, builtMud + 1 + Math.min(handMud, 2)) + 1;
+    return Math.min(9, 3 * (builtMud + 1 + Math.min(handMud, 2))) + 1;
   }
   if (struct.name === 'Hidden Cache') {
     const mats = new Set();
