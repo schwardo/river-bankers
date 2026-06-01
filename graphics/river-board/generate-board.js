@@ -55,6 +55,11 @@ const VARIANTS = [
     showFlushBox: true,        // "pay 5 to flush HW + auction" info box
     hideGuides: true,          // suppress trim/safe/bleed/fold print guides
     fullBleedBg: true,         // background image extends through bleed
+    reverseHwOrder: true,      // HW row reads L→R as Deck, HW3, HW2, HW1
+                               // (cards progress rightward from upstream toward river)
+    arrowColor: '#fff',        // flow arrows + chevrons rendered white so they
+                               // stand out against the background art
+    arrowOutline: '#1d3f4d',   // dark outline for legibility
     outFile: 'river-board.svg',
   },
 ];
@@ -134,8 +139,11 @@ function computeLayout(v) {
   const RIVER_BOTTOM = RIVER_Y + riverSlotH;
 
   const colX = (rowX0, col) => rowX0 + (col - 1) * (CARD_W + slotGap);
+  // HW column index: when reversed, slot i lives in column (5 - i) so
+  // the L→R order is Deck (col 1), HW3 (col 2), HW2 (col 3), HW1 (col 4).
+  const hwCol = (i) => v.reverseHwOrder ? (5 - i) : i;
   const hwSlot    = (i) => ({
-    x: colX(HW_X0, i), y: HW_Y, w: CARD_W, h: hwSlotH,
+    x: colX(HW_X0, hwCol(i)), y: HW_Y, w: CARD_W, h: hwSlotH,
     cardH: CARD_H, headerStrip: HW_HEADER_STRIP,
   });
   const riverSlot = (i) => ({
@@ -151,8 +159,11 @@ function computeLayout(v) {
   let deck = null;
   if (v.deckOnBoard) {
     if (v.deckOverCol) {
+      // When the HW row is reversed, the deck moves to the leftmost
+      // column (col 1) regardless of the configured deckOverCol.
+      const deckCol = v.reverseHwOrder ? 1 : v.deckOverCol;
       deck = {
-        x: colX(HW_X0, v.deckOverCol), y: HW_Y,
+        x: colX(HW_X0, deckCol), y: HW_Y,
         w: CARD_W, h: hwSlotH,
         cardH: CARD_H, headerStrip: HW_HEADER_STRIP,
         aligned: true,
@@ -334,6 +345,10 @@ function buildSvg(layout) {
             markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#244c5a"/>
     </marker>
+    <marker id="arrow-white" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#fff" stroke="#1d3f4d" stroke-width="0.6"/>
+    </marker>
     <marker id="arrow-bold" viewBox="0 0 10 10" refX="8" refY="5"
             markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#244c5a"/>
@@ -374,6 +389,11 @@ function buildSvg(layout) {
         : `<rect x="0" y="0" width="${W}" height="${H}"/>`}
     </clipPath>
   </defs>`);
+
+  // Shared arrow appearance for all flow markers + chevrons.
+  const FLOW_STROKE = 3;
+  const ARROW_COLOR = v.arrowColor || '#244c5a';
+  const ARROW_MARKER = (v.arrowColor === '#fff') ? 'arrow-white' : 'arrow';
 
   // ---- background ----
   // Full-bleed image: rendered OUTSIDE the trim clip so the printer can
@@ -558,13 +578,21 @@ function buildSvg(layout) {
 
   // ---- Card-flow arrows in HW row (HW3 → HW2 → HW1) ----
   // All flow/funnel arrows share the same stroke weight for visual unity.
-  const FLOW_STROKE = 3;
-  parts.push(`<g id="hw-flow" stroke="#244c5a" stroke-width="${FLOW_STROKE}" fill="none" opacity="0.7">`);
+  // When the HW row is reversed, arrows point RIGHT (deck→HW3→HW2→HW1
+  // reads L→R); otherwise they point LEFT (HW3 on the right).
+  parts.push(`<g id="hw-flow" stroke="${ARROW_COLOR}" stroke-width="${FLOW_STROKE}" fill="none" opacity="0.9">`);
   for (let i = 3; i > 1; i--) {
     const from = hwSlot(i);
     const to = hwSlot(i - 1);
     const y = from.y + (from.headerStrip || 0) + from.cardH / 2;
-    parts.push(`<line x1="${from.x + 20}" y1="${y}" x2="${to.x + to.w - 20}" y2="${y}" marker-end="url(#arrow)"/>`);
+    let x1, x2;
+    if (v.reverseHwOrder) {
+      // from is to the LEFT of to (HW3 left, HW2 middle, HW1 right)
+      x1 = from.x + from.w - 20; x2 = to.x + 20;
+    } else {
+      x1 = from.x + 20;          x2 = to.x + to.w - 20;
+    }
+    parts.push(`<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" marker-end="url(#${ARROW_MARKER})"/>`);
   }
   parts.push(`</g>`);
 
@@ -636,9 +664,9 @@ function buildSvg(layout) {
       const chevY1 = cardsBottom + 4;
       const chevY2 = chevY1 + 12;
       parts.push(`<path d="M ${cx - armW} ${chevY1} L ${cx} ${chevY1 + armH} L ${cx + armW} ${chevY1}"
-        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>`);
+        fill="none" stroke="${ARROW_COLOR}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`);
       parts.push(`<path d="M ${cx - armW} ${chevY2} L ${cx} ${chevY2 + armH} L ${cx + armW} ${chevY2}"
-        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>`);
+        fill="none" stroke="${ARROW_COLOR}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`);
     } else {
       // Single-card slot (bifold / mat-with-fish-track): label inside.
       parts.push(text({
@@ -660,12 +688,12 @@ function buildSvg(layout) {
 
   // River-flow arrows: target the top-card mid-height (consistent y across
   // single- and multi-card slots).
-  parts.push(`<g id="river-flow" stroke="#1d3f4d" stroke-width="${FLOW_STROKE}" fill="none" opacity="0.7">`);
+  parts.push(`<g id="river-flow" stroke="${ARROW_COLOR}" stroke-width="${FLOW_STROKE}" fill="none" opacity="0.9">`);
   for (let i = 1; i < 4; i++) {
     const from = riverSlot(i);
     const to = riverSlot(i + 1);
     const y = from.y + (from.titleStrip || 0) + from.cardH / 2;
-    parts.push(`<line x1="${from.x + from.w - 12}" y1="${y}" x2="${to.x + 12}" y2="${y}" marker-end="url(#arrow)"/>`);
+    parts.push(`<line x1="${from.x + from.w - 12}" y1="${y}" x2="${to.x + 12}" y2="${y}" marker-end="url(#${ARROW_MARKER})"/>`);
   }
   parts.push(`</g>`);
 
@@ -678,8 +706,8 @@ function buildSvg(layout) {
     const yBot = r1.y - 4;
     const yTop = yBot - 40;        // short arrow, only ~40px long
     parts.push(`<line x1="${cx}" y1="${yTop}" x2="${cx}" y2="${yBot}"
-      stroke="#244c5a" stroke-width="${FLOW_STROKE}" stroke-linecap="round"
-      marker-end="url(#arrow)" opacity="0.7"/>`);
+      stroke="${ARROW_COLOR}" stroke-width="${FLOW_STROKE}" stroke-linecap="round"
+      marker-end="url(#${ARROW_MARKER})" opacity="0.9"/>`);
   }
 
   // ---- R4 → right-edge flow arrow ----
@@ -687,8 +715,8 @@ function buildSvg(layout) {
     const r4 = riverSlot(4);
     const y = r4.y + (r4.titleStrip || 0) + r4.cardH / 2;
     parts.push(`<line x1="${r4.x + r4.w + 4}" y1="${y}" x2="${W - 10}" y2="${y}"
-      stroke="#1d3f4d" stroke-width="${FLOW_STROKE}" stroke-linecap="round"
-      marker-end="url(#arrow)" opacity="0.7"/>`);
+      stroke="${ARROW_COLOR}" stroke-width="${FLOW_STROKE}" stroke-linecap="round"
+      marker-end="url(#${ARROW_MARKER})" opacity="0.9"/>`);
   }
 
   // ---- Icon legend ----
@@ -764,33 +792,33 @@ function buildSvg(layout) {
   //   mat-nofish: double-chevron rail centered on the right edge,
   //               matching the pile-column style
   if (v.shorelineAtRightEdgeCenter) {
-    parts.push(`<g id="shoreline" opacity="0.75">`);
-    // Align with the logo's vertical center (the logo sits in the central
-    // gap between HW and River rows).
+    parts.push(`<g id="shoreline" opacity="0.9">`);
     const cy = HW_BOTTOM + layout.GAP / 2;
     const railL = IX1 - 130;
-    const railR = W + BLEED;       // rails extend through the trim into the bleed
+    const railR = W + BLEED;
     const railTop = cy - 30;
     const railBot = cy + 30;
     parts.push(`<line x1="${railL}" y1="${railTop}" x2="${railR}" y2="${railTop}"
-      stroke="#1d3f4d" stroke-width="3" stroke-dasharray="10,5"/>`);
+      stroke="${ARROW_COLOR}" stroke-width="3" stroke-dasharray="10,5"/>`);
     parts.push(`<line x1="${railL}" y1="${railBot}" x2="${railR}" y2="${railBot}"
-      stroke="#1d3f4d" stroke-width="3" stroke-dasharray="10,5"/>`);
-    // Double chevron pointing right, sitting at the left end of the channel
-    const armH = 22;
-    const chevX1 = railL + 16;
-    const chevX2 = chevX1 + 20;
-    for (const cx of [chevX1, chevX2]) {
-      parts.push(`<path d="M ${cx} ${cy - armH} L ${cx + 14} ${cy} L ${cx} ${cy + armH}"
-        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`);
-    }
-    // Label inside the channel, to the right of the chevrons.
+      stroke="${ARROW_COLOR}" stroke-width="3" stroke-dasharray="10,5"/>`);
+    // Label on the LEFT side of the channel, chevrons to the RIGHT
+    // (anchored near the rail's right edge so they read as "exit").
     parts.push(text({
-      x: chevX2 + 28, y: cy + 5,
+      x: railL + 12, y: cy + 5,
       content: 'shoreline cards',
       'text-anchor': 'start', 'font-size': 14, 'font-weight': 'bold',
-      fill: '#1d3f4d', 'font-style': 'italic',
+      fill: '#fff', stroke: '#1d3f4d', 'stroke-width': 0.5,
+      'paint-order': 'stroke', 'font-style': 'italic',
     }));
+    const armH = 22;
+    const chevArmW = 14;
+    const chevX2 = railR - chevArmW - 4;
+    const chevX1 = chevX2 - 20;
+    for (const cx of [chevX1, chevX2]) {
+      parts.push(`<path d="M ${cx} ${cy - armH} L ${cx + chevArmW} ${cy} L ${cx} ${cy + armH}"
+        fill="none" stroke="${ARROW_COLOR}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`);
+    }
     parts.push(`</g>`);
   } else {
     const r4 = riverSlot(4);
@@ -906,17 +934,25 @@ function buildSvg(layout) {
         'font-size': 26, 'font-weight': 'bold', fill: '#eee2c8', 'letter-spacing': '3',
       }));
     }
-    // Feed arrow from the deck → HW3 (deck refills HW3 after a card vacates).
-    // Aim at the card-area midline of HW3, not the full-slot midline.
+    // Feed arrow from the deck → HW3. Matches the in-row HW arrows:
+    // starts ~20px inside the source's interior edge and ends ~20px
+    // inside the destination's interior edge, so it visually extends
+    // into both slots instead of floating in the gap between them.
     const hw3 = hwSlot(3);
     const fy = hw3.y + (hw3.headerStrip || 0) + hw3.cardH / 2;
     const fyDeck = deck.y + (deck.headerStrip || 0) + deck.cardH / 2;
     if (deck.aligned) {
-      parts.push(`<line x1="${deck.x - 4}" y1="${fyDeck}" x2="${hw3.x + hw3.w + 4}" y2="${fy}"
-        stroke="#5a3a00" stroke-width="${FLOW_STROKE}" marker-end="url(#arrow)" opacity="0.65" stroke-dasharray="6,4"/>`);
+      let x1, x2;
+      if (v.reverseHwOrder) {
+        x1 = deck.x + deck.w - 20; x2 = hw3.x + 20;
+      } else {
+        x1 = deck.x + 20;          x2 = hw3.x + hw3.w - 20;
+      }
+      parts.push(`<line x1="${x1}" y1="${fyDeck}" x2="${x2}" y2="${fy}"
+        stroke="${ARROW_COLOR}" stroke-width="${FLOW_STROKE}" marker-end="url(#${ARROW_MARKER})" opacity="0.9"/>`);
     } else {
-      parts.push(`<line x1="${deck.x + 10}" y1="${fyDeck}" x2="${hw3.x + hw3.w - 12}" y2="${fyDeck}"
-        stroke="#5a3a00" stroke-width="${FLOW_STROKE}" marker-end="url(#arrow)" opacity="0.65" stroke-dasharray="6,4"/>`);
+      parts.push(`<line x1="${deck.x + 20}" y1="${fyDeck}" x2="${hw3.x + hw3.w - 20}" y2="${fyDeck}"
+        stroke="${ARROW_COLOR}" stroke-width="${FLOW_STROKE}" marker-end="url(#${ARROW_MARKER})" opacity="0.9"/>`);
     }
     parts.push(`</g>`);
   } else {
