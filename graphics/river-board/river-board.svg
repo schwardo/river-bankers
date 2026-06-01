@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+  xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1"
+  width="16.25in" height="10.25in"
+  viewBox="-12.5 -12.5 1625 1025"
+  font-family="'Georgia', 'Iowan Old Style', 'Times New Roman', serif">
+<title>River Bankers — River Bankers — TGC Small Game Mat 10×16 (fish track off-mat) (play orientation)</title>
+<defs>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#cfeaf4"/>
+      <stop offset="100%" stop-color="#7cb6d2"/>
+    </linearGradient>
+    <linearGradient id="hwwater" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e6f3f8"/>
+      <stop offset="100%" stop-color="#a8d1e3"/>
+    </linearGradient>
+    <!-- Slot fade gradients: 90% alpha at top, 60% at bottom, so the
+         background art is more visible toward the bottom of each slot. -->
+    <linearGradient id="hw-fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#eaf4fa" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#eaf4fa" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="river-fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#d8ecf3" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#d8ecf3" stop-opacity="0.6"/>
+    </linearGradient>
+    <pattern id="bank" x="0" y="0" width="46" height="46" patternUnits="userSpaceOnUse">
+      <rect width="46" height="46" fill="#a8895a"/>
+      <circle cx="9"  cy="11" r="1.6" fill="#7a5e36" opacity="0.55"/>
+      <circle cx="31" cy="20" r="1.6" fill="#7a5e36" opacity="0.55"/>
+      <circle cx="18" cy="34" r="1.2" fill="#7a5e36" opacity="0.45"/>
+      <circle cx="38" cy="38" r="1.2" fill="#7a5e36" opacity="0.45"/>
+      <circle cx="4"  cy="29" r="1.0" fill="#7a5e36" opacity="0.4"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#244c5a"/>
+    </marker>
+    <marker id="arrow-bold" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#244c5a"/>
+    </marker>
+    <symbol id="fish" viewBox="0 0 100 50">
+      <path d="M 25 25 L 3 8 L 12 25 L 3 42 Z" fill="#2d527a"/>
+      <path d="M 25 25 Q 25 5 55 5 Q 88 5 95 25 Q 88 45 55 45 Q 25 45 25 25 Z"
+            fill="#4a82b0" stroke="#1d3f4d" stroke-width="2"/>
+      <ellipse cx="62" cy="35" rx="22" ry="6" fill="#c5dbeb" opacity="0.55"/>
+      <path d="M 50 14 Q 45 25 50 36" fill="none" stroke="#1d3f4d" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="80" cy="20" r="3.8" fill="#fff"/>
+      <circle cx="81" cy="20" r="2" fill="#1a1a1a"/>
+    </symbol>
+    <!-- Auction-action cost icon: a stylized material card. Means "this is
+         the cost to TRIGGER an auction on a card in this slot." -->
+    <symbol id="card-cost" viewBox="0 0 80 56">
+      <rect x="4" y="4" width="72" height="48" rx="5" ry="5"
+            fill="#f0e5cf" stroke="#5a3a00" stroke-width="3"/>
+      <rect x="4" y="4" width="72" height="14" rx="5" ry="5"
+            fill="#7a5230" stroke="#5a3a00" stroke-width="3"/>
+      <circle cx="18" cy="36" r="4" fill="#5a3a00"/>
+      <circle cx="32" cy="36" r="4" fill="#5a3a00"/>
+      <circle cx="46" cy="36" r="4" fill="#5a3a00"/>
+      <circle cx="60" cy="36" r="4" fill="#5a3a00"/>
+    </symbol>
+    <!-- Per-item cost icon: a worker disc. Means "this is the cost EACH
+         worker you place pays in fish." -->
+    <symbol id="worker-cost" viewBox="0 0 50 50">
+      <circle cx="25" cy="27" r="18" fill="#3a2510" opacity="0.3"/>
+      <circle cx="25" cy="25" r="18" fill="#8b6f44" stroke="#3a2510" stroke-width="3"/>
+      <ellipse cx="20" cy="17" rx="7" ry="4" fill="#c5a87a" opacity="0.6"/>
+    </symbol>
+    <!-- A trim-shaped clip so the bank pattern + water don't bleed past the
+         rounded corners of the mat. -->
+    <clipPath id="trim-clip">
+      <rect x="0" y="0" width="1600" height="1000" rx="50" ry="50"/>
+    </clipPath>
+  </defs>
+<image xlink:href="../../artwork/starter-card-back.png"
+      x="-12.5" y="-12.5"
+      width="1625" height="1025"
+      preserveAspectRatio="xMidYMid slice"
+      opacity="1"/>
+<g clip-path="url(#trim-clip)">
+</g>
+<image xlink:href="../../artwork/logo.png"
+      x="718.60" y="332.50"
+      width="162.81" height="61.00"
+      preserveAspectRatio="xMidYMid meet"/>
+<g id="headwaters">
+<rect x="62.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
+<text x="74.50" y="40.50" text-anchor="start" font-size="20" font-weight="bold" fill="#244c5a">Headwaters 1</text>
+<use xlink:href="#card-cost" x="242.40" y="24.50" width="28.40" height="20.00"/><text x="280.20" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">2</text><use xlink:href="#fish" x="289.60" y="24.50" width="27.00" height="20.00"/>
+<use xlink:href="#worker-cost" x="334.10" y="24.50" width="20.00" height="20.00"/><text x="363.50" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="372.90" y="24.50" width="27.00" height="20.00"/>
+<rect x="72.50" y="60.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#244c5a" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="437.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
+<text x="449.50" y="40.50" text-anchor="start" font-size="20" font-weight="bold" fill="#244c5a">Headwaters 2</text>
+<use xlink:href="#card-cost" x="617.40" y="24.50" width="28.40" height="20.00"/><text x="655.20" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">3</text><use xlink:href="#fish" x="664.60" y="24.50" width="27.00" height="20.00"/>
+<use xlink:href="#worker-cost" x="709.10" y="24.50" width="20.00" height="20.00"/><text x="738.50" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="747.90" y="24.50" width="27.00" height="20.00"/>
+<rect x="447.50" y="60.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#244c5a" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="812.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
+<text x="824.50" y="40.50" text-anchor="start" font-size="20" font-weight="bold" fill="#244c5a">Headwaters 3</text>
+<use xlink:href="#card-cost" x="992.40" y="24.50" width="28.40" height="20.00"/><text x="1030.20" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">4</text><use xlink:href="#fish" x="1039.60" y="24.50" width="27.00" height="20.00"/>
+<use xlink:href="#worker-cost" x="1084.10" y="24.50" width="20.00" height="20.00"/><text x="1113.50" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1122.90" y="24.50" width="27.00" height="20.00"/>
+<rect x="822.50" y="60.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#244c5a" stroke-width="2" stroke-dasharray="8,4"/>
+</g>
+<g id="hw-flow" stroke="#244c5a" stroke-width="3" fill="none" opacity="0.7">
+<line x1="832.5" y1="181.5" x2="767.5" y2="181.5" marker-end="url(#arrow)"/>
+<line x1="457.5" y1="181.5" x2="392.5" y2="181.5" marker-end="url(#arrow)"/>
+</g>
+<g id="river">
+<rect x="62.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
+<text x="80.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 1</text>
+<use xlink:href="#card-cost" x="217.69" y="424.50" width="31.24" height="22.00"/><text x="259.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="269.61" y="424.50" width="29.70" height="22.00"/>
+<use xlink:href="#worker-cost" x="320.31" y="424.50" width="22.00" height="22.00"/><text x="352.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">2</text><use xlink:href="#fish" x="362.99" y="424.50" width="29.70" height="22.00"/>
+<rect x="72.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="72.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<path d="M 219.5 961.5 L 237.5 969.5 L 255.5 961.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+<path d="M 219.5 973.5 L 237.5 981.5 L 255.5 973.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+<rect x="437.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
+<text x="455.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 2</text>
+<use xlink:href="#card-cost" x="592.69" y="424.50" width="31.24" height="22.00"/><text x="634.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="644.61" y="424.50" width="29.70" height="22.00"/>
+<use xlink:href="#worker-cost" x="695.31" y="424.50" width="22.00" height="22.00"/><text x="727.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">3</text><use xlink:href="#fish" x="737.99" y="424.50" width="29.70" height="22.00"/>
+<rect x="447.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="447.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<path d="M 594.5 961.5 L 612.5 969.5 L 630.5 961.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+<path d="M 594.5 973.5 L 612.5 981.5 L 630.5 973.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+<rect x="812.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
+<text x="830.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 3</text>
+<use xlink:href="#card-cost" x="967.69" y="424.50" width="31.24" height="22.00"/><text x="1009.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1019.61" y="424.50" width="29.70" height="22.00"/>
+<use xlink:href="#worker-cost" x="1070.31" y="424.50" width="22.00" height="22.00"/><text x="1102.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">4</text><use xlink:href="#fish" x="1112.99" y="424.50" width="29.70" height="22.00"/>
+<rect x="822.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="822.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<path d="M 969.5 961.5 L 987.5 969.5 L 1005.5 961.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+<path d="M 969.5 973.5 L 987.5 981.5 L 1005.5 973.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+<rect x="1187.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
+<text x="1205.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 4</text>
+<use xlink:href="#card-cost" x="1342.69" y="424.50" width="31.24" height="22.00"/><text x="1384.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1394.61" y="424.50" width="29.70" height="22.00"/>
+<use xlink:href="#worker-cost" x="1445.31" y="424.50" width="22.00" height="22.00"/><text x="1477.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">5</text><use xlink:href="#fish" x="1487.99" y="424.50" width="29.70" height="22.00"/>
+<rect x="1197.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="1197.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<path d="M 1344.5 961.5 L 1362.5 969.5 L 1380.5 961.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+<path d="M 1344.5 973.5 L 1362.5 981.5 L 1380.5 973.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+</g>
+<g id="river-flow" stroke="#1d3f4d" stroke-width="3" fill="none" opacity="0.7">
+<line x1="400.5" y1="582.5" x2="449.5" y2="582.5" marker-end="url(#arrow)"/>
+<line x1="775.5" y1="582.5" x2="824.5" y2="582.5" marker-end="url(#arrow)"/>
+<line x1="1150.5" y1="582.5" x2="1199.5" y2="582.5" marker-end="url(#arrow)"/>
+</g>
+<line x1="237.5" y1="369.5" x2="237.5" y2="409.5"
+      stroke="#244c5a" stroke-width="3" stroke-linecap="round"
+      marker-end="url(#arrow)" opacity="0.7"/>
+<line x1="1541.5" y1="582.5" x2="1590" y2="582.5"
+      stroke="#1d3f4d" stroke-width="3" stroke-linecap="round"
+      marker-end="url(#arrow)" opacity="0.7"/>
+<g id="legend">
+<rect x="315.00" y="334.00" width="220.00" height="58.00" rx="8" ry="8" fill="#fff" stroke="#244c5a" stroke-width="1.5"/>
+<use xlink:href="#card-cost" x="327" y="340" width="32" height="20"/>
+<text x="367.00" y="355.00" text-anchor="start" font-size="14" font-style="italic" fill="#244c5a">= pay to start auction</text>
+<use xlink:href="#worker-cost" x="331" y="364" width="22" height="22"/>
+<text x="367.00" y="380.00" text-anchor="start" font-size="14" font-style="italic" fill="#244c5a">= pay per item bid</text>
+</g>
+<g id="flush-action">
+<rect x="1065.00" y="334.00" width="220.00" height="58.00" rx="8" ry="8" fill="#fff" stroke="#244c5a" stroke-width="1.5"/>
+<text x="1175.00" y="352.00" text-anchor="middle" font-size="14" font-weight="bold" fill="#244c5a" letter-spacing="1">FLUSH HEADWATERS</text>
+<use xlink:href="#card-cost" x="1097.61" y="367.00" width="25.56" height="18.00"/><text x="1131.63" y="381.76" text-anchor="middle" font-size="18" font-weight="bold" fill="#5a3a00">5</text><use xlink:href="#fish" x="1140.09" y="367.00" width="24.30" height="18.00"/>
+<use xlink:href="#worker-cost" x="1193.79" y="367.00" width="18.00" height="18.00"/><text x="1220.25" y="381.76" text-anchor="middle" font-size="18" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1228.71" y="367.00" width="24.30" height="18.00"/>
+</g>
+<g id="shoreline" opacity="0.75">
+<line x1="1457.5" y1="333" x2="1612.5" y2="333"
+      stroke="#1d3f4d" stroke-width="3" stroke-dasharray="10,5"/>
+<line x1="1457.5" y1="393" x2="1612.5" y2="393"
+      stroke="#1d3f4d" stroke-width="3" stroke-dasharray="10,5"/>
+<path d="M 1473.5 341 L 1487.5 363 L 1473.5 385"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 1493.5 341 L 1507.5 363 L 1493.5 385"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1521.50" y="368.00" text-anchor="start" font-size="14" font-weight="bold" fill="#1d3f4d" font-style="italic">shoreline cards</text>
+</g>
+<g id="deck">
+<rect x="1187.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
+<text x="1362.50" y="40.50" text-anchor="middle" font-size="18" font-weight="bold" fill="#244c5a" letter-spacing="2">MATERIAL DECK</text>
+<defs><clipPath id="deck-card-clip">
+        <rect x="1197.50" y="60.50"
+              width="330.00" height="242.00" rx="8" ry="8"/>
+      </clipPath></defs>
+<g clip-path="url(#deck-card-clip)">
+<image xlink:href="../material-deck-back.png"
+        x="1241.50" y="16.50"
+        width="242.00" height="330.00"
+        preserveAspectRatio="xMidYMid slice"
+        transform="rotate(90 1362.50 181.50)"/>
+</g>
+<line x1="1183.5" y1="181.5" x2="1166.5" y2="181.5"
+        stroke="#5a3a00" stroke-width="3" marker-end="url(#arrow)" opacity="0.65" stroke-dasharray="6,4"/>
+</g>
+</svg>
