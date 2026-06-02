@@ -90,118 +90,122 @@
       width="162.81" height="61.00"
       preserveAspectRatio="xMidYMid meet"/>
 <g id="headwaters">
-<rect x="1187.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
-<text x="1199.50" y="40.50" text-anchor="start" font-size="20" font-weight="bold" fill="#244c5a">Headwaters 1</text>
-<use xlink:href="#card-cost" x="1367.40" y="24.50" width="28.40" height="20.00"/><text x="1405.20" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">2</text><use xlink:href="#fish" x="1414.60" y="24.50" width="27.00" height="20.00"/>
-<use xlink:href="#worker-cost" x="1459.10" y="24.50" width="20.00" height="20.00"/><text x="1488.50" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1497.90" y="24.50" width="27.00" height="20.00"/>
-<rect x="1197.50" y="60.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#244c5a" stroke-width="2" stroke-dasharray="8,4"/>
-<rect x="812.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
-<text x="824.50" y="40.50" text-anchor="start" font-size="20" font-weight="bold" fill="#244c5a">Headwaters 2</text>
-<use xlink:href="#card-cost" x="992.40" y="24.50" width="28.40" height="20.00"/><text x="1030.20" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">3</text><use xlink:href="#fish" x="1039.60" y="24.50" width="27.00" height="20.00"/>
-<use xlink:href="#worker-cost" x="1084.10" y="24.50" width="20.00" height="20.00"/><text x="1113.50" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1122.90" y="24.50" width="27.00" height="20.00"/>
-<rect x="822.50" y="60.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#244c5a" stroke-width="2" stroke-dasharray="8,4"/>
-<rect x="437.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
-<text x="449.50" y="40.50" text-anchor="start" font-size="20" font-weight="bold" fill="#244c5a">Headwaters 3</text>
-<use xlink:href="#card-cost" x="617.40" y="24.50" width="28.40" height="20.00"/><text x="655.20" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">4</text><use xlink:href="#fish" x="664.60" y="24.50" width="27.00" height="20.00"/>
-<use xlink:href="#worker-cost" x="709.10" y="24.50" width="20.00" height="20.00"/><text x="738.50" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="747.90" y="24.50" width="27.00" height="20.00"/>
-<rect x="447.50" y="60.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#244c5a" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="1168.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
+<text x="1180.50" y="40.50" text-anchor="start" font-size="20" font-weight="bold" fill="#244c5a">Headwaters 1</text>
+<use xlink:href="#card-cost" x="1348.40" y="24.50" width="28.40" height="20.00"/><text x="1386.20" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">2</text><use xlink:href="#fish" x="1395.60" y="24.50" width="27.00" height="20.00"/>
+<use xlink:href="#worker-cost" x="1440.10" y="24.50" width="20.00" height="20.00"/><text x="1469.50" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1478.90" y="24.50" width="27.00" height="20.00"/>
+<rect x="1178.50" y="60.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#244c5a" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="793.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
+<text x="805.50" y="40.50" text-anchor="start" font-size="20" font-weight="bold" fill="#244c5a">Headwaters 2</text>
+<use xlink:href="#card-cost" x="973.40" y="24.50" width="28.40" height="20.00"/><text x="1011.20" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">3</text><use xlink:href="#fish" x="1020.60" y="24.50" width="27.00" height="20.00"/>
+<use xlink:href="#worker-cost" x="1065.10" y="24.50" width="20.00" height="20.00"/><text x="1094.50" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1103.90" y="24.50" width="27.00" height="20.00"/>
+<rect x="803.50" y="60.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#244c5a" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="418.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
+<text x="430.50" y="40.50" text-anchor="start" font-size="20" font-weight="bold" fill="#244c5a">Headwaters 3</text>
+<use xlink:href="#card-cost" x="598.40" y="24.50" width="28.40" height="20.00"/><text x="636.20" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">4</text><use xlink:href="#fish" x="645.60" y="24.50" width="27.00" height="20.00"/>
+<use xlink:href="#worker-cost" x="690.10" y="24.50" width="20.00" height="20.00"/><text x="719.50" y="40.90" text-anchor="middle" font-size="20" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="728.90" y="24.50" width="27.00" height="20.00"/>
+<rect x="428.50" y="60.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#244c5a" stroke-width="2" stroke-dasharray="8,4"/>
 </g>
 <g id="hw-flow" stroke="#fff" stroke-width="3" fill="none" opacity="0.9">
-<line x1="767.5" y1="181.5" x2="832.5" y2="181.5" marker-end="url(#arrow-white)"/>
-<line x1="1142.5" y1="181.5" x2="1207.5" y2="181.5" marker-end="url(#arrow-white)"/>
+<line x1="748.5" y1="181.5" x2="813.5" y2="181.5" marker-end="url(#arrow-white)"/>
+<line x1="1123.5" y1="181.5" x2="1188.5" y2="181.5" marker-end="url(#arrow-white)"/>
 </g>
 <g id="river">
-<rect x="62.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
-<text x="80.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 1</text>
-<use xlink:href="#card-cost" x="217.69" y="424.50" width="31.24" height="22.00"/><text x="259.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="269.61" y="424.50" width="29.70" height="22.00"/>
-<use xlink:href="#worker-cost" x="320.31" y="424.50" width="22.00" height="22.00"/><text x="352.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">2</text><use xlink:href="#fish" x="362.99" y="424.50" width="29.70" height="22.00"/>
-<rect x="72.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
-<rect x="72.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
-<path d="M 219.5 961.5 L 237.5 969.5 L 255.5 961.5"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-<path d="M 219.5 973.5 L 237.5 981.5 L 255.5 973.5"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-<rect x="437.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
-<text x="455.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 2</text>
-<use xlink:href="#card-cost" x="592.69" y="424.50" width="31.24" height="22.00"/><text x="634.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="644.61" y="424.50" width="29.70" height="22.00"/>
-<use xlink:href="#worker-cost" x="695.31" y="424.50" width="22.00" height="22.00"/><text x="727.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">3</text><use xlink:href="#fish" x="737.99" y="424.50" width="29.70" height="22.00"/>
-<rect x="447.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
-<rect x="447.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
-<path d="M 594.5 961.5 L 612.5 969.5 L 630.5 961.5"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-<path d="M 594.5 973.5 L 612.5 981.5 L 630.5 973.5"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-<rect x="812.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
-<text x="830.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 3</text>
-<use xlink:href="#card-cost" x="967.69" y="424.50" width="31.24" height="22.00"/><text x="1009.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1019.61" y="424.50" width="29.70" height="22.00"/>
-<use xlink:href="#worker-cost" x="1070.31" y="424.50" width="22.00" height="22.00"/><text x="1102.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">4</text><use xlink:href="#fish" x="1112.99" y="424.50" width="29.70" height="22.00"/>
-<rect x="822.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
-<rect x="822.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
-<path d="M 969.5 961.5 L 987.5 969.5 L 1005.5 961.5"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-<path d="M 969.5 973.5 L 987.5 981.5 L 1005.5 973.5"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-<rect x="1187.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
-<text x="1205.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 4</text>
-<use xlink:href="#card-cost" x="1342.69" y="424.50" width="31.24" height="22.00"/><text x="1384.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1394.61" y="424.50" width="29.70" height="22.00"/>
-<use xlink:href="#worker-cost" x="1445.31" y="424.50" width="22.00" height="22.00"/><text x="1477.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">5</text><use xlink:href="#fish" x="1487.99" y="424.50" width="29.70" height="22.00"/>
-<rect x="1197.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
-<rect x="1197.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
-<path d="M 1344.5 961.5 L 1362.5 969.5 L 1380.5 961.5"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-<path d="M 1344.5 973.5 L 1362.5 981.5 L 1380.5 973.5"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<rect x="43.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
+<text x="61.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 1</text>
+<use xlink:href="#card-cost" x="198.69" y="424.50" width="31.24" height="22.00"/><text x="240.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="250.61" y="424.50" width="29.70" height="22.00"/>
+<use xlink:href="#worker-cost" x="301.31" y="424.50" width="22.00" height="22.00"/><text x="333.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">2</text><use xlink:href="#fish" x="343.99" y="424.50" width="29.70" height="22.00"/>
+<rect x="53.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="53.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<path d="M 200.5 961.5 L 218.5 969.5 L 236.5 961.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<path d="M 200.5 973.5 L 218.5 981.5 L 236.5 973.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<rect x="418.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
+<text x="436.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 2</text>
+<use xlink:href="#card-cost" x="573.69" y="424.50" width="31.24" height="22.00"/><text x="615.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="625.61" y="424.50" width="29.70" height="22.00"/>
+<use xlink:href="#worker-cost" x="676.31" y="424.50" width="22.00" height="22.00"/><text x="708.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">3</text><use xlink:href="#fish" x="718.99" y="424.50" width="29.70" height="22.00"/>
+<rect x="428.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="428.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<path d="M 575.5 961.5 L 593.5 969.5 L 611.5 961.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<path d="M 575.5 973.5 L 593.5 981.5 L 611.5 973.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<rect x="793.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
+<text x="811.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 3</text>
+<use xlink:href="#card-cost" x="948.69" y="424.50" width="31.24" height="22.00"/><text x="990.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1000.61" y="424.50" width="29.70" height="22.00"/>
+<use xlink:href="#worker-cost" x="1051.31" y="424.50" width="22.00" height="22.00"/><text x="1083.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">4</text><use xlink:href="#fish" x="1093.99" y="424.50" width="29.70" height="22.00"/>
+<rect x="803.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="803.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<path d="M 950.5 961.5 L 968.5 969.5 L 986.5 961.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<path d="M 950.5 973.5 L 968.5 981.5 L 986.5 973.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<rect x="1168.50" y="413.50" width="350.00" height="599.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
+<text x="1186.50" y="441.50" text-anchor="start" font-size="22" font-weight="bold" fill="#1d3f4d">River 4</text>
+<use xlink:href="#card-cost" x="1323.69" y="424.50" width="31.24" height="22.00"/><text x="1365.27" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1375.61" y="424.50" width="29.70" height="22.00"/>
+<use xlink:href="#worker-cost" x="1426.31" y="424.50" width="22.00" height="22.00"/><text x="1458.65" y="442.54" text-anchor="middle" font-size="22" font-weight="bold" fill="#5a3a00">5</text><use xlink:href="#fish" x="1468.99" y="424.50" width="29.70" height="22.00"/>
+<rect x="1178.50" y="461.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<rect x="1178.50" y="711.50" width="330.00" height="242.00" rx="8" ry="8" fill="none" stroke="#1d3f4d" stroke-width="2" stroke-dasharray="8,4"/>
+<path d="M 1325.5 961.5 L 1343.5 969.5 L 1361.5 961.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<path d="M 1325.5 973.5 L 1343.5 981.5 L 1361.5 973.5"
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
 </g>
 <g id="river-flow" stroke="#fff" stroke-width="3" fill="none" opacity="0.9">
-<line x1="400.5" y1="582.5" x2="449.5" y2="582.5" marker-end="url(#arrow-white)"/>
-<line x1="775.5" y1="582.5" x2="824.5" y2="582.5" marker-end="url(#arrow-white)"/>
-<line x1="1150.5" y1="582.5" x2="1199.5" y2="582.5" marker-end="url(#arrow-white)"/>
+<line x1="381.5" y1="582.5" x2="430.5" y2="582.5" marker-end="url(#arrow-white)"/>
+<line x1="756.5" y1="582.5" x2="805.5" y2="582.5" marker-end="url(#arrow-white)"/>
+<line x1="1131.5" y1="582.5" x2="1180.5" y2="582.5" marker-end="url(#arrow-white)"/>
 </g>
-<line x1="237.5" y1="369.5" x2="237.5" y2="409.5"
-      stroke="#fff" stroke-width="3" stroke-linecap="round"
-      marker-end="url(#arrow-white)" opacity="0.9"/>
-<line x1="1541.5" y1="582.5" x2="1590" y2="582.5"
+<line x1="218.5" y1="369.5" x2="218.5" y2="409.5"
       stroke="#fff" stroke-width="3" stroke-linecap="round"
       marker-end="url(#arrow-white)" opacity="0.9"/>
 <g id="legend">
-<rect x="315.00" y="334.00" width="220.00" height="58.00" rx="8" ry="8" fill="#fff" stroke="#244c5a" stroke-width="1.5"/>
-<use xlink:href="#card-cost" x="327" y="340" width="32" height="20"/>
-<text x="367.00" y="355.00" text-anchor="start" font-size="14" font-style="italic" fill="#244c5a">= pay to start auction</text>
-<use xlink:href="#worker-cost" x="331" y="364" width="22" height="22"/>
-<text x="367.00" y="380.00" text-anchor="start" font-size="14" font-style="italic" fill="#244c5a">= pay per item bid</text>
+<rect x="296.00" y="334.00" width="220.00" height="58.00" rx="8" ry="8" fill="#fff" stroke="#244c5a" stroke-width="1.5"/>
+<use xlink:href="#card-cost" x="308" y="340" width="32" height="20"/>
+<text x="348.00" y="355.00" text-anchor="start" font-size="14" font-style="italic" fill="#244c5a">= pay to start auction</text>
+<use xlink:href="#worker-cost" x="312" y="364" width="22" height="22"/>
+<text x="348.00" y="380.00" text-anchor="start" font-size="14" font-style="italic" fill="#244c5a">= pay per item bid</text>
 </g>
 <g id="flush-action">
-<rect x="1065.00" y="334.00" width="220.00" height="58.00" rx="8" ry="8" fill="#fff" stroke="#244c5a" stroke-width="1.5"/>
-<text x="1175.00" y="352.00" text-anchor="middle" font-size="14" font-weight="bold" fill="#244c5a" letter-spacing="1">FLUSH HEADWATERS</text>
-<use xlink:href="#card-cost" x="1097.61" y="367.00" width="25.56" height="18.00"/><text x="1131.63" y="381.76" text-anchor="middle" font-size="18" font-weight="bold" fill="#5a3a00">5</text><use xlink:href="#fish" x="1140.09" y="367.00" width="24.30" height="18.00"/>
-<use xlink:href="#worker-cost" x="1193.79" y="367.00" width="18.00" height="18.00"/><text x="1220.25" y="381.76" text-anchor="middle" font-size="18" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1228.71" y="367.00" width="24.30" height="18.00"/>
+<rect x="1046.00" y="334.00" width="220.00" height="58.00" rx="8" ry="8" fill="#fff" stroke="#244c5a" stroke-width="1.5"/>
+<text x="1156.00" y="352.00" text-anchor="middle" font-size="14" font-weight="bold" fill="#244c5a" letter-spacing="1">FLUSH HEADWATERS</text>
+<use xlink:href="#card-cost" x="1078.61" y="367.00" width="25.56" height="18.00"/><text x="1112.63" y="381.76" text-anchor="middle" font-size="18" font-weight="bold" fill="#5a3a00">5</text><use xlink:href="#fish" x="1121.09" y="367.00" width="24.30" height="18.00"/>
+<use xlink:href="#worker-cost" x="1174.79" y="367.00" width="18.00" height="18.00"/><text x="1201.25" y="381.76" text-anchor="middle" font-size="18" font-weight="bold" fill="#5a3a00">1</text><use xlink:href="#fish" x="1209.71" y="367.00" width="24.30" height="18.00"/>
 </g>
-<g id="shoreline" opacity="0.9">
-<line x1="1457.5" y1="333" x2="1612.5" y2="333"
-      stroke="#fff" stroke-width="3" stroke-dasharray="10,5"/>
-<line x1="1457.5" y1="393" x2="1612.5" y2="393"
-      stroke="#fff" stroke-width="3" stroke-dasharray="10,5"/>
-<text x="1469.50" y="368.00" text-anchor="start" font-size="14" font-weight="bold" fill="#fff" stroke="#1d3f4d" stroke-width="0.5" paint-order="stroke" font-style="italic">shoreline cards</text>
-<path d="M 1574.5 341 L 1588.5 363 L 1574.5 385"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M 1594.5 341 L 1608.5 363 L 1594.5 385"
-        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="shoreline">
+<rect x="1549.50" y="-12.50" width="63.00" height="1025.00" rx="0" ry="0" fill="url(#river-fade)" stroke="#1d3f4d" stroke-width="4"/>
+<text x="1574.75" y="500.00"
+      transform="rotate(90 1574.75 500.00)"
+      text-anchor="middle" font-size="22" font-weight="bold"
+      fill="#1d3f4d">Shoreline</text>
+<path d="M 1564.75 232 L 1572.75 250 L 1564.75 268"
+          fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<path d="M 1576.75 232 L 1584.75 250 L 1576.75 268"
+          fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<path d="M 1564.75 732 L 1572.75 750 L 1564.75 768"
+          fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<path d="M 1576.75 732 L 1584.75 750 L 1576.75 768"
+          fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
 </g>
+<line x1="1498.5" y1="582.5" x2="1569.5" y2="582.5"
+      stroke="#fff" stroke-width="3" stroke-linecap="round"
+      marker-end="url(#arrow-white)" opacity="0.9"/>
 <g id="deck">
-<rect x="62.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
-<text x="237.50" y="40.50" text-anchor="middle" font-size="18" font-weight="bold" fill="#244c5a" letter-spacing="2">MATERIAL DECK</text>
+<rect x="43.50" y="12.50" width="350.00" height="300.00" rx="0" ry="0" fill="url(#hw-fade)" stroke="#244c5a" stroke-width="4"/>
+<text x="218.50" y="40.50" text-anchor="middle" font-size="18" font-weight="bold" fill="#244c5a" letter-spacing="2">MATERIAL DECK</text>
 <defs><clipPath id="deck-card-clip">
-        <rect x="72.50" y="60.50"
+        <rect x="53.50" y="60.50"
               width="330.00" height="242.00" rx="8" ry="8"/>
       </clipPath></defs>
 <g clip-path="url(#deck-card-clip)">
 <image xlink:href="../material-deck-back.png"
-        x="116.50" y="16.50"
+        x="97.50" y="16.50"
         width="242.00" height="330.00"
         preserveAspectRatio="xMidYMid slice"
-        transform="rotate(90 237.50 181.50)"/>
+        transform="rotate(90 218.50 181.50)"/>
 </g>
-<line x1="392.5" y1="181.5" x2="457.5" y2="181.5"
+<line x1="373.5" y1="181.5" x2="438.5" y2="181.5"
         stroke="#fff" stroke-width="3" marker-end="url(#arrow-white)" opacity="0.9"/>
 </g>
 </svg>

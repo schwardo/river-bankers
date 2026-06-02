@@ -37,6 +37,9 @@ const VARIANTS = [
     edgeMarginIn: 0.25,        // curl-safety margin
     centerRows: true,          // center the 4-column rows horizontally
     slotGapPx: 25,             // breathing room between adjacent slots
+    shorelineFixedSx: 1549.5,  // shoreline box's left edge stays at this
+                               // absolute x; content is positioned so the
+                               // padding to safe-zone-left == padding to here
     showTitle: false,          // logo replaces the text title
     logoBetweenRows: true,
     shorelineAtRightEdgeCenter: true,  // double-chevron at right edge center
@@ -87,8 +90,15 @@ function computeLayout(v) {
   const rowWidth = (cols) => cols * CARD_W + (cols - 1) * slotGap;
 
   // Center each row in IW when v.centerRows; otherwise use rowLeftMarginPx.
-  let HW_X0, RIVER_X0;
-  if (v.centerRows) {
+  // When v.shorelineFixedSx is set, place the rows so the padding from
+  // safe-zone-left to content-left equals the padding from content-right
+  // to the shoreline box's left edge.
+  let HW_X0, RIVER_X0, shorelineX = null;
+  if (v.shorelineFixedSx != null) {
+    shorelineX = v.shorelineFixedSx;
+    HW_X0    = (IX0 + shorelineX - rowWidth(hwCols))    / 2;
+    RIVER_X0 = (IX0 + shorelineX - rowWidth(riverCols)) / 2;
+  } else if (v.centerRows) {
     HW_X0    = IX0 + (IW - rowWidth(hwCols))    / 2;
     RIVER_X0 = IX0 + (IW - rowWidth(riverCols)) / 2;
   } else {
@@ -183,6 +193,7 @@ function computeLayout(v) {
     TITLE_Y, HW_Y, HW_BOTTOM, GAP, RIVER_Y, RIVER_BOTTOM,
     HW_X0, RIVER_X0, hwCols, riverCols, slotGap,
     hwSlot, riverSlot, deck,
+    shorelineX,
     foldX: v.hasFold ? W / 2 : null,
   };
 }
@@ -663,10 +674,12 @@ function buildSvg(layout) {
       const armH = 8;
       const chevY1 = cardsBottom + 4;
       const chevY2 = chevY1 + 12;
+      // Chevron color matches the card-outline color (river-dark) so the
+      // chevrons read as part of the slot framework, not as flow arrows.
       parts.push(`<path d="M ${cx - armW} ${chevY1} L ${cx} ${chevY1 + armH} L ${cx + armW} ${chevY1}"
-        fill="none" stroke="${ARROW_COLOR}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`);
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`);
       parts.push(`<path d="M ${cx - armW} ${chevY2} L ${cx} ${chevY2 + armH} L ${cx + armW} ${chevY2}"
-        fill="none" stroke="${ARROW_COLOR}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`);
+        fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`);
     } else {
       // Single-card slot (bifold / mat-with-fish-track): label inside.
       parts.push(text({
@@ -706,15 +719,6 @@ function buildSvg(layout) {
     const yBot = r1.y - 4;
     const yTop = yBot - 40;        // short arrow, only ~40px long
     parts.push(`<line x1="${cx}" y1="${yTop}" x2="${cx}" y2="${yBot}"
-      stroke="${ARROW_COLOR}" stroke-width="${FLOW_STROKE}" stroke-linecap="round"
-      marker-end="url(#${ARROW_MARKER})" opacity="0.9"/>`);
-  }
-
-  // ---- R4 → right-edge flow arrow ----
-  if (v.flowArrowR4ToEdge) {
-    const r4 = riverSlot(4);
-    const y = r4.y + (r4.titleStrip || 0) + r4.cardH / 2;
-    parts.push(`<line x1="${r4.x + r4.w + 4}" y1="${y}" x2="${W - 10}" y2="${y}"
       stroke="${ARROW_COLOR}" stroke-width="${FLOW_STROKE}" stroke-linecap="round"
       marker-end="url(#${ARROW_MARKER})" opacity="0.9"/>`);
   }
@@ -792,32 +796,44 @@ function buildSvg(layout) {
   //   mat-nofish: double-chevron rail centered on the right edge,
   //               matching the pile-column style
   if (v.shorelineAtRightEdgeCenter) {
-    parts.push(`<g id="shoreline" opacity="0.9">`);
-    const cy = HW_BOTTOM + layout.GAP / 2;
-    const railL = IX1 - 130;
-    const railR = W + BLEED;
-    const railTop = cy - 30;
-    const railBot = cy + 30;
-    parts.push(`<line x1="${railL}" y1="${railTop}" x2="${railR}" y2="${railTop}"
-      stroke="${ARROW_COLOR}" stroke-width="3" stroke-dasharray="10,5"/>`);
-    parts.push(`<line x1="${railL}" y1="${railBot}" x2="${railR}" y2="${railBot}"
-      stroke="${ARROW_COLOR}" stroke-width="3" stroke-dasharray="10,5"/>`);
-    // Label on the LEFT side of the channel, chevrons to the RIGHT
-    // (anchored near the rail's right edge so they read as "exit").
-    parts.push(text({
-      x: railL + 12, y: cy + 5,
-      content: 'shoreline cards',
-      'text-anchor': 'start', 'font-size': 14, 'font-weight': 'bold',
-      fill: '#fff', stroke: '#1d3f4d', 'stroke-width': 0.5,
-      'paint-order': 'stroke', 'font-style': 'italic',
+    // Shoreline box: styled like a river slot — same outer frame, same
+    // river-fade gradient, square corners. Extends along the full right
+    // edge of the mat (top through bottom), past the trim into the bleed
+    // on all three exposed sides. Left edge is either a fixed absolute
+    // x (when symmetric padding is configured) or just-right of R4.
+    const r4 = riverSlot(4);
+    const sx = (layout.shorelineX != null) ? layout.shorelineX : (r4.x + r4.w + 12);
+    const sy = -BLEED;
+    const sw = (W + BLEED) - sx;
+    const sh = (H + BLEED) - sy;
+    parts.push(`<g id="shoreline">`);
+    parts.push(rect({
+      x: sx, y: sy, w: sw, h: sh,
+      rx: 0, ry: 0,
+      fill: 'url(#river-fade)',
+      stroke: '#1d3f4d', 'stroke-width': 4,
     }));
-    const armH = 22;
-    const chevArmW = 14;
-    const chevX2 = railR - chevArmW - 4;
-    const chevX1 = chevX2 - 20;
-    for (const cx of [chevX1, chevX2]) {
-      parts.push(`<path d="M ${cx} ${cy - armH} L ${cx + chevArmW} ${cy} L ${cx} ${cy + armH}"
-        fill="none" stroke="${ARROW_COLOR}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`);
+    // "Shoreline" label rotated 90° (reads top-to-bottom), same font/
+    // size/color as the "River N" titles. Centered on the mat trim.
+    const visCx = (sx + W) / 2;
+    const matCy = H / 2;
+    parts.push(`<text x="${visCx.toFixed(2)}" y="${matCy.toFixed(2)}"
+      transform="rotate(90 ${visCx.toFixed(2)} ${matCy.toFixed(2)})"
+      text-anchor="middle" font-size="22" font-weight="bold"
+      fill="#1d3f4d">Shoreline</text>`);
+    // Side chevrons at 25% and 75% of the mat height. Rendered exactly
+    // like the down-chevrons in the river slots (armW=18, armH=8, 12px
+    // offset between the two chevrons in the pair) but rotated 90° CCW
+    // so they point RIGHT (toward the mat edge).
+    const sArmW = 18;
+    const sArmH = 8;
+    const sChevX1 = visCx - 10;     // pair span = 20px, centered on visCx
+    const sChevX2 = sChevX1 + 12;
+    for (const y of [H * 0.25, H * 0.75]) {
+      for (const x of [sChevX1, sChevX2]) {
+        parts.push(`<path d="M ${x} ${y - sArmW} L ${x + sArmH} ${y} L ${x} ${y + sArmW}"
+          fill="none" stroke="#1d3f4d" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`);
+      }
     }
     parts.push(`</g>`);
   } else {
@@ -837,6 +853,25 @@ function buildSvg(layout) {
       'text-anchor': 'middle', 'font-size': 11, fill: '#1d3f4d',
       'font-style': 'italic',
     }));
+  }
+
+  // ---- R4 → shoreline / right-edge flow arrow ----
+  // Drawn AFTER the shoreline box so the arrowhead reads as flowing
+  // INTO the box (like the HW row arrows extend into their destinations).
+  if (v.flowArrowR4ToEdge) {
+    const r4 = riverSlot(4);
+    const y = r4.y + (r4.titleStrip || 0) + r4.cardH / 2;
+    const x1 = r4.x + r4.w - 20;
+    let x2;
+    if (v.shorelineAtRightEdgeCenter) {
+      const sx = (layout.shorelineX != null) ? layout.shorelineX : (r4.x + r4.w + 12);
+      x2 = sx + 20;
+    } else {
+      x2 = W - 10;
+    }
+    parts.push(`<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"
+      stroke="${ARROW_COLOR}" stroke-width="${FLOW_STROKE}" stroke-linecap="round"
+      marker-end="url(#${ARROW_MARKER})" opacity="0.9"/>`);
   }
 
   // Pile-column indicators below each river slot.
