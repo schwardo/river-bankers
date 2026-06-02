@@ -1453,9 +1453,13 @@ const SPECIES = [
 // If you edit graphics/icons/*.svg, update these strings to match.
 const MAT_ICON_SVG = {
   logs: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
-    + '<ellipse cx="0" cy="0" rx="14" ry="9" fill="#8b5a2b" stroke="#5a3a18" stroke-width="1.5"/>'
-    + '<ellipse cx="0" cy="0" rx="9"  ry="5.5" fill="none" stroke="#5a3a18" stroke-width="0.8"/>'
-    + '<ellipse cx="0" cy="0" rx="4"  ry="2.5" fill="none" stroke="#5a3a18" stroke-width="0.7"/>'
+    + '<path d="M -10 -8 L 8 -8 A 4 8 0 0 1 8 8 L -10 8 A 4 8 0 0 0 -10 -8 Z"'
+    + ' fill="#8b5a2b" stroke="#5a3a18" stroke-width="1.2"/>'
+    + '<ellipse cx="8" cy="0" rx="4" ry="8" fill="#d8b078" stroke="#5a3a18" stroke-width="1.2"/>'
+    + '<ellipse cx="8" cy="0" rx="2.5" ry="5"   fill="none" stroke="#5a3a18" stroke-width="0.8"/>'
+    + '<ellipse cx="8" cy="0" rx="1.1" ry="2.2" fill="none" stroke="#5a3a18" stroke-width="0.7"/>'
+    + '<line x1="-4" y1="-7.5" x2="-4" y2="7.5" stroke="#5a3a18" stroke-width="0.7" opacity="0.85"/>'
+    + '<line x1="1"  y1="-7.7" x2="1"  y2="7.7" stroke="#5a3a18" stroke-width="0.6" opacity="0.7"/>'
     + '</svg>',
   stones: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
     + '<ellipse cx="-7" cy="4"  rx="6" ry="5" fill="#6e6e6e" stroke="#3f3f3f" stroke-width="1.0"/>'
@@ -1473,10 +1477,12 @@ const MAT_ICON_SVG = {
     + '<ellipse cx="8"  cy="-5" rx="3" ry="6"   fill="#5a8e3a" stroke="#365821" stroke-width="1.0"/>'
     + '</svg>',
   mud: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
-    + '<path d="M -14 -2 q 1 -9 14 -8 q 13 -1 14 8 q -1 9 -14 8 q -13 1 -14 -8 Z"'
+    + '<path d="M -1 -13 C 5 -13 11 -11 12 -5 C 14 0 12 7 7 11'
+    + ' C 2 14 -5 13 -9 10 C -13 7 -14 1 -12 -4 C -11 -10 -7 -13 -1 -13 Z"'
     + ' fill="#5c3a1f" stroke="#3c2410" stroke-width="1.2"/>'
-    + '<ellipse cx="-5" cy="-2" rx="2.2" ry="1.3" fill="#3c2410"/>'
-    + '<ellipse cx="6"  cy="2"  rx="2.0" ry="1.2" fill="#3c2410"/>'
+    + '<ellipse cx="-3" cy="-2" rx="2.0" ry="1.4" fill="#3c2410" opacity="0.85"/>'
+    + '<ellipse cx="5"  cy="3"  rx="1.8" ry="1.2" fill="#3c2410" opacity="0.85"/>'
+    + '<ellipse cx="-5" cy="6"  rx="1.2" ry="0.9" fill="#3c2410" opacity="0.7"/>'
     + '</svg>',
   vines: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
     + '<path d="M -3 13 Q -10 1 -1 -11 Q 11 1 4 13 Z"'

@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Canonical "mud" silhouette: irregular blob with two dark spots. Colors
-     baked from MATERIALS.mud (color #5c3a1f, ink #3c2410). -->
+<!-- Canonical "mud" silhouette: round-ish irregular blob (splat) with
+     three darker pock-marks. Colors baked from MATERIALS.mud
+     (color #5c3a1f, ink #3c2410). -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -15 30 30">
-  <path d="M -14 -2 q 1 -9 14 -8 q 13 -1 14 8 q -1 9 -14 8 q -13 1 -14 -8 Z"
+  <path d="M -1 -13
+           C 5 -13 11 -11 12 -5
+           C 14 0 12 7 7 11
+           C 2 14 -5 13 -9 10
+           C -13 7 -14 1 -12 -4
+           C -11 -10 -7 -13 -1 -13 Z"
         fill="#5c3a1f" stroke="#3c2410" stroke-width="1.2"/>
-  <ellipse cx="-5" cy="-2" rx="2.2" ry="1.3" fill="#3c2410"/>
-  <ellipse cx="6"  cy="2"  rx="2.0" ry="1.2" fill="#3c2410"/>
+  <!-- darker pock-marks -->
+  <ellipse cx="-3" cy="-2" rx="2.0" ry="1.4" fill="#3c2410" opacity="0.85"/>
+  <ellipse cx="5"  cy="3"  rx="1.8" ry="1.2" fill="#3c2410" opacity="0.85"/>
+  <ellipse cx="-5" cy="6"  rx="1.2" ry="0.9" fill="#3c2410" opacity="0.7"/>
 </svg>

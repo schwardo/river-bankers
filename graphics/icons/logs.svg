@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Canonical "logs" silhouette: end-on log with three concentric growth rings.
-     viewBox is -15..15 on both axes so the icon can drop into any disc by
-     scaling. Color/ink baked from MATERIALS.logs (color #8b5a2b, ink #5a3a18).
-     Edit this file once and both Python generators (material-deck /
-     structure-deck) plus the web prototype pick up the change. -->
+<!-- Canonical "logs" silhouette: 3D side-view log (cylinder with cut end
+     showing growth rings), like the 🪵 emoji. Colors baked from
+     MATERIALS.logs (bark #8b5a2b, ink #5a3a18, wood #d8b078). Edit this
+     file once and both Python generators (material-deck / structure-deck)
+     plus the web prototype pick up the change. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -15 30 30">
-  <ellipse cx="0" cy="0" rx="14" ry="9" fill="#8b5a2b" stroke="#5a3a18" stroke-width="1.5"/>
-  <ellipse cx="0" cy="0" rx="9"  ry="5.5" fill="none" stroke="#5a3a18" stroke-width="0.8"/>
-  <ellipse cx="0" cy="0" rx="4"  ry="2.5" fill="none" stroke="#5a3a18" stroke-width="0.7"/>
+  <!-- cylinder body (bark) -->
+  <path d="M -10 -8 L 8 -8 A 4 8 0 0 1 8 8 L -10 8 A 4 8 0 0 0 -10 -8 Z"
+        fill="#8b5a2b" stroke="#5a3a18" stroke-width="1.2"/>
+  <!-- cut end (right) — lighter wood -->
+  <ellipse cx="8" cy="0" rx="4" ry="8" fill="#d8b078" stroke="#5a3a18" stroke-width="1.2"/>
+  <!-- growth rings on the cut end -->
+  <ellipse cx="8" cy="0" rx="2.5" ry="5"   fill="none" stroke="#5a3a18" stroke-width="0.8"/>
+  <ellipse cx="8" cy="0" rx="1.1" ry="2.2" fill="none" stroke="#5a3a18" stroke-width="0.7"/>
+  <!-- bark texture lines along the body -->
+  <line x1="-4" y1="-7.5" x2="-4" y2="7.5" stroke="#5a3a18" stroke-width="0.7" opacity="0.85"/>
+  <line x1="1"  y1="-7.7" x2="1"  y2="7.7" stroke="#5a3a18" stroke-width="0.6" opacity="0.7"/>
 </svg>
