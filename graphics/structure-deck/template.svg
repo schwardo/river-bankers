@@ -36,6 +36,7 @@
       .vp-text        { font-family: 'DejaVu Serif', serif; font-weight: 700; font-size: 11pt; fill: #a07a30; }
       .fish-text      { font-family: 'DejaVu Serif', serif; font-weight: 700; font-size: 13pt; fill: #1a4565; }
       .cost-number    { font-family: 'DejaVu Sans', sans-serif; font-weight: 700; font-size: 8pt; fill: #2c1f15; text-anchor: middle; }
+      .cost-label     { font-family: 'DejaVu Sans', sans-serif; font-weight: 700; font-size: 5.5pt; text-anchor: middle; }
       .effect-text    { font-family: 'DejaVu Sans', sans-serif; font-style: italic; font-size: 6.5pt; fill: #2a2a5c; }
     ]]></style>
   </defs>

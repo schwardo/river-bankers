@@ -56,7 +56,7 @@ VP_Y = 37.0
 # wide; gap between slots stretches to fill the row (with a max so a 1-
 # or 2-element card doesn't fling its icons to the edges).
 COST_ROW_Y = 78.0                   # vertical center of the FIRST row
-COST_ROW_GAP_Y = 44.0               # vertical distance between row centers
+COST_ROW_GAP_Y = 66.0               # vertical distance between row centers
 COST_ROW_X = 26.0                   # 8pt inset from the header / effect boxes
 COST_ROW_W = 146.0                  # 162pt safe area − 2×8pt inset
 COST_ELEMENT_W = 32.0               # slot width = material disc diameter
@@ -220,23 +220,36 @@ def _cost_slot_centers(n: int):
 
 def _render_fish_slot(card, cx: float, cy: float):
     """Fish-cost element ('N' + fish silhouette) centered on (cx, cy) within
-    a COST_ELEMENT_W slot. Number sits in the left half, glyph in the right."""
+    a COST_ELEMENT_W slot. Number sits in the left half, glyph in the right.
+    "Fish ×N" label sits below with the SAME visual gap to the glyph as the
+    material discs have to their labels — the fish silhouette is much
+    smaller than a 32pt disc, so its label_y is closer to cy."""
     n = card.get("time", 0)
     num_x = cx - 13                  # text-anchor=start; digit renders right of here
     glyph_cx = cx + 11               # ~10pt of clear space between digit and fish
+    # Same baseline as the material labels so all cost labels in a row line
+    # up horizontally (fish slot has more visual whitespace above the label
+    # since its glyph footprint is smaller than the 32pt disc — that's fine).
+    label_y = cy + COST_DISC_RADIUS_PT + 16
     return (
         f'  <text x="{num_x:.2f}" y="{cy + 5:.2f}" class="fish-text">{n}</text>\n'
-        f'  <g transform="translate({glyph_cx:.2f} {cy:.2f})">{_FISH_GLYPH}</g>'
+        f'  <g transform="translate({glyph_cx:.2f} {cy:.2f})">{_FISH_GLYPH}</g>\n'
+        f'  <text x="{cx:.2f}" y="{label_y:.2f}" class="cost-label" fill="#1a4565">Fish ×{n}</text>'
     )
 
 
 def _render_material_slot(mat_key: str, count: int, mat_spec: dict, cx: float, cy: float):
     """One material-cost disc centered on (cx, cy). Material's colored glyph
-    inside a white disc, with a small count badge tucked lower-right."""
+    inside a white disc, with a small count badge tucked lower-right and the
+    material name labeled just below the disc."""
     r = COST_DISC_RADIUS_PT
     color = mat_spec["color"]
     ink = mat_spec["ink"]
+    name = mat_spec["name"]
     glyph_svg = MATERIAL_GLYPHS[mat_key]
+    # Label baseline sits ~16pt below the disc bottom; ink color so it ties
+    # back to the material visually without competing with the disc rim.
+    label_y = cy + r + 16
     return (
         f'  <circle cx="{cx:.2f}" cy="{cy}" r="{r}" fill="#ffffff" '
         f'stroke="{color}" stroke-width="1.6"/>\n'
@@ -245,7 +258,8 @@ def _render_material_slot(mat_key: str, count: int, mat_spec: dict, cx: float, c
         f'  </g>\n'
         f'  <circle cx="{cx + 9:.2f}" cy="{cy + 9:.2f}" r="6" '
         f'fill="#ffffff" stroke="{ink}" stroke-width="1.2"/>\n'
-        f'  <text x="{cx + 9:.2f}" y="{cy + 12.3:.2f}" class="cost-number">{count}</text>'
+        f'  <text x="{cx + 9:.2f}" y="{cy + 12.3:.2f}" class="cost-number">{count}</text>\n'
+        f'  <text x="{cx:.2f}" y="{label_y:.2f}" class="cost-label" fill="{ink}">{name} ×{count}</text>'
     )
 
 
