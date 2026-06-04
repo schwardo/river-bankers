@@ -65,6 +65,10 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'At the start of your turn, swap one of your workers on a river card with another worker (yours or an opponent\'s) on a different river card. Pay the source card\'s per-item cost in fish.' },
   { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 6, effect: 'As your main action, place 1-5 workers from your supply onto uncovered icons of one river card. Fish cost escalates 1/2/3/5/8 per successive worker.' },
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game, take a turn immediately after another player takes their turn, even if you are not next on the fish track.' },
+  { name: 'Trophy Lodge',   cost: { clay: 3, stones: 2 },            time: 3, vp: 0, effect: 'End game: +3 VP per ?-VP structure you control, including this one (max +12).' },
+  { name: 'Springwater Pool', cost: { vines: 3, mud: 2 },            time: 3, vp: 4, effect: 'When built, ready all of your spent once-per-game cards.' },
+  { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 2, vp: 2, effect: 'When built, fire all of your pass-0 triggers once (as if you passed 0).' },
+  { name: 'Trade Post',     cost: { clay: 2, reeds: 2 },             time: 3, vp: 4, effect: 'At the start of your turn, pay 1 fish: recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.' },
 
   // Species starter structures (asymmetric play, see SPECIES.md). Each player
   // drafts 1 of their 3 species cards at setup; picked card is pre-built in
@@ -111,6 +115,15 @@ const SPECIES_DRAFT_WEIGHT = {
 
 // Cattail Patch end-game schedule, indexed by distinct-material count (0..6).
 const CATTAIL_PATCH_VP = [0, 1, 1, 2, 3, 5, 8];
+
+// "?-VP" cohort: cards whose printed VP is 0 and whose scoring lives entirely
+// in an End-game clause. Used by Trophy Lodge to count its synergy targets.
+// Trophy Lodge counts itself when computing its own bonus.
+const VARIABLE_VP_CARDS = new Set([
+  'Heron Watch', 'Pier', 'Vine Ladder', 'Vine Trellis', 'Stone Causeway',
+  'Reed Walkway', 'Clay Vault', 'Burrow Network', 'Hidden Cache',
+  'Cattail Patch', 'Trophy Lodge',
+]);
 
 // Ablation toggle: set STRUCTURE_EFFECT_DISABLED['Pier'] = true to ignore that
 // card's effect (still in deck, still scores its printed VP — only the bonus is suppressed).
@@ -162,6 +175,10 @@ function totalVP(p, state) {
   }
   if (hasEffect(p, 'Heron Watch')) {
     v += Math.min(6, state.shorelineCards.length);
+  }
+  if (hasEffect(p, 'Trophy Lodge')) {
+    const count = p.built.filter(b => VARIABLE_VP_CARDS.has(b.name)).length;
+    v += Math.min(12, 3 * count);
   }
   if (FINAL_PAIR_VP) {
     v += endgamePairVP(state, p.idx);
@@ -1460,6 +1477,67 @@ function doTributeStone(state, playerIdx, victimIdx, card) {
   return true;
 }
 
+// Trade Post: pay 1 fish to recall 1 worker each from 3 different-material
+// river cards (TRADE_POST_DROPS_BLANKS controls whether blanks drop), then
+// place 2 free workers from supply onto uncovered icons of one river card.
+// AI heuristic: choose target = river card whose material is most-needed by
+// hand builds AND has ≥2 uncovered icons. Choose 3 sources = cards holding
+// our workers across 3 distinct materials, preferring (a) lowest hand need
+// for that material, then (b) lowest worker count parked there.
+const TRADE_POST_DROPS_BLANKS = true;
+
+function findTradePostAction(state, playerIdx) {
+  const p = state.players[playerIdx];
+  // Tally how much each material is needed across our current hand.
+  const need = {};
+  for (const s of p.hand) for (const m in s.cost) need[m] = (need[m] || 0) + s.cost[m];
+  // Candidate targets: river cards with ≥2 uncovered icons. Score by hand
+  // need for that material (higher is better) with a small bonus per
+  // uncovered icon (so we don't pick a near-full card we can't fully use).
+  const targets = state.riverCards
+    .filter(c => uncoveredIcons(c) >= 2)
+    .map(c => ({ card: c, score: (need[c.material] || 0) * 10 + uncoveredIcons(c) }))
+    .sort((a, b) => b.score - a.score);
+  if (targets.length === 0 || (need[targets[0].card.material] || 0) === 0) return null;
+  const target = targets[0].card;
+  // Source candidates: cards with our worker, of materials != target.material.
+  // Score each card by (-need[mat]) so we drain materials we need LEAST.
+  const sources = [];
+  const seenMats = new Set();
+  const candPool = []
+    .concat(state.shorelineCards.filter(c => workersOnCard(c, playerIdx) > 0))
+    .concat(state.riverCards.filter(c => workersOnCard(c, playerIdx) > 0))
+    .filter(c => c.material !== target.material)
+    .sort((a, b) => (need[a.material] || 0) - (need[b.material] || 0)
+                  || workersOnCard(a, playerIdx) - workersOnCard(b, playerIdx));
+  for (const c of candPool) {
+    if (seenMats.has(c.material)) continue;
+    sources.push(c);
+    seenMats.add(c.material);
+    if (sources.length === 3) break;
+  }
+  if (sources.length < 3) return null;
+  return { sources, target };
+}
+
+function doTradePost(state, playerIdx, action) {
+  const p = state.players[playerIdx];
+  // Recall 1 worker from each of the 3 source cards.
+  for (const c of action.sources) {
+    c.workers[playerIdx] -= 1;
+    if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
+    if (TRADE_POST_DROPS_BLANKS && typeof c.slot === 'number') c.blanks += 1;
+    p.supply += 1;
+  }
+  // Pay 1 fish and place 2 workers on the target card's uncovered icons.
+  p.timePos += 1;
+  const place = Math.min(2, p.supply, uncoveredIcons(action.target));
+  action.target.workers[playerIdx] = (action.target.workers[playerIdx] || 0) + place;
+  p.supply -= place;
+  if (TRADE_POST_DROPS_BLANKS) noteBlanks(state);
+  return true;
+}
+
 function findTributeStoneTarget(state, playerIdx) {
   let best = null;
   for (const c of state.riverCards) {
@@ -1743,6 +1821,16 @@ function aiStartOfTurnAbilities(state, playerIdx) {
   if (hasEffect(p, 'Rolling Float') && !p.rollingFloatUsed) {
     const target = findRollingFloatTarget(state, playerIdx);
     if (target) doRollingFloat(state, playerIdx, target.cardA, target.cardB, target.otherIdx);
+  }
+  // Trade Post: pay 1 fish to recall 1 worker each from 3 different-material
+  // cards (drops 3 blanks by default; toggle TRADE_POST_DROPS_BLANKS = false
+  // for the variant that doesn't drop blanks), then place 2 free workers
+  // from supply onto uncovered icons of one card. AI fires when the swap
+  // is net-useful: target card material is in our hand-need and we have
+  // 3+ disposable distinct-material workers parked on lower-priority cards.
+  if (hasEffect(p, 'Trade Post') && p.timePos < ENDGAME_TRACK_END - 1 && p.supply >= 2) {
+    const action = findTradePostAction(state, playerIdx);
+    if (action) doTradePost(state, playerIdx, action);
   }
   // Tail Slap (beaver species starter): drop a blank on a R1 card whose
   // material we don't need (deny opponents who do). Costs 1 fish.
@@ -2115,6 +2203,30 @@ function fireOnBuildEffect(state, playerIdx, struct) {
   }
   if (struct.name === 'Royal Lodge') {
     state.bonusTurnPlayer = playerIdx;
+    return;
+  }
+  if (struct.name === 'Spring Cascade') {
+    // Fire the builder's pass-0 triggers (Wood Pile / Hollowed-out Log /
+    // Pack Rat Burrow) exactly once, without actually moving them on the
+    // track. Mill Wheel is a passive movement modifier (changes WHERE the
+    // pawn stops when they would pass 0) — it has no trigger and is
+    // unaffected.
+    firePassZeroEffects(state, playerIdx, 1);
+    return;
+  }
+  if (struct.name === 'Springwater Pool') {
+    // Ready all of the builder's spent once-per-game cards. Tracked flags
+    // mirror the player init in newGame(): main-deck cards (granaryUsed,
+    // floodgateUsed, spyMoundUsed, tributeStoneUsed, slipstreamUsed) plus
+    // species starter cards (rollingFloatUsed, snareSetUsed, stoneToolUsed).
+    p.granaryUsed = false;
+    p.floodgateUsed = false;
+    p.spyMoundUsed = false;
+    p.tributeStoneUsed = false;
+    p.slipstreamUsed = false;
+    p.rollingFloatUsed = false;
+    p.snareSetUsed = false;
+    p.stoneToolUsed = false;
     return;
   }
   if (struct.name === 'Beaver Dam') {
