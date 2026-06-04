@@ -21,54 +21,54 @@ let MAT_KEYS = ORIG_MATERIALS.slice();
 // Hooks are keyed off the structure name in helpers below.
 // Disable a single card's effect for ablation via setStructureEffectDisabled.
 const BASE_STRUCTURE_TEMPLATES = [
-  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built, wash one card of your choice from River 1 to the shoreline (workers carry along).' },
-  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'When you pass 0 on the fish track, recall one worker from a river card without dropping a blank.' },
-  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built, pull a Headwaters card to River 1 for free; an auction immediately runs on it at 1 fish/item.' },
-  { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End game: +1 VP per shoreline card on the table (max +6).' },
-  { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less fish per item (min 1).' },
-  { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built, drop 2 blanks on uncovered icons in the river.' },
-  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build, advance 3 fewer fish (min 1).' },
+  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built: wash one card from River 1 to the shoreline (workers carry along).' },
+  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'At 0 on 🐟 track: recall one worker from a river card (no blank).' },
+  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built: pull a Headwaters card to River 1; run an auction on it at 1🐟/item.' },
+  { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End of game: +1 VP per shoreline card on the table (max +6).' },
+  { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
+  { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built: drop 2 blanks on uncovered icons in the river.' },
+  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build: advance 3 fewer 🐟 (min 1).' },
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
-  { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built, draw 3 structure cards, keep 1, discard 2.' },
-  { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 6, effect: 'When building, 1 of your Clay workers may substitute for any other material.' },
-  { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top card of the material deck at any time.' },
-  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End game: +2 VP per shoreline card with at least one of your workers.' },
-  { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'Each Reed worker you spend on a build counts as 2 reeds.' },
-  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'When you pass 0 on the fish track, claim 1 uncovered Log icon from any river card for 1 fish.' },
-  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'At the start of your turn you may pay 1 fish to replace a Headwaters card with the top of the material deck.' },
-  { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay fish for one fewer worker.' },
-  { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 6, effect: 'When you would pass 0 on the fish track, stop at space 1 instead.' },
-  { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5, effect: 'When built, look at the top 5 material cards and rearrange them in any order.' },
-  { name: 'Flush Channel',  cost: { mud: 3, reeds: 1 },              time: 2, vp: 6, effect: 'When built, discard 1 Headwaters card of your choice (out of game) and refill that slot from the top of the material deck. No auction.' },
-  { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 4, effect: 'Once per game, your build costs 1 fewer of one listed material (your choice).' },
+  { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built: draw 3 structure cards, keep 1, discard 2.' },
+  { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 6, effect: 'When you build: 1 of your Clay workers may substitute for any other material.' },
+  { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top of the material deck at any time.' },
+  { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +2 VP per shoreline card with at least one of your workers.' },
+  { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 6, effect: 'When you build: each Reed worker counts as 2 reeds.' },
+  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'At 0 on 🐟 track: claim 1 uncovered Log icon from any river card for 1🐟.' },
+  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck.' },
+  { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
+  { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 6, effect: 'When you would pass 0 on 🐟 track, stop at space 1 instead.' },
+  { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 5, effect: 'When built: look at the top 5 material cards and rearrange them in any order.' },
+  { name: 'Flush Channel',  cost: { mud: 3, reeds: 1 },              time: 2, vp: 6, effect: 'When built: discard 1 Headwaters card (out of game) and refill that slot from the material deck. No auction.' },
+  { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 4, effect: 'Once per game (flip card): your build costs 1 fewer of one listed material.' },
   { name: 'Granite Spire',  cost: { stones: 6 },                     time: 4, vp: 7 },
-  { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built, take an immediate extra turn.' },
-  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you recall workers before an auction, slide back 1 fish per worker recalled.' },
-  { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game, before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
-  { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built, slide your pawn back 5 on the fish track.' },
-  { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 4, effect: 'When built, place 2 free workers from your supply onto uncovered icons of one river card.' },
-  { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 6, effect: 'Once per game, decide your auction bid after the other players reveal theirs.' },
-  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End game: +4 VP per built structure of yours that uses Vines (max +12).' },
-  { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 0, effect: 'When you build a structure that uses Vines, slide back 1 fish on the fish track. End game: +2 VP per built structure of yours that uses Vines.' },
-  { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 0, effect: 'When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +2 VP per built structure of yours that uses Stones (max +8).' },
-  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +2 VP per built structure of yours that uses Reeds.' },
-  { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +3 VP per built structure of yours that uses Clay (max +12).' },
-  { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 2, vp: 0, effect: 'When you build a structure that uses Mud, move one of your workers from any river card to another river card containing at least one of your workers (you may replace a blank instead of taking an uncovered icon). End game: +3 VP per built structure of yours that uses Mud (max +9).' },
-  { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'At the start of your turn you may pay 1 fish to add a blank to any uncovered icon.' },
-  { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built, look at every opponent\'s hand of structure cards.' },
-  { name: 'Hidden Cache',   cost: { vines: 2, stones: 3, clay: 2 },  time: 3, vp: 0, effect: 'End game: +3 VP per 2 distinct materials in your built structures (max +9).' },
-  { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 4, effect: 'When building, you may spend 2 of any one material as 1 of any other material. Once per build.' },
-  { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
-  { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile.' },
-  { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game, at the start of your turn, force an opponent to recall one of their workers from a river card (dropping a blank). The opponent slides back 3 fish in compensation.' },
-  { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'On your turn, instead of a regular action, pay 2 fish to slide a river card 1 space toward the Headwaters.' },
-  { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'At the start of your turn, swap one of your workers on a river card with another worker (yours or an opponent\'s) on a different river card. Pay the source card\'s per-item cost in fish.' },
-  { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 6, effect: 'As your main action, place 1-5 workers from your supply onto uncovered icons of one river card. Fish cost escalates 1/2/3/5/8 per successive worker.' },
-  { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game, take a turn immediately after another player takes their turn, even if you are not next on the fish track.' },
-  { name: 'Trophy Lodge',   cost: { clay: 3, stones: 2 },            time: 3, vp: 0, effect: 'End game: +3 VP per ?-VP structure you control, including this one (max +12).' },
-  { name: 'Springwater Pool', cost: { vines: 3, mud: 2 },            time: 3, vp: 4, effect: 'When built, ready all of your spent once-per-game cards.' },
-  { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 2, vp: 2, effect: 'When built, fire all of your pass-0 triggers once (as if you passed 0).' },
-  { name: 'Trade Post',     cost: { clay: 2, reeds: 2 },             time: 3, vp: 4, effect: 'At the start of your turn, pay 1 fish: recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.' },
+  { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built: take an immediate extra turn.' },
+  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you recall workers before an auction, slide back 1🐟 per worker recalled.' },
+  { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game (flip card): before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
+  { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built: slide your pawn back 5 on 🐟 track.' },
+  { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 4, effect: 'When built: place 2 free workers from your supply onto uncovered icons of one river card.' },
+  { name: 'Spy Mound',      cost: { stones: 4, clay: 1 },            time: 3, vp: 6, effect: 'Once per game (flip card): decide your auction bid after the other players reveal theirs.' },
+  { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End of game: +4 VP per built structure of yours that uses Vines (max +12).' },
+  { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 0, effect: 'When you build a structure that uses Vines: slide back 1🐟.\n\nEnd of game: +2 VP per built structure of yours that uses Vines.' },
+  { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 0, effect: 'When you build a structure that uses Stones: draw 1 structure card and discard 1.\n\nEnd of game: +2 VP per built structure of yours that uses Stones (max +8).' },
+  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds: place 1 free worker on a River 1 card.\n\nEnd of game: +2 VP per built structure of yours that uses Reeds.' },
+  { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay: peek at the top of the structure deck; you may swap it with 1 card from your hand.\n\nEnd of game: +3 VP per built structure of yours that uses Clay (max +12).' },
+  { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 2, vp: 0, effect: 'When you build a structure that uses Mud: move one of your workers to another river card with at least one of your workers (may replace a blank).\n\nEnd of game: +3 VP per built structure of yours that uses Mud (max +9).' },
+  { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'As an action: pay 1🐟 to add a blank to any uncovered icon.' },
+  { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built: look at every opponent\'s hand of structure cards.' },
+  { name: 'Hidden Cache',   cost: { vines: 2, stones: 3, clay: 2 },  time: 3, vp: 0, effect: 'End of game: +3 VP per 2 distinct materials in your built structures (max +9).' },
+  { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 3, vp: 4, effect: 'When you build: you may spend 2 of any one material as 1 of any other. Once per build.' },
+  { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
+  { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'At 0 on 🐟 track: you may discard 1 structure from your hand and take one from the discard pile.' },
+  { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back 3🐟 in compensation.' },
+  { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'As an action: pay 2🐟 to slide a river card 1 space toward the Headwaters.' },
+  { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.' },
+  { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 6, effect: 'As an action: place 1-5 workers from your supply onto uncovered icons of one river card. 🐟 cost escalates 1/2/3/5/8 per successive worker.' },
+  { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track.' },
+  { name: 'Trophy Lodge',   cost: { clay: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +3 VP per ?-VP structure you control, including this one (max +12).' },
+  { name: 'Springwater Pool', cost: { vines: 3, mud: 2 },            time: 3, vp: 4, effect: 'When built: ready all of your spent once-per-game cards.' },
+  { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 2, vp: 2, effect: 'When built: trigger each of your \'0 on 🐟 track\' effects once.' },
+  { name: 'Trading Post',     cost: { clay: 2, reeds: 2 },             time: 3, vp: 4, effect: 'As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.' },
 
   // Species starter structures (asymmetric play, see SPECIES.md). Each player
   // drafts 1 of their 3 species cards at setup; picked card is pre-built in
@@ -1477,7 +1477,7 @@ function doTributeStone(state, playerIdx, victimIdx, card) {
   return true;
 }
 
-// Trade Post: pay 1 fish to recall 1 worker each from 3 different-material
+// Trading Post: pay 1 fish to recall 1 worker each from 3 different-material
 // river cards (TRADE_POST_DROPS_BLANKS controls whether blanks drop), then
 // place 2 free workers from supply onto uncovered icons of one river card.
 // AI heuristic: choose target = river card whose material is most-needed by
@@ -1486,7 +1486,7 @@ function doTributeStone(state, playerIdx, victimIdx, card) {
 // for that material, then (b) lowest worker count parked there.
 const TRADE_POST_DROPS_BLANKS = true;
 
-function findTradePostAction(state, playerIdx) {
+function findTradingPostAction(state, playerIdx) {
   const p = state.players[playerIdx];
   // Tally how much each material is needed across our current hand.
   const need = {};
@@ -1520,7 +1520,7 @@ function findTradePostAction(state, playerIdx) {
   return { sources, target };
 }
 
-function doTradePost(state, playerIdx, action) {
+function doTradingPost(state, playerIdx, action) {
   const p = state.players[playerIdx];
   // Recall 1 worker from each of the 3 source cards.
   for (const c of action.sources) {
@@ -1822,15 +1822,15 @@ function aiStartOfTurnAbilities(state, playerIdx) {
     const target = findRollingFloatTarget(state, playerIdx);
     if (target) doRollingFloat(state, playerIdx, target.cardA, target.cardB, target.otherIdx);
   }
-  // Trade Post: pay 1 fish to recall 1 worker each from 3 different-material
+  // Trading Post: pay 1 fish to recall 1 worker each from 3 different-material
   // cards (drops 3 blanks by default; toggle TRADE_POST_DROPS_BLANKS = false
   // for the variant that doesn't drop blanks), then place 2 free workers
   // from supply onto uncovered icons of one card. AI fires when the swap
   // is net-useful: target card material is in our hand-need and we have
   // 3+ disposable distinct-material workers parked on lower-priority cards.
-  if (hasEffect(p, 'Trade Post') && p.timePos < ENDGAME_TRACK_END - 1 && p.supply >= 2) {
-    const action = findTradePostAction(state, playerIdx);
-    if (action) doTradePost(state, playerIdx, action);
+  if (hasEffect(p, 'Trading Post') && p.timePos < ENDGAME_TRACK_END - 1 && p.supply >= 2) {
+    const action = findTradingPostAction(state, playerIdx);
+    if (action) doTradingPost(state, playerIdx, action);
   }
   // Tail Slap (beaver species starter): drop a blank on a R1 card whose
   // material we don't need (deny opponents who do). Costs 1 fish.

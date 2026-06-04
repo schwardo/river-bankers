@@ -39,6 +39,15 @@
       .cost-label     { font-family: 'DejaVu Sans', sans-serif; font-weight: 700; font-size: 5.5pt; text-anchor: middle; }
       .effect-text    { font-family: 'DejaVu Sans', sans-serif; font-style: italic; font-size: 6.5pt; fill: #2a2a5c; }
     ]]></style>
+    <!-- Inline fish glyph used in effect-text prose. Same shape as the
+         cost-row fish (1a4565 ink). Authored at natural coords (-12..12 x
+         -5..5 = roughly 24 units wide × 10 tall). The renderer references
+         this via <use transform="translate(x y) scale(s)"> so each call
+         picks its own scale; (0, 0) sits on the text baseline midline. -->
+    <g id="fish-inline">
+      <path d="M -8 0 Q -6 -4 0 -4 Q 6 -4 8 0 Q 6 4 0 4 Q -6 4 -8 0 Z M 8 0 L 11 -3 L 11 3 Z" fill="#1a4565"/>
+      <circle cx="-4" cy="-1" r="0.9" fill="#ffffff"/>
+    </g>
   </defs>
 
   <!-- Full bleed: border color extends to canvas edge so TGC trim leaves a clean colored frame. -->

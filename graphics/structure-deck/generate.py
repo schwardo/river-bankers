@@ -296,17 +296,75 @@ def render_cost_row(card, materials):
     return "\n".join(pieces)
 
 
+# Inline fish-glyph rendering. We emit the fish path inline (not via
+# <use href="#fish-inline">) because Inkscape's SVG-to-PNG renderer
+# occasionally renders <use> targeting a <g> in <defs> at the wrong scale
+# (or zero size). Inlining the path with a transform sidesteps that.
+FISH_INLINE_SCALE = 0.55
+FISH_INLINE_W_PT = 16.0  # natural 19-unit-wide glyph × scale ≈ 10.5pt, + ~5.5pt
+                          # of total slack (~2.75pt padding on each side)
+EFFECT_CHAR_WIDTH_PT = 4.2  # avg pt/char for DejaVu Sans 6.5pt italic body text.
+                             # Empirically: 3.6 underestimates and causes the
+                             # fish to overlap preceding text on long lines
+                             # (e.g. Salmon Run's "icons of one river card. 🐟").
+
+# Inline fish path — identical to template.svg's <g id="fish-inline">.
+_FISH_INLINE_PATHS = (
+    '<path d="M -8 0 Q -6 -4 0 -4 Q 6 -4 8 0 Q 6 4 0 4 Q -6 4 -8 0 Z '
+    'M 8 0 L 11 -3 L 11 3 Z" fill="#1a4565"/>'
+    '<circle cx="-4" cy="-1" r="0.9" fill="#ffffff"/>'
+)
+
+
+def _render_effect_line(line: str, x_start: float, y: float):
+    """Render one effect line as SVG. If the line contains 🐟, splits on
+    that character and emits alternating <text> and <use href="#fish-inline">
+    elements with explicit x positions. Char widths are approximated."""
+    if not line:
+        return ""
+    if "🐟" not in line:
+        return (
+            f'<text x="{x_start:.2f}" y="{y:.2f}" class="effect-text">'
+            f'{html.escape(line)}</text>'
+        )
+    parts = line.split("🐟")
+    pieces = []
+    x = x_start
+    # Vertical centering on the full text line. For 6.5pt italic body text
+    # the visual line spans roughly y-5 (ascender) to y+1.5 (descender);
+    # mid-line ≈ y - 1.75. Bumping a touch higher (-2.25) reads as
+    # "between the ascender and baseline" rather than "x-height level".
+    glyph_y = y - 2.25
+    for i, part in enumerate(parts):
+        if part:
+            pieces.append(
+                f'<text x="{x:.2f}" y="{y:.2f}" class="effect-text">'
+                f'{html.escape(part)}</text>'
+            )
+            x += len(part) * EFFECT_CHAR_WIDTH_PT
+        if i < len(parts) - 1:
+            # Center the glyph horizontally within the reserved slot, then
+            # translate+scale the inline fish paths so the body sits on the
+            # baseline as a lowercase-height letter.
+            cx = x + FISH_INLINE_W_PT / 2
+            pieces.append(
+                f'<g transform="translate({cx:.2f} {glyph_y:.2f}) '
+                f'scale({FISH_INLINE_SCALE})">{_FISH_INLINE_PATHS}</g>'
+            )
+            x += FISH_INLINE_W_PT
+    return "".join(pieces)
+
+
 def render_effect_block(card):
     """Italic effect prose in a bottom-anchored block sized to fit the wrap.
-    Empty for cards without effect text (e.g. Granite Spire)."""
+    Empty for cards without effect text (e.g. Granite Spire). Supports the
+    standardized prefixes ("End of game:", "When built:", "When you build:",
+    "Once per game (flip card):", "At 0 on 🐟 track:", "As an action:") and
+    inline 🐟 glyphs in the prose. Paragraph breaks come from explicit
+    \\n\\n in the source text."""
     text = card.get("effect") or ""
     if not text:
         return ""
-    # When the prose has a mid-text "End game:" scoring clause (preceded by
-    # an on-build / passive effect), break it out onto its own paragraph so
-    # the two halves read as distinct. Cards whose effect STARTS with "End
-    # game:" already render as a single block — no break needed.
-    text = re.sub(r" (End [Gg]ame:)", r"\n\n\1", text)
     paragraphs = text.split("\n\n")
     body_lines = []
     for i, para in enumerate(paragraphs):
@@ -319,12 +377,10 @@ def render_effect_block(card):
     box_y = EFFECT_BLOCK_BOTTOM - box_h
     body_y0 = box_y + EFFECT_BLOCK_PAD + _FONT_ASCENDER
 
-    line_tags = []
+    line_frags = []
     for i, line in enumerate(body_lines):
         y = body_y0 + i * EFFECT_LINE_H
-        line_tags.append(
-            f'    <tspan x="{EFFECT_TEXT_LEFT}" y="{y:.2f}">{html.escape(line)}</tspan>'
-        )
+        line_frags.append(_render_effect_line(line, EFFECT_TEXT_LEFT, y))
 
     return (
         f'<g id="effect-block" inkscape:label="Effect">\n'
@@ -332,10 +388,8 @@ def render_effect_block(card):
         f'width="{EFFECT_BLOCK_W}" height="{box_h:.2f}" rx="3" ry="3" '
         f'fill="#2a2a5c" fill-opacity="0.08" '
         f'stroke="#2a2a5c" stroke-opacity="0.35" stroke-width="0.5"/>\n'
-        f'  <text class="effect-text">\n'
-        + "\n".join(line_tags) +
-        '\n  </text>\n'
-        f'</g>'
+        + "\n".join(f'  {frag}' for frag in line_frags if frag) +
+        '\n</g>'
     )
 
 
