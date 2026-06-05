@@ -465,7 +465,11 @@
   .player-pawn-mini .sp-icon,
   .icon-slot.icon-worker .sp-icon,
   .species-emoji .sp-icon { width: 84%; height: 84%; }
-  .mat-card.has-art .icon-slot.icon-blank { background: #ccc; color: #888; border: 1.5px dashed var(--bank); }
+  .mat-card.has-art .icon-slot.icon-blank {
+    background: url('../graphics/blank-chit/blank-chit.svg') center center / 100% 100% no-repeat;
+    border: none;
+    color: transparent;
+  }
   /* Invisible spacers preserve positional indices for the "open" icons that
      are already drawn on the PNG. */
   .mat-card.has-art .icon-slot.icon-open { visibility: hidden; }
@@ -538,10 +542,13 @@
     background: #fff;
   }
   .icon-slot.icon-open { background: #fff; }
+  /* Blank chit: the printed Medium Circle Chit art (cream body + ink dot,
+     matches graphics/blank-chit/blank-chit.svg). Image fills the slot,
+     so we drop the icon-slot border and any text content. */
   .icon-slot.icon-blank {
-    background: #ccc;
-    color: #888;
-    border-style: dashed;
+    background: url('../graphics/blank-chit/blank-chit.svg') center center / 100% 100% no-repeat;
+    border-color: transparent;
+    color: transparent;
   }
   .icon-slot.icon-worker { color: #fff; font-weight: 700; }
   /* Inline material-icon SVG used everywhere we used to print a Unicode
@@ -2943,7 +2950,8 @@ function renderMatCard(card, opts = {}) {
   }
   // Blanks (river only — shoreline cards never carry blanks)
   for (let i = 0; i < card.blanks; i++) {
-    iconSlots.push(`<div class="icon-slot icon-blank" title="sold">·</div>`);
+    // Background-image (blank-chit.svg) provides the visual; div stays empty.
+    iconSlots.push(`<div class="icon-slot icon-blank" title="sold"></div>`);
   }
   // Open icons — drawn on the printed PNG, so the overlay slot is an
   // invisible placeholder (CSS: .icon-slot.icon-open { visibility:hidden }).
