@@ -181,7 +181,9 @@ def render_vp_block(card):
     """
     vp = card.get("vp", 0)
     effect = card.get("effect") or ""
-    has_endgame = bool(re.search(r"End [Gg]ame", effect))
+    # Match "End of game" — the canonical phrasing all end-game cards use.
+    # (Earlier "End [Gg]ame" pattern missed every card because of the "of".)
+    has_endgame = bool(re.search(r"[Ee]nd of game", effect))
     if vp == 0:
         label = "? ★" if has_endgame else "0 ★"
     elif has_endgame:
