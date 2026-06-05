@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>River Bankers — Rulebook</title>
+<style>
+  @page {
+    size: letter;
+    margin: 0.55in 0.6in 0.6in 0.6in;
+  }
+  :root {
+    --water-deep:   #1d4e6b;
+    --water-mid:    #3a8fb7;
+    --water-light:  #c4dde9;
+    --bank:         #6b5436;
+    --bank-light:   #a0825a;
+    --shore:        #d4b97a;
+    --shore-light:  #ecd9a8;
+    --forest:       #2f5d3a;
+    --forest-light: #4a8056;
+    --reed-green:   #6ba14a;
+    --paper:        #faf3e3;
+    --paper-warm:   #f3e8cb;
+    --ink:          #2c1f15;
+    --ink-soft:     #5a4a36;
+    --beaver:       #8b5a2b;
+    --otter:        #b04545;
+    --muskrat:      #4a8056;
+    --mink:         #6a4a8a;
+  }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    color: var(--ink);
+    font-size: 10.3pt;
+    line-height: 1.35;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    color: var(--water-deep);
+    margin: 0 0 6pt;
+    line-height: 1.15;
+    page-break-after: avoid;
+  }
+  h1 { font-size: 26pt; letter-spacing: 0.5pt; }
+  h2 {
+    font-size: 16pt;
+    border-bottom: 1.5pt solid var(--water-mid);
+    padding-bottom: 3pt;
+    margin-top: 14pt;
+    margin-bottom: 8pt;
+  }
+  h3 {
+    font-size: 12pt;
+    color: var(--forest);
+    margin-top: 10pt;
+    margin-bottom: 3pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+  }
+  h4 {
+    font-size: 10.5pt;
+    color: var(--bank);
+    margin-top: 8pt;
+    margin-bottom: 2pt;
+  }
+  p { margin: 0 0 6pt; }
+  ul, ol { margin: 0 0 7pt 18pt; padding: 0; }
+  li { margin-bottom: 3pt; }
+  strong { color: var(--water-deep); }
+  em { color: var(--ink-soft); }
+  a { color: var(--water-deep); text-decoration: none; }
+
+  /* ============ COVER ============ */
+  .cover {
+    height: 9.4in;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    page-break-after: always;
+    background:
+      radial-gradient(ellipse at center top, var(--water-light) 0%, transparent 60%),
+      linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);
+    padding: 0.5in 0;
+  }
+  .cover img.logo {
+    width: 6.5in;
+    height: auto;
+    max-height: 5.5in;
+    filter: drop-shadow(0 4pt 8pt rgba(0,0,0,0.25));
+    margin-bottom: 0.5in;
+  }
+  .cover .tagline {
+    font-size: 14pt;
+    color: var(--ink-soft);
+    font-style: italic;
+    max-width: 5.5in;
+    line-height: 1.5;
+    margin: 0 auto 0.4in;
+  }
+  .cover .meta {
+    font-size: 11pt;
+    color: var(--ink-soft);
+    letter-spacing: 1pt;
+    text-transform: uppercase;
+  }
+  .cover .meta span { margin: 0 0.3in; }
+  .cover .meta strong { color: var(--water-deep); }
+  .cover .credits {
+    margin-top: 0.5in;
+    font-size: 10pt;
+    color: var(--ink-soft);
+    letter-spacing: 0.5pt;
+    line-height: 1.6;
+  }
+  .cover .credits .designer {
+    font-style: italic;
+  }
+  .cover .credits .designer strong {
+    color: var(--water-deep);
+    font-style: normal;
+    letter-spacing: 0.6pt;
+  }
+  .cover .credits .publisher {
+    margin-top: 4pt;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 1.5pt;
+    color: var(--forest);
+    font-weight: 700;
+  }
+
+  /* ============ LAYOUT ============ */
+  .col2 { column-count: 2; column-gap: 0.3in; }
+  .col2 h3, .col2 h4 { break-after: avoid; }
+  .col2 .keep { break-inside: avoid; }
+
+  .lead {
+    font-size: 11.2pt;
+    line-height: 1.45;
+    color: var(--ink);
+    margin-bottom: 10pt;
+  }
+
+  /* ============ CARDS / GRAPHICS ============ */
+  img.card {
+    border-radius: 6pt;
+    box-shadow: 0 1pt 3pt rgba(0,0,0,0.18);
+    background: var(--paper);
+  }
+  .card-row {
+    display: flex;
+    gap: 8pt;
+    align-items: center;
+    justify-content: center;
+    margin: 6pt 0;
+  }
+  .card-row img.card { width: 1.55in; height: auto; }
+
+  /* Setup diagram: stacked Headwaters row + River row */
+  .board {
+    background: linear-gradient(180deg, #d8c89b 0%, #c8b07a 100%);
+    border: 1.5pt solid var(--bank);
+    border-radius: 8pt;
+    padding: 10pt;
+    margin: 8pt 0;
+    page-break-inside: avoid;
+  }
+  .board-label {
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 1.2pt;
+    color: var(--ink-soft);
+    font-weight: 600;
+    margin-bottom: 4pt;
+  }
+  .slots {
+    display: grid;
+    gap: 6pt;
+    margin-bottom: 6pt;
+  }
+  .slots.headwaters { grid-template-columns: repeat(3, 1fr); }
+  .slots.river      { grid-template-columns: repeat(4, 1fr); }
+  .slot {
+    background: linear-gradient(180deg, var(--water-mid) 0%, var(--water-deep) 100%);
+    border-radius: 5pt;
+    padding: 4pt;
+    text-align: center;
+    color: #fff;
+    font-size: 8pt;
+    min-height: 1.55in;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .slot .slot-name { font-weight: 700; letter-spacing: 0.5pt; text-transform: uppercase; }
+  .slot .slot-cost { font-size: 12pt; margin-top: 1pt; }
+  .slot img.card { width: 1.05in; height: auto; margin: 3pt 0; }
+  .slot.empty { background: rgba(255,255,255,0.18); border: 1pt dashed rgba(255,255,255,0.6); }
+  .slot.empty .placeholder {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.65);
+    font-style: italic;
+    font-size: 8pt;
+  }
+  .river-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--water-deep);
+    font-size: 9pt;
+    font-style: italic;
+    margin-top: 2pt;
+    gap: 6pt;
+  }
+  .river-flow .arrow { color: var(--water-mid); font-size: 13pt; line-height: 1; }
+
+  /* Physical-board pair: river-board (landscape) stacked above fish-board (square, centered) */
+  .boards-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 12pt;
+    margin: 8pt 0;
+  }
+  .boards-pair figure {
+    margin: 0;
+    page-break-inside: avoid;
+    text-align: center;
+  }
+  .boards-pair figure.river-figure img.board-art {
+    width: 78%;
+    height: auto;
+  }
+  .boards-pair figure.fish-figure img.board-art {
+    width: 50%;
+    height: auto;
+  }
+  .boards-pair img.board-art {
+    border-radius: 6pt;
+    box-shadow: 0 1pt 4pt rgba(0,0,0,0.22);
+  }
+  .boards-pair figcaption {
+    font-size: 8.5pt;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-top: 4pt;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* Shoreline strip beside river */
+  .board.with-shoreline {
+    display: grid;
+    grid-template-columns: 1fr 1.1in;
+    gap: 8pt;
+    align-items: stretch;
+  }
+  .shoreline {
+    background: linear-gradient(180deg, var(--shore-light) 0%, var(--shore) 100%);
+    border-radius: 5pt;
+    padding: 4pt;
+    text-align: center;
+    color: var(--ink);
+    font-size: 8pt;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .shoreline .slot-name { font-weight: 700; letter-spacing: 0.5pt; text-transform: uppercase; }
+
+  /* ============ INLINE TOKENS ============ */
+  .icon {
+    display: inline-block;
+    width: 0.16in;
+    height: 0.16in;
+    vertical-align: -2pt;
+  }
+  .fish {
+    display: inline-block;
+    color: #c25c2f;
+    font-weight: 700;
+  }
+  .vp {
+    display: inline-block;
+    color: var(--forest);
+    font-weight: 700;
+  }
+  .worker {
+    display: inline-block;
+    width: 0.13in;
+    height: 0.13in;
+    border-radius: 50%;
+    vertical-align: -1pt;
+    margin: 0 1pt;
+    border: 0.5pt solid rgba(0,0,0,0.35);
+  }
+  .worker.beaver  { background: var(--beaver); }
+  .worker.otter   { background: var(--otter); }
+  .worker.muskrat { background: var(--muskrat); }
+  .worker.mink    { background: var(--mink); }
+
+  /* ============ CALLOUT BLOCKS ============ */
+  .callout {
+    background: var(--paper);
+    border-left: 3pt solid var(--water-mid);
+    padding: 6pt 9pt;
+    margin: 6pt 0;
+    font-size: 9.7pt;
+    line-height: 1.4;
+    break-inside: avoid;
+    border-radius: 0 4pt 4pt 0;
+  }
+  .callout.example { border-left-color: var(--forest); background: #f4f1e3; }
+  .callout.example .label {
+    text-transform: uppercase;
+    letter-spacing: 1pt;
+    font-size: 8pt;
+    font-weight: 700;
+    color: var(--forest);
+    margin-bottom: 3pt;
+  }
+  .callout.note { border-left-color: var(--bank); background: #faf3e3; }
+  .callout.note .label {
+    text-transform: uppercase;
+    letter-spacing: 1pt;
+    font-size: 8pt;
+    font-weight: 700;
+    color: var(--bank);
+    margin-bottom: 3pt;
+  }
+
+  /* ============ ACTION BLOCKS ============ */
+  .action {
+    display: grid;
+    grid-template-columns: 0.9in 1fr;
+    gap: 10pt;
+    background: var(--paper);
+    border-radius: 6pt;
+    padding: 7pt 10pt;
+    margin-bottom: 6pt;
+    break-inside: avoid;
+    align-items: start;
+  }
+  .action .tag {
+    background: var(--water-deep);
+    color: #fff;
+    border-radius: 5pt;
+    text-align: center;
+    padding: 5pt 4pt 4pt;
+    font-weight: 700;
+  }
+  .action .tag .name {
+    display: block;
+    font-size: 12pt;
+    letter-spacing: 0.5pt;
+    text-transform: uppercase;
+    line-height: 1.05;
+  }
+  .action .tag .cost {
+    display: block;
+    margin-top: 2pt;
+    font-size: 9pt;
+    font-weight: 600;
+    opacity: 0.92;
+  }
+  .action .body h4 {
+    margin: 0 0 3pt;
+    color: var(--water-deep);
+    font-size: 11pt;
+  }
+
+  /* ============ TABLES ============ */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin: 4pt 0 8pt;
+  }
+  th, td {
+    text-align: left;
+    padding: 3pt 5pt;
+    border-bottom: 0.5pt solid var(--bank-light);
+    vertical-align: top;
+  }
+  th {
+    background: var(--paper-warm);
+    color: var(--water-deep);
+    font-weight: 700;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+  }
+  td.cost, td.tier { white-space: nowrap; }
+
+  /* ============ EFFECT CARDS GRID ============ */
+  .effect-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10pt;
+    margin: 6pt 0;
+  }
+  .effect-card {
+    display: grid;
+    grid-template-columns: 1.4in 1fr;
+    gap: 8pt;
+    background: var(--paper);
+    border-radius: 6pt;
+    padding: 7pt;
+    break-inside: avoid;
+    align-items: center;
+  }
+  .effect-card img.card { width: 1.4in; height: auto; }
+  .effect-card h4 { margin: 0 0 3pt; color: var(--water-deep); font-size: 10.5pt; }
+  .effect-card .tier-label {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.6pt;
+    color: var(--ink-soft);
+    margin-bottom: 4pt;
+  }
+  .effect-card p { font-size: 9.3pt; margin: 0; line-height: 1.35; }
+
+  /* ============ PAGE BREAKS ============ */
+  .page-break { page-break-before: always; }
+
+  .footer {
+    margin-top: 16pt;
+    text-align: center;
+    font-size: 8pt;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- COVER                                                        -->
+<!-- ============================================================ -->
+<section class="cover">
+  <img class="logo" src="../artwork/logo.png" alt="River Bankers">
+  <div class="tagline">
+    Bid your workers on materials drifting downriver.<br>
+    Spend them to build structures on the bank.<br>
+    Every action costs fish.
+  </div>
+  <div class="meta">
+    <span><strong>2–4</strong> Players</span>
+    <span><strong>30–60</strong> Minutes</span>
+    <span>Ages <strong>10+</strong></span>
+  </div>
+  <div class="credits">
+    <div class="designer">Designed by <strong>Don Schwarz</strong></div>
+    <div class="publisher">Left Field Games</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- OVERVIEW & COMPONENTS                                        -->
+<!-- ============================================================ -->
+<h1 style="text-align:center; margin-bottom: 4pt;">River Bankers</h1>
+<p class="lead" style="text-align:center; max-width: 6in; margin: 0 auto 14pt;">
+  Rival semi-aquatic mammals — <strong>beavers, river otters, muskrats, and minks</strong> —
+  bid workers on materials drifting downriver and spend them to build structures along the
+  bank. Every action costs <span class="fish">fish🐟</span> — workers eat them to swim
+  against the current — paid out on a shared track. The player furthest <em>back</em> on
+  the track always acts next.
+</p>
+
+<h2>Components</h2>
+<div class="col2">
+  <ul>
+    <li><strong>1 game board</strong> showing the Headwaters, river, shoreline, and a 60-space fish track</li>
+    <li><strong>24 material cards</strong> — 6 materials × 4 icon-count variants (4, 5, 7, 8)</li>
+    <li><strong>32 structure cards</strong></li>
+    <li><strong>32 worker discs</strong> (8 per species) in four colors:
+      <span class="worker beaver"></span> brown beaver,
+      <span class="worker otter"></span> red river otter,
+      <span class="worker muskrat"></span> green muskrat,
+      <span class="worker mink"></span> purple mink</li>
+    <li><strong>4 fish-track pawns</strong> — one disc per species, color-matched</li>
+    <li><strong>28 blank chits</strong> — shared pool, drop onto vacated icons</li>
+    <li><strong>1 rulebook</strong> (this booklet)</li>
+  </ul>
+  <div class="card-row" style="flex-direction: column; gap: 4pt;">
+    <img class="card" src="../graphics/material-deck/out/web/Logjam.png" style="width: 1.7in;" alt="Material card example">
+    <div style="font-size: 8pt; color: var(--ink-soft); font-style: italic;">A material card — 7 log icons, ready for workers.</div>
+  </div>
+</div>
+
+<h2>Goal</h2>
+<p>
+  Score the most <span class="vp">victory points★</span> from structures you build along the bank.
+  Tiebreaker: fewer spaces advanced on the fish track.
+</p>
+
+<!-- ============================================================ -->
+<!-- SETUP                                                        -->
+<!-- ============================================================ -->
+<h2>Setup</h2>
+<ol>
+  <li>Each player picks a species and takes its workers (<strong>8</strong> in 2–3 player games; <strong>7</strong> at 4 players — the eighth goes back in the box) and a fish-track pawn. Place all pawns on space <strong>0</strong>, stacked in player order with the first player on top.</li>
+  <li>Shuffle the structure deck. Deal each player <strong>3 cards face-down</strong> as a private hand.</li>
+  <li>Shuffle the material deck. Reveal <strong>3 cards into the Headwaters</strong> (one per slot). The river starts <strong>empty</strong> — it fills as players pull cards from the Headwaters. Place the rest of the material deck face-down beside the Headwaters.</li>
+  <li>The player on top of the stack at space 0 takes the first turn.</li>
+</ol>
+
+<div class="callout note">
+  <div class="label">Deck size by player count</div>
+  Material deck: <strong>12 cards (2P)</strong> · <strong>18 cards (3P)</strong> · <strong>24 cards (4P)</strong>.
+  5- and 7-icon cards are always included; 4-icon cards are added at 3+ players; 8-icon cards are added at 4 players.
+</div>
+
+<h3>The boards</h3>
+<div class="boards-pair">
+  <figure class="river-figure">
+    <img class="board-art" src="river-board-landscape.png" alt="River board">
+    <figcaption>River board — Headwaters slots feed the four river spaces, which graduate to the shoreline.</figcaption>
+  </figure>
+  <figure class="fish-figure">
+    <img class="board-art" src="../graphics/fish-board/fish-board.png" alt="Fish track board">
+    <figcaption>Fish-track board — 0–59 loop around the structure deck and Invent action panel.</figcaption>
+  </figure>
+</div>
+
+<!-- ============================================================ -->
+<!-- GAME ELEMENTS                                                -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Game elements</h2>
+
+<h3>Material cards</h3>
+<p>
+  Each card shows one material (Logs, Stones, Reeds, Mud, Vines, Clay) and a row of item icons.
+  Cards <strong>do not carry a printed cost</strong> — every cost is determined by where the card sits.
+  Items are not separate tokens; players claim them by placing workers directly on the icons.
+</p>
+<p>
+  <strong>Eight of the 24 cards carry printed effects</strong> (wildcards, fish-track bonuses,
+  position-gated yield). See the reference at the back of this rulebook. Effects are gated by tier so
+  2P games only see those that work without a crowded board.
+</p>
+
+<h3>Blank chits</h3>
+<p>
+  Round chits from a shared pool. A blank is dropped onto any icon a worker leaves behind, marking it
+  as already-sold and removing it from future auctions.
+</p>
+
+<h3>Headwaters</h3>
+<p>
+  Three numbered slots above the river: <strong>Headwaters 1, 2, 3</strong>, counting away from the
+  river. Headwaters 1 is closest to the river; Headwaters 3 is farthest upstream. Each slot has a
+  fixed <em>move cost</em> — pay it to pull whichever card is in that slot down into the river.
+</p>
+<ul>
+  <li><strong>Headwaters 1</strong> — pay <span class="fish">2🐟</span> to pull</li>
+  <li><strong>Headwaters 2</strong> — pay <span class="fish">3🐟</span> to pull</li>
+  <li><strong>Headwaters 3</strong> — pay <span class="fish">4🐟</span> to pull</li>
+</ul>
+<p>
+  Headwaters auctions resolve at a flat <strong>Headwaters rate of 1🐟/item</strong> — slightly
+  cheaper than River 1.
+</p>
+
+<h3>River track</h3>
+<p>
+  Four spaces, each with a fixed <em>per-item cost</em>: <strong>River 1 = 2🐟/item</strong>,
+  <strong>River 2 = 3🐟/item</strong>, <strong>River 3 = 4🐟/item</strong>,
+  <strong>River 4 = 5🐟/item</strong>. That's how many fish each worker you win on a card costs you —
+  cards drifting farther downriver demand longer swims and bigger meals.
+</p>
+<p>
+  Cards enter the river at space 1 (after a Headwaters move). <strong>Multiple cards can occupy the
+  same space</strong> — they pile up there. A card only moves when <em>it itself</em> is auctioned
+  and still has uncovered icons afterward: it slides one space downriver, where the per-item cost is
+  one higher. New cards arriving from the Headwaters don't push the cards already in the river.
+  Past the fourth (last) space is the <strong>shoreline</strong>.
+</p>
+
+<h3>Shoreline</h3>
+<p>
+  A column past the river where graduated cards collect. Shoreline cards can't be auctioned and their
+  icon counts no longer matter. Workers still on them can be spent on builds. A shoreline card with
+  no workers left is discarded.
+</p>
+
+<h3>Structure deck</h3>
+<p>
+  Each card shows a structure, the materials required to build it, the fish cost to build it, and a
+  victory-point value. Discarded structure cards form a face-up pile next to the deck; whenever the
+  deck runs out, shuffle the discard pile to form a new deck.
+</p>
+
+<div class="card-row">
+  <img class="card" src="../graphics/structure-deck/out/web/BeaverDam.png" alt="">
+  <img class="card" src="../graphics/structure-deck/out/web/OtterDen.png" alt="">
+  <img class="card" src="../graphics/structure-deck/out/web/CattailMarsh.png" alt="">
+  <img class="card" src="../graphics/structure-deck/out/web/MillWheel.png" alt="">
+</div>
+<div style="font-size: 8.5pt; color: var(--ink-soft); font-style: italic; text-align: center; margin-top: -2pt;">
+  Structure cards — material cost top, fish cost bottom, victory points on the corner.
+</div>
+
+<h3>Worker tokens</h3>
+<p>
+  Each player gets 8 disc workers of their species color, sized to fully cover one icon on a
+  material card. At 4 players, each player returns one worker to the box (starting with 7).
+</p>
+
+<h3>Fish track</h3>
+<p>
+  A 60-space loop with one pawn per player. Pawns advance forward, wrapping back to <strong>0</strong>
+  after space 59. If a pawn is <em>lapped</em> (caught up to from behind by another pawn), it gets
+  flipped over and <strong>exhausted</strong> — it sits out, can't take turns, and can't bid in
+  auctions, until the lapper passes it again (a second time around). The next "pass" wakes it back up.
+</p>
+
+<!-- ============================================================ -->
+<!-- TURN ORDER & YOUR TURN                                       -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Turn order</h2>
+<p>
+  There are no rounds. The next player to act is whoever's <em>non-exhausted</em> pawn is on the
+  <strong>lowest space</strong> of the fish track; if pawns share that space, the one
+  <strong>on top of the stack</strong> acts first. A pawn moving onto a space stacks on top.
+  Exhausted pawns are skipped until they're revived by the next lap pass.
+</p>
+
+<h2>Your turn</h2>
+<p class="lead">
+  Take exactly <strong>one</strong> action. Every action advances your pawn forward on the fish
+  track by its fish cost. Any action that triggers an auction (<strong>Pull</strong>,
+  <strong>Auction</strong>, or <strong>Flush</strong>) requires at least one worker available — in
+  your supply or placed on a card you could recall (see <em>Pre-auction recall</em>, next page).
+</p>
+
+<div class="action">
+  <div class="tag"><span class="name">Pull</span><span class="cost">2 – 4🐟</span></div>
+  <div class="body">
+    <h4>Auction a Headwaters card</h4>
+    <p>
+      Choose a card in the Headwaters and pay the move cost on its slot (<span class="fish">2🐟</span> for
+      Headwaters 1, <span class="fish">3🐟</span> for Headwaters 2, <span class="fish">4🐟</span> for
+      Headwaters 3). An auction immediately runs on the card <em>in place</em>, at the
+      <strong>Headwaters rate of 1🐟/item</strong>. The initiating player must bid at least one worker;
+      other players may bid 0. After the auction settles, the card moves to <strong>River 1</strong>
+      if any icons remain uncovered, or straight to the <strong>shoreline</strong> if every icon was
+      claimed (see the universal card-movement rule below).
+    </p>
+  </div>
+</div>
+
+<div class="action">
+  <div class="tag"><span class="name">Auction</span><span class="cost">1🐟 flat</span></div>
+  <div class="body">
+    <h4>Auction an existing river card</h4>
+    <p>
+      Choose any river card that still has uncovered icons. The initiating player must bid at least
+      one worker; other players may bid 0. The flat fish is paid immediately; <em>per-item</em> fish
+      still applies on whatever you win, set by the card's current river space (2/3/4/5🐟).
+    </p>
+  </div>
+</div>
+
+<div class="action">
+  <div class="tag"><span class="name">Flush</span><span class="cost">5🐟</span></div>
+  <div class="body">
+    <h4>Flush the Headwaters</h4>
+    <p>
+      Set aside all cards currently in the Headwaters. Refill from the top of the deck
+      (revealing 3 fresh cards). Then <strong>shuffle the set-aside cards back into the material
+      deck</strong>. Pick one of the newly-revealed cards and run an auction on it at the Headwaters
+      rate (1🐟/item); triggering this auction is free — the 5🐟 already paid covers it — but you
+      still pay for your own bid normally. The initiating player must bid at least one worker;
+      other players may bid 0. The other two newly-revealed Headwaters cards stay in their slots.
+    </p>
+    <p>
+      If the deck has fewer than 3 cards left when you flush, the Headwaters refills with whatever's
+      available before the set-aside cards are shuffled in. <strong>You can't flush once the material
+      deck is empty</strong> — without fresh cards to draw, the action is illegal.
+    </p>
+  </div>
+</div>
+
+<div class="action">
+  <div class="tag"><span class="name">Invent</span><span class="cost">1 – 5🐟</span></div>
+  <div class="body">
+    <h4>Invent structures (you choose N from 1–5)</h4>
+    <p>
+      Draw N structure cards from the deck, then discard N cards from your hand (any mix of new
+      draws and old). Discards go face-up onto the structure discard pile. If the deck runs out
+      mid-draw, shuffle the discard pile to refill it.
+    </p>
+  </div>
+</div>
+
+<div class="action">
+  <div class="tag"><span class="name">Build</span><span class="cost">printed</span></div>
+  <div class="body">
+    <h4>Build a structure (fish cost printed on the card)</h4>
+    <p>
+      For each material listed, pick up that many of <em>your</em> workers from cards of the matching
+      type and return them to your supply. Drop a blank on each uncovered river-card icon. (Shoreline
+      cards don't need blanks.) Place the structure face-up in front of you for scoring, then draw a
+      replacement structure card so your hand returns to 3.
+    </p>
+  </div>
+</div>
+
+<p>
+  After your action resolves (and any auction settles), check the fish track again. If you're still
+  on top of the lowest occupied space, take another turn.
+</p>
+
+<!-- ============================================================ -->
+<!-- AUCTIONS                                                     -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Auctions</h2>
+<p>
+  Triggered by <strong>Pull</strong>, <strong>Auction</strong>, or <strong>Flush</strong>. The
+  action's flat fish cost is paid immediately (2/3/4🐟 to pull a Headwaters card, 1🐟 for an
+  existing river card, 5🐟 to flush the Headwaters); auction results may cost additional fish.
+</p>
+
+<h3>Pre-auction recall</h3>
+<p>
+  Immediately before any auction (yours or another player's), each player may recall any number of
+  their own workers from river cards back to their supply. Drop a blank onto each river-card icon
+  you uncover. Workers recalled from shoreline cards don't need blanks. Recall is <em>free</em> — no
+  fish cost — and the recalled workers are immediately available to bid.
+</p>
+<p>
+  Recalls are public and resolve before bidding begins. They're not an action; they don't move any card.
+</p>
+
+<h3>Bidding</h3>
+<p>
+  Everyone — including the active player — secretly chooses how many workers from their supply to
+  bid. The triggering player must bid at least one; other players may bid zero. A bid is capped at
+  the number of <strong>uncovered icons on the card</strong> — you can't bid for items that aren't
+  there.
+</p>
+<p>
+  When everyone's ready, all bids are revealed at the same time.
+</p>
+
+<h3>Resolving the auction</h3>
+<ol>
+  <li>
+    <strong>Pay fish first.</strong> Every bidder slides their pawn forward on the fish track by
+    <em>their bid × the card's per-item cost</em> (1🐟 in the Headwaters; 2/3/4/5🐟 for
+    River 1/2/3/4). <strong>You pay for every worker you bid, win or lose</strong> — the fish are
+    spent on the swim, not on the prize.
+  </li>
+  <li>
+    <strong>Then place workers.</strong> Add up all the bids.
+    <ul>
+      <li>
+        <strong>If the total fits on the card</strong> (bids ≤ icons), everyone gets exactly what
+        they bid — place all bid workers on the card.
+      </li>
+      <li>
+        <strong>If the total goes over</strong> (bids &gt; icons), the river jams. Count how many
+        extra workers were bid beyond the card's capacity — that's the <strong>overbid</strong>.
+        Each player takes their own bid minus the overbid. Anyone whose bid is smaller than the
+        overbid takes nothing. Unplaced workers return to their owners' supplies (the fish they ate
+        are already spent).
+      </li>
+    </ul>
+  </li>
+</ol>
+<p>
+  Paying fish first — before resolving who got what — keeps high bids honest: a jam costs every
+  bidder for their full bid, win or lose.
+</p>
+
+<div class="callout example">
+  <div class="label">Example — jam</div>
+  A card on <strong>River 2</strong> has 5 uncovered <strong>log</strong> icons.
+  <span class="worker beaver"></span> You bid 4 workers; <span class="worker otter"></span> your opponent bids 4. Total: 8 — three over the card's 5.
+  <strong>Pay first:</strong> both of you advance <strong>4 × 3🐟 = 12🐟</strong> (River 2's per-item cost × your full bid, regardless of how many clinch).
+  <strong>Then place:</strong> the overbid is 3. Each of you takes 4 − 3 = 1 log; you each place 1 worker on an icon and the other 3 workers go back to your supplies. The 3 uncovered icons stay where they are, and the card slides to River 3.
+</div>
+
+<div class="callout example">
+  <div class="label">Example — outbid</div>
+  A card on <strong>River 1</strong> has 5 uncovered log icons.
+  <span class="worker beaver"></span> You bid 1; <span class="worker otter"></span> opponent bids 5 (the cap). Total: 6 — one over the card's 5.
+  <strong>Pay first:</strong> you pay <strong>1 × 2🐟 = 2🐟</strong>; the opponent pays <strong>5 × 2🐟 = 10🐟</strong>.
+  <strong>Then place:</strong> the overbid is 1. Your bid of 1 − 1 = 0 — you take nothing and your worker returns to your supply. The opponent takes 5 − 1 = 4 logs. 1 icon stays uncovered; the card slides to River 2.
+</div>
+
+<p>
+  Workers that didn't clinch an icon return to your supply (the fish you fed them is the only cost).
+  Workers placed on icons stay there until you spend them on a structure or call them home.
+</p>
+
+<!-- ============================================================ -->
+<!-- CARD MOVEMENT                                                -->
+<!-- ============================================================ -->
+<h2>Card movement</h2>
+<p>
+  Only the card being auctioned can move. Other cards in the river — even ones at the same space —
+  stay put. The river isn't a queue; it's a set of four spaces that can each hold any number of cards.
+</p>
+<p>After <strong>any</strong> auction (plenty or jam) on a card:</p>
+<ul>
+  <li><strong>If any icons are still uncovered</strong>, the card slides one space downstream —
+    Headwaters → River 1, River 1 → River 2, and so on. From River 4 it graduates to the
+    <strong>shoreline</strong> (the card leaves the river entirely, with its workers). When the card
+    lands on a deeper river space, its per-item cost matches the new space (one higher than before).</li>
+  <li><strong>If every icon was claimed</strong>, the card has nothing left to auction and goes
+    straight to the <strong>shoreline</strong>.</li>
+</ul>
+<p>
+  After a Headwaters card vacates its slot, any Headwaters cards in higher-numbered slots (farther
+  from the river) advance one slot toward the river to fill the gap. Then a new card from the top of
+  the material deck enters the now-empty Headwaters 3 (farthest upstream). Cards that did <em>not</em>
+  lose a slot in front of them stay where they are.
+</p>
+<p>
+  When a card reaches the shoreline, return any blanks on it to the pool. Workers stay on it until
+  spent on a build. Once the last worker leaves a shoreline card, the card is discarded.
+</p>
+<p>
+  Spending or recalling a worker from a river card does <em>not</em> move the card — it just leaves
+  a blank on the icon. The card keeps drifting normally. New material cards only enter the river by
+  being pulled out of the Headwaters.
+</p>
+
+<!-- ============================================================ -->
+<!-- LAPPING                                                      -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Lapping (and getting winded)</h2>
+<p>
+  The fish track wraps around every 60 spaces. When your pawn passes another player's pawn by going
+  all the way around the loop — i.e., your pawn catches up to their space N from behind, having gone
+  the long way around — <strong>you</strong> (the lapper) get <strong>exhausted</strong>. Flip your
+  pawn upside-down and sit out:
+</p>
+<ul>
+  <li>Your pawn doesn't take turns. The next non-exhausted pawn at the lowest space acts.</li>
+  <li>You can't bid on auctions while exhausted; you implicitly bid 0.</li>
+</ul>
+<p>
+  You stay exhausted until each player you lapped <strong>catches up to your spot on the track</strong>.
+  Each such catch-up wakes you with respect to that one player; you remain exhausted until <em>all</em>
+  the players you lapped have caught back up. Once they all have, flip your pawn back upright; you can
+  act and bid as normal.
+</p>
+<p>
+  Lapping the same player again later (after they've caught up and you've woken) exhausts you again.
+</p>
+
+<!-- ============================================================ -->
+<!-- ENDGAME                                                      -->
+<!-- ============================================================ -->
+<h2>Endgame &amp; game end</h2>
+<p>The moment the <strong>material deck runs out</strong>, the endgame begins:</p>
+<ol>
+  <li>Move all pawns to spaces <strong>1, 2, 3, …</strong> on the fish track, preserving their
+    relative order (the player with the lowest pre-endgame fish total sits at 1, next at 2, and so
+    on). Lap-shadow / exhaustion is cleared.</li>
+  <li>Play continues with the same turn order (lowest non-retired pawn acts next; ties → top of
+    stack). Legal actions: auctioning river cards, pulling from the Headwaters, inventing, and
+    building. <strong>Flushing is illegal during endgame</strong> — the material deck is empty by
+    definition.</li>
+  <li>A player <strong>retires</strong> (and their pawn is removed) when:
+    <ul>
+      <li>their action advances them to space <strong>59 or beyond</strong>, <em>or</em></li>
+      <li>they pass — they have no productive action (typically signals they've used up their hand
+        and material supply).</li>
+    </ul>
+  </li>
+  <li>Retired players don't take turns and don't bid in auctions; their built structures stay on the
+    table for scoring.</li>
+</ol>
+<p>
+  The game ends as soon as <strong>every player has retired</strong>. Total the victory points on
+  each player's built structures, <strong>plus 1<span class="vp">★</span> per pair of same-type
+  leftover workers</strong> on the board (river + shoreline). For each material, count your workers
+  across all your cards of that material and score floor(workers / 2). Singletons score nothing.
+</p>
+<p>
+  Wildcard cards (Driftwood Tangle, Mud Slick) let each of their workers count toward either of
+  their two materials — assign each worker individually to maximize your pair count.
+</p>
+
+<h3>Leftover worker examples</h3>
+<table>
+  <thead>
+    <tr><th>Leftover workers</th><th>Pairs</th><th>Score</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>4 logs, 4 mud</td><td>2 + 2</td><td><strong>4★</strong></td></tr>
+    <tr><td>3 logs, 3 reeds</td><td>1 + 1 (singleton in each pile)</td><td><strong>2★</strong></td></tr>
+    <tr><td>2 logs, 1 reed, 1 mud, 1 vines, 1 clay</td><td>only logs pair up</td><td><strong>1★</strong></td></tr>
+    <tr><td>8 logs (extreme specialist)</td><td>4 pairs</td><td><strong>4★</strong></td></tr>
+    <tr><td>1 worker on each of 6 materials</td><td>all singletons</td><td><strong>0★</strong></td></tr>
+  </tbody>
+</table>
+
+<p>
+  Highest total wins; ties broken by fewer spaces the retired pawn ended on (i.e., whoever retired
+  earliest).
+</p>
+
+<!-- ============================================================ -->
+<!-- MATERIAL EFFECT REFERENCE                                    -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Material card effects reference</h2>
+<p>
+  Eight of the 24 material cards carry printed effects. Effects are gated by tier so 2P games only
+  see those that work without a crowded board. The remaining 16 cards are vanilla — they yield one
+  material per claimed icon, no extras.
+</p>
+
+<h3>Always tier (in deck at 2P+)</h3>
+<div class="effect-cards">
+  <div class="effect-card">
+    <img class="card" src="../graphics/material-deck/out/web/DriftwoodTangle.png" alt="">
+    <div>
+      <div class="tier-label">Wild Logs / Reeds · 5 icons</div>
+      <h4>Driftwood Tangle</h4>
+      <p>Each claimed icon yields Logs <em>or</em> Reeds (chosen at retrieve).</p>
+    </div>
+  </div>
+  <div class="effect-card">
+    <img class="card" src="../graphics/material-deck/out/web/MudSlick.png" alt="">
+    <div>
+      <div class="tier-label">Wild Mud / Clay · 7 icons</div>
+      <h4>Mud Slick</h4>
+      <p>Each claimed icon yields Mud <em>or</em> Clay (chosen at retrieve).</p>
+    </div>
+  </div>
+</div>
+
+<h3>3+ tier (added at 3P and 4P)</h3>
+<div class="effect-cards">
+  <div class="effect-card">
+    <img class="card" src="../graphics/material-deck/out/web/HiddenInlet.png" alt="">
+    <div>
+      <div class="tier-label">Reeds · 4 icons</div>
+      <h4>Hidden Inlet</h4>
+      <p>At retrieve, if you are the <em>only</em> player with workers on this card, move 1 space backward on the fish track per worker you retrieve.</p>
+    </div>
+  </div>
+  <div class="effect-card">
+    <img class="card" src="../graphics/material-deck/out/web/VineCurtain.png" alt="">
+    <div>
+      <div class="tier-label">Vines · 4 icons</div>
+      <h4>Vine Curtain</h4>
+      <p>When you retrieve from here, peek at the top 2 material cards and rearrange them.</p>
+    </div>
+  </div>
+  <div class="effect-card">
+    <img class="card" src="../graphics/material-deck/out/web/MudWallow.png" alt="">
+    <div>
+      <div class="tier-label">Mud · 4 icons</div>
+      <h4>Mud Wallow</h4>
+      <p>At retrieve, the player with the most workers on this card moves 2 spaces backward on the fish track. (Ties: nobody.)</p>
+    </div>
+  </div>
+</div>
+
+<h3>4+ tier (added at 4P only)</h3>
+<div class="effect-cards">
+  <div class="effect-card">
+    <img class="card" src="../graphics/material-deck/out/web/CattailCluster.png" alt="">
+    <div>
+      <div class="tier-label">Reeds · 8 icons</div>
+      <h4>Cattail Cluster</h4>
+      <p>Vanilla yield (1 Reed per claimed icon). At retrieve, the player with the most workers on this card moves 3 spaces backward. (Ties: nobody.)</p>
+    </div>
+  </div>
+  <div class="effect-card">
+    <img class="card" src="../graphics/material-deck/out/web/SlippingSandbar.png" alt="">
+    <div>
+      <div class="tier-label">Clay · 8 icons</div>
+      <h4>Slipping Sandbar</h4>
+      <p>Enters the river at <strong>River 4</strong> instead of River 1. After any auction in which workers were placed, slide it one slot upstream. If at River 1 with uncovered icons remaining, the card moves to shoreline.</p>
+    </div>
+  </div>
+  <div class="effect-card">
+    <img class="card" src="../graphics/material-deck/out/web/OldGrowth.png" alt="">
+    <div>
+      <div class="tier-label">Logs · 8 icons</div>
+      <h4>Old Growth</h4>
+      <p>If this card is at River 3 or 4, each worker you retrieve yields <strong>2 Logs</strong> instead of 1.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- QUICK REFERENCE                                              -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Quick reference</h2>
+
+<div class="col2">
+  <div class="keep">
+    <h3>Actions (one per turn)</h3>
+    <table>
+      <thead><tr><th>Name</th><th>What it does</th><th>Fish</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Pull</strong></td><td>Auction a Headwaters card</td><td>2 / 3 / 4🐟</td></tr>
+        <tr><td><strong>Auction</strong></td><td>Auction a river card</td><td>1🐟 flat</td></tr>
+        <tr><td><strong>Flush</strong></td><td>Reset the Headwaters</td><td>5🐟</td></tr>
+        <tr><td><strong>Invent</strong></td><td>Draw N, discard N (1 ≤ N ≤ 5)</td><td>N🐟</td></tr>
+        <tr><td><strong>Build</strong></td><td>Build a structure</td><td>printed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="keep">
+    <h3>Per-item fish rates</h3>
+    <table>
+      <thead><tr><th>Position</th><th>🐟 / item</th></tr></thead>
+      <tbody>
+        <tr><td>Headwaters auction</td><td>1🐟</td></tr>
+        <tr><td>River 1</td><td>2🐟</td></tr>
+        <tr><td>River 2</td><td>3🐟</td></tr>
+        <tr><td>River 3</td><td>4🐟</td></tr>
+        <tr><td>River 4</td><td>5🐟</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="keep">
+    <h3>Auction resolution</h3>
+    <p style="font-size: 9.5pt;">
+      Bids are capped at the card's uncovered icons.<br>
+      <strong>1. Pay first</strong> — every bidder advances <em>bid × per-item cost</em>, win or lose.<br>
+      <strong>2. Then place</strong> —<br>
+      &nbsp;&nbsp;<em>Bids fit</em> (total ≤ icons): everyone places their full bid.<br>
+      &nbsp;&nbsp;<em>Bids spill</em> (total &gt; icons): subtract the <em>overbid</em> (excess) from each bid — that's what they place. Smaller bids may take nothing.
+    </p>
+  </div>
+
+  <div class="keep">
+    <h3>Card movement</h3>
+    <ul style="font-size: 9.5pt;">
+      <li>Only the auctioned card moves.</li>
+      <li>Icons still uncovered → slide one space downstream.</li>
+      <li>All icons claimed → straight to shoreline.</li>
+      <li>From River 4 → shoreline.</li>
+    </ul>
+  </div>
+
+  <div class="keep">
+    <h3>Turn order</h3>
+    <p style="font-size: 9.5pt;">
+      Lowest non-exhausted pawn acts next. Ties → top of stack. New arrivals on a space stack on top.
+    </p>
+  </div>
+
+  <div class="keep">
+    <h3>Lapping</h3>
+    <p style="font-size: 9.5pt;">
+      Pass a pawn the long way around → <strong>you</strong> are exhausted. Stay flipped until every player you lapped catches up to your spot.
+    </p>
+  </div>
+
+  <div class="keep">
+    <h3>Endgame trigger</h3>
+    <p style="font-size: 9.5pt;">
+      Material deck empties → compress pawns to 1, 2, 3, …; play continues. Retire at space 59+ or when you pass. Game ends when all retired.
+    </p>
+  </div>
+
+  <div class="keep">
+    <h3>Final scoring</h3>
+    <p style="font-size: 9.5pt;">
+      Sum VP on built structures. <strong>+1★ per pair</strong> of same-type leftover workers (singletons score nothing). Wildcards assign per worker.
+    </p>
+  </div>
+</div>
+
+<div class="footer">
+  River Bankers — draft rulebook · v0.1 · designed by Don Schwarz · published by Left Field Games
+</div>
+
+</body>
+</html>
