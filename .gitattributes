@@ -4,3 +4,5 @@ graphics/*.svg filter=lfs diff=lfs merge=lfs -text
 graphics/river-board/*.png filter=lfs diff=lfs merge=lfs -text
 graphics/fish-board/*.svg filter=lfs diff=lfs merge=lfs -text
 graphics/fish-board/*.png filter=lfs diff=lfs merge=lfs -text
+graphics/box/*.png filter=lfs diff=lfs merge=lfs -text
+graphics/box/*.svg filter=lfs diff=lfs merge=lfs -text
