@@ -132,6 +132,33 @@
     color: var(--forest);
     font-weight: 700;
   }
+  .cover .play-qr {
+    margin-top: 0.35in;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4pt;
+  }
+  .cover .play-qr img {
+    width: 1.2in;
+    height: 1.2in;
+    border: 4pt solid #ffffff;
+    background: #ffffff;
+    border-radius: 3pt;
+    box-shadow: 0 1pt 4pt rgba(0,0,0,0.18);
+  }
+  .cover .play-qr .qr-label {
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 1.4pt;
+    color: var(--water-deep);
+    font-weight: 700;
+  }
+  .cover .play-qr .qr-url {
+    font-size: 8.5pt;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    color: var(--ink-soft);
+  }
 
   /* ============ LAYOUT ============ */
   .col2 { column-count: 2; column-gap: 0.3in; }
@@ -460,6 +487,11 @@
   <div class="credits">
     <div class="designer">Designed by <strong>Don Schwarz</strong></div>
     <div class="publisher">Left Field Games</div>
+  </div>
+  <div class="play-qr">
+    <div class="qr-label">Play in your browser</div>
+    <img src="../graphics/qr/play-qr.png" alt="QR code to leftfield.games/games/river-bankers">
+    <div class="qr-url">leftfield.games/games/river-bankers</div>
   </div>
 </section>
 
