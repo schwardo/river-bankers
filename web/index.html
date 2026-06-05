@@ -469,8 +469,11 @@
      species color (set inline as background-color). Applied only to
      workers sitting ON MATERIAL CARDS, matching the printed chit. Fish-
      track pawns, supply meeples, player-pawn-minis and the setup picker
-     stay as plain colored discs. */
-  .icon-slot.icon-worker {
+     stay as plain colored discs.
+     Selector matches the existing `.mat-card.has-art .icon-slot.icon-worker`
+     specificity so it overrides the `background: transparent` set on
+     `.mat-card.has-art .icon-slot` further down. */
+  .mat-card.has-art .icon-slot.icon-worker {
     background-image: radial-gradient(circle,
                         rgba(255,255,255,0.40) 0%,
                         rgba(255,255,255,0) 100%);
