@@ -465,6 +465,19 @@
   .player-pawn-mini .sp-icon,
   .icon-slot.icon-worker .sp-icon,
   .species-emoji .sp-icon { width: 84%; height: 84%; }
+  /* Worker-chit background: soft white-wash radial gradient laid over the
+     species color (set inline as background-color). Matches the printed
+     chit's radial gradient (white 40% at center → transparent at edge,
+     see graphics/worker-chits/*.svg). */
+  .pawn,
+  .worker-meeple,
+  .player-pawn-mini,
+  .icon-slot.icon-worker,
+  .species-picker .species-emoji {
+    background-image: radial-gradient(circle,
+                        rgba(255,255,255,0.40) 0%,
+                        rgba(255,255,255,0) 100%);
+  }
   .mat-card.has-art .icon-slot.icon-blank {
     background: url('../graphics/blank-chit/blank-chit.svg') center center / 100% 100% no-repeat;
     border: none;
@@ -2859,7 +2872,7 @@ function renderTimeTrack() {
       const p = state.players[idx];
       const isNext = idx === state.currentPlayer && !state.gameOver && !p.exhausted;
       const exh = p.exhausted ? ' exhausted' : '';
-      pawns += `<div class="pawn${isNext ? ' next-up' : ''}${exh}" data-pawn="${idx}" style="background:${p.species.color}" title="${p.species.name}${p.exhausted ? ' (exhausted)' : ''}">${speciesIcon(p.species)}</div>`;
+      pawns += `<div class="pawn${isNext ? ' next-up' : ''}${exh}" data-pawn="${idx}" style="background-color:${p.species.color}" title="${p.species.name}${p.exhausted ? ' (exhausted)' : ''}">${speciesIcon(p.species)}</div>`;
     }
     const isLapMark = (i === 0); // visual mark at the lap boundary
     html += `<div class="fish-cell${isLapMark ? ' lap-mark' : ''}"><div class="cell-num">${i}</div><div class="pawn-stack">${pawns}</div></div>`;
@@ -2945,7 +2958,7 @@ function renderMatCard(card, opts = {}) {
     const sp = state.players[pIdx].species;
     totalWorkers += cnt;
     for (let i = 0; i < cnt; i++) {
-      iconSlots.push(`<div class="icon-slot icon-worker" style="background:${sp.color}" title="${sp.name}'s worker">${speciesIcon(sp)}</div>`);
+      iconSlots.push(`<div class="icon-slot icon-worker" style="background-color:${sp.color}" title="${sp.name}'s worker">${speciesIcon(sp)}</div>`);
     }
   }
   // Blanks (river only — shoreline cards never carry blanks)
@@ -3211,7 +3224,7 @@ function renderPlayers() {
     const totalVPVal = totalVP(p, state);
     let supplyIcons = '';
     for (let i = 0; i < p.supply; i++) {
-      supplyIcons += `<span class="worker-meeple" style="background:${p.species.color}" title="worker in supply">${speciesIcon(p.species)}</span>`;
+      supplyIcons += `<span class="worker-meeple" style="background-color:${p.species.color}" title="worker in supply">${speciesIcon(p.species)}</span>`;
     }
     if (p.supply === 0) supplyIcons = `<span class="small-note">all placed</span>`;
     let builtList = '';
@@ -3235,7 +3248,7 @@ function renderPlayers() {
     html += `<div class="${cls.join(' ')}">
       <div class="player-head">
         <div class="player-title">
-          <span class="player-pawn-mini" style="background:${p.species.color}">${speciesIcon(p.species)}</span>
+          <span class="player-pawn-mini" style="background-color:${p.species.color}">${speciesIcon(p.species)}</span>
           ${p.species.name}${p.isHuman ? ' (you)' : ''}
         </div>
         <div class="player-mat-summary">${matSummary}</div>
@@ -3661,7 +3674,7 @@ function renderActionPanel() {
         else outcomeStr = `bid <b>${bid}</b> → won <b>${took}</b> (+${time}🐟)`;
         rows += `<div class="bidder-row"${dim}>
           <span class="bidder-name">
-            <span class="player-pawn-mini" style="background:${p.species.color}">${speciesIcon(p.species)}</span>
+            <span class="player-pawn-mini" style="background-color:${p.species.color}">${speciesIcon(p.species)}</span>
             ${p.species.name}${p.isHuman ? ' (you)' : ''}
           </span>
           <span>${outcomeStr}</span>
@@ -6924,7 +6937,7 @@ function showGameOver() {
              `<label for="${id}">${label}</label>`;
     };
     return `<div class="species-picker" data-species="${sp.id}">
-      <span class="species-emoji" style="background:${sp.color};color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;">${speciesIcon(sp)}</span>
+      <span class="species-emoji" style="background-color:${sp.color};color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;">${speciesIcon(sp)}</span>
       <span class="species-name">${sp.name}</span>
       <span class="role-toggle">
         ${roleInput('off', 'Off')}
