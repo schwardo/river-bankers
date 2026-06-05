@@ -465,15 +465,12 @@
   .player-pawn-mini .sp-icon,
   .icon-slot.icon-worker .sp-icon,
   .species-emoji .sp-icon { width: 84%; height: 84%; }
-  /* Worker-chit background: soft white-wash radial gradient laid over the
-     species color (set inline as background-color). Matches the printed
-     chit's radial gradient (white 40% at center → transparent at edge,
-     see graphics/worker-chits/*.svg). */
-  .pawn,
-  .worker-meeple,
-  .player-pawn-mini,
-  .icon-slot.icon-worker,
-  .species-picker .species-emoji {
+  /* Worker chit background: soft white-wash radial gradient laid over the
+     species color (set inline as background-color). Applied only to
+     workers sitting ON MATERIAL CARDS, matching the printed chit. Fish-
+     track pawns, supply meeples, player-pawn-minis and the setup picker
+     stay as plain colored discs. */
+  .icon-slot.icon-worker {
     background-image: radial-gradient(circle,
                         rgba(255,255,255,0.40) 0%,
                         rgba(255,255,255,0) 100%);
