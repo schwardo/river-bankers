@@ -2853,8 +2853,13 @@ function advancePlayer(playerIdx, byTime) {
 // =============================================================================
 // LOG
 // =============================================================================
+// Log entries store the original HTML in `msg` for renderLog (innerHTML), plus
+// a tag-stripped `text` sibling so external readers (debug dumps, playtest
+// transcripts, AI prompts) don't have to grovel through embedded SVG markup
+// from the material/species icons.
 function log(msg) {
-  state.log.push({ msg, t: Date.now() });
+  const text = String(msg).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  state.log.push({ msg, text, t: Date.now() });
   if (state.log.length > 200) state.log.shift();
   renderLog();
 }
@@ -3837,23 +3842,23 @@ function slidesSandbarUpstream(card) {
 
 function jamCardDownriver(card) {
   if (card.slot === 'pre') {
-    // Upstream card jams: it normally enters River 1 (slot 0). Refill upstream queue.
+    // Upstream card drifts down: it normally enters River 1 (slot 0). Refill upstream queue.
     // Slipping Sandbar enters at River 4 instead (see MATERIALS.md).
     const idx = prerivIndexOf(card);
     card.slot = (card.effect === 'slipping-sandbar') ? 3 : 0;
     state.riverCards.push(card);
     if (idx !== -1) refillPreriv(idx);
-    log(`💨 ${MATERIALS[card.material].icon} ${card.name} jams from the Headwaters into River ${card.slot + 1} (${riverSlotCost(card.slot)}🐟/item).`);
+    log(`💨 ${MATERIALS[card.material].icon} ${card.name} drifts from the Headwaters into River ${card.slot + 1} (${riverSlotCost(card.slot)}🐟/item).`);
     return;
   }
-  // Cost is slot-based: jamming to a higher slot raises the per-item cost automatically.
+  // Cost is slot-based: drifting to a higher slot raises the per-item cost automatically.
   const newSlot = card.slot + 1;
   if (newSlot > 3) {
     moveCardToShoreline(card);
     return;
   }
   card.slot = newSlot;
-  log(`💨 ${MATERIALS[card.material].icon} ${card.name} jams to River ${newSlot + 1} (${riverSlotCost(newSlot)}🐟/item).`);
+  log(`💨 ${MATERIALS[card.material].icon} ${card.name} drifts to River ${newSlot + 1} (${riverSlotCost(newSlot)}🐟/item).`);
 }
 
 // =============================================================================
@@ -3870,7 +3875,7 @@ function refillPreriv(emptiedIdx) {
     const c = state.matDeck.pop();
     c.slot = 'pre';
     state.prerivCards[0] = c;
-    log(`⬇ ${MATERIALS[c.material].icon} new ${MATERIALS[c.material].name} card enters Headwaters 3 (move: ${prerivTriggerCost(0)}🐟).`);
+    log(`⬇ ${MATERIALS[c.material].icon} ${c.name} (${MATERIALS[c.material].name}) refills Headwaters 3.`);
   }
 }
 
@@ -6074,14 +6079,15 @@ async function fireOnBuildEffect(playerIdx, struct) {
     let dropped = 0;
     if (isHuman) {
       for (let drop = 0; drop < 2; drop++) {
-        const cands = [
-          ...state.riverCards.map(c => ({ card: c, where: `River ${c.slot + 1}` })),
-          ...state.prerivCards.map((c, i) => c ? { card: c, where: `Headwaters ${PRERIV_SLOTS - i}` } : null).filter(x => x),
-        ].filter(x => uncoveredIcons(x.card) > 0);
+        // Card text: "drop 2 blanks on uncovered icons in the river" — Headwaters
+        // cards are upstream of the river and are not valid targets.
+        const cands = state.riverCards
+          .map(c => ({ card: c, where: `River ${c.slot + 1}` }))
+          .filter(x => uncoveredIcons(x.card) > 0);
         if (cands.length === 0) break;
         const pick = await pickFromList(
           `${MATERIALS.mud.icon} Mud Levee — drop blank ${drop + 1}/2`,
-          'Pick a card to block one uncovered icon.',
+          'Pick a river card to block one uncovered icon.',
           cands,
           x => `${x.where}: ${MATERIALS[x.card.material].icon} ${x.card.name} · ${uncoveredIcons(x.card)} open`
         );
@@ -6091,7 +6097,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         render();
       }
     } else {
-      const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
+      const cands = state.riverCards
         .filter(c => uncoveredIcons(c) > 0)
         .sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
       for (const c of cands) {
@@ -6795,7 +6801,10 @@ function aiChooseFlushTarget(playerIdx) {
 async function executeAIAction(playerIdx, action) {
   const p = state.players[playerIdx];
   if (action.type === 'pass') {
-    // Pass: advance 1 to break tie. Or call home. We'll just no-op-ish: try a roll out fallback.
+    // In endgame, "pass" is retiring — no fish advancement; the endgame
+    // removal block below sets p.out and logs the retirement.
+    if (state.endgame) return;
+    // Normal play: advance 1 to break the turn-order tie / fall to back of stack.
     log(`💤 ${speciesLabel(p)} can't act — passes (advances 1🐟).`);
     advancePlayer(playerIdx, 1);
     return;
