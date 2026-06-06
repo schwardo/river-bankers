@@ -6083,7 +6083,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
           `${MATERIALS.mud.icon} Mud Levee — drop blank ${drop + 1}/2`,
           'Pick a card to block one uncovered icon.',
           cands,
-          x => `${x.where}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} open`
+          x => `${x.where}: ${MATERIALS[x.card.material].icon} ${x.card.name} · ${uncoveredIcons(x.card)} open`
         );
         if (!pick) break;
         pick.card.blanks++;
