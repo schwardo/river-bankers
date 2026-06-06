@@ -929,6 +929,28 @@
   Wildcard cards (Driftwood Tangle, Mud Slick) let each of their workers count toward either of
   their two materials — assign each worker individually to maximize your pair count.
 </p>
+<h3>Variable-VP (<span class="vp">?</span>-VP) structures</h3>
+<p>
+  Some structures show <span class="vp">?</span> in the VP corner instead of a number. Their final
+  score depends on what's on the table at the end of the game, and the formula is printed on the
+  card itself. Common shapes:
+</p>
+<ul>
+  <li><strong>Shoreline counters</strong> (e.g. <em>Heron Watch</em>, <em>Pier</em>) — score per
+    shoreline card that meets a condition.</li>
+  <li><strong>Material-themed scalers</strong> (e.g. <em>Vine Ladder</em>, <em>Stone Causeway</em>,
+    <em>Reed Walkway</em>, <em>Clay Vault</em>, <em>Burrow Network</em>) — score per built
+    structure of yours that uses a given material, often capped.</li>
+  <li><strong>Diversity bonuses</strong> (<em>Hidden Cache</em>, <em>Cattail Patch</em>) — score
+    based on the number of distinct materials across your built structures.</li>
+  <li><strong>Meta-scorers</strong> (<em>Trophy Lodge</em>) — score per <span class="vp">?</span>-VP
+    structure you control, counting itself.</li>
+</ul>
+<p>
+  Apply each formula independently and add the result to that structure's score. Order doesn't
+  matter — every <span class="vp">?</span>-VP card reads the same end-state, and they don't chain
+  except where one explicitly references the others (Trophy Lodge).
+</p>
 
 <h3>Leftover worker examples</h3>
 <table>
@@ -967,7 +989,7 @@
     <div>
       <div class="tier-label">Wild Logs / Reeds · 5 icons</div>
       <h4>Driftwood Tangle</h4>
-      <p>Each claimed icon yields Logs <em>or</em> Reeds (chosen at retrieve).</p>
+      <p>Each claimed icon yields Logs <em>or</em> Reeds (chosen at build time).</p>
     </div>
   </div>
   <div class="effect-card">
@@ -975,7 +997,7 @@
     <div>
       <div class="tier-label">Wild Mud / Clay · 7 icons</div>
       <h4>Mud Slick</h4>
-      <p>Each claimed icon yields Mud <em>or</em> Clay (chosen at retrieve).</p>
+      <p>Each claimed icon yields Mud <em>or</em> Clay (chosen at build time).</p>
     </div>
   </div>
 </div>
@@ -987,7 +1009,7 @@
     <div>
       <div class="tier-label">Reeds · 4 icons</div>
       <h4>Hidden Inlet</h4>
-      <p>At retrieve, if you are the <em>only</em> player with workers on this card, move 1 space backward on the fish track per worker you retrieve.</p>
+      <p>If exactly one player has workers on this card <strong>when it reaches shoreline</strong>, that player moves back 1 space on the fish track per worker.</p>
     </div>
   </div>
   <div class="effect-card">
@@ -995,7 +1017,7 @@
     <div>
       <div class="tier-label">Vines · 4 icons</div>
       <h4>Vine Curtain</h4>
-      <p>When you retrieve from here, peek at the top 2 material cards and rearrange them.</p>
+      <p>When you build using workers from this card, peek at the top 2 material cards and rearrange them.</p>
     </div>
   </div>
   <div class="effect-card">
@@ -1003,7 +1025,7 @@
     <div>
       <div class="tier-label">Mud · 4 icons</div>
       <h4>Mud Wallow</h4>
-      <p>At retrieve, the player with the most workers on this card moves 2 spaces backward on the fish track. (Ties: nobody.)</p>
+      <p>When this card reaches shoreline, the player with the most workers on it moves back 2 spaces on the fish track. (Ties: nobody.)</p>
     </div>
   </div>
 </div>
@@ -1015,7 +1037,7 @@
     <div>
       <div class="tier-label">Reeds · 8 icons</div>
       <h4>Cattail Cluster</h4>
-      <p>Vanilla yield (1 Reed per claimed icon). At retrieve, the player with the most workers on this card moves 3 spaces backward. (Ties: nobody.)</p>
+      <p>Vanilla yield (1 Reed per claimed icon). When this card reaches shoreline, the player with the most workers on it moves back 3 spaces. (Ties: nobody.)</p>
     </div>
   </div>
   <div class="effect-card">
@@ -1031,7 +1053,7 @@
     <div>
       <div class="tier-label">Logs · 8 icons</div>
       <h4>Old Growth</h4>
-      <p>If this card is at River 3 or 4, each worker you retrieve yields <strong>2 Logs</strong> instead of 1.</p>
+      <p>If this card is at River 3 or 4, each worker you retrieve (pick up while paying a Build cost) yields <strong>2 Logs</strong> instead of 1.</p>
     </div>
   </div>
 </div>
@@ -1122,7 +1144,7 @@
 </div>
 
 <div class="footer">
-  River Bankers — draft rulebook · v0.1 · designed by Don Schwarz · published by Left Field Games
+  River Bankers — draft rulebook · v0.1.2 · designed by Don Schwarz · published by Left Field Games
 </div>
 
 </body>
