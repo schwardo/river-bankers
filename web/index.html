@@ -5379,9 +5379,10 @@ async function humanSalmonRun() {
     nCands.push({ n, cost: salmonRunCumulativeCost(n) });
   }
   if (nCands.length === 0) return;
+  const cumulativeSeries = SALMON_RUN_COSTS.map((_, i) => salmonRunCumulativeCost(i + 1)).join('/');
   const nPick = await pickFromList(
     '🐟 Salmon Run — how many workers?',
-    `Cumulative fish cost grows as 2/5/10/18/31 for 1/2/3/4/5 workers. You have ${human.supply} in supply.`,
+    `Cumulative fish cost grows as ${cumulativeSeries} for 1/2/3/4/5 workers. You have ${human.supply} in supply.`,
     nCands,
     x => `${x.n} worker${x.n === 1 ? '' : 's'} — pay ${x.cost}🐟 total`,
     { cancelable: false }
