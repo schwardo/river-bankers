@@ -325,6 +325,17 @@ function setFlushReturnsToDeck(b) { FLUSH_RETURNS_TO_DECK = b; }
 let FINAL_PAIR_VP = true;
 function setFinalPairVP(b) { FINAL_PAIR_VP = b; }
 
+// Endgame pass-0 ablation toggles (see sweepEndgamePass0). Default = both off,
+// mirroring the live game: no synthetic endgame pass-0 boundary fire. The
+// natural advancePlayer lap-boundary check still fires when a pawn overshoots
+// 60. The 2026-06-06 ablation showed all four combinations are statistically
+// indistinguishable for VP / spread / endgame length, so we keep the simpler
+// rule. Toggles preserved for future re-investigation.
+let PASS0_AT_ENDGAME_START = false;
+let PASS0_AT_ENDGAME_END = false;
+function setPass0AtEndgameStart(b) { PASS0_AT_ENDGAME_START = b; }
+function setPass0AtEndgameEnd(b) { PASS0_AT_ENDGAME_END = b; }
+
 // End-of-game pair-VP for one player. Walks the same data shape as
 // playerWorkersByMaterial: solid material counts in `out[m]` plus a list of
 // wild pools, each with a `count` and a 2-material option list. Returns the
@@ -806,6 +817,9 @@ function triggerEndgame(state) {
   state.shadowedBy = {};
   for (const p of state.players) p.exhausted = false;
   state.stackOrder = ordered.map(o => o.idx);
+  if (PASS0_AT_ENDGAME_START) {
+    for (const o of ordered) firePassZeroEffects(state, o.idx, 1);
+  }
 }
 
 function advancePlayer(state, playerIdx, byTime) {
@@ -2504,7 +2518,10 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
     if (state.endgame && !p.out) {
       const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
       const passed = action.type === 'pass';
-      if (reachedEnd || passed) p.out = true;
+      if (reachedEnd || passed) {
+        if (PASS0_AT_ENDGAME_END) firePassZeroEffects(state, p.idx, 1);
+        p.out = true;
+      }
     }
     maybeFireSlipstream(state, p.idx);
     if (state.endgame && state.players.every(pp => pp.out)) break;
@@ -3736,6 +3753,98 @@ function sweepVineLadder(numGamesArg, numPArg, workersArg) {
   console.log(`\nElapsed: ${((Date.now() - tStart) / 1000).toFixed(1)}s.`);
 }
 
+// =============================================================================
+// ENDGAME PASS-0 ABLATION
+// =============================================================================
+// Compares 4 ways to handle the "At 0 on 🐟 track" effects in endgame:
+//   neither — no synthetic endgame pass-0 trigger. advancePlayer's natural
+//             lap-boundary check still fires if a pawn overshoots 60.
+//   start   — fire pass-0 once for each non-out player when the endgame begins
+//             (deck-empty pawn compression counts as a final pass-0 event).
+//   end     — fire pass-0 once for each player at the moment they retire
+//             from endgame (whether by reaching 59 or by passing).
+//   both    — start + end.
+//
+// Affected cards: Wood Pile (claim 1 Log icon for 1🐟), Hollowed-out Log
+// (recall 1 worker, no blank), Pack Rat Burrow (swap hand↔discard).
+// Pack Rat Burrow's swap is moot at retire (hand cards don't score); Wood
+// Pile is mildly positive (new worker → potential pair-VP); Hollowed-out Log
+// is mildly negative for the retiring player (recalls a worker off the board
+// → loses pair-VP material).
+function sweepEndgamePass0(numGamesArg, numPArg, workersArg) {
+  const numGames = parseInt(numGamesArg) || 1000;
+  const numPArgInt = parseInt(numPArg);
+  const playerCounts = numPArgInt ? [numPArgInt] : [2, 3, 4];
+  const workers = parseInt(workersArg) || 8;
+  const numMats = 6;
+  configureMaterials(numMats);
+
+  console.log(`\nEndgame pass-0 ablation (${numGames} games per config, ${workers} workers)`);
+  console.log(`Cards: Wood Pile, Hollowed-out Log, Pack Rat Burrow.\n`);
+
+  const variants = [
+    { label: 'neither', start: false, end: false },
+    { label: 'start',   start: true,  end: false },
+    { label: 'end',     start: false, end: true  },
+    { label: 'both',    start: true,  end: true  },
+  ];
+
+  for (const numP of playerCounts) {
+    console.log(`=== ${numP}P ===`);
+    console.log(
+      pad('config', 9) +
+      padL('turns', 7) +
+      padL('winVP', 7) + padL('lastVP', 8) + padL('spread', 8) +
+      padL('egTurn', 7) + padL('egBuild', 8) + padL('egInv', 7) + padL('egAuc', 7) +
+      padL('avgPair', 9) + padL('winPair', 9)
+    );
+    console.log('-'.repeat(9 + 7 + 7 + 8 + 8 + 7 + 8 + 7 + 7 + 9 + 9));
+
+    for (const v of variants) {
+      setPass0AtEndgameStart(v.start);
+      setPass0AtEndgameEnd(v.end);
+      const trials = [];
+      for (let t = 0; t < numGames; t++) trials.push(runGame(numP, numMats, workers));
+      const turns = avg(trials.map(m => m.turns));
+      const winVP = avg(trials.map(m => m.winnerVP));
+      const lastVP = avg(trials.map(m => m.loserVP));
+      const spread = avg(trials.map(m => m.vpSpread));
+      const egTurns = avg(trials.map(m => m.endgameTurns));
+      const egBuilds = avg(trials.map(m => m.endgameBuilds));
+      const egBrowses = avg(trials.map(m => m.endgameBrowses));
+      const egAucs = avg(trials.map(m => m.endgameAuctions));
+      const avgPair = avg(trials.map(m => m.avgPairVP || 0));
+      const winPair = avg(trials.map(m => m.winnerPairVP || 0));
+      console.log(
+        pad(v.label, 9) +
+        padL(turns.toFixed(0), 7) +
+        padL(winVP.toFixed(1), 7) +
+        padL(lastVP.toFixed(1), 8) +
+        padL(spread.toFixed(1), 8) +
+        padL(egTurns.toFixed(1), 7) +
+        padL(egBuilds.toFixed(2), 8) +
+        padL(egBrowses.toFixed(2), 7) +
+        padL(egAucs.toFixed(2), 7) +
+        padL(avgPair.toFixed(2), 9) +
+        padL(winPair.toFixed(2), 9)
+      );
+    }
+    console.log();
+  }
+  // Restore live defaults (both off).
+  setPass0AtEndgameStart(false);
+  setPass0AtEndgameEnd(false);
+
+  console.log('\nLegend:');
+  console.log('  spread  = winnerVP − loserVP (mean across games)');
+  console.log('  egTurn  = avg # of player-turns in endgame phase');
+  console.log('  egBuild = avg builds during endgame');
+  console.log('  egInv   = avg Invent (browse) actions during endgame');
+  console.log('  egAuc   = avg auctions (river/preriv/flush) during endgame');
+  console.log('  avgPair = avg pair-VP per player at endgame');
+  console.log('  winPair = avg pair-VP earned by the winner\n');
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
@@ -3751,5 +3860,6 @@ if (require.main === module) {
   else if (mode === 'pair-vp') sweepPairVP(process.argv[3]);
   else if (mode === 'vp-rework') sweepVpRework(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'vine-ladder') sweepVineLadder(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'endgame-pass0') sweepEndgamePass0(process.argv[3], process.argv[4], process.argv[5]);
   else sweep();
 }

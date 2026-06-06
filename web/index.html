@@ -2796,10 +2796,6 @@ function triggerEndgame() {
   for (const p of state.players) p.exhausted = false;
   state.stackOrder = ordered.map(o => o.idx);
   log(`🏁 Material deck is empty — entering endgame. Pawns reset to spaces 1–${ordered.length}; reach space ${ENDGAME_TRACK_END} or pass to retire.`);
-  // The endgame compression counts as a final pass-0 event for everyone still
-  // in the game — fire Wood Pile / Hollowed-out Log / Pack Rat Burrow once per
-  // non-out player so deck-empty doesn't strand their lap-bonus payouts.
-  for (const o of ordered) firePassZeroEffects(o.idx, 1);
 }
 
 // Lapping a player exhausts the LAPPER (the heavy spender), not the lapped.
