@@ -2774,6 +2774,16 @@ function pickNextPlayer() {
 
 const ENDGAME_TRACK_END = 59;
 
+// Gate for actions that cost fish: during the endgame the track has a finish
+// line at ENDGAME_TRACK_END and an action that would push us past it is wasted,
+// so we hide/skip it. During normal play `timePos` is cumulative across laps
+// (no finish line), so the cap should never fire — callers used to compare raw
+// `timePos` against ENDGAME_TRACK_END and lost their action-granting structures
+// (e.g. Salmon Run, Beaver Tow) mid-game once cumulative pos crossed ~57.
+function canAffordTimeCost(p, fishCost) {
+  return !state.endgame || p.timePos + fishCost < ENDGAME_TRACK_END;
+}
+
 function triggerEndgame() {
   if (state.endgame) return;
   state.endgame = true;
@@ -3451,10 +3461,10 @@ function renderActionPanel() {
     const placed = totalPlacedWorkers(state, cur.idx);
     const hasPreriv = state.prerivCards.some(c => c !== null);
     const abilityBtns = [];
-    if (hasEffect(cur, 'Heron Roost') && state.matDeck.length > 0 && cur.timePos < ENDGAME_TRACK_END - 1 && hasPreriv) {
+    if (hasEffect(cur, 'Heron Roost') && state.matDeck.length > 0 && canAffordTimeCost(cur, 1) && hasPreriv) {
       abilityBtns.push(`<button class="ability-btn" onclick="humanUseHeronRoost()">🦩 Heron Roost (1🐟): replace Headwaters card</button>`);
     }
-    if (hasEffect(cur, 'Driftwood Snag') && cur.timePos < ENDGAME_TRACK_END - 1) {
+    if (hasEffect(cur, 'Driftwood Snag') && canAffordTimeCost(cur, 1)) {
       const anyOpen = [...state.riverCards, ...state.prerivCards.filter(c => c)].some(c => uncoveredIcons(c) > 0);
       if (anyOpen) abilityBtns.push(`<button class="ability-btn" onclick="humanUseDriftwoodSnag()">${MATERIALS.logs.icon} Driftwood Snag (1🐟): drop blank</button>`);
     }
@@ -3467,7 +3477,7 @@ function renderActionPanel() {
       const haveMine = state.riverCards.some(c => typeof c.slot === 'number' && workersOnCard(c, cur.idx) > 0);
       const haveOther = state.riverCards.some(c =>
         typeof c.slot === 'number' && Object.keys(c.workers).some(k => c.workers[k] > 0 && (parseInt(k) !== cur.idx || workersOnCard(c, cur.idx) > 1)));
-      if (haveMine && haveOther && cur.timePos < ENDGAME_TRACK_END - 2) {
+      if (haveMine && haveOther && canAffordTimeCost(cur, 2)) {
         abilityBtns.push(`<button class="ability-btn" onclick="humanUseOtterTrail()">🦦 Otter Trail (pay source 🐟): swap a river worker</button>`);
       }
     }
@@ -3476,7 +3486,7 @@ function renderActionPanel() {
     // ≥2 in supply to place. We don't strictly enforce sources != target
     // material here (let the human pick freely) — the handler restricts in
     // the source-pick step.
-    if (hasEffect(cur, 'Trading Post') && cur.timePos < ENDGAME_TRACK_END - 1 && cur.supply >= 2) {
+    if (hasEffect(cur, 'Trading Post') && canAffordTimeCost(cur, 1) && cur.supply >= 2) {
       const myCardMats = new Set();
       for (const c of [...state.shorelineCards, ...state.riverCards]) {
         if (workersOnCard(c, cur.idx) > 0) myCardMats.add(c.material);
@@ -3496,7 +3506,7 @@ function renderActionPanel() {
       if (anyOpponentWorker) abilityBtns.push(`<button class="ability-btn" onclick="humanUseSnareSet()">🪤 Snare Set (once per game): force opponent recall</button>`);
     }
     // Tail Slap (beaver species starter): pay 1🐟 to drop a blank on a R1 card.
-    if (hasEffect(cur, 'Tail Slap') && cur.timePos < ENDGAME_TRACK_END - 1) {
+    if (hasEffect(cur, 'Tail Slap') && canAffordTimeCost(cur, 1)) {
       const anyR1Open = state.riverCards.some(c => c.slot === 0 && uncoveredIcons(c) > 0);
       if (anyR1Open) abilityBtns.push(`<button class="ability-btn" onclick="humanUseTailSlap()">🦫 Tail Slap (1🐟): drop blank on a R1 card</button>`);
     }
@@ -3526,11 +3536,11 @@ function renderActionPanel() {
     // Worker pool that can fund a triggered auction = supply + placed (you can recall before bidding).
     const triggerPool = cur.supply + placed;
     const beaverTowAvail = hasEffect(cur, 'Beaver Tow')
-      && cur.timePos + 2 < ENDGAME_TRACK_END
+      && canAffordTimeCost(cur, 2)
       && state.riverCards.some(c => typeof c.slot === 'number' && c.slot > 0);
     const salmonRunAvail = hasEffect(cur, 'Salmon Run')
       && cur.supply > 0
-      && cur.timePos + 2 < ENDGAME_TRACK_END
+      && canAffordTimeCost(cur, 2)
       && state.riverCards.some(c => typeof c.slot === 'number' && uncoveredIcons(c) > 0);
     html = `<div class="action-panel-title">Your turn — choose an action</div>
       <div class="action-buttons">
@@ -4536,15 +4546,15 @@ function aiChooseAction(playerIdx) {
   // 2.5) Beaver Tow: if no good auction was found, but we have Beaver Tow built
   // and there's a useful river card at slot ≥ 1 with ≥4 uncovered icons, slide it
   // down so a future auction will be cheaper.
-  if (hasEffect(p, 'Beaver Tow') && p.timePos + 2 < ENDGAME_TRACK_END) {
+  if (hasEffect(p, 'Beaver Tow') && canAffordTimeCost(p, 2)) {
     const towTarget = findBeaverTowTarget(playerIdx, needs);
     if (towTarget) return { type: 'beaverTow', cardId: towTarget.id };
   }
   // 2.6) Salmon Run: place workers from supply onto a single river card without an auction,
   // paying the Fibonacci-ish escalating cost. Best used when one card has lots of useful icons.
-  if (hasEffect(p, 'Salmon Run') && p.supply > 0 && p.timePos + 2 < ENDGAME_TRACK_END) {
+  if (hasEffect(p, 'Salmon Run') && p.supply > 0 && canAffordTimeCost(p, 2)) {
     const target = findSalmonRunTarget(playerIdx, needs);
-    if (target && p.timePos + salmonRunCumulativeCost(target.n) < ENDGAME_TRACK_END) {
+    if (target && canAffordTimeCost(p, salmonRunCumulativeCost(target.n))) {
       return { type: 'salmonRun', cardId: target.card.id, workerCount: target.n };
     }
   }
@@ -4846,7 +4856,7 @@ function findTributeStoneTarget(playerIdx) {
 // + whether to fire.
 function aiStartOfTurnAbilities(playerIdx) {
   const p = state.players[playerIdx];
-  if (hasEffect(p, 'Heron Roost') && state.matDeck.length > 0 && p.timePos < ENDGAME_TRACK_END - 1) {
+  if (hasEffect(p, 'Heron Roost') && state.matDeck.length > 0 && canAffordTimeCost(p, 1)) {
     const myMats = new Set();
     for (const s of p.hand) for (const m in s.cost) myMats.add(m);
     const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
@@ -4858,7 +4868,7 @@ function aiStartOfTurnAbilities(playerIdx) {
       log(`🦩 Heron Roost: ${speciesLabel(p)} replaces a Headwaters card (+1🐟).`);
     }
   }
-  if (hasEffect(p, 'Driftwood Snag') && p.timePos < ENDGAME_TRACK_END - 1) {
+  if (hasEffect(p, 'Driftwood Snag') && canAffordTimeCost(p, 1)) {
     const myMats = new Set();
     for (const s of p.hand) for (const m in s.cost) myMats.add(m);
     const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
@@ -4872,21 +4882,21 @@ function aiStartOfTurnAbilities(playerIdx) {
   }
   // Tribute Stone: fire when there's a high-value opponent worker (per-item cost ≥ 3)
   // and we're not too deep into endgame (slide-back is useless if the victim is already past us).
-  if (hasEffect(p, 'Tribute Stone') && !p.tributeStoneUsed && p.timePos < ENDGAME_TRACK_END - 10) {
+  if (hasEffect(p, 'Tribute Stone') && !p.tributeStoneUsed && canAffordTimeCost(p, 10)) {
     const target = findTributeStoneTarget(playerIdx);
     if (target && target.value >= 3) {
       doTributeStone(playerIdx, target.victimIdx, target.card);
     }
   }
   // Otter Trail: swap to pry an opponent off a useful material card.
-  if (hasEffect(p, 'Otter Trail') && p.timePos < ENDGAME_TRACK_END - 5) {
+  if (hasEffect(p, 'Otter Trail') && canAffordTimeCost(p, 5)) {
     const target = findOtterTrailTarget(playerIdx);
-    if (target && p.timePos + cardCost(target.cardA) < ENDGAME_TRACK_END) {
+    if (target && canAffordTimeCost(p, cardCost(target.cardA))) {
       doOtterTrail(playerIdx, target.cardA.id, target.cardB.id, target.otherIdx);
     }
   }
   // Snare Set (mink species starter): Tribute Stone variant w/ its own flag.
-  if (hasEffect(p, 'Snare Set') && !p.snareSetUsed && p.timePos < ENDGAME_TRACK_END - 10) {
+  if (hasEffect(p, 'Snare Set') && !p.snareSetUsed && canAffordTimeCost(p, 10)) {
     const target = findTributeStoneTarget(playerIdx);
     if (target && target.value >= 3) {
       // Mirror Tribute Stone logic but mark the snareSetUsed flag.
@@ -4903,13 +4913,13 @@ function aiStartOfTurnAbilities(playerIdx) {
   // Trading Post: pay 1🐟 to recall 1 worker each from 3 different-material
   // cards (drops 3 blanks) and place 2 free workers on one card. Bot AI
   // only — human players will get a click-based prompt (TODO: hook UI).
-  if (hasEffect(p, 'Trading Post') && !p.isHuman && p.timePos < ENDGAME_TRACK_END - 1 && p.supply >= 2) {
+  if (hasEffect(p, 'Trading Post') && !p.isHuman && canAffordTimeCost(p, 1) && p.supply >= 2) {
     const action = findTradingPostAction(playerIdx);
     if (action) doTradingPost(playerIdx, action);
   }
   // Tail Slap (beaver species starter): pay 1🐟 to drop a blank on a R1 card
   // whose material we don't need (denies opponents).
-  if (hasEffect(p, 'Tail Slap') && p.timePos < ENDGAME_TRACK_END - 1) {
+  if (hasEffect(p, 'Tail Slap') && canAffordTimeCost(p, 1)) {
     const myMats = new Set();
     for (const s of p.hand) for (const m in s.cost) myMats.add(m);
     const cands = state.riverCards
@@ -5063,7 +5073,7 @@ function awaitHuman() {
 async function humanUseHeronRoost() {
   const human = state.players.find(p => p.isHuman);
   if (!human || !hasEffect(human, 'Heron Roost') || state.matDeck.length === 0) return;
-  if (human.timePos >= ENDGAME_TRACK_END - 1) return;
+  if (!canAffordTimeCost(human, 1)) return;
   const cands = state.prerivCards
     .map((c, i) => c ? { card: c, idx: i } : null)
     .filter(x => x);
@@ -5086,7 +5096,7 @@ async function humanUseHeronRoost() {
 async function humanUseDriftwoodSnag() {
   const human = state.players.find(p => p.isHuman);
   if (!human || !hasEffect(human, 'Driftwood Snag')) return;
-  if (human.timePos >= ENDGAME_TRACK_END - 1) return;
+  if (!canAffordTimeCost(human, 1)) return;
   const cands = [
     ...state.riverCards.map(c => ({ card: c, where: `River ${c.slot + 1}` })),
     ...state.prerivCards.map((c, i) => c ? { card: c, where: `Headwaters ${PRERIV_SLOTS - i}` } : null).filter(x => x),
@@ -5173,7 +5183,7 @@ async function humanUseTributeStone() {
 async function humanUseTradingPost() {
   const human = state.players.find(p => p.isHuman);
   if (!human || !hasEffect(human, 'Trading Post')) return;
-  if (human.timePos >= ENDGAME_TRACK_END - 1 || human.supply < 2) return;
+  if (!canAffordTimeCost(human, 1) || human.supply < 2) return;
 
   const targets = state.riverCards.filter(c => uncoveredIcons(c) >= 2);
   if (targets.length === 0) return;
@@ -5245,7 +5255,7 @@ async function humanUseSnareSet() {
 
 async function humanUseTailSlap() {
   const human = state.players.find(p => p.isHuman);
-  if (!human || !hasEffect(human, 'Tail Slap') || human.timePos >= ENDGAME_TRACK_END - 1) return;
+  if (!human || !hasEffect(human, 'Tail Slap') || !canAffordTimeCost(human, 1)) return;
   const cands = state.riverCards.filter(c => c.slot === 0 && uncoveredIcons(c) > 0);
   if (cands.length === 0) return;
   const pick = await pickFromList(
