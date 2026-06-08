@@ -1,6 +1,6 @@
 # River Bankers — Material Cards
 
-Every (material, icon-count) slot in the 24-card material deck (see `RULES.md`) carries a unique card name so cards are easy to reference in playtest notes, the action log, and the rules PDF. **Eight slots are effect-bearing** (listed in the tier tables below); the remaining sixteen are vanilla — they yield one material per claimed icon, no extras.
+Every (material, icon-count) slot in the 24-card material deck (see `rulebook/rulebook.html`) carries a unique card name so cards are easy to reference in playtest notes, the action log, and the rules PDF. **Eight slots are effect-bearing** (listed in the tier tables below); the remaining sixteen are vanilla — they yield one material per claimed icon, no extras.
 
 ## Full naming table
 

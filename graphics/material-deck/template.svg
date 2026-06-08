@@ -67,7 +67,7 @@
   <!-- ============ ICON GRID ============
        Discs sized to the physical 0.63" worker token (45.36 pt diameter)
        — see board-games.org "Design / choose worker tokens" (2026-05-25)
-       and RULES.md Components. Generator places circles + emoji glyphs. -->
+       and rulebook.html Components. Generator places circles + emoji glyphs. -->
   {{ICON_GRID}}
 
   <!-- ============ EFFECT BLOCK (effect-bearing cards only) ============ -->

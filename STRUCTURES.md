@@ -1,6 +1,6 @@
 # River Bankers — Structure Effects
 
-Design notes for giving structure cards either **constant** (passive, always-on) or **one-time** (triggered when built) effects. Names are thematic to the river/burrow/dam vocabulary already in `RULES.md`.
+Design notes for giving structure cards either **constant** (passive, always-on) or **one-time** (triggered when built) effects. Names are thematic to the river/burrow/dam vocabulary already in `rulebook/rulebook.html`.
 
 > **Trigger convention.** Where a constant effect would otherwise be "once per loop of the fish track," use **"when you pass 0 on the fish track"** instead — much easier to track. Most pass-0 triggers fire immediately (claim a free thing, peek the deck); a few "bank" a use that lasts until you pass 0 again.
 

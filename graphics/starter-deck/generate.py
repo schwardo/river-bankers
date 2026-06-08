@@ -57,7 +57,7 @@ _FONT_ASCENDER = 5.0
 _FONT_DESCENDER = 1.5
 
 
-# Species palette (matches RULES.md / web prototype).
+# Species palette (matches rulebook.html / web prototype).
 SPECIES = {
     "beaver":  {"name": "Beaver",  "color": "#8b5a2b"},
     "otter":   {"name": "River Otter", "color": "#b8362a"},

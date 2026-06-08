@@ -1,0 +1,22 @@
+node_modules/
+out/
+
+# Public assets that are copies / generated; regenerable from gen_gemini_tts.py
+# or from the parent river-bankers graphics/ tree.
+public/board/
+public/voiceover/
+public/worker-*.png
+public/blank-chit.png
+
+# Voiceover artifacts at repo root — regenerable from gen_gemini_tts.py /
+# edge-tts. Kore is the live voice; other voices were eval samples.
+*.mp3
+*.wav
+*.vtt
+kore_alignment.json
+
+# Reference screenshots captured by ad-hoc playwright scripts. Regenerable.
+reference/
+
+# Misc
+scene1.txt
