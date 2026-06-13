@@ -56,6 +56,7 @@
     { "name": "Trophy Lodge",     "cost": {"clay": 3, "stones": 2},            "time": 3, "vp": 0,  "effect": "End of game: +3 VP per ?-VP structure you control, including this one (max +12)." },
     { "name": "Springwater Pool", "cost": {"vines": 3, "mud": 2},              "time": 3, "vp": 5,  "effect": "When built: ready all of your spent once-per-game cards." },
     { "name": "Spring Cascade",   "cost": {"logs": 2, "mud": 1},               "time": 1, "vp": 3,  "effect": "When built: trigger each of your '0 on 🐟 track' effects once." },
-    { "name": "Trading Post",       "cost": {"clay": 2, "reeds": 2},             "time": 3, "vp": 5,  "effect": "As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card." }
+    { "name": "Trading Post",       "cost": {"clay": 2, "reeds": 2},             "time": 3, "vp": 5,  "effect": "As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card." },
+    { "name": "Confluence",         "cost": {"reeds": 2, "stones": 2},           "time": 3, "vp": 5,  "effect": "As an action: pay 🐟 to trigger one auction over two same-symbol cards, pooling all their uncovered icons into a single larger pool. Both cards then float downriver." }
   ]
 }

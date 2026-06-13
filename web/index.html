@@ -1826,6 +1826,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Springwater Pool', cost: { vines: 3, mud: 2 },            time: 3, vp: 5, effect: 'When built: ready all of your spent once-per-game cards.' },
   { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 1, vp: 3, effect: 'When built: trigger each of your \'0 on 🐟 track\' effects once.' },
   { name: 'Trading Post',     cost: { clay: 2, reeds: 2 },             time: 3, vp: 5, effect: 'As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.' },
+  { name: 'Confluence',       cost: { reeds: 2, stones: 2 },           time: 3, vp: 5, effect: 'As an action: pay 🐟 to trigger one auction over two same-symbol cards, pooling all their uncovered icons into a single larger pool. Both cards then float downriver.' },
 
   // Species starter structures (asymmetric play, see SPECIES.md). Each player
   // drafts 1 of their 3 species cards at setup; picked card is pre-built in
@@ -3547,6 +3548,10 @@ function renderActionPanel() {
       && cur.supply > 0
       && canAffordTimeCost(cur, 2)
       && state.riverCards.some(c => typeof c.slot === 'number' && uncoveredIcons(c) > 0);
+    const confluenceAvail = hasEffect(cur, 'Confluence')
+      && triggerPool > 0
+      && canAffordTimeCost(cur, 1)
+      && confluenceAvailable();
     html = `<div class="action-panel-title">Your turn — choose an action</div>
       <div class="action-buttons">
         <button onclick="humanChooseAction('preriv')" ${(triggerPool > 0 && hasPreriv) ? '' : 'disabled'}>1. Auction Headwaters card (2–4🐟)</button>
@@ -3556,6 +3561,7 @@ function renderActionPanel() {
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>5. Build a structure</button>
         ${beaverTowAvail ? `<button onclick="humanChooseAction('beaverTow')">6. Beaver Tow (2🐟): slide a river card upstream</button>` : ''}
         ${salmonRunAvail ? `<button onclick="humanChooseAction('salmonRun')">7. Salmon Run (1/2/3/5/8🐟): place workers on a single card</button>` : ''}
+        ${confluenceAvail ? `<button onclick="humanChooseAction('confluence')">8. Confluence: pool-auction two same-symbol cards</button>` : ''}
         ${state.endgame ? `<button class="ghost" onclick="humanRetire()">Retire (endgame)</button>` : ''}
       </div>
       ${abilityRow}
@@ -3732,7 +3738,9 @@ function renderActionPanel() {
       } else if (result.outcome === 'plenty') {
         const leftover = result.leftover;
         let fateLine;
-        if (result.cardFate === 'plenty-slid') {
+        if (result.combined) {
+          fateLine = `<p>Both pooled cards <b>float downriver</b> — a filled card graduates to the shoreline, one with leftovers slides one slot downstream.</p>`;
+        } else if (result.cardFate === 'plenty-slid') {
           fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The card <b>drifts into River ${result.cardNewSlot + 1}</b> with its leftover icons, where it can be auctioned again at <b>${result.cardNewCost}🐟</b> per item.</p>`;
         } else if (result.cardFate === 'shoreline-graduated') {
           fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The card was already on the last river space, so it <b>graduates to the shoreline</b> with its workers.</p>`;
@@ -3745,7 +3753,9 @@ function renderActionPanel() {
         </div>`;
       } else { // jam
         let fateLine;
-        if (result.cardFate === 'shoreline-graduated') {
+        if (result.combined) {
+          fateLine = `<p>Both pooled cards <b>float downriver</b> — a filled card graduates to the shoreline, one with leftovers slides one slot downstream.</p>`;
+        } else if (result.cardFate === 'shoreline-graduated') {
           fateLine = `<p>The card was already on the last river space, so it <b>graduates to the shoreline</b> with its workers. ${result.leftover} unclaimed icon${result.leftover === 1 ? '' : 's'} no longer matter — shoreline cards can't be auctioned.</p>`;
         } else {
           fateLine = `<p>${result.leftover} icon${result.leftover === 1 ? '' : 's'} stay${result.leftover === 1 ? 's' : ''} uncovered. The card <b>slides to River ${result.cardNewSlot + 1}</b>, where its per-item cost is <b>${result.cardNewCost}🐟</b>.</p>`;
@@ -3933,7 +3943,7 @@ function callWorkersHome(playerIdx, recallSpec) {
 async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   // Floodgate: AI auto-uses; human is prompted (it's once-per-game, so you may want to save it).
   const trig = state.players[triggerPlayerIdx];
-  if (hasEffect(trig, 'Floodgate') && !trig.floodgateUsed && typeof card.slot === 'number' && card.slot > 0) {
+  if (!card.combinedPair && hasEffect(trig, 'Floodgate') && !trig.floodgateUsed && typeof card.slot === 'number' && card.slot > 0) {
     let useIt = true;
     if (trig.isHuman) {
       const newSlotCost = riverSlotCost(card.slot - 1);
@@ -4126,6 +4136,7 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
 }
 
 function resolveAuction(card, bids) {
+  if (card.combinedPair) return resolveCombinedAuction(card, bids);
   const m = MATERIALS[card.material];
   const open = uncoveredIcons(card);
   const totalBid = Object.values(bids).reduce((s, n) => s + n, 0);
@@ -4241,6 +4252,132 @@ function resolveAuction(card, bids) {
     }
   }
   return result;
+}
+
+// =============================================================================
+// CONFLUENCE: combined two-card auction (same-symbol pair, both cards float)
+// =============================================================================
+// 🐟 cost to initiate a single-card auction on `card` (river = 1, Headwaters =
+// slot-based). Confluence's trigger cost is the MIN of its two cards' triggers.
+function singleAuctionTriggerCost(card) {
+  return card.slot === 'pre' ? prerivTriggerCost(prerivIndexOf(card)) : 1;
+}
+function combinedTriggerCost(cardA, cardB) {
+  return Math.min(singleAuctionTriggerCost(cardA), singleAuctionTriggerCost(cardB));
+}
+// Virtual pooled card: combined uncovered icons, billed at the cheaper card's
+// per-item rate ('min'). combinedPair routes resolveAuction to the combined path
+// and lets the shared bid pipeline (runAuction) drive the pooled auction.
+function makeVirtualCombinedCard(cardA, cardB) {
+  const cheaper = cardCost(cardA) <= cardCost(cardB) ? cardA : cardB;
+  return {
+    id: 'combined', material: cardA.material, wildAlt: null, name: 'Confluence pool',
+    totalIcons: uncoveredIcons(cardA) + uncoveredIcons(cardB),
+    slot: cheaper.slot, workers: {}, blanks: 0, effect: null, effectSpec: null,
+    combinedPair: [cardA, cardB],
+  };
+}
+function runCombinedAuction(cardA, cardB, triggerPlayerIdx, minBidTrigger) {
+  return runAuction(makeVirtualCombinedCard(cardA, cardB), triggerPlayerIdx, minBidTrigger);
+}
+// Both cards float downriver after a Confluence auction, whether or not workers
+// landed: a filled card graduates to the shoreline, a card with leftovers slides
+// one slot downstream.
+function finalizeCombinedCard(card) {
+  if (uncoveredIcons(card) === 0) moveCardToShoreline(card);
+  else jamCardDownriver(card);
+}
+function resolveCombinedAuction(virtual, bids) {
+  const [cardA, cardB] = virtual.combinedPair;
+  const m = MATERIALS[virtual.material];
+  let remA = uncoveredIcons(cardA), remB = uncoveredIcons(cardB);
+  const open = remA + remB;
+  const totalBid = Object.values(bids).reduce((s, n) => s + n, 0);
+  const result = {
+    cardMaterial: virtual.material, cardWildAlt: null,
+    cardName: `${cardA.name} + ${cardB.name}`, costAtAuction: cardCost(virtual),
+    openBefore: open, totalBid, bids: { ...bids }, takings: {}, timeAdvances: {},
+    outcome: 'no-bids', leftover: 0, cardFate: 'combined-floated',
+    cardNewSlot: null, cardNewCost: null, combined: true,
+  };
+  for (const idxStr in bids) result.takings[parseInt(idxStr)] = 0;
+  // Confluence pairing 'same': fill cardA's icons first, then cardB.
+  const place = (idx, n) => {
+    let placed = 0;
+    const toA = Math.min(n, remA);
+    if (toA > 0) { cardA.workers[idx] = (cardA.workers[idx] || 0) + toA; remA -= toA; placed += toA; n -= toA; }
+    const toB = Math.min(n, remB);
+    if (toB > 0) { cardB.workers[idx] = (cardB.workers[idx] || 0) + toB; remB -= toB; placed += toB; }
+    return placed;
+  };
+  const pairs = Object.entries(bids).filter(([_, b]) => b > 0).map(([idx, b]) => ({ idx: parseInt(idx), bid: b }));
+  if (totalBid === 0) {
+    log(`💤 No bids — both ${m.name} cards still float downriver.`);
+  } else if (totalBid <= open) {
+    result.outcome = 'plenty';
+    for (const { idx, bid } of pairs) {
+      const p = state.players[idx];
+      const placed = place(idx, bid);
+      p.supply -= placed;
+      const timeAdvance = placed * playerCardCost(virtual, idx);
+      advancePlayer(idx, timeAdvance);
+      result.takings[idx] = placed; result.timeAdvances[idx] = timeAdvance;
+      log(`✅ ${speciesLabel(p)} wins ${placed} icon${placed === 1 ? '' : 's'} (advance ${timeAdvance}🐟).`);
+    }
+    result.leftover = open - totalBid;
+  } else {
+    result.outcome = 'jam';
+    let totalTaken = 0;
+    for (const { idx, bid } of pairs) {
+      const p = state.players[idx];
+      const others = totalBid - bid;
+      const got = Math.max(0, Math.min(bid, open - others));
+      const placed = place(idx, got);
+      if (placed > 0) p.supply -= placed;
+      let billable = bid;
+      if (placed < bid && hasEffect(p, 'Otter Raft')) billable = Math.max(0, bid - 1);
+      const timeAdvance = billable * playerCardCost(virtual, idx);
+      advancePlayer(idx, timeAdvance);
+      result.takings[idx] = placed; result.timeAdvances[idx] = timeAdvance;
+      if (placed > 0) log(`✅ ${speciesLabel(p)} bid ${bid}, took ${placed} (advance ${timeAdvance}🐟).`);
+      else log(`✗ ${speciesLabel(p)} bid ${bid}, took 0 (advance ${timeAdvance}🐟 for the bid).`);
+      totalTaken += placed;
+    }
+    result.leftover = open - totalTaken;
+  }
+  finalizeCombinedCard(cardA);
+  finalizeCombinedCard(cardB);
+  return result;
+}
+// Confluence finder (AI): the same-material pair of available cards (river +
+// Headwaters, ≥1 open icon) that best serves the player's hand needs. Scored
+// like single-card auction targets so the two compare directly.
+function findCombinedAuctionTarget(playerIdx, needs, triggerPool) {
+  if (triggerPool <= 0) return null;
+  let best = null;
+  for (const mat of MAT_KEYS) {
+    const need = needs[mat];
+    if (need === 0) continue;
+    const cards = [...state.riverCards, ...state.prerivCards.filter(c => c)]
+      .filter(c => c.material === mat && uncoveredIcons(c) > 0);
+    if (cards.length < 2) continue;
+    cards.sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
+    const A = cards[0], B = cards[1];
+    const got = Math.min(uncoveredIcons(A) + uncoveredIcons(B), triggerPool, need);
+    const perItem = Math.min(playerCardCost(A, playerIdx), playerCardCost(B, playerIdx));
+    const score = need * got - perItem * got * 0.4 - combinedTriggerCost(A, B) * 0.6;
+    if (!best || score > best.score) best = { A, B, score };
+  }
+  return best;
+}
+// True when the human could currently trigger a Confluence (≥2 same-symbol open
+// cards available across river + Headwaters).
+function confluenceAvailable() {
+  const byMat = {};
+  for (const c of [...state.riverCards, ...state.prerivCards.filter(c => c)]) {
+    if (uncoveredIcons(c) > 0) byMat[c.material] = (byMat[c.material] || 0) + 1;
+  }
+  return Object.values(byMat).some(n => n >= 2);
 }
 
 // Auction outcome — also rendered inline in the action panel rather than a
@@ -4542,6 +4679,15 @@ function aiChooseAction(playerIdx) {
     const trigger = prerivTriggerCost(i);
     const score = need * got - 1 * got * 0.4 - trigger * 0.6;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'preriv'; bestPrerivIdx = i; }
+  }
+  // 2.2) Confluence: a pooled same-symbol auction can satisfy a need that no
+  // single card can (two small same-material cards together). Prefer it only
+  // when it scores above the best single-card target.
+  if (hasEffect(p, 'Confluence')) {
+    const ct = findCombinedAuctionTarget(playerIdx, needs, triggerPool);
+    if (ct && ct.score > bestScore && canAffordTimeCost(p, combinedTriggerCost(ct.A, ct.B))) {
+      return { type: 'confluenceAuction', aId: ct.A.id, bId: ct.B.id };
+    }
   }
   if (bestCard && triggerPool > 0) {
     if (bestKind === 'river') return { type: 'auction', cardId: bestCard.id };
@@ -5359,6 +5505,8 @@ function humanChooseAction(type) {
     humanBeaverTow().then(() => humanResolver && humanResolver());
   } else if (type === 'salmonRun') {
     humanSalmonRun().then(() => humanResolver && humanResolver());
+  } else if (type === 'confluence') {
+    humanConfluence().then(() => humanResolver && humanResolver());
   }
 }
 
@@ -5413,6 +5561,40 @@ async function humanBeaverTow() {
   if (!pick) return;
   doBeaverTow(human.idx, pick.id);
   render();
+}
+
+async function humanConfluence() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human || !hasEffect(human, 'Confluence')) return;
+  state.lastHumanActionType = 'confluence';
+  const cardLabel = c => `${c.slot === 'pre' ? 'Headwaters' : 'River ' + (c.slot + 1)}: ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${uncoveredIcons(c)} open)`;
+  // Available cards grouped by material; only materials with ≥2 are valid pairs.
+  const all = [...state.riverCards, ...state.prerivCards.filter(c => c)].filter(c => uncoveredIcons(c) > 0);
+  const byMat = {};
+  for (const c of all) (byMat[c.material] = byMat[c.material] || []).push(c);
+  const aCands = all.filter(c => byMat[c.material].length >= 2);
+  if (aCands.length === 0) return;
+  // Step 1: pick the first card.
+  const cardA = await pickFromList(
+    '🌊 Confluence — pick the first card',
+    'Pool two SAME-symbol cards into one auction (their open icons combine). Both cards float downriver afterward. Trigger costs the cheaper of the two cards’ auction triggers.',
+    aCands, cardLabel, { cancelable: true }
+  );
+  if (!cardA) return;
+  // Step 2: pick the second, same-symbol card.
+  const bCands = byMat[cardA.material].filter(c => c !== cardA);
+  const cardB = await pickFromList(
+    `🌊 Confluence — pick the second ${MATERIALS[cardA.material].name} card`,
+    `Both cards must share the symbol ${MATERIALS[cardA.material].icon} ${MATERIALS[cardA.material].name}. The pooled auction bills every item at the cheaper card’s rate.`,
+    bCands, cardLabel, { cancelable: true }
+  );
+  if (!cardB) return;
+  const trig = combinedTriggerCost(cardA, cardB);
+  advancePlayer(human.idx, trig);
+  log(`🎬 ${speciesLabel(human)} spends ${trig}🐟 (Confluence) to pool-auction two ${MATERIALS[cardA.material].name} cards.`);
+  state.phase = 'idle';
+  render();
+  await runCombinedAuction(cardA, cardB, human.idx, 1);
 }
 
 async function humanFlushUpstream() {
@@ -6831,6 +7013,19 @@ async function executeAIAction(playerIdx, action) {
     render();
     await sleep(300);
     if (card) await runAuction(card, playerIdx, 1);
+    return;
+  }
+  if (action.type === 'confluenceAuction') {
+    const find = id => state.riverCards.find(c => c.id === id) || state.prerivCards.find(c => c && c.id === id);
+    const A = find(action.aId), B = find(action.bId);
+    if (A && B && A !== B) {
+      const trig = combinedTriggerCost(A, B);
+      advancePlayer(playerIdx, trig);
+      log(`🎬 ${speciesLabel(p)} spends ${trig}🐟 (Confluence) to pool-auction two ${MATERIALS[A.material].name} cards.`);
+      render();
+      await sleep(300);
+      await runCombinedAuction(A, B, playerIdx, 1);
+    }
     return;
   }
   if (action.type === 'preriv') {

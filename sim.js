@@ -69,6 +69,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Springwater Pool', cost: { vines: 3, mud: 2 },            time: 3, vp: 5, effect: 'When built: ready all of your spent once-per-game cards.' },
   { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 1, vp: 3, effect: 'When built: trigger each of your \'0 on 🐟 track\' effects once.' },
   { name: 'Trading Post',     cost: { clay: 2, reeds: 2 },             time: 3, vp: 5, effect: 'As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.' },
+  { name: 'Confluence',       cost: { reeds: 2, stones: 2 },            time: 3, vp: 5, effect: 'As an action: pay 🐟 to trigger one auction over two cards (Headwaters or river), pooling all their uncovered icons into a single larger pool. Both cards then float downriver.' },
 
   // Species starter structures (asymmetric play, see SPECIES.md). Each player
   // drafts 1 of their 3 species cards at setup; picked card is pre-built in
@@ -134,6 +135,10 @@ function setStructureEffectDisabled(name, disabled) {
 }
 function effectActive(name) { return STRUCTURE_EFFECT_DISABLED[name] !== true; }
 function hasEffect(p, name) { return effectActive(name) && p.built.some(s => s.name === name); }
+// The combined-auction ability is granted either to a player who builds the
+// Confluence structure card, or to ALL players when the Double Vision card (an
+// "Optional Rules" type card — no VP, no cost) is in play.
+function hasCombinedAuctionAbility(p) { return DOUBLE_VISION_ACTIVE || hasEffect(p, 'Confluence'); }
 
 // Per-card end-game scoring overrides used by sweepVpRework. Empty by
 // default → the helper falls back to each card's hard-coded multiplier/cap
@@ -215,6 +220,7 @@ function firePassZeroEffects(state, playerIdx, count) {
         p.supply -= 1;
         target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
         p.timePos += 1;
+        noteEffectUse(state, 'Wood Pile');
       }
     }
     if (hasEffect(p, 'Hollowed-out Log')) {
@@ -223,6 +229,7 @@ function firePassZeroEffects(state, playerIdx, count) {
         target.workers[playerIdx] -= 1;
         if (target.workers[playerIdx] === 0) delete target.workers[playerIdx];
         p.supply += 1;
+        noteEffectUse(state, 'Hollowed-out Log');
       }
     }
     if (hasEffect(p, 'Pack Rat Burrow') && p.hand.length > 0 && state.structDiscard.length > 0) {
@@ -243,6 +250,7 @@ function firePassZeroEffects(state, playerIdx, count) {
         const dropped = p.hand.splice(worstHand.i, 1)[0];
         state.structDiscard.push(dropped);
         p.hand.push(taken);
+        noteEffectUse(state, 'Pack Rat Burrow');
       }
     }
   }
@@ -309,6 +317,62 @@ function setAllPlentySlides(b) { ALL_PLENTY_SLIDES = b; }
 let PRERIV_PLENTY_SLIDES_TO_RIVER = true;
 function setPrerivPlentySlides(b) { PRERIV_PLENTY_SLIDES_TO_RIVER = b; }
 
+// Combined-auction configuration. Three independent knobs:
+//   pairing — 'same' requires the two cards share a material (interchangeable
+//             pooled icons, fixed A→B fill); 'any' allows any two cards, winners
+//             placing each clinched worker on whichever card they need more, in
+//             player order (one action can serve two different material needs).
+//   trigger — how the 🐟 cost to initiate is derived from the two cards' single-
+//             auction trigger costs: 'sum' (pay both), 'min' (cheaper), 'max'.
+//   item    — how each pooled item is billed when the cards sit at different
+//             slots: 'min' (cheaper card's rate) or 'max' (pricier).
+// The combined auction reaches the table two ways, each with its own config:
+// the Confluence structure card (per builder, same/min/min), or the Double
+// Vision card (all players, any/max/max — see below).
+const COMBINED_AUCTION_PROFILES = {
+  Confluence: { pairing: 'same', trigger: 'min', item: 'min' },
+};
+// "Optional Rules" cards are game-setup modules that change the rules for ALL
+// players (no VP, no build cost, not drafted or in any deck). Double Vision is
+// the one implemented: it grants the combined two-card auction to everyone,
+// always using the any/max/max config. Off by default — it's optional; sweeps
+// enable it to measure its impact.
+const DOUBLE_VISION = {
+  name: 'Double Vision', type: 'Optional Rules',
+  config: { pairing: 'any', trigger: 'max', item: 'max' },
+};
+let DOUBLE_VISION_ACTIVE = false;
+function setDoubleVisionActive(b) { DOUBLE_VISION_ACTIVE = b; }
+// Sweep override: when non-null, forces one config for ALL combined auctions
+// regardless of source. The setters below build it up; clear it (or never set
+// it) for live per-source behavior. Defaults match the historical globals.
+let COMBINED_AUCTION_OVERRIDE = null;
+function combinedOverride() {
+  if (!COMBINED_AUCTION_OVERRIDE) COMBINED_AUCTION_OVERRIDE = { pairing: 'same', trigger: 'sum', item: 'min' };
+  return COMBINED_AUCTION_OVERRIDE;
+}
+function setCombinedAuctionCostMode(m)    { combinedOverride().item = m; }
+function setCombinedAuctionPairing(m)     { combinedOverride().pairing = m; }
+function setCombinedAuctionTriggerMode(m) { combinedOverride().trigger = m; }
+function clearCombinedAuctionConfig()     { COMBINED_AUCTION_OVERRIDE = null; }
+// Resolve the active config for player `p` triggering a combined auction: the
+// sweep override if set, else Double Vision's config when that card is in play,
+// else the Confluence structure-card profile.
+function combinedConfig(p) {
+  if (COMBINED_AUCTION_OVERRIDE) return COMBINED_AUCTION_OVERRIDE;
+  if (DOUBLE_VISION_ACTIVE) return DOUBLE_VISION.config;
+  return COMBINED_AUCTION_PROFILES.Confluence;
+}
+
+// Test harness: inject a free, pre-built, printed-VP-0 card (named by
+// INJECT_STARTER_NAME) as a turn-1 starter for player INJECT_STARTER_PLAYER
+// (-1 = off), to measure an ability's power as a STARTER rather than a built
+// structure. DECK_EXCLUDE (a Set of names) removes cards from the shared
+// structure deck so only the injected player holds the ability.
+let INJECT_STARTER_NAME = null;
+let INJECT_STARTER_PLAYER = -1;
+let DECK_EXCLUDE = null;
+
 // Live rule: the Flush action returns the 3 displaced Headwaters cards to the
 // material draw pile (and reshuffles) instead of removing them from the game.
 // Keeps the deck-empty endgame trigger from accelerating with every Flush.
@@ -365,6 +429,25 @@ function endgamePairVP(state, playerIdx) {
 }
 
 function prerivTriggerCost(idx) { return PRERIV_SLOTS - idx + 1; }
+// 🐟 cost to initiate a normal single-card auction on `card`: flat 1 for a river
+// card, slot-dependent (prerivTriggerCost) for a Headwaters card. A Confluence
+// auction pays the SUM of this across its two cards.
+function singleAuctionTriggerCost(state, card) {
+  if (card.slot === 'pre') {
+    const idx = state.prerivCards.indexOf(card);
+    return idx >= 0 ? prerivTriggerCost(idx) : UPSTREAM_AUCTION_COST;
+  }
+  return 1;
+}
+// 🐟 cost to initiate a Confluence auction over cardA + cardB, per the active
+// trigger-cost rule (sum / min / max of the two single-auction triggers).
+function combinedTriggerCost(state, cardA, cardB, mode) {
+  const a = singleAuctionTriggerCost(state, cardA);
+  const b = singleAuctionTriggerCost(state, cardB);
+  if (mode === 'min') return Math.min(a, b);
+  if (mode === 'max') return Math.max(a, b);
+  return a + b;
+}
 function riverSlotCost(slot) { return typeof slot === 'number' ? slot + 2 : 0; }
 function cardCost(card) {
   if (card.slot === 'pre') return UPSTREAM_AUCTION_COST;
@@ -638,6 +721,8 @@ function buildStructureDeck(numPlayers) {
   let id = 0;
   const templates = STRUCTURE_TEMPLATES.filter(s => {
     if (s.species) return false; // species starters never enter the shared deck
+    if (s.testStarter) return false; // injection-only test starters (reserved)
+    if (DECK_EXCLUDE && DECK_EXCLUDE.has(s.name)) return false; // test harness
     if (s.only2P) return numPlayers === 2;
     return true;
   });
@@ -700,6 +785,21 @@ function newGame(numPlayers, workersPerPlayer = null) {
     }
     p.built.push(picked);
   }
+  // Test harness: give a free turn-1 starter (printed VP 0) to one player
+  // (INJECT_STARTER_PLAYER >= 0) or to ALL players (=== -2), to measure the
+  // ability's strength / game-length impact. See INJECT_STARTER_NAME.
+  if (INJECT_STARTER_NAME && (INJECT_STARTER_PLAYER >= 0 || INJECT_STARTER_PLAYER === -2)) {
+    const tmpl = BASE_STRUCTURE_TEMPLATES.find(s => s.name === INJECT_STARTER_NAME);
+    const targets = INJECT_STARTER_PLAYER === -2
+      ? players
+      : (INJECT_STARTER_PLAYER < players.length ? [players[INJECT_STARTER_PLAYER]] : []);
+    for (const tp of targets) {
+      tp.built.push({
+        name: INJECT_STARTER_NAME, cost: {}, time: 0, vp: 0,
+        effect: tmpl ? tmpl.effect : '', id: 'free_' + INJECT_STARTER_NAME + '_' + tp.idx,
+      });
+    }
+  }
   const prerivCards = [null, null, null];
   for (let i = 0; i < PRERIV_SLOTS; i++) {
     if (matDeck.length === 0) break;
@@ -723,6 +823,10 @@ function newGame(numPlayers, workersPerPlayer = null) {
     metrics: {
       turns: 0,
       auctions: 0,
+      combinedAuctions: 0, // Confluence: pooled two-card auctions triggered
+      combinedCrossMat: 0, // subset of combinedAuctions where the two cards differ in material
+      combinedTriggerFish: 0, // total 🐟 paid to initiate combined auctions
+      effectUses: {},      // name → times that card's active ability actually fired
       jamAuctions: 0,
       plentyAuctions: 0,
       noBidAuctions: 0,
@@ -756,6 +860,13 @@ function newGame(numPlayers, workersPerPlayer = null) {
 // Sum of all blank tokens currently on the board (river + pre-river only —
 // shoreline cards have their blanks returned to the pool when they graduate).
 // Called after every operation that mints a blank to update the peak metric.
+// Count one successful activation of a card's active ability. Used by the
+// effect-usage sweep to compare how often each "as an action" / triggered
+// effect actually fires per builder (not just whether it was built).
+function noteEffectUse(state, name) {
+  const u = state.metrics.effectUses;
+  u[name] = (u[name] || 0) + 1;
+}
 function noteBlanks(state) {
   let total = 0;
   for (const c of state.riverCards) total += c.blanks;
@@ -991,6 +1102,14 @@ function runAuction(state, card, triggerPlayerIdx, minBidTrigger) {
     card.slot -= 1;
     trig.floodgateUsed = true;
   }
+  const bids = collectAuctionBids(state, card, triggerPlayerIdx, minBidTrigger);
+  resolveAuction(state, card, bids);
+}
+// Collect every player's sealed bid for an auction over `card`, honouring
+// Spy Mound / Quick Strike deferral. Factored out of runAuction so the
+// combined same-symbol auction (Confluence) can reuse the exact same bidding
+// AI against a virtual pooled card. Returns { playerIdx: bidCount }.
+function collectAuctionBids(state, card, triggerPlayerIdx, minBidTrigger) {
   const bids = {};
   // Spy Mound (once per game) / Quick Strike (mink species starter, unlimited):
   // a player auto-defers to bid LAST on a high-value auction whose material
@@ -1059,7 +1178,7 @@ function runAuction(state, card, triggerPlayerIdx, minBidTrigger) {
     }
     bids[p.idx] = bid;
   }
-  resolveAuction(state, card, bids);
+  return bids;
 }
 function resolveAuction(state, card, bids) {
   const open = uncoveredIcons(card);
@@ -1131,6 +1250,154 @@ function resolveAuction(state, card, bids) {
     } else {
       jamCardDownriver(state, card);
     }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Confluence: combined two-card auction
+// -----------------------------------------------------------------------------
+// One auction is run over TWO cards, pooling all of their uncovered icons into a
+// single larger pool. Bidding reuses the standard AI via a virtual card whose
+// uncovered-icon count is the combined pool and whose per-item 🐟 cost reflects
+// the chosen cost mode (min/max of the two cards). Two pairing rules:
+//   'same' — the two cards share a material; pooled icons are interchangeable,
+//            and clinched workers fill cardA first, then cardB.
+//   'any'  — the two cards may be different materials; in player order each
+//            winner places their clinched workers on whichever of the two cards
+//            they need more (subject to remaining capacity). The virtual card
+//            carries wildAlt = cardB's material so the bid AI counts deficits in
+//            BOTH materials (a worker can satisfy either), making one action
+//            able to serve two different material needs.
+// Each engaged card is then finalized (slides downstream with leftovers,
+// graduates to shoreline when filled) like a normal single-card auction.
+function makeVirtualCombinedCard(cardA, cardB, costMode) {
+  // Per-item cost is governed by river slot (cardCost). For a same-material
+  // pair any per-material discount is identical across the two cards, so
+  // picking the cheaper/pricier card's slot reproduces min/max of
+  // playerCardCost exactly. For a mixed pair, wildAlt lets the bid AI value
+  // deficits in either material.
+  const aIsCheaper = cardCost(cardA) <= cardCost(cardB);
+  const ref = (costMode === 'min') ? (aIsCheaper ? cardA : cardB)
+                                   : (aIsCheaper ? cardB : cardA);
+  return {
+    id: 'combined',
+    material: cardA.material,
+    wildAlt: cardA.material !== cardB.material ? cardB.material : null,
+    totalIcons: uncoveredIcons(cardA) + uncoveredIcons(cardB),
+    slot: ref.slot,
+    workers: {},
+    blanks: 0,
+    effect: null,
+    effectSpec: null,
+  };
+}
+// 'any'-pairing placement: pick the card (with capacity) whose material this
+// player needs more right now; tie-break to the cheaper per-item cost. Need is
+// recomputed live, so a player fills their scarcer deficit first then spills to
+// the other material.
+function choosePlacementCard(state, playerIdx, cardA, cardB, remA, remB) {
+  if (remA > 0 && remB <= 0) return cardA;
+  if (remB > 0 && remA <= 0) return cardB;
+  if (remA <= 0 && remB <= 0) return null;
+  const p = state.players[playerIdx];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const needMat = (mat) => {
+    let n = 0;
+    for (const s of p.hand) n = Math.max(n, Math.max(0, (s.cost[mat] || 0) - (wbm[mat] || 0)));
+    return n;
+  };
+  const nA = needMat(cardA.material), nB = needMat(cardB.material);
+  if (nA !== nB) return nA > nB ? cardA : cardB;
+  return playerCardCost(state, cardA, playerIdx) <= playerCardCost(state, cardB, playerIdx) ? cardA : cardB;
+}
+function runCombinedAuction(state, cardA, cardB, triggerPlayerIdx, minBidTrigger, costMode, pairing) {
+  state.metrics.auctions++;
+  state.metrics.combinedAuctions++;
+  if (cardA.material !== cardB.material) state.metrics.combinedCrossMat++;
+  noteEffectUse(state, 'Confluence');
+  const virtual = makeVirtualCombinedCard(cardA, cardB, costMode);
+  const bids = collectAuctionBids(state, virtual, triggerPlayerIdx, minBidTrigger);
+  resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing);
+}
+function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing) {
+  let remA = uncoveredIcons(cardA);
+  let remB = uncoveredIcons(cardB);
+  const open = remA + remB;
+  const totalBid = Object.values(bids).reduce((s, n) => s + n, 0);
+  const place = (idx, n) => {
+    let placed = 0;
+    for (let k = 0; k < n; k++) {
+      let card;
+      if (pairing === 'any') {
+        card = choosePlacementCard(state, idx, cardA, cardB, remA, remB);
+      } else {
+        card = remA > 0 ? cardA : (remB > 0 ? cardB : null);
+      }
+      if (!card) break;
+      card.workers[idx] = (card.workers[idx] || 0) + 1;
+      if (card === cardA) remA--; else remB--;
+      placed++;
+    }
+    return placed;
+  };
+  if (totalBid === 0) {
+    state.metrics.noBidAuctions++;
+    // No bids, but the auction was triggered — both cards still float downriver.
+    finalizeCombinedCard(state, cardA, false);
+    finalizeCombinedCard(state, cardB, false);
+    return;
+  }
+  const playerBidPairs = Object.entries(bids)
+    .filter(([_, b]) => b > 0)
+    .map(([idx, b]) => ({ idx: parseInt(idx), bid: b }));
+  const isJam = totalBid > open;
+  if (!isJam) {
+    state.metrics.plentyAuctions++;
+    for (const { idx, bid } of playerBidPairs) {
+      const p = state.players[idx];
+      const placed = place(idx, bid); // == bid in the plenty case
+      p.supply -= placed;
+      advancePlayer(state, idx, placed * playerCardCost(state, virtual, idx));
+      state.metrics.iconsClaimed += placed;
+      state.metrics.nonZeroBidders++;
+    }
+  } else {
+    state.metrics.jamAuctions++;
+    let totalClinched = 0;
+    for (const { idx, bid } of playerBidPairs) {
+      const p = state.players[idx];
+      const others = totalBid - bid;
+      const got = Math.max(0, Math.min(bid, open - others));
+      const placed = place(idx, got);
+      if (placed > 0) p.supply -= placed;
+      let billable = bid;
+      if (placed < bid && hasEffect(p, 'Otter Raft')) billable = Math.max(0, bid - 1);
+      advancePlayer(state, idx, billable * playerCardCost(state, virtual, idx));
+      state.metrics.iconsClaimed += placed;
+      state.metrics.nonZeroBidders++;
+      if (placed === 0) state.metrics.zeroClinchBidders++;
+      totalClinched += placed;
+    }
+    if (totalClinched === 0) state.metrics.zeroClinchAuctions++;
+  }
+  finalizeCombinedCard(state, cardA, isJam);
+  finalizeCombinedCard(state, cardB, isJam);
+}
+// Post-auction slide/graduate for one card in a combined auction. Triggering a
+// Confluence engages BOTH cards, so each one floats downriver afterward whether
+// or not workers landed on it: a fully-covered card graduates to the shoreline;
+// any card with leftover icons slides one slot downstream.
+function finalizeCombinedCard(state, card, wasJam) {
+  if (uncoveredIcons(card) === 0) { moveCardToShoreline(state, card); return; }
+  const slidesNow =
+    wasJam || ALL_PLENTY_SLIDES ||
+    (PRERIV_PLENTY_SLIDES_TO_RIVER && card.slot === 'pre');
+  if (slidesNow) {
+    if (card.slot === 'pre') state.metrics.preToRiverFromPlenty++;
+    else state.metrics.riverPlentySlides++;
+    jamCardDownriver(state, card);
+  } else {
+    moveCardToShoreline(state, card);
   }
 }
 
@@ -1275,6 +1542,7 @@ const EFFECT_VP_FIXED = {
   'Beaver Tow': 1,
   'Otter Trail': 1.5,
   'Salmon Run': 2,
+  'Confluence': 1.5,
   'Stone Pool': 0,
   'Flush Channel': 0,
   // Sim no-ops (would be > 0 with smarter AI)
@@ -1385,6 +1653,60 @@ function aiEffectValue(struct, p, state) {
 // =============================================================================
 // AI: TURN DECISIONS
 // =============================================================================
+// Confluence finder: pick the same-material pair of available cards (river +
+// pre-river, ≥1 uncovered icon each) that best serves the player's hand needs.
+// Returns { A, B, material, score, got } or null. Scored on the same basis as
+// single-card auction targets so the two can be compared directly.
+function findCombinedAuctionTarget(state, playerIdx, needs, triggerPool) {
+  if (triggerPool <= 0) return null;
+  let best = null;
+  for (const m of MAT_KEYS) {
+    const need = needs[m];
+    if (need === 0) continue;
+    const cards = [...state.riverCards, ...state.prerivCards.filter(c => c)]
+      .filter(c => c.material === m && uncoveredIcons(c) > 0);
+    if (cards.length < 2) continue;
+    // Two biggest pools → largest combined pool.
+    cards.sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
+    const A = cards[0], B = cards[1];
+    const pool = uncoveredIcons(A) + uncoveredIcons(B);
+    const got = Math.min(pool, triggerPool, need);
+    const cfg = combinedConfig(state.players[playerIdx]);
+    const perItem = (cfg.item === 'min')
+      ? Math.min(playerCardCost(state, A, playerIdx), playerCardCost(state, B, playerIdx))
+      : Math.max(playerCardCost(state, A, playerIdx), playerCardCost(state, B, playerIdx));
+    const trig = combinedTriggerCost(state, A, B, cfg.trigger);
+    const score = need * got - perItem * got * 0.4 - trig * 0.6;
+    if (!best || score > best.score) best = { A, B, material: m, score, got };
+  }
+  return best;
+}
+// 'any'-pairing finder: pick the two highest-scoring distinct cards the player
+// needs, regardless of material. Scored like single-card auction targets, with
+// a per-material need cap so a same-material pair isn't double-counted. The two
+// cards may be different materials → one action covers two needs.
+function findCombinedAuctionTargetAny(state, playerIdx, needs, triggerPool) {
+  if (triggerPool <= 0) return null;
+  const avail = [...state.riverCards, ...state.prerivCards.filter(c => c)]
+    .filter(c => uncoveredIcons(c) > 0 && needs[c.material] > 0);
+  if (avail.length < 2) return null;
+  const scored = avail.map(c => {
+    const g = Math.min(uncoveredIcons(c), needs[c.material]);
+    return { c, score: needs[c.material] * g - playerCardCost(state, c, playerIdx) * g * 0.4 };
+  }).sort((a, b) => b.score - a.score);
+  const A = scored[0].c, B = scored[1].c;
+  // Combined score: greedy claim against own needs + trigger pool, capping each
+  // material's quantity so a reeds+reeds pair doesn't claim 2× the reeds need.
+  const remNeed = { ...needs };
+  let pool = triggerPool, combined = 0;
+  for (const c of [A, B]) {
+    const g = Math.max(0, Math.min(uncoveredIcons(c), remNeed[c.material], pool));
+    combined += needs[c.material] * g - playerCardCost(state, c, playerIdx) * g * 0.4;
+    remNeed[c.material] -= g; pool -= g;
+  }
+  const trig = combinedTriggerCost(state, A, B, combinedConfig(state.players[playerIdx]).trigger);
+  return { A, B, score: combined - trig * 0.6 };
+}
 function aiChooseAction(state, playerIdx) {
   const p = state.players[playerIdx];
   const wbm = playerWorkersByMaterial(state, playerIdx);
@@ -1432,6 +1754,22 @@ function aiChooseAction(state, playerIdx) {
     const trigger = prerivTriggerCost(i);
     const score = need * got - 1 * got * 0.4 - trigger * 0.6;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'preriv'; bestPrerivIdx = i; }
+  }
+  // Combined auction (Confluence card / Double Vision module): a pooled auction
+  // can satisfy a need (or two, under 'any') that no single card can. Score it
+  // against the best single-card target and prefer it only when it genuinely
+  // wins. Config comes from combinedConfig (per-source).
+  if (hasCombinedAuctionAbility(p)) {
+    const cfg = combinedConfig(p);
+    const ct = (cfg.pairing === 'any')
+      ? findCombinedAuctionTargetAny(state, playerIdx, needs, triggerPool)
+      : findCombinedAuctionTarget(state, playerIdx, needs, triggerPool);
+    if (ct) {
+      const trig = combinedTriggerCost(state, ct.A, ct.B, cfg.trigger);
+      if (ct.score > bestScore && p.timePos + trig < ENDGAME_TRACK_END) {
+        return { type: 'combinedAuction', aId: ct.A.id, bId: ct.B.id };
+      }
+    }
   }
   if (bestCard && triggerPool > 0) {
     if (bestKind === 'river') return { type: 'auction', cardId: bestCard.id };
@@ -1549,6 +1887,7 @@ function doTradingPost(state, playerIdx, action) {
   action.target.workers[playerIdx] = (action.target.workers[playerIdx] || 0) + place;
   p.supply -= place;
   if (TRADE_POST_DROPS_BLANKS) noteBlanks(state);
+  noteEffectUse(state, 'Trading Post');
   return true;
 }
 
@@ -1582,6 +1921,7 @@ function doOtterTrail(state, playerIdx, cardAId, cardBId, otherPlayerIdx) {
   cardA.workers[otherPlayerIdx] = (cardA.workers[otherPlayerIdx] || 0) + 1;
   cardB.workers[playerIdx] = (cardB.workers[playerIdx] || 0) + 1;
   advancePlayer(state, playerIdx, cardCost(cardA));
+  noteEffectUse(state, 'Otter Trail');
   return true;
 }
 
@@ -1711,6 +2051,7 @@ function doSalmonRun(state, playerIdx, cardId, workerCount) {
   card.workers[playerIdx] = (card.workers[playerIdx] || 0) + maxPlaceable;
   p.supply -= maxPlaceable;
   advancePlayer(state, playerIdx, cost);
+  noteEffectUse(state, 'Salmon Run');
   return true;
 }
 
@@ -1745,6 +2086,7 @@ function doBeaverTow(state, playerIdx, cardId) {
   if (!card || typeof card.slot !== 'number' || card.slot === 0) return false;
   card.slot -= 1;
   advancePlayer(state, playerIdx, 2);
+  noteEffectUse(state, 'Beaver Tow');
   return true;
 }
 
@@ -1797,6 +2139,7 @@ function aiStartOfTurnAbilities(state, playerIdx) {
       state.prerivCards[target] = newCard;
       state.metrics.iconsSpawned += newCard.totalIcons;
       p.timePos += 1; // 1 fish cost
+      noteEffectUse(state, 'Heron Roost');
     }
   }
   // Driftwood Snag: drop a blank on a card with the most uncovered icons (disruption).
@@ -1810,6 +2153,7 @@ function aiStartOfTurnAbilities(state, playerIdx) {
       target.blanks += 1;
       noteBlanks(state);
       p.timePos += 1; // 1 fish cost
+      noteEffectUse(state, 'Driftwood Snag');
     }
   }
   // Tribute Stone: fire when there's a high-value opponent worker (per-item cost ≥ 3)
@@ -1858,6 +2202,7 @@ function aiStartOfTurnAbilities(state, playerIdx) {
       target.blanks += 1;
       noteBlanks(state);
       p.timePos += 1;
+      noteEffectUse(state, 'Tail Slap');
     }
   }
   // Channel Clearer (muskrat species starter): discard 1 opponent Reed worker
@@ -1878,6 +2223,7 @@ function aiStartOfTurnAbilities(state, playerIdx) {
       pick.card.workers[pick.victimIdx] -= 1;
       if (pick.card.workers[pick.victimIdx] === 0) delete pick.card.workers[pick.victimIdx];
       state.players[pick.victimIdx].supply += 1;
+      noteEffectUse(state, 'Channel Clearer');
     }
   }
 }
@@ -2408,6 +2754,19 @@ function executeAction(state, playerIdx, action) {
     if (!card) return;
     advancePlayer(state, playerIdx, prerivTriggerCost(action.slotIdx));
     runAuction(state, card, playerIdx, 1);
+    return;
+  }
+  if (action.type === 'combinedAuction') {
+    const find = id => state.riverCards.find(c => c.id === id) ||
+                       state.prerivCards.find(c => c && c.id === id);
+    const A = find(action.aId), B = find(action.bId);
+    if (A && B && A !== B) {
+      const cfg = combinedConfig(state.players[playerIdx]);
+      const trigger = combinedTriggerCost(state, A, B, cfg.trigger);
+      state.metrics.combinedTriggerFish += trigger;
+      advancePlayer(state, playerIdx, trigger);
+      runCombinedAuction(state, A, B, playerIdx, 1, cfg.item, cfg.pairing);
+    }
     return;
   }
   if (action.type === 'flush') {
@@ -3058,6 +3417,893 @@ function sweepAblation(numGamesArg, numPArg, workersArg) {
   console.log('  avgVP(B/A)  = average final totalVP for those builders');
   console.log('  Δ VP        = avgVP(B) − avgVP(A) — the effect\'s average VP contribution');
   console.log('  Lookout Tree, Salt Lick are intentional sim no-ops → expect Δ ≈ 0.\n');
+}
+
+// Confluence sweep: compare the combined same-symbol auction card across three
+// variants — effect OFF (printed VP only), effect ON billing at the cheaper
+// card's rate (cost mode 'min'), and effect ON billing at the pricier rate
+// (cost mode 'max'). Reports the card's build rate, its average VP for builders
+// vs. the effect-off baseline (Δ = effect contribution), and combined-auction
+// usage. Use to pick the cost mode and to gauge whether the card lands in the
+// ±1 net-VP balance band. Run with `cpulimit -l 50 -f -m --` per the sim rule.
+function sweepConfluence(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+  const CARD = 'Confluence';
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  // variant: { mode: 'off'|'min'|'max' }. Returns aggregate stats.
+  function collect(mode) {
+    delete STRUCTURE_EFFECT_DISABLED[CARD];
+    if (mode === 'off') STRUCTURE_EFFECT_DISABLED[CARD] = true;
+    else setCombinedAuctionCostMode(mode);
+    let builders = 0, builderVPsum = 0, players = 0;
+    let combinedAuctions = 0, totalAuctions = 0, jam = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      combinedAuctions += state.metrics.combinedAuctions;
+      totalAuctions += state.metrics.auctions;
+      jam += state.metrics.jamAuctions;
+      for (const p of state.players) {
+        players++;
+        if (p.built.some(s => s.name === CARD)) {
+          builders++;
+          builderVPsum += totalVP(p, state);
+        }
+      }
+    }
+    delete STRUCTURE_EFFECT_DISABLED[CARD];
+    setCombinedAuctionCostMode('min');
+    return {
+      mode,
+      buildRate: builders / players,
+      builderN: builders,
+      avgBuilderVP: builders ? builderVPsum / builders : NaN,
+      combinedPerGame: combinedAuctions / numGames,
+      combinedPctOfAuctions: totalAuctions ? combinedAuctions / totalAuctions : 0,
+      jamPct: totalAuctions ? jam / totalAuctions : 0,
+    };
+  }
+
+  console.log(`\nRiver Bankers — Confluence (combined same-symbol auction) sweep`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games per variant.\n`);
+  const t0 = Date.now();
+  const off = collect('off');
+  process.stderr.write('\r  ran off ...   ');
+  const min = collect('min');
+  process.stderr.write('\r  ran min ...   ');
+  const max = collect('max');
+  process.stderr.write('\r' + ' '.repeat(30) + '\r');
+
+  console.log(
+    pad('Variant', 10) + padL('builds', 9) + padL('buildRate', 11) +
+    padL('avgVP', 9) + padL('ΔVP', 8) + padL('cmb/game', 10) + padL('cmb%auc', 9) + padL('jam%', 8)
+  );
+  console.log('-'.repeat(10 + 9 + 11 + 9 + 8 + 10 + 9 + 8));
+  for (const r of [off, min, max]) {
+    const dvp = r.mode === 'off' ? NaN : r.avgBuilderVP - off.avgBuilderVP;
+    const dvpStr = isNaN(dvp) ? '-' : (dvp >= 0 ? '+' : '') + dvp.toFixed(2);
+    console.log(
+      pad(r.mode, 10) + padL(r.builderN, 9) + padL((r.buildRate * 100).toFixed(1) + '%', 11) +
+      padL(isNaN(r.avgBuilderVP) ? '-' : r.avgBuilderVP.toFixed(2), 9) + padL(dvpStr, 8) +
+      padL(r.combinedPerGame.toFixed(2), 10) +
+      padL((r.combinedPctOfAuctions * 100).toFixed(1) + '%', 9) +
+      padL((r.jamPct * 100).toFixed(1) + '%', 8)
+    );
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  ΔVP      = builder avgVP for this mode − builder avgVP with the effect off');
+  console.log('             (the combined-auction effect\'s average VP contribution).');
+  console.log('  cmb/game = average combined (Confluence) auctions triggered per game.');
+  console.log('  cmb%auc  = combined auctions as a share of all auctions.');
+  console.log('  jam%     = jam share of all auctions (combined + normal) — watch for warping.\n');
+}
+
+// Confluence pairing sweep: compare the same-symbol rule ('same') against the
+// any-two-cards rule ('any', where winners place each clinched worker on
+// whichever of the two cards they need more, in player order). Reports the
+// card's build rate, builder ΔVP vs. effect-off, usage, and how often the 'any'
+// rule actually pairs two DIFFERENT materials. Cost mode held at 'min'. Run
+// with `cpulimit -l 50 -f -m --` per the sim-ablations rule.
+function sweepConfluencePairing(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+  const CARD = 'Confluence';
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  // variant: 'off' | 'same' | 'any'
+  function collect(variant) {
+    delete STRUCTURE_EFFECT_DISABLED[CARD];
+    setCombinedAuctionCostMode('min');
+    if (variant === 'off') STRUCTURE_EFFECT_DISABLED[CARD] = true;
+    else setCombinedAuctionPairing(variant);
+    let builders = 0, builderVPsum = 0, players = 0;
+    let combined = 0, crossMat = 0, totalAuctions = 0, jam = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      combined += state.metrics.combinedAuctions;
+      crossMat += state.metrics.combinedCrossMat;
+      totalAuctions += state.metrics.auctions;
+      jam += state.metrics.jamAuctions;
+      for (const p of state.players) {
+        players++;
+        if (p.built.some(s => s.name === CARD)) { builders++; builderVPsum += totalVP(p, state); }
+      }
+    }
+    delete STRUCTURE_EFFECT_DISABLED[CARD];
+    setCombinedAuctionPairing('same');
+    return {
+      variant, builderN: builders,
+      buildRate: builders / players,
+      avgBuilderVP: builders ? builderVPsum / builders : NaN,
+      firesPerBuilder: builders ? combined / builders : NaN,
+      combinedPerGame: combined / numGames,
+      crossMatPct: combined ? crossMat / combined : 0,
+      jamPct: totalAuctions ? jam / totalAuctions : 0,
+    };
+  }
+
+  console.log(`\nRiver Bankers — Confluence pairing rule sweep (cost mode 'min')`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games per variant.\n`);
+  const t0 = Date.now();
+  const off = collect('off');
+  const same = collect('same');
+  const any = collect('any');
+
+  console.log(
+    pad('Variant', 9) + padL('builds', 8) + padL('buildRate', 11) +
+    padL('avgVP', 9) + padL('ΔVP', 8) + padL('fires/bld', 11) +
+    padL('cmb/game', 10) + padL('xMat%', 8) + padL('jam%', 8)
+  );
+  console.log('-'.repeat(9 + 8 + 11 + 9 + 8 + 11 + 10 + 8 + 8));
+  for (const r of [off, same, any]) {
+    const dvp = r.variant === 'off' ? NaN : r.avgBuilderVP - off.avgBuilderVP;
+    const dvpStr = isNaN(dvp) ? '-' : (dvp >= 0 ? '+' : '') + dvp.toFixed(2);
+    console.log(
+      pad(r.variant, 9) + padL(r.builderN, 8) + padL((r.buildRate * 100).toFixed(1) + '%', 11) +
+      padL(isNaN(r.avgBuilderVP) ? '-' : r.avgBuilderVP.toFixed(2), 9) + padL(dvpStr, 8) +
+      padL(isNaN(r.firesPerBuilder) ? '-' : r.firesPerBuilder.toFixed(2), 11) +
+      padL(r.combinedPerGame.toFixed(2), 10) +
+      padL((r.crossMatPct * 100).toFixed(0) + '%', 8) +
+      padL((r.jamPct * 100).toFixed(1) + '%', 8)
+    );
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  ΔVP       = builder avgVP − effect-off builder avgVP (effect contribution).');
+  console.log('  fires/bld = combined auctions ÷ builders — avg uses per builder per game.');
+  console.log('  cmb/game  = combined auctions per game.');
+  console.log('  xMat%     = share of combined auctions pairing two DIFFERENT materials');
+  console.log('              (always 0% for \'same\'; the new flexibility for \'any\').');
+  console.log('  jam%      = jam share of all auctions — watch for economy warping.\n');
+}
+
+// Confluence-as-a-starter sweep: give ONE player (idx 0) a free, pre-built,
+// printed-VP-0 Confluence from turn 1 (deck copy excluded so opponents can't
+// also get it) and measure that player's win rate vs. the uniform fair share.
+// If even at VP 0 the win rate sits well above fair share, the ability is too
+// strong to hand out free; at/below fair share it's a safe (if weak) starter.
+// Runs a no-bonus control (isolates any turn-order/seat advantage) plus both
+// pairing rules. Run with `cpulimit -l 50 -f -m --` per the sim-ablations rule.
+function sweepConfluenceStarter(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const numGames = parseInt(numGamesArg) || 5000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  // variant: 'control' (no bonus) | 'same' | 'any'
+  function collect(variant) {
+    DECK_EXCLUDE = new Set(['Confluence']);
+    if (variant === 'control') {
+      INJECT_STARTER_NAME = null; INJECT_STARTER_PLAYER = -1;
+    } else {
+      INJECT_STARTER_NAME = 'Confluence'; INJECT_STARTER_PLAYER = 0;
+      setCombinedAuctionPairing(variant);
+    }
+    let wins = 0, vp0sum = 0, fires = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      fires += state.metrics.combinedAuctions; // only player 0 can trigger these
+      const scored = state.players.map(p => ({ idx: p.idx, vp: totalVP(p, state), timePos: p.timePos }));
+      scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+      if (scored[0].idx === 0) wins++;
+      vp0sum += scored.find(s => s.idx === 0).vp;
+    }
+    INJECT_STARTER_NAME = null; INJECT_STARTER_PLAYER = -1;
+    DECK_EXCLUDE = null;
+    setCombinedAuctionPairing('same');
+    return { variant, winPct: 100 * wins / numGames, avgVP0: vp0sum / numGames, firesPerGame: fires / numGames };
+  }
+
+  const fair = 100 / numP;
+  console.log(`\nRiver Bankers — Confluence as a free turn-1 starter (printed VP 0)`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games. Bonus player = idx 0.`);
+  console.log(`Fair share = 1/${numP} = ${fair.toFixed(1)}%.\n`);
+  const t0 = Date.now();
+  const control = collect('control');
+  const same = collect('same');
+  const any = collect('any');
+
+  console.log(
+    pad('Variant', 10) + padL('P0 win%', 9) + padL('Δ fair', 8) +
+    padL('Δ ctrl', 8) + padL('P0 avgVP', 10) + padL('fires/game', 12)
+  );
+  console.log('-'.repeat(10 + 9 + 8 + 8 + 10 + 12));
+  for (const r of [control, same, any]) {
+    const dFair = r.winPct - fair;
+    const dCtrl = r.winPct - control.winPct;
+    console.log(
+      pad(r.variant, 10) + padL(r.winPct.toFixed(1) + '%', 9) +
+      padL((dFair >= 0 ? '+' : '') + dFair.toFixed(1), 8) +
+      padL(r.variant === 'control' ? '-' : (dCtrl >= 0 ? '+' : '') + dCtrl.toFixed(1), 8) +
+      padL(r.avgVP0.toFixed(2), 10) + padL(r.firesPerGame.toFixed(2), 12)
+    );
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  P0 win%   = win rate of the bonus player (idx 0).');
+  console.log('  Δ fair    = P0 win% − uniform fair share (any seat advantage shows in control).');
+  console.log('  Δ ctrl    = P0 win% − the no-bonus control win% (isolates the ability).');
+  console.log('  A free starter is "too strong" if Δ ctrl is large and positive.\n');
+}
+
+// Confluence trigger-cost sweep: for a fixed pairing rule (default 'any'),
+// compare the three trigger-cost rules — 'sum' (both cards' triggers), 'min'
+// (cheaper), 'max' (pricier) — against an effect-off baseline. Shows how the
+// initiation cost trades off usage vs. the card's VP contribution. Cost mode
+// (per-item billing) held at 'min'. Run with `cpulimit -l 50 -f -m --`.
+function sweepConfluenceTrigger(numGamesArg, numPArg, workersArg, pairingArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const numGames = parseInt(numGamesArg) || 4000;
+  const pairing = (pairingArg === 'same') ? 'same' : 'any';
+  configureMaterials(6);
+  const CARD = 'Confluence';
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  // variant: 'off' | 'sum' | 'min' | 'max'
+  function collect(variant) {
+    delete STRUCTURE_EFFECT_DISABLED[CARD];
+    setCombinedAuctionCostMode('min');
+    setCombinedAuctionPairing(pairing);
+    if (variant === 'off') STRUCTURE_EFFECT_DISABLED[CARD] = true;
+    else setCombinedAuctionTriggerMode(variant);
+    let builders = 0, builderVPsum = 0, players = 0;
+    let combined = 0, trigFish = 0, totalAuctions = 0, jam = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      combined += state.metrics.combinedAuctions;
+      trigFish += state.metrics.combinedTriggerFish;
+      totalAuctions += state.metrics.auctions;
+      jam += state.metrics.jamAuctions;
+      for (const p of state.players) {
+        players++;
+        if (p.built.some(s => s.name === CARD)) { builders++; builderVPsum += totalVP(p, state); }
+      }
+    }
+    delete STRUCTURE_EFFECT_DISABLED[CARD];
+    setCombinedAuctionTriggerMode('sum');
+    setCombinedAuctionPairing('same');
+    return {
+      variant, builderN: builders,
+      avgBuilderVP: builders ? builderVPsum / builders : NaN,
+      firesPerBuilder: builders ? combined / builders : NaN,
+      avgTrig: combined ? trigFish / combined : NaN,
+      jamPct: totalAuctions ? jam / totalAuctions : 0,
+    };
+  }
+
+  console.log(`\nRiver Bankers — Confluence trigger-cost sweep (pairing='${pairing}', cost mode 'min')`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games per variant.\n`);
+  const t0 = Date.now();
+  const off = collect('off');
+  const variants = [off, collect('sum'), collect('min'), collect('max')];
+
+  console.log(
+    pad('Trigger', 9) + padL('builds', 8) + padL('avgVP', 9) + padL('ΔVP', 8) +
+    padL('fires/bld', 11) + padL('avgTrig🐟', 11) + padL('jam%', 8)
+  );
+  console.log('-'.repeat(9 + 8 + 9 + 8 + 11 + 11 + 8));
+  for (const r of variants) {
+    const dvp = r.variant === 'off' ? NaN : r.avgBuilderVP - off.avgBuilderVP;
+    const dvpStr = isNaN(dvp) ? '-' : (dvp >= 0 ? '+' : '') + dvp.toFixed(2);
+    console.log(
+      pad(r.variant, 9) + padL(r.builderN, 8) +
+      padL(isNaN(r.avgBuilderVP) ? '-' : r.avgBuilderVP.toFixed(2), 9) + padL(dvpStr, 8) +
+      padL(isNaN(r.firesPerBuilder) ? '-' : r.firesPerBuilder.toFixed(2), 11) +
+      padL(isNaN(r.avgTrig) ? '-' : r.avgTrig.toFixed(2), 11) +
+      padL((r.jamPct * 100).toFixed(1) + '%', 8)
+    );
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  ΔVP       = builder avgVP − effect-off builder avgVP (effect contribution).');
+  console.log('  fires/bld = combined auctions ÷ builders — avg uses per builder per game.');
+  console.log('  avgTrig🐟 = average 🐟 actually paid to initiate a combined auction.');
+  console.log('  jam%      = jam share of all auctions.\n');
+}
+
+// Game-length sweep: how the combined-auction ability changes game length.
+// Each combined auction floats BOTH its cards downriver (vs. one for a normal
+// auction), churning the river faster. Variants: baseline (Confluence effect
+// off, no ability in play), Confluence live in the deck, and the Double Vision
+// card (combined auction granted to ALL players). Reports avg player-turns and
+// board-churn proxies. Run with `cpulimit -l 50 -f -m --`.
+function sweepGameLength(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const numGames = parseInt(numGamesArg) || 5000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  // variant: 'baseline' | 'confluence' | 'double-vision'
+  function collect(variant) {
+    clearCombinedAuctionConfig();
+    Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+    setDoubleVisionActive(false);
+    if (variant === 'baseline') {
+      STRUCTURE_EFFECT_DISABLED['Confluence'] = true;
+    } else if (variant === 'double-vision') {
+      STRUCTURE_EFFECT_DISABLED['Confluence'] = true; // isolate the card
+      setDoubleVisionActive(true);
+    }
+    let turns = 0, combined = 0, auctions = 0, shore = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      turns += state.metrics.turns;
+      combined += state.metrics.combinedAuctions;
+      auctions += state.metrics.auctions;
+      shore += state.metrics.riverExitSlots.length + state.metrics.preToShoreCards;
+    }
+    Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+    setDoubleVisionActive(false);
+    return {
+      variant, turns: turns / numGames, combined: combined / numGames,
+      auctions: auctions / numGames, shore: shore / numGames,
+    };
+  }
+
+  console.log(`\nRiver Bankers — game-length impact  (${numP}P × ${workers} workers × ${numGames} games)`);
+  const t0 = Date.now();
+  const base = collect('baseline');
+  const rows = [base, collect('confluence'), collect('double-vision')];
+
+  console.log(
+    pad('Variant', 16) + padL('avgTurns', 10) + padL('Δturns', 9) + padL('Δ%', 8) +
+    padL('cmb/game', 10) + padL('auc/game', 10) + padL('shore/game', 12)
+  );
+  console.log('-'.repeat(16 + 10 + 9 + 8 + 10 + 10 + 12));
+  for (const r of rows) {
+    const dt = r.turns - base.turns;
+    const dp = base.turns ? 100 * dt / base.turns : 0;
+    console.log(
+      pad(r.variant, 16) + padL(r.turns.toFixed(1), 10) +
+      padL(r.variant === 'baseline' ? '-' : (dt >= 0 ? '+' : '') + dt.toFixed(1), 9) +
+      padL(r.variant === 'baseline' ? '-' : (dp >= 0 ? '+' : '') + dp.toFixed(1) + '%', 8) +
+      padL(r.combined.toFixed(2), 10) + padL(r.auctions.toFixed(2), 10) + padL(r.shore.toFixed(2), 12)
+    );
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  avgTurns   = average total player-turns per game (the game-length proxy).');
+  console.log('  Δturns/Δ%  = change vs. the no-ability baseline.');
+  console.log('  cmb/game   = combined auctions per game; auc/game = all auctions; shore/game = cards retired to shoreline.\n');
+}
+
+// Balance sweep: places Confluence in the full structure-card net-VP
+// distribution, and ranks the 12 species starters by effect VP, using the LIVE
+// config (no override). Heuristic per the rebalance task: 1 material = 1.0 VP,
+// 1 time(🐟) = 0.3 VP; net = printed + effectΔVP − costEquiv. Starters are
+// compared by injecting each as a free printed-VP-0 ability for player 0
+// (isolating the effect) and measuring win% / avgVP vs a no-bonus control.
+// Run with `cpulimit -l 50 -f -m --`.
+function sweepBalance(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const numGames = parseInt(numGamesArg) || 3000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+  function costEquivVP(tmpl) {
+    let mats = 0;
+    for (const m in tmpl.cost) mats += tmpl.cost[m];
+    return mats * 1.0 + (tmpl.time || 0) * 0.3;
+  }
+
+  // ===== PART A: structure cards (net VP) =====
+  // baseline (all effects on): per-player VP, plus per-card builder counts and
+  // effect-use tallies for fires/builder.
+  function collectStruct(disabledName) {
+    clearCombinedAuctionConfig();
+    DECK_EXCLUDE = null; INJECT_STARTER_NAME = null; INJECT_STARTER_PLAYER = -1;
+    Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+    if (disabledName) STRUCTURE_EFFECT_DISABLED[disabledName] = true;
+    const results = [];
+    const uses = {};
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      for (const k in state.metrics.effectUses) uses[k] = (uses[k] || 0) + state.metrics.effectUses[k];
+      for (const p of state.players) results.push({ names: new Set(p.built.map(s => s.name)), vp: totalVP(p, state) });
+    }
+    return { results, uses };
+  }
+
+  const templates = STRUCTURE_TEMPLATES.filter(s => s.effect && !s.species && !s.testStarter);
+  const byName = {};
+  for (const s of BASE_STRUCTURE_TEMPLATES) byName[s.name] = s;
+  const t0 = Date.now();
+  process.stderr.write('\rbalance: structure baseline ...');
+  const base = collectStruct(null);
+  const structRows = [];
+  const names = Array.from(new Set(templates.map(s => s.name)));
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i];
+    process.stderr.write(`\rbalance: structure [${i + 1}/${names.length}] ${name.padEnd(20)}`);
+    const abl = collectStruct(name);
+    const bB = base.results.filter(r => r.names.has(name));
+    const aB = abl.results.filter(r => r.names.has(name));
+    if (bB.length === 0) continue;
+    const avgB = bB.reduce((s, r) => s + r.vp, 0) / bB.length;
+    const avgA = aB.length ? aB.reduce((s, r) => s + r.vp, 0) / aB.length : avgB;
+    const effect = avgB - avgA;
+    const tmpl = byName[name];
+    const costEq = costEquivVP(tmpl);
+    const net = tmpl.vp + effect - costEq;
+    const fires = base.uses[name] !== undefined ? base.uses[name] / bB.length : null;
+    structRows.push({ name, printed: tmpl.vp, effect, costEq, net, builds: bB.length, fires });
+  }
+  Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+
+  // ===== PART B: starters (effect VP via free printed-VP-0 injection) =====
+  const STARTERS = ['Lodge Foundation', 'Tail Slap', 'Cache Burrow', 'Kelp Bed',
+    'Rolling Float', 'Stone Tool', 'Mud Burrow', 'Channel Clearer', 'Marsh Lookout',
+    'Clay Den', 'Quick Strike', 'Snare Set'];
+  function collectStarter(name) {
+    clearCombinedAuctionConfig();
+    Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+    DECK_EXCLUDE = null;
+    INJECT_STARTER_NAME = name; INJECT_STARTER_PLAYER = name ? 0 : -1;
+    if (!name) INJECT_STARTER_PLAYER = -1;
+    let wins = 0, vp0 = 0, fires = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      fires += state.metrics.combinedAuctions;
+      const scored = state.players.map(p => ({ idx: p.idx, vp: totalVP(p, state), timePos: p.timePos }));
+      scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+      if (scored[0].idx === 0) wins++;
+      vp0 += scored.find(s => s.idx === 0).vp;
+    }
+    INJECT_STARTER_NAME = null; INJECT_STARTER_PLAYER = -1; DECK_EXCLUDE = null;
+    return { winPct: 100 * wins / numGames, avgVP0: vp0 / numGames, fires: fires / numGames };
+  }
+  process.stderr.write('\rbalance: starter control ...      ');
+  const sctrl = collectStarter(null);
+  const starterRows = [];
+  for (let i = 0; i < STARTERS.length; i++) {
+    process.stderr.write(`\rbalance: starter [${i + 1}/${STARTERS.length}] ${STARTERS[i].padEnd(18)}`);
+    const r = collectStarter(STARTERS[i]);
+    starterRows.push({ name: STARTERS[i], printed: byName[STARTERS[i]] ? byName[STARTERS[i]].vp : 0,
+      effect: r.avgVP0 - sctrl.avgVP0, dwin: r.winPct - sctrl.winPct, fires: r.fires });
+  }
+  process.stderr.write('\r' + ' '.repeat(60) + '\r');
+  clearCombinedAuctionConfig();
+
+  // ---- print structure table ----
+  console.log(`\nRiver Bankers — balance stats  (${numP}P × ${workers} workers × ${numGames} games, live per-card config)`);
+  console.log(`Heuristic: 1 material = 1.0 VP, 1 time(🐟) = 0.3 VP.  net = printed + effectΔVP − costEquiv.\n`);
+  console.log(`== Confluence vs. structure cards — sorted by net VP ==`);
+  console.log(pad('Card', 20) + padL('printed', 9) + padL('effect', 9) + padL('costEq', 9) + padL('net', 8) + padL('builds', 8) + padL('fires/bld', 11));
+  console.log('-'.repeat(20 + 9 + 9 + 9 + 8 + 8 + 11));
+  structRows.sort((a, b) => b.net - a.net);
+  for (const r of structRows) {
+    const mark = r.name === 'Confluence' ? '▶ ' : '  ';
+    console.log(mark + pad(r.name, 18) + padL(r.printed.toFixed(0), 9) +
+      padL((r.effect >= 0 ? '+' : '') + r.effect.toFixed(2), 9) + padL(r.costEq.toFixed(1), 9) +
+      padL((r.net >= 0 ? '+' : '') + r.net.toFixed(2), 8) + padL(r.builds, 8) +
+      padL(r.fires === null ? '-' : r.fires.toFixed(2), 11));
+  }
+  const inBand = structRows.filter(r => Math.abs(r.net) <= 1).length;
+  console.log(`\n${inBand}/${structRows.length} cards within the ±1 net-VP band.`);
+
+  // ---- print starter table ----
+  const fair = 100 / numP;
+  console.log(`\n== Starter cards — effect isolated (each injected free at printed VP 0) ==`);
+  console.log(`Control: P0 win% ${sctrl.winPct.toFixed(1)}% (fair ${fair.toFixed(1)}%), P0 avgVP ${sctrl.avgVP0.toFixed(2)}.\n`);
+  console.log(pad('Starter', 20) + padL('printed', 9) + padL('effectVP', 10) + padL('Δwin%', 9) + padL('fires/game', 12));
+  console.log('-'.repeat(20 + 9 + 10 + 9 + 12));
+  starterRows.sort((a, b) => b.effect - a.effect);
+  for (const r of starterRows) {
+    const mark = '  ';
+    console.log(mark + pad(r.name, 18) + padL(r.printed.toFixed(0), 9) +
+      padL((r.effect >= 0 ? '+' : '') + r.effect.toFixed(2), 10) +
+      padL((r.dwin >= 0 ? '+' : '') + r.dwin.toFixed(1), 9) +
+      padL(r.fires.toFixed(2), 12));
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  effect/effectVP = effect\'s avgVP contribution (builder ΔVP / injected-starter ΔavgVP vs control).');
+  console.log('  costEq = VP-equivalent of build cost (materials + time). net = printed + effect − costEq.');
+  console.log('  printed VP shown for reference; starters are injected at VP 0 so effectVP is the ability alone.');
+  console.log('  fires = combined auctions per builder (structure) / per game (starter); "-" = not instrumented.\n');
+}
+
+// Combined-auction matrix sweep: tests the ability as a built STRUCTURE card
+// (Confluence) and as the Double Vision card (combined auction for all players)
+// across the full 8-config matrix — pairing {same, any} × trigger-cost {min,
+// max} × per-item cost {min, max}. Structure measured by builder ΔVP vs.
+// effect-off baseline; Double Vision — symmetric across players, so win% is
+// meaningless — measured by avg game length (turns) vs. a no-ability baseline.
+// (Double Vision's live config is fixed at any/max/max; the matrix sweeps all 8
+// to show how the knobs would behave.) Run with `cpulimit -l 50 -f -m --`.
+function sweepConfluenceMatrix(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const numGames = parseInt(numGamesArg) || 3000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  function resetGlobals() {
+    delete STRUCTURE_EFFECT_DISABLED['Confluence'];
+    DECK_EXCLUDE = null; INJECT_STARTER_NAME = null; INJECT_STARTER_PLAYER = -1;
+    setDoubleVisionActive(false);
+    clearCombinedAuctionConfig();
+  }
+  function setCfg(cfg) {
+    setCombinedAuctionPairing(cfg.pairing);
+    setCombinedAuctionTriggerMode(cfg.trig);
+    setCombinedAuctionCostMode(cfg.item);
+  }
+
+  // STRUCTURE: Confluence in the deck, effect on. Builder avgVP + fires/builder.
+  function structRun(cfg) {
+    resetGlobals(); setCfg(cfg);
+    let builders = 0, vpSum = 0, combined = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      combined += state.metrics.combinedAuctions;
+      for (const p of state.players) {
+        if (p.built.some(s => s.name === 'Confluence')) { builders++; vpSum += totalVP(p, state); }
+      }
+    }
+    return { builders, avgVP: builders ? vpSum / builders : NaN, fires: builders ? combined / builders : NaN };
+  }
+  function structBaseline() {
+    resetGlobals();
+    STRUCTURE_EFFECT_DISABLED['Confluence'] = true;
+    let builders = 0, vpSum = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      for (const p of state.players) {
+        if (p.built.some(s => s.name === 'Confluence')) { builders++; vpSum += totalVP(p, state); }
+      }
+    }
+    resetGlobals();
+    return { builders, avgVP: builders ? vpSum / builders : NaN };
+  }
+
+  // DOUBLE VISION: combined auction granted to ALL players (Confluence disabled
+  // to isolate the card). Symmetric across players, so game length (avg turns)
+  // is the meaningful metric, not win%.
+  function doubleVisionRun(cfg, on) {
+    resetGlobals();
+    STRUCTURE_EFFECT_DISABLED['Confluence'] = true;
+    if (on) { setDoubleVisionActive(true); setCfg(cfg); }
+    let turns = 0, combined = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      turns += state.metrics.turns;
+      combined += state.metrics.combinedAuctions;
+    }
+    resetGlobals();
+    return { turns: turns / numGames, fires: combined / numGames };
+  }
+
+  const CONFIGS = [];
+  for (const pairing of ['same', 'any'])
+    for (const trig of ['min', 'max'])
+      for (const item of ['min', 'max'])
+        CONFIGS.push({ pairing, trig, item });
+
+  console.log(`\nRiver Bankers — Confluence (structure) + Double Vision (Optional Rules) config matrix`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games per cell.`);
+  const t0 = Date.now();
+
+  // ---- Structure table ----
+  const base = structBaseline();
+  const structRows = CONFIGS.map((cfg, i) => {
+    process.stderr.write(`\rstructure [${i + 1}/${CONFIGS.length}] `);
+    const r = structRun(cfg);
+    return { cfg, ...r, dvp: r.avgVP - base.avgVP };
+  });
+  // ---- Double Vision table ----
+  const orBase = doubleVisionRun({ pairing: 'same', trig: 'min', item: 'min' }, false);
+  const orRows = CONFIGS.map((cfg, i) => {
+    process.stderr.write(`\rdouble-vision [${i + 1}/${CONFIGS.length}] `);
+    const r = doubleVisionRun(cfg, true);
+    return { cfg, ...r, dturns: r.turns - orBase.turns };
+  });
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  const cfgLabel = c => `${c.pairing.padEnd(4)} ${c.trig.padEnd(3)} ${c.item.padEnd(3)}`;
+  console.log(`\n== Confluence as a STRUCTURE card (builder ΔVP) ==`);
+  console.log(`Effect-off baseline: ${base.avgVP.toFixed(2)} avgVP over ${base.builders} builders.\n`);
+  console.log(pad('pair trig item', 16) + padL('builds', 8) + padL('avgVP', 9) + padL('ΔVP', 8) + padL('fires/bld', 11));
+  console.log('-'.repeat(16 + 8 + 9 + 8 + 11));
+  for (const r of structRows) {
+    console.log(pad(cfgLabel(r.cfg), 16) + padL(r.builders, 8) +
+      padL(r.avgVP.toFixed(2), 9) + padL((r.dvp >= 0 ? '+' : '') + r.dvp.toFixed(2), 8) +
+      padL(r.fires.toFixed(2), 11));
+  }
+
+  console.log(`\n== Double Vision (Optional Rules) — combined auction for ALL players (game length) ==`);
+  console.log(`No-ability baseline: ${orBase.turns.toFixed(1)} avg turns.\n`);
+  console.log(pad('pair trig item', 16) + padL('avgTurns', 10) + padL('Δturns', 9) + padL('Δ%', 8) + padL('cmb/game', 11));
+  console.log('-'.repeat(16 + 10 + 9 + 8 + 11));
+  for (const r of orRows) {
+    const dp = orBase.turns ? 100 * r.dturns / orBase.turns : 0;
+    console.log(pad(cfgLabel(r.cfg), 16) + padL(r.turns.toFixed(1), 10) +
+      padL((r.dturns >= 0 ? '+' : '') + r.dturns.toFixed(1), 9) +
+      padL((dp >= 0 ? '+' : '') + dp.toFixed(1) + '%', 8) + padL(r.fires.toFixed(2), 11));
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  pair/trig/item = pairing rule / trigger-cost rule / per-item-cost rule.');
+  console.log('  ΔVP     = builder avgVP − effect-off baseline (structure effect contribution).');
+  console.log('  Δturns/Δ% = avg game-turns change vs. the no-ability baseline (Double Vision is all-players).');
+  console.log('  cmb/game = combined auctions per game under Double Vision.\n');
+}
+
+// Effect-usage sweep: for every card with an active/triggered ability, measure
+// how often it actually FIRES per player who built it (not just whether it was
+// built). Puts Confluence's trigger rate in context against the rest of the
+// "as an action" / "at 0 🐟" / starter-active cohort. All effects on, live
+// defaults. Run with `cpulimit -l 50 -f -m --` per the sim-ablations rule.
+function sweepEffectUse(numGamesArg, numPArg, workersArg, pairingArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const numGames = parseInt(numGamesArg) || 4000;
+  // Optional 4th arg sets Confluence's pairing rule for this run ('same'|'any'),
+  // so its usage can be read against the rest of the cohort under either rule.
+  const pairing = (pairingArg === 'any') ? 'any' : 'same';
+  setCombinedAuctionPairing(pairing);
+  configureMaterials(6);
+  // Cards with an instrumented active ability, grouped for the printout.
+  const COHORT = {
+    'as-an-action': ['Confluence', 'Heron Roost', 'Driftwood Snag', 'Otter Trail',
+                     'Trading Post', 'Beaver Tow', 'Salmon Run'],
+    'at-0-fish':    ['Wood Pile', 'Hollowed-out Log', 'Pack Rat Burrow'],
+    'starter':      ['Tail Slap', 'Channel Clearer'],
+  };
+  const ALL = [].concat(...Object.values(COHORT));
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  const uses = {}, builders = {};
+  for (const n of ALL) { uses[n] = 0; builders[n] = 0; }
+  const t0 = Date.now();
+  for (let g = 0; g < numGames; g++) {
+    const state = newGame(numP, workers);
+    runOneGame(state);
+    for (const n of ALL) uses[n] += (state.metrics.effectUses[n] || 0);
+    for (const p of state.players) {
+      const names = new Set(p.built.map(s => s.name));
+      for (const n of ALL) if (names.has(n)) builders[n]++;
+    }
+  }
+
+  setCombinedAuctionPairing('same'); // restore live default
+  console.log(`\nRiver Bankers — active-effect usage rates`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games. All effects on. Confluence pairing='${pairing}'.\n`);
+  console.log(
+    pad('Card', 20) + pad('cohort', 14) + padL('builders', 10) +
+    padL('fires', 9) + padL('fires/bld', 11) + padL('fires/game', 12)
+  );
+  console.log('-'.repeat(20 + 14 + 10 + 9 + 11 + 12));
+  const rows = [];
+  for (const [cohort, names] of Object.entries(COHORT)) {
+    for (const n of names) {
+      rows.push({ n, cohort, builders: builders[n], fires: uses[n],
+        perBld: builders[n] ? uses[n] / builders[n] : NaN,
+        perGame: uses[n] / numGames });
+    }
+  }
+  rows.sort((a, b) => (b.perBld || 0) - (a.perBld || 0));
+  for (const r of rows) {
+    console.log(
+      pad(r.n, 20) + pad(r.cohort, 14) + padL(r.builders, 10) +
+      padL(r.fires, 9) + padL(isNaN(r.perBld) ? '-' : r.perBld.toFixed(2), 11) +
+      padL(r.perGame.toFixed(3), 12)
+    );
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  builders   = total builder-instances across all games (a starter');
+  console.log('               counts whenever its species drafted it).');
+  console.log('  fires      = total successful activations across all games.');
+  console.log('  fires/bld  = fires ÷ builders — avg times a builder uses it per game.');
+  console.log('  fires/game = fires ÷ games — raw board frequency.\n');
 }
 
 // Compare 4-river-slot baseline vs 3-river-slot variant. Cards graduating off
@@ -3852,6 +5098,14 @@ if (require.main === module) {
   else if (mode === 'deck') sweepDeck(process.argv[3]);
   else if (mode === 'uniform') sweepUniform();
   else if (mode === 'ablation') sweepAblation(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'confluence') sweepConfluence(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'effect-use') sweepEffectUse(process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
+  else if (mode === 'confluence-pairing') sweepConfluencePairing(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'confluence-starter') sweepConfluenceStarter(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'confluence-trigger') sweepConfluenceTrigger(process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
+  else if (mode === 'confluence-matrix') sweepConfluenceMatrix(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'balance') sweepBalance(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'game-length') sweepGameLength(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-winrate') sweepSpeciesWinRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-starters') sweepSpeciesStarters(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'river-slots') sweepRiverSlots();
