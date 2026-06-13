@@ -1755,38 +1755,41 @@ function aiChooseAction(state, playerIdx) {
     const score = need * got - 1 * got * 0.4 - trigger * 0.6;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'preriv'; bestPrerivIdx = i; }
   }
-  // Combined auction (Confluence card / Double Vision module): a pooled auction
-  // can satisfy a need (or two, under 'any') that no single card can. Score it
-  // against the best single-card target and prefer it only when it genuinely
-  // wins. Config comes from combinedConfig (per-source).
+  // Pick the best material-gaining action across single auctions, the combined
+  // (Confluence / Double Vision) auction, Salmon Run, and Beaver Tow — all
+  // scored on the same need-weighted scale (need × workers − fish×0.4). Folding
+  // them into one comparison keeps Salmon Run / Beaver Tow reachable: a single
+  // auction used to `return` first, so they fired ~never even when cheaper.
+  const candidates = [];
+  if (bestCard) {
+    candidates.push({
+      score: bestScore, needsTrigger: true,
+      make: () => bestKind === 'river' ? { type: 'auction', cardId: bestCard.id } : { type: 'preriv', slotIdx: bestPrerivIdx },
+    });
+  }
   if (hasCombinedAuctionAbility(p)) {
     const cfg = combinedConfig(p);
     const ct = (cfg.pairing === 'any')
       ? findCombinedAuctionTargetAny(state, playerIdx, needs, triggerPool)
       : findCombinedAuctionTarget(state, playerIdx, needs, triggerPool);
-    if (ct) {
-      const trig = combinedTriggerCost(state, ct.A, ct.B, cfg.trigger);
-      if (ct.score > bestScore && p.timePos + trig < ENDGAME_TRACK_END) {
-        return { type: 'combinedAuction', aId: ct.A.id, bId: ct.B.id };
-      }
+    if (ct && p.timePos + combinedTriggerCost(state, ct.A, ct.B, cfg.trigger) < ENDGAME_TRACK_END) {
+      candidates.push({ score: ct.score, needsTrigger: true, make: () => ({ type: 'combinedAuction', aId: ct.A.id, bId: ct.B.id }) });
     }
   }
-  if (bestCard && triggerPool > 0) {
-    if (bestKind === 'river') return { type: 'auction', cardId: bestCard.id };
-    return { type: 'preriv', slotIdx: bestPrerivIdx };
-  }
-  // Beaver Tow: if no good auction was found, slide a useful card upstream
-  // (cheaper for a future auction).
-  if (hasEffect(p, 'Beaver Tow') && p.timePos + 2 < ENDGAME_TRACK_END) {
-    const towTarget = findBeaverTowTarget(state, playerIdx, needs);
-    if (towTarget) return { type: 'beaverTow', cardId: towTarget.id };
-  }
-  // Salmon Run: place workers from supply on a single card with escalating cost.
   if (hasEffect(p, 'Salmon Run') && p.supply > 0 && p.timePos + 2 < ENDGAME_TRACK_END) {
-    const target = findSalmonRunTarget(state, playerIdx, needs);
-    if (target && p.timePos + salmonRunCumulativeCost(target.n) < ENDGAME_TRACK_END) {
-      return { type: 'salmonRun', cardId: target.card.id, workerCount: target.n };
+    const t = findSalmonRunTarget(state, playerIdx, needs);
+    if (t && p.timePos + salmonRunCumulativeCost(t.n) < ENDGAME_TRACK_END) {
+      candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'salmonRun', cardId: t.card.id, workerCount: t.n }) });
     }
+  }
+  if (hasEffect(p, 'Beaver Tow') && p.timePos + 2 < ENDGAME_TRACK_END) {
+    const t = findBeaverTowTarget(state, playerIdx, needs);
+    if (t) candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'beaverTow', cardId: t.card.id }) });
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  for (const cand of candidates) {
+    if (cand.needsTrigger && triggerPool <= 0) continue;
+    return cand.make();
   }
   // Endgame pair-VP cash-out check: if the rule is live, we're in endgame,
   // and our leftover workers already pair up to ≥1 VP, prefer passing over
@@ -2035,6 +2038,10 @@ function findOtterTrailTarget(state, playerIdx) {
 
 // Salmon Run: marginal fish cost for the 1st/2nd/3rd/4th/5th worker placed.
 const SALMON_RUN_COSTS = [1, 2, 3, 5, 8];
+// Turn-delay penalty for Beaver Tow: towing spends a whole action now to set up
+// a cheaper auction later, so the future grab must be sizable to beat just
+// auctioning the card outright this turn. Tuned so tow only wins on big grabs.
+const BEAVER_TOW_DELAY = 1.5;
 function salmonRunCumulativeCost(n) {
   let total = 0;
   for (let i = 0; i < n && i < SALMON_RUN_COSTS.length; i++) total += SALMON_RUN_COSTS[i];
@@ -2062,21 +2069,19 @@ function findSalmonRunTarget(state, playerIdx, needs) {
     if (typeof c.slot !== 'number') continue;
     const need = needs[c.material] || 0;
     if (need === 0) continue;
-    const yieldPerWorker = playerCardCost(state, c, playerIdx);
-    let bestN = 0, bestGain = 0;
+    let bestN = 0, bestScore = 0;
     const maxN = Math.min(p.supply, uncoveredIcons(c), need, SALMON_RUN_COSTS.length);
     for (let n = 1; n <= maxN; n++) {
-      const gain = n * yieldPerWorker - salmonRunCumulativeCost(n);
-      if (gain > bestGain) { bestGain = gain; bestN = n; }
+      // Scored on the SAME need-weighted scale as a single-card auction
+      // (need × workers − fish×0.4), but Salmon Run's escalating cost is
+      // slot-independent — so it beats an auction on deep/expensive cards.
+      const score = need * n - salmonRunCumulativeCost(n) * 0.4;
+      if (score > bestScore) { bestScore = score; bestN = n; }
     }
-    if (bestN > 0 && (best === null || bestGain > best.gain)) {
-      best = { card: c, n: bestN, gain: bestGain };
+    if (bestN > 0 && (best === null || bestScore > best.score)) {
+      best = { card: c, n: bestN, score: bestScore };
     }
   }
-  // Opportunity-cost floor: a main action is worth ~3 fish of board progress
-  // (could otherwise auction, build, etc.). Don't burn it on marginal Salmon
-  // Run gains — e.g. 1 worker on R1 saves only 1 fish vs. a regular bid.
-  if (best && best.gain < 3) return null;
   return best;
 }
 
@@ -2114,11 +2119,19 @@ function findBeaverTowTarget(state, playerIdx, needs) {
   let best = null;
   for (const c of state.riverCards) {
     if (typeof c.slot !== 'number' || c.slot === 0) continue;
-    const own = needs[c.material] || 0;
-    if (own < 2) continue; // builder needs ≥2 of this material for the tow to pay off
+    const need = needs[c.material] || 0;
+    if (need < 2) continue; // builder needs ≥2 of this material for the tow to pay off
     if (uncoveredIcons(c) < 4) continue;
     if (opponentNeedsMaterial(c.material)) continue;
-    if (!best || c.slot > best.slot || (c.slot === best.slot && uncoveredIcons(c) > uncoveredIcons(best))) best = c;
+    // Tow sets up a cheaper future auction: sliding one slot upstream cuts the
+    // per-item cost by 1🐟. Score it on the auction scale as the value of that
+    // discounted future grab, minus the 2🐟 tow cost and a turn-delay penalty
+    // (an extra action spent now without gaining material) — so it only wins
+    // over auctioning the card outright when the future grab is large.
+    const futureGot = Math.min(need, uncoveredIcons(c), triggerPool);
+    const reducedCost = Math.max(1, playerCardCost(state, c, playerIdx) - 1);
+    const score = need * futureGot - reducedCost * futureGot * 0.4 - 2 * 0.4 - BEAVER_TOW_DELAY;
+    if (!best || score > best.score) best = { card: c, score };
   }
   return best;
 }
