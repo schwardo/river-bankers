@@ -1317,9 +1317,9 @@ function runCombinedAuction(state, cardA, cardB, triggerPlayerIdx, minBidTrigger
   noteEffectUse(state, 'Confluence');
   const virtual = makeVirtualCombinedCard(cardA, cardB, costMode);
   const bids = collectAuctionBids(state, virtual, triggerPlayerIdx, minBidTrigger);
-  resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing);
+  resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing, triggerPlayerIdx);
 }
-function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing) {
+function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing, triggerPlayerIdx) {
   let remA = uncoveredIcons(cardA);
   let remB = uncoveredIcons(cardB);
   const open = remA + remB;
@@ -1347,9 +1347,14 @@ function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing) {
     finalizeCombinedCard(state, cardB, false);
     return;
   }
+  // Clinch counts are order-independent, but placement (which physical card
+  // fills) goes CLOCKWISE from the player who initiated the auction.
+  const nP = state.players.length;
+  const cwDist = (idx) => ((idx - triggerPlayerIdx) % nP + nP) % nP;
   const playerBidPairs = Object.entries(bids)
     .filter(([_, b]) => b > 0)
-    .map(([idx, b]) => ({ idx: parseInt(idx), bid: b }));
+    .map(([idx, b]) => ({ idx: parseInt(idx), bid: b }))
+    .sort((a, b) => cwDist(a.idx) - cwDist(b.idx));
   const isJam = totalBid > open;
   if (!isJam) {
     state.metrics.plentyAuctions++;
