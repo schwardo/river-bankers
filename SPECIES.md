@@ -58,7 +58,7 @@ Each species (Beaver, River Otter, Muskrat, Mink) has a private pool of **3 them
 | Name | VP | Type | Effect |
 |------|----|------|--------|
 | **Clay Den** ⭐ | 0 | Constant — material bonus | Clay icons cost you 2 less fish per item (min 1). |
-| **Quick Strike** | 2 | Constant — bidding | When you trigger an auction, you may declare your bid last (after all other bids are revealed). |
+| **Quick Strike** | 2 | Constant — bidding | When you trigger an auction, you may declare your bid last (after all other bids are revealed). You must still bid at least 1 worker, as the trigger always does. |
 | **Snare Set** | 1 | Constant — disruption, once-per-game | Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3🐟 in compensation. (Same as the main-deck Tribute Stone card.) |
 
 > **Printed VP** values were calibrated via per-starter forced-pick ablation. Underperforming cards get bumps; over-target cards stay at 0 VP (since printed VP can't go negative). See "Balance notes" below.

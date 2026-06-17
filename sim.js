@@ -88,7 +88,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 2, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
   // Mink (Clay bias)
   { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 2 less fish per item (min 1).' },
-  { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 2, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed).' },
+  { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 2, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed). You must still bid at least 1 worker, as the trigger always does.' },
   { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 1, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3 fish in compensation.' },
 ];
 
