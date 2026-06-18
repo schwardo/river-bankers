@@ -1818,7 +1818,7 @@ function buildMaterialDeck(numPlayers) {
 //   <material> <icons>" indicator) that's visible whenever the human has Lookout Tree built.
 const STRUCTURE_TEMPLATES = [
   { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built: wash one card from River 1 to the shoreline (workers carry along).' },
-  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'At 0 on 🐟 track: recall one worker from a river card (no blank).' },
+  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'Once per game (flip card): recall one worker from a river card (no blank).' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built: pull a Headwaters card to River 1; run an auction on it at 1🐟/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End of game: +1 VP per shoreline card on the table (max +6).' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
@@ -1830,10 +1830,10 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top of the material deck at any time.' },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +2 VP per shoreline card with at least one of your workers.' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build: each Reed worker counts as 2 reeds.' },
-  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'At 0 on 🐟 track: claim 1 uncovered Log icon from any river card for 1🐟.' },
+  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck.' },
   { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
-  { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 6, effect: 'When you would pass 0 on 🐟 track, stop at space 1 instead.' },
+  { name: 'Mill Wheel',     cost: { logs: 3, stones: 2 },            time: 4, vp: 6, effect: 'When built: activate one "when built" effect of a built structure controlled by the player to your left or right.\n\nAs an action: activate the "as an action" ability of a built structure controlled by the player to your left or right.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When built: look at the top 5 material cards and rearrange them in any order.' },
   { name: 'Flush Channel',  cost: { mud: 3, reeds: 1 },              time: 2, vp: 6, effect: 'When built: discard 1 Headwaters card (out of game) and refill that slot from the material deck. No auction.' },
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 3, effect: 'Once per game (flip card): your build costs 1 fewer of one listed material.' },
@@ -1855,7 +1855,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 3, clay: 2 },  time: 3, vp: 0, effect: 'End of game: +3 VP per 2 distinct materials in your built structures (max +9).' },
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 4, vp: 3, effect: 'When you build: you may spend 2 of any one material as 1 of any other. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
-  { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'At 0 on 🐟 track: you may discard 1 structure from your hand and take one from the discard pile.' },
+  { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'Once per game (flip card): discard 1 structure from your hand and take one of your choice from the discard pile.' },
   { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back 3🐟 in compensation.' },
   { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'As an action: pay 2🐟 to slide a river card 1 space toward the Headwaters.' },
   { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.' },
@@ -1863,7 +1863,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track.' },
   { name: 'Trophy Lodge',   cost: { clay: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +3 VP per ?-VP structure you control, including this one (max +12).' },
   { name: 'Springwater Pool', cost: { vines: 3, mud: 2 },            time: 3, vp: 5, effect: 'When built: ready all of your spent once-per-game cards.' },
-  { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 1, vp: 3, effect: 'When built: trigger each of your \'0 on 🐟 track\' effects once.' },
+  { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 1, vp: 3, effect: 'Once per game (flip card): ready one of your other spent once-per-game cards.' },
   { name: 'Trading Post',     cost: { clay: 2, reeds: 2 },             time: 3, vp: 5, effect: 'As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.' },
   { name: 'Confluence',       cost: { reeds: 2, stones: 2 },           time: 3, vp: 5, effect: 'As an action: pay 🐟 to trigger one auction over two same-symbol cards, pooling all their uncovered icons into a single larger pool. Both cards then float downriver.' },
 
@@ -1921,6 +1921,10 @@ function oncePerGameUsed(p, name) {
   if (name === 'Floodgate'     && p.floodgateUsed)     return true;
   if (name === 'Spy Mound'     && p.spyMoundUsed)      return true;
   if (name === 'Tribute Stone' && p.tributeStoneUsed)  return true;
+  if (name === 'Wood Pile'        && p.woodPileUsed)      return true;
+  if (name === 'Hollowed-out Log' && p.hollowedLogUsed)   return true;
+  if (name === 'Pack Rat Burrow'  && p.packRatUsed)       return true;
+  if (name === 'Spring Cascade'   && p.springCascadeUsed) return true;
   return false;
 }
 function maxHandSize(p) { return 3 + (hasEffect(p, 'Cache Burrow') ? 1 : 0); }
@@ -2025,55 +2029,11 @@ function playerCardCost(card, playerIdx) {
 
 // Pass-0 freebies fire when a player crosses lap-loop boundary (timePos % LAP_LENGTH wraps).
 // Each crossing fires the effects once.
-function firePassZeroEffects(playerIdx, count) {
-  const p = state.players[playerIdx];
-  for (let i = 0; i < count; i++) {
-    if (hasEffect(p, 'Wood Pile')) {
-      const target = state.riverCards.find(c => c.material === 'logs' && uncoveredIcons(c) > 0);
-      if (target && p.supply > 0) {
-        p.supply -= 1;
-        target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
-        // 1 fish cost — direct increment to skip nested lap-shadow recomputation.
-        p.timePos += 1;
-        log(`${MATERIALS.logs.icon} Wood Pile: ${speciesLabel(p)} claims 1 log icon (+1🐟).`);
-      }
-    }
-    if (hasEffect(p, 'Hollowed-out Log')) {
-      const target = state.riverCards.find(c => workersOnCard(c, playerIdx) > 0);
-      if (target) {
-        target.workers[playerIdx] -= 1;
-        if (target.workers[playerIdx] === 0) delete target.workers[playerIdx];
-        p.supply += 1;
-        log(`${MATERIALS.logs.icon} Hollowed-out Log: ${speciesLabel(p)} recalls 1 worker (no blank).`);
-      }
-    }
-    if (hasEffect(p, 'Pack Rat Burrow') && p.hand.length > 0 && state.structDiscard.length > 0) {
-      if (p.isHuman) {
-        // Defer to the end of the turn — modal interaction shouldn't block the
-        // synchronous advancePlayer math. Queue a pending swap prompt.
-        state.pendingPackRatSwaps = (state.pendingPackRatSwaps || 0) + 1;
-      } else {
-        const wbm = playerWorkersByMaterial(state, playerIdx);
-        const score = (s) => {
-          let deficit = 0;
-          for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
-          return s.vp + aiEffectValue(s, p, state) - deficit * 1.5;
-        };
-        const handScored = p.hand.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => a.sc - b.sc);
-        const discardScored = state.structDiscard.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => b.sc - a.sc);
-        const worstHand = handScored[0];
-        const bestDiscard = discardScored[0];
-        if (bestDiscard.sc > worstHand.sc) {
-          const taken = state.structDiscard.splice(bestDiscard.i, 1)[0];
-          const dropped = p.hand.splice(worstHand.i, 1)[0];
-          state.structDiscard.push(dropped);
-          p.hand.push(taken);
-          log(`🐀 Pack Rat Burrow: ${speciesLabel(p)} swaps ${dropped.name} ↔ ${taken.name} (discard pile).`);
-        }
-      }
-    }
-  }
-}
+// Pass-0 (lap-crossing) effects. Wood Pile / Hollowed-out Log / Pack Rat Burrow
+// were reworked from "at 0 on track" triggers to once-per-game on-demand
+// abilities, so no card fires here anymore. Kept as a no-op stub (advancePlayer
+// still calls it on each lap crossing).
+function firePassZeroEffects(playerIdx, count) { /* no pass-0 cards remain */ }
 
 // Pack Rat Burrow swap UI for the human, called after a turn settles when the
 // pass-0 event queued one or more pending swaps.
@@ -2640,6 +2600,10 @@ function startGame() {
       rollingFloatUsed: false,
       snareSetUsed: false,
       stoneToolUsed: false,
+      woodPileUsed: false,
+      hollowedLogUsed: false,
+      packRatUsed: false,
+      springCascadeUsed: false,
     });
   }
 
@@ -2875,15 +2839,12 @@ function advancePlayer(playerIdx, byTime) {
   const p = state.players[playerIdx];
   const prev = p.timePos;
   p.timePos += byTime;
-  // Detect pass-0 crossings (lap-loop boundary). Mill Wheel clamps to (boundary + 1).
   const prevLapBoundary = Math.floor(prev / LAP_LENGTH);
   const newLapBoundary  = Math.floor(p.timePos / LAP_LENGTH);
   const passZeroCount = Math.max(0, newLapBoundary - prevLapBoundary);
-  if (passZeroCount > 0 && hasEffect(p, 'Mill Wheel')) {
-    p.timePos = (prevLapBoundary + 1) * LAP_LENGTH + 1;
-    log(`⚙ ${speciesLabel(p)} stops at space 1 (Mill Wheel).`);
-  }
-  // Pass-0 freebies (Wood Pile, Hollowed-out Log) consume the crossing event.
+  // (Wood Pile / Hollowed-out Log / Pack Rat Burrow were reworked from pass-0
+  // triggers to once-per-game abilities, and Mill Wheel from a pass-0 clamp to a
+  // neighbour-copy — so nothing fires on a lap crossing anymore.)
   if (passZeroCount > 0) firePassZeroEffects(playerIdx, passZeroCount);
   state.stackOrder = state.stackOrder.filter(i => i !== playerIdx);
   state.stackOrder.unshift(playerIdx);
@@ -3661,6 +3622,29 @@ function renderActionPanel() {
         if (avail) break;
       }
       if (avail) abilityBtns.push(`<button class="ability-btn" onclick="humanUseRollingFloat()">🦦 Rolling Float (once per game): swap workers in the same slot</button>`);
+    }
+    // Reworked once-per-game cards.
+    if (hasEffect(cur, 'Wood Pile') && !cur.woodPileUsed && cur.supply > 0 &&
+        state.riverCards.some(c => c.material === 'logs' && uncoveredIcons(c) > 0)) {
+      abilityBtns.push(`<button class="ability-btn" onclick="humanUseWoodPile()">${MATERIALS.logs.icon} Wood Pile (once per game, 1🐟): claim a Log icon</button>`);
+    }
+    if (hasEffect(cur, 'Hollowed-out Log') && !cur.hollowedLogUsed &&
+        state.riverCards.some(c => workersOnCard(c, cur.idx) > 0)) {
+      abilityBtns.push(`<button class="ability-btn" onclick="humanUseHollowedLog()">🪵 Hollowed-out Log (once per game): recall a worker (no blank)</button>`);
+    }
+    if (hasEffect(cur, 'Pack Rat Burrow') && !cur.packRatUsed && cur.hand.length > 0 && state.structDiscard.length > 0) {
+      abilityBtns.push(`<button class="ability-btn" onclick="humanUsePackRat()">🐀 Pack Rat Burrow (once per game): swap a hand card with the discard</button>`);
+    }
+    if (hasEffect(cur, 'Spring Cascade') && !cur.springCascadeUsed &&
+        ONCE_PER_GAME_FLAGS.some(([name, flag]) => cur[flag] && cur.built.some(s => s.name === name))) {
+      abilityBtns.push(`<button class="ability-btn" onclick="humanUseSpringCascade()">💦 Spring Cascade (once per game): ready a spent once-per-game card</button>`);
+    }
+    if (hasEffect(cur, 'Mill Wheel')) {
+      const nAvail = new Set();
+      for (const nIdx of neighborIdxs(cur.idx))
+        for (const s of state.players[nIdx].built) if (effectActive(s.name)) nAvail.add(s.name);
+      if (MILL_WHEEL_ASACTION.some(n => nAvail.has(n)))
+        abilityBtns.push(`<button class="ability-btn" onclick="humanUseMillWheel()">⚙ Mill Wheel: copy a neighbour's "as an action" ability</button>`);
     }
     const abilityRow = abilityBtns.length
       ? `<div class="ability-row"><span class="ability-label">Optional abilities:</span>${abilityBtns.join('')}</div>`
@@ -4839,7 +4823,8 @@ const EFFECT_VP_FIXED = {
   'Reed Bed': 0.5,
   'Otter Slide': 2,
   'Mill Wheel': 0.5,
-  'Pack Rat Burrow': 1.5,
+  'Pack Rat Burrow': 1,
+  'Spring Cascade': 0.5,
   'Royal Lodge': 1,
   'Burrow Run': 1,
   'Sap Drip': 1,
@@ -4869,6 +4854,10 @@ function aiEffectValue(struct, p, state) {
   if (struct.name === 'Floodgate' && p.floodgateUsed) return 0;
   if (struct.name === 'Spy Mound' && p.spyMoundUsed) return 0;
   if (struct.name === 'Tribute Stone' && p.tributeStoneUsed) return 0;
+  if (struct.name === 'Wood Pile' && p.woodPileUsed) return 0;
+  if (struct.name === 'Hollowed-out Log' && p.hollowedLogUsed) return 0;
+  if (struct.name === 'Pack Rat Burrow' && p.packRatUsed) return 0;
+  if (struct.name === 'Spring Cascade' && p.springCascadeUsed) return 0;
   // Otter Trail's value depends on having opponent workers on useful materials;
   // first-pass uses the flat EFFECT_VP_FIXED entry.
   if (struct.name === 'Pier') {
@@ -5338,6 +5327,11 @@ function findTributeStoneTarget(playerIdx) {
 // + whether to fire.
 function aiStartOfTurnAbilities(playerIdx) {
   const p = state.players[playerIdx];
+  aiTryWoodPile(playerIdx);
+  aiTryHollowedLog(playerIdx);
+  aiTryPackRat(playerIdx);
+  aiTrySpringCascade(playerIdx);
+  aiTryMillWheel(playerIdx);
   if (hasEffect(p, 'Heron Roost') && state.matDeck.length > 0 && canAffordTimeCost(p, 1)) {
     const myMats = new Set();
     for (const s of p.hand) for (const m in s.cost) myMats.add(m);
@@ -5469,6 +5463,99 @@ function aiStartOfTurnAbilities(playerIdx) {
   }
 }
 
+// --- Reworked once-per-game abilities + Mill Wheel copy (AI; humans use the
+// "Optional abilities" buttons). All fire at most once per game when useful. ---
+const ONCE_PER_GAME_FLAGS = [
+  ['Tribute Stone', 'tributeStoneUsed'], ['Snare Set', 'snareSetUsed'],
+  ['Floodgate', 'floodgateUsed'], ['Spy Mound', 'spyMoundUsed'],
+  ['Granary', 'granaryUsed'], ['Slipstream', 'slipstreamUsed'],
+  ['Wood Pile', 'woodPileUsed'], ['Hollowed-out Log', 'hollowedLogUsed'],
+  ['Pack Rat Burrow', 'packRatUsed'],
+];
+function aiTryWoodPile(playerIdx) {
+  const p = state.players[playerIdx];
+  if (!hasEffect(p, 'Wood Pile') || p.woodPileUsed || p.supply <= 0) return;
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  let need = 0;
+  for (const s of p.hand) need = Math.max(need, Math.max(0, (s.cost.logs || 0) - (wbm.logs || 0)));
+  if (need <= 0) return;
+  const target = state.riverCards.find(c => c.material === 'logs' && uncoveredIcons(c) > 0);
+  if (!target) return;
+  p.supply -= 1;
+  target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
+  p.timePos += 1;
+  p.woodPileUsed = true;
+  log(`${MATERIALS.logs.icon} Wood Pile: ${speciesLabel(p)} claims 1 log icon (+1🐟).`);
+}
+function aiTryHollowedLog(playerIdx) {
+  const p = state.players[playerIdx];
+  if (!hasEffect(p, 'Hollowed-out Log') || p.hollowedLogUsed) return;
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const needMat = new Set();
+  for (const s of p.hand) for (const m in s.cost) if ((s.cost[m] || 0) > (wbm[m] || 0)) needMat.add(m);
+  const target = state.riverCards.find(c => workersOnCard(c, playerIdx) > 0 && !needMat.has(c.material))
+    || state.riverCards.find(c => workersOnCard(c, playerIdx) > 0);
+  if (!target) return;
+  target.workers[playerIdx] -= 1;
+  if (target.workers[playerIdx] === 0) delete target.workers[playerIdx];
+  p.supply += 1;
+  p.hollowedLogUsed = true;
+  log(`${MATERIALS.logs.icon} Hollowed-out Log: ${speciesLabel(p)} recalls 1 worker (no blank).`);
+}
+function aiTryPackRat(playerIdx) {
+  const p = state.players[playerIdx];
+  if (!hasEffect(p, 'Pack Rat Burrow') || p.packRatUsed) return;
+  if (p.hand.length === 0 || state.structDiscard.length === 0) return;
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const score = (s) => { let d = 0; for (const m in s.cost) d += Math.max(0, s.cost[m] - (wbm[m] || 0)); return s.vp + aiEffectValue(s, p, state) - d * 1.5; };
+  const hs = p.hand.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => a.sc - b.sc);
+  const ds = state.structDiscard.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => b.sc - a.sc);
+  if (ds[0].sc <= hs[0].sc + 1) return;
+  const taken = state.structDiscard.splice(ds[0].i, 1)[0];
+  const dropped = p.hand.splice(hs[0].i, 1)[0];
+  state.structDiscard.push(dropped); p.hand.push(taken);
+  p.packRatUsed = true;
+  log(`🐀 Pack Rat Burrow: ${speciesLabel(p)} swaps ${dropped.name} ↔ ${taken.name} (discard).`);
+}
+function aiTrySpringCascade(playerIdx) {
+  const p = state.players[playerIdx];
+  if (!hasEffect(p, 'Spring Cascade') || p.springCascadeUsed) return;
+  for (const [name, flag] of ONCE_PER_GAME_FLAGS) {
+    if (p[flag] && p.built.some(s => s.name === name)) {
+      p[flag] = false; p.springCascadeUsed = true;
+      log(`💦 Spring Cascade: ${speciesLabel(p)} re-readies ${name}.`);
+      return;
+    }
+  }
+}
+function aiTryMillWheel(playerIdx) {
+  const p = state.players[playerIdx];
+  if (!hasEffect(p, 'Mill Wheel')) return;
+  const avail = new Set();
+  for (const nIdx of neighborIdxs(playerIdx))
+    for (const s of state.players[nIdx].built) if (effectActive(s.name)) avail.add(s.name);
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  for (const s of p.hand) for (const m in s.cost) needs[m] = Math.max(needs[m], Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0)));
+  if (avail.has('Salmon Run') && p.supply > 0) {
+    const t = findSalmonRunTarget(playerIdx, needs);
+    if (t && canAffordTimeCost(p, salmonRunCumulativeCost(t.n))) { doSalmonRun(playerIdx, t.card.id, t.n); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Salmon Run.`); return; }
+  }
+  if (avail.has('Trading Post') && canAffordTimeCost(p, 1) && p.supply >= 2) {
+    const a = findTradingPostAction(playerIdx);
+    if (a) { doTradingPost(playerIdx, a); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Trading Post.`); return; }
+  }
+  if (avail.has('Otter Trail')) {
+    const t = findOtterTrailTarget(playerIdx);
+    if (t && canAffordTimeCost(p, cardCost(t.cardA))) { doOtterTrail(playerIdx, t.cardA.id, t.cardB.id, t.otherIdx); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Otter Trail.`); return; }
+  }
+  if (avail.has('Beaver Tow')) {
+    const t = findBeaverTowTarget(playerIdx, needs);
+    if (t) { doBeaverTow(playerIdx, t.card.id); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Beaver Tow.`); return; }
+  }
+}
+
 // Returns {safe, fallback}: ordered lists of {cardId, count} for pre-auction recall.
 //   safe     — no-regret recalls: shoreline (no blank), then irrelevant-material
 //              river workers, then surplus useful workers (placed > hand-build cap).
@@ -5572,6 +5659,112 @@ async function humanUseHeronRoost() {
   state.prerivCards[pick.idx] = newCard;
   human.timePos += 1;
   log(`🦩 Heron Roost: ${speciesLabel(human)} replaces Headwaters ${PRERIV_SLOTS - pick.idx} with ${MATERIALS[newCard.material].name} (+1🐟).`);
+  render();
+}
+
+// --- Reworked once-per-game cards + Mill Wheel (human ability buttons) ---
+async function humanUseWoodPile() {
+  const h = state.players.find(p => p.isHuman);
+  if (!h || !hasEffect(h, 'Wood Pile') || h.woodPileUsed || h.supply <= 0) return;
+  const cands = state.riverCards.filter(c => c.material === 'logs' && uncoveredIcons(c) > 0);
+  if (!cands.length) return;
+  const pick = await pickFromList('🪵 Wood Pile — claim a Log icon',
+    'Place 1 worker on a Log river card for 1🐟. (Once per game.)', cands,
+    c => `River ${c.slot + 1}: ${MATERIALS.logs.icon} Logs (${uncoveredIcons(c)} open)`, { cancelable: true });
+  if (!pick) return;
+  h.supply -= 1;
+  pick.workers[h.idx] = (pick.workers[h.idx] || 0) + 1;
+  h.timePos += 1;
+  h.woodPileUsed = true;
+  log(`${MATERIALS.logs.icon} Wood Pile: ${speciesLabel(h)} claims 1 Log icon (+1🐟).`);
+  render();
+}
+
+async function humanUseHollowedLog() {
+  const h = state.players.find(p => p.isHuman);
+  if (!h || !hasEffect(h, 'Hollowed-out Log') || h.hollowedLogUsed) return;
+  const cands = state.riverCards.filter(c => workersOnCard(c, h.idx) > 0);
+  if (!cands.length) return;
+  const pick = await pickFromList('🪵 Hollowed-out Log — recall a worker',
+    'Recall 1 of your workers from a river card (no blank dropped). Once per game.', cands,
+    c => `River ${c.slot + 1}: ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${workersOnCard(c, h.idx)} yours)`, { cancelable: true });
+  if (!pick) return;
+  pick.workers[h.idx] -= 1;
+  if (pick.workers[h.idx] === 0) delete pick.workers[h.idx];
+  h.supply += 1;
+  h.hollowedLogUsed = true;
+  log(`${MATERIALS.logs.icon} Hollowed-out Log: ${speciesLabel(h)} recalls 1 worker (no blank).`);
+  render();
+}
+
+async function humanUsePackRat() {
+  const h = state.players.find(p => p.isHuman);
+  if (!h || !hasEffect(h, 'Pack Rat Burrow') || h.packRatUsed) return;
+  if (h.hand.length === 0 || state.structDiscard.length === 0) return;
+  const drop = await pickFromList('🐀 Pack Rat Burrow — discard a hand card',
+    'Choose a structure from your hand to discard. (Once per game.)', h.hand,
+    s => `${s.name} (${s.time}🐟, ${vpDisplay(s)}★)`, { cancelable: true });
+  if (!drop) return;
+  const take = await pickFromList('🐀 Pack Rat Burrow — take from the discard',
+    'Choose any card of your choice from the discard pile to take.', state.structDiscard,
+    s => `${s.name} (${s.time}🐟, ${vpDisplay(s)}★)`, { cancelable: true });
+  if (!take) return;
+  h.hand.splice(h.hand.indexOf(drop), 1);
+  state.structDiscard.splice(state.structDiscard.indexOf(take), 1);
+  state.structDiscard.push(drop);
+  h.hand.push(take);
+  h.packRatUsed = true;
+  log(`🐀 Pack Rat Burrow: ${speciesLabel(h)} swaps ${drop.name} ↔ ${take.name}.`);
+  render();
+}
+
+async function humanUseSpringCascade() {
+  const h = state.players.find(p => p.isHuman);
+  if (!h || !hasEffect(h, 'Spring Cascade') || h.springCascadeUsed) return;
+  const cands = ONCE_PER_GAME_FLAGS.filter(([name, flag]) => h[flag] && h.built.some(s => s.name === name));
+  if (!cands.length) return;
+  const pick = await pickFromList('💦 Spring Cascade — ready a spent card',
+    'Choose one of your spent once-per-game cards to ready (so you can use it again). Once per game.', cands,
+    ([name]) => name, { cancelable: true });
+  if (!pick) return;
+  h[pick[1]] = false;
+  h.springCascadeUsed = true;
+  log(`💦 Spring Cascade: ${speciesLabel(h)} readies ${pick[0]}.`);
+  render();
+}
+
+async function humanUseMillWheel() {
+  const h = state.players.find(p => p.isHuman);
+  if (!h || !hasEffect(h, 'Mill Wheel')) return;
+  const avail = new Set();
+  for (const nIdx of neighborIdxs(h.idx))
+    for (const s of state.players[nIdx].built) if (effectActive(s.name)) avail.add(s.name);
+  const opts = MILL_WHEEL_ASACTION.filter(n => avail.has(n));
+  if (!opts.length) return;
+  const pick = await pickFromList('⚙ Mill Wheel — copy a neighbour ability',
+    'Choose a neighbour\'s "as an action" ability to activate for yourself (the target is auto-chosen).', opts,
+    n => n, { cancelable: true });
+  if (!pick) return;
+  const wbm = playerWorkersByMaterial(state, h.idx);
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  for (const s of h.hand) for (const m in s.cost) needs[m] = Math.max(needs[m], Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0)));
+  let fired = false;
+  if (pick === 'Salmon Run' && h.supply > 0) { const t = findSalmonRunTarget(h.idx, needs); if (t) { doSalmonRun(h.idx, t.card.id, t.n); fired = true; } }
+  else if (pick === 'Trading Post' && h.supply >= 2) { const a = findTradingPostAction(h.idx); if (a) { doTradingPost(h.idx, a); fired = true; } }
+  else if (pick === 'Otter Trail') { const t = findOtterTrailTarget(h.idx); if (t) { doOtterTrail(h.idx, t.cardA.id, t.cardB.id, t.otherIdx); fired = true; } }
+  else if (pick === 'Beaver Tow') { const t = findBeaverTowTarget(h.idx, needs); if (t) { doBeaverTow(h.idx, t.card.id); fired = true; } }
+  else if (pick === 'Heron Roost' && state.matDeck.length > 0) {
+    const myMats = new Set();
+    for (const s of h.hand) for (const m in s.cost) myMats.add(m);
+    let ti = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
+    if (ti === -1) ti = state.prerivCards.findIndex(c => c);
+    if (ti !== -1) { const nc = state.matDeck.pop(); nc.slot = 'pre'; state.prerivCards[ti] = nc; h.timePos += 1; fired = true; }
+  } else if (pick === 'Driftwood Snag') {
+    const c2 = [...state.riverCards, ...state.prerivCards.filter(c => c)].filter(c => uncoveredIcons(c) > 0);
+    if (c2.length) { const t = c2.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b); t.blanks += 1; h.timePos += 1; fired = true; }
+  }
+  log(fired ? `⚙ Mill Wheel: ${speciesLabel(h)} copies ${pick}.` : `⚙ Mill Wheel: ${pick} had no valid target.`);
   render();
 }
 
@@ -6518,6 +6711,22 @@ function aiBurrowNetworkMove(playerIdx) {
   log(`🕳 Burrow Network: ${speciesLabel(p)} moves 1 worker from ${best.src.name} to ${best.dst.name} (${what}).`);
 }
 
+// Left/right seat neighbours of a player (both collapse to one in a 2P game).
+function neighborIdxs(playerIdx) {
+  const n = state.players.length;
+  if (n <= 1) return [];
+  const left = (playerIdx - 1 + n) % n;
+  const right = (playerIdx + 1) % n;
+  return left === right ? [left] : [left, right];
+}
+// What Mill Wheel can copy from a neighbour, in rough value order. When-built
+// excludes Mill Wheel (no recursion) and info-only Salt Lick; as-an-action set
+// matches the sim (Confluence excluded).
+const MILL_WHEEL_WHENBUILT = ['Royal Lodge', 'Sap Drip', 'Springwater Pool', 'Vine Lattice',
+  'Snag Pile', 'Beaver Dam', 'Mud Levee', 'Flush Channel', 'Stone Pool', 'Burrow Run'];
+const MILL_WHEEL_ASACTION = ['Salmon Run', 'Trading Post', 'Otter Trail', 'Beaver Tow',
+  'Heron Roost', 'Driftwood Snag'];
+
 // One-time on-build effects fire here (web). Each card's effect is triggered by name.
 // async because Snag Pile / Flush Channel trigger auctions and several effects await
 // human-pick modals (Mud Levee, Sap Drip, Snag Pile, Vine Lattice, Stone Pool, Flush Channel,
@@ -6537,20 +6746,32 @@ async function fireOnBuildEffect(playerIdx, struct) {
     log(`👑 ${speciesLabel(p)} takes an immediate extra turn (Royal Lodge).`);
     return;
   }
-  if (struct.name === 'Spring Cascade') {
-    // Fire one pass-0 trigger round (Wood Pile / Hollowed-out Log /
-    // Pack Rat Burrow). Mill Wheel is a passive movement modifier and
-    // has no trigger — it's unaffected.
-    firePassZeroEffects(playerIdx, 1);
-    log(`💦 Spring Cascade: ${speciesLabel(p)} fires their pass-0 triggers.`);
+  // Spring Cascade is now a once-per-game on-demand ability (humanUseSpringCascade /
+  // AI) — nothing fires on build.
+  if (struct.name === 'Mill Wheel') {
+    // When built: copy one "when built" effect from a left/right neighbour's
+    // built structure, resolved for us (best by priority). The repeatable
+    // as-an-action copy is a turn ability (humanUseMillWheel / AI).
+    const neighborHas = new Set();
+    for (const nIdx of neighborIdxs(playerIdx))
+      for (const s of state.players[nIdx].built)
+        if (effectActive(s.name)) neighborHas.add(s.name);
+    const copy = MILL_WHEEL_WHENBUILT.find(n => neighborHas.has(n));
+    if (copy) {
+      log(`⚙ Mill Wheel: ${speciesLabel(p)} copies ${copy} (when-built).`);
+      await fireOnBuildEffect(playerIdx, { name: copy });
+    } else {
+      log(`⚙ Mill Wheel: no neighbour "when built" effect to copy.`);
+    }
     return;
   }
   if (struct.name === 'Springwater Pool') {
     // Ready all of the builder's spent once-per-game cards (main deck +
-    // species starters). Mirrors the player init in newGame.
+    // species starters + the reworked once-per-game cards). Mirrors newGame.
     const flags = [
       'granaryUsed', 'floodgateUsed', 'spyMoundUsed', 'tributeStoneUsed',
       'slipstreamUsed', 'rollingFloatUsed', 'snareSetUsed', 'stoneToolUsed',
+      'woodPileUsed', 'hollowedLogUsed', 'packRatUsed', 'springCascadeUsed',
     ];
     const refreshed = flags.filter(f => p[f]);
     for (const f of flags) p[f] = false;

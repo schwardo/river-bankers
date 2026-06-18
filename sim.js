@@ -22,7 +22,7 @@ let MAT_KEYS = ORIG_MATERIALS.slice();
 // Disable a single card's effect for ablation via setStructureEffectDisabled.
 const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built: wash one card from River 1 to the shoreline (workers carry along).' },
-  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'At 0 on 🐟 track: recall one worker from a river card (no blank).' },
+  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'Once per game (flip card): recall one worker from a river card (no blank).' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built: pull a Headwaters card to River 1; run an auction on it at 1🐟/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End of game: +1 VP per shoreline card on the table (max +6).' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
@@ -34,10 +34,10 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top of the material deck at any time.' },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +2 VP per shoreline card with at least one of your workers.' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build: each Reed worker counts as 2 reeds.' },
-  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'At 0 on 🐟 track: claim 1 uncovered Log icon from any river card for 1🐟.' },
+  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck.' },
   { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
-  { name: 'Mill Wheel',     cost: { logs: 3, stones: 3 },            time: 4, vp: 6, effect: 'When you would pass 0 on 🐟 track, stop at space 1 instead.' },
+  { name: 'Mill Wheel',     cost: { logs: 3, stones: 2 },            time: 4, vp: 6, effect: 'When built: activate one "when built" effect of a built structure controlled by the player to your left or right.\n\nAs an action: activate the "as an action" ability of a built structure controlled by the player to your left or right.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When built: look at the top 5 material cards and rearrange them in any order.' },
   { name: 'Flush Channel',  cost: { mud: 3, reeds: 1 },              time: 2, vp: 6, effect: 'When built: discard 1 Headwaters card (out of game) and refill that slot from the material deck. No auction.' },
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 3, effect: 'Once per game (flip card): your build costs 1 fewer of one listed material.' },
@@ -59,7 +59,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 3, clay: 2 },  time: 3, vp: 0, effect: 'End of game: +3 VP per 2 distinct materials in your built structures (max +9).' },
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 4, vp: 3, effect: 'When you build: you may spend 2 of any one material as 1 of any other. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
-  { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'At 0 on 🐟 track: you may discard 1 structure from your hand and take one from the discard pile.' },
+  { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'Once per game (flip card): discard 1 structure from your hand and take one of your choice from the discard pile.' },
   { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back 3🐟 in compensation.' },
   { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'As an action: pay 2🐟 to slide a river card 1 space toward the Headwaters.' },
   { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.' },
@@ -67,7 +67,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track.' },
   { name: 'Trophy Lodge',   cost: { clay: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +3 VP per ?-VP structure you control, including this one (max +12).' },
   { name: 'Springwater Pool', cost: { vines: 3, mud: 2 },            time: 3, vp: 5, effect: 'When built: ready all of your spent once-per-game cards.' },
-  { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 1, vp: 3, effect: 'When built: trigger each of your \'0 on 🐟 track\' effects once.' },
+  { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 1, vp: 3, effect: 'Once per game (flip card): ready one of your other spent once-per-game cards.' },
   { name: 'Trading Post',     cost: { clay: 2, reeds: 2 },             time: 3, vp: 5, effect: 'As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.' },
   { name: 'Confluence',       cost: { reeds: 2, stones: 2 },            time: 3, vp: 5, effect: 'As an action: pay 🐟 to trigger one auction over two cards (Headwaters or river), pooling all their uncovered icons into a single larger pool. Both cards then float downriver.' },
 
@@ -211,47 +211,169 @@ function playerCardCost(state, card, playerIdx) {
   return Math.max(1, base - total);
 }
 
-function firePassZeroEffects(state, playerIdx, count) {
+// Pass-0 (lap-crossing) effects. Wood Pile / Hollowed-out Log / Pack Rat Burrow
+// were reworked from "at 0 on track" triggers to once-per-game on-demand
+// abilities (see tryOncePerGameAbilities), so no card fires here anymore. Kept
+// as a no-op stub: advancePlayer and the endgame-pass0 ablation still call it.
+function firePassZeroEffects(state, playerIdx, count) { /* no pass-0 cards remain */ }
+
+// --- Reworked once-per-game abilities (formerly pass-0 / when-built) -----------
+// Each fires at most once per game, on demand, when a beneficial target exists.
+
+// Wood Pile: claim 1 uncovered Log icon from a river card for 1🐟.
+function tryWoodPile(state, playerIdx) {
   const p = state.players[playerIdx];
-  for (let i = 0; i < count; i++) {
-    if (hasEffect(p, 'Wood Pile')) {
-      const target = state.riverCards.find(c => c.material === 'logs' && uncoveredIcons(c) > 0);
-      if (target && p.supply > 0) {
-        p.supply -= 1;
-        target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
-        p.timePos += 1;
-        noteEffectUse(state, 'Wood Pile');
-      }
+  if (!hasEffect(p, 'Wood Pile') || p.woodPileUsed || p.supply <= 0) return;
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  let need = 0;
+  for (const s of p.hand) need = Math.max(need, Math.max(0, (s.cost.logs || 0) - (wbm.logs || 0)));
+  if (need <= 0) return; // only grab a log when a hand card actually wants logs
+  const target = state.riverCards.find(c => c.material === 'logs' && uncoveredIcons(c) > 0);
+  if (!target) return;
+  p.supply -= 1;
+  target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
+  p.timePos += 1;
+  p.woodPileUsed = true;
+  noteEffectUse(state, 'Wood Pile');
+}
+
+// Hollowed-out Log: recall one worker from a river card (no blank).
+function tryHollowedLog(state, playerIdx) {
+  const p = state.players[playerIdx];
+  if (!hasEffect(p, 'Hollowed-out Log') || p.hollowedLogUsed) return;
+  // Worth it only if the worker is stuck on a card whose material no hand card
+  // needs (free it up to redeploy), and we're not at the very end.
+  if (p.timePos >= SIM_FINISH_LINE - 2) return;
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const needMat = new Set();
+  for (const s of p.hand) for (const m in s.cost) if ((s.cost[m] || 0) > (wbm[m] || 0)) needMat.add(m);
+  const target = state.riverCards.find(c => workersOnCard(c, playerIdx) > 0 && !needMat.has(c.material))
+    || state.riverCards.find(c => workersOnCard(c, playerIdx) > 0);
+  if (!target) return;
+  target.workers[playerIdx] -= 1;
+  if (target.workers[playerIdx] === 0) delete target.workers[playerIdx];
+  p.supply += 1;
+  p.hollowedLogUsed = true;
+  noteEffectUse(state, 'Hollowed-out Log');
+}
+
+// Pack Rat Burrow: swap your worst hand card for the best card in the discard.
+function tryPackRat(state, playerIdx) {
+  const p = state.players[playerIdx];
+  if (!hasEffect(p, 'Pack Rat Burrow') || p.packRatUsed) return;
+  if (p.hand.length === 0 || state.structDiscard.length === 0) return;
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const score = (s) => {
+    let deficit = 0;
+    for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
+    return s.vp + aiEffectValue(s, p, state) - deficit * 1.5;
+  };
+  const handScored = p.hand.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => a.sc - b.sc);
+  const discardScored = state.structDiscard.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => b.sc - a.sc);
+  const worstHand = handScored[0];
+  const bestDiscard = discardScored[0];
+  if (bestDiscard.sc <= worstHand.sc + 1) return; // only swap for a real upgrade
+  const taken = state.structDiscard.splice(bestDiscard.i, 1)[0];
+  const dropped = p.hand.splice(worstHand.i, 1)[0];
+  state.structDiscard.push(dropped);
+  p.hand.push(taken);
+  p.packRatUsed = true;
+  noteEffectUse(state, 'Pack Rat Burrow');
+}
+
+// Spring Cascade: ready one of your OTHER spent once-per-game cards, so you can
+// reuse that ability once more. Picks a spent card the player has built and
+// could plausibly still use.
+const ONCE_PER_GAME_FLAGS = [
+  ['Tribute Stone', 'tributeStoneUsed'], ['Snare Set', 'snareSetUsed'],
+  ['Floodgate', 'floodgateUsed'], ['Spy Mound', 'spyMoundUsed'],
+  ['Granary', 'granaryUsed'], ['Slipstream', 'slipstreamUsed'],
+  ['Wood Pile', 'woodPileUsed'], ['Hollowed-out Log', 'hollowedLogUsed'],
+  ['Pack Rat Burrow', 'packRatUsed'],
+];
+function trySpringCascade(state, playerIdx) {
+  const p = state.players[playerIdx];
+  if (!hasEffect(p, 'Spring Cascade') || p.springCascadeUsed) return;
+  // Re-ready the highest-priority spent ability the player has built.
+  for (const [name, flag] of ONCE_PER_GAME_FLAGS) {
+    if (p[flag] && p.built.some(s => s.name === name)) {
+      p[flag] = false;
+      p.springCascadeUsed = true;
+      noteEffectUse(state, 'Spring Cascade');
+      return;
     }
-    if (hasEffect(p, 'Hollowed-out Log')) {
-      const target = state.riverCards.find(c => workersOnCard(c, playerIdx) > 0);
-      if (target) {
-        target.workers[playerIdx] -= 1;
-        if (target.workers[playerIdx] === 0) delete target.workers[playerIdx];
-        p.supply += 1;
-        noteEffectUse(state, 'Hollowed-out Log');
-      }
+  }
+}
+
+// Mill Wheel: as an action (repeatable), activate one "as an action" ability
+// of a built structure controlled by your left or right neighbour — resolved
+// for you. Modelled like the other as-an-action cards (fires as a start-of-turn
+// freebie when beneficial). Copyable set excludes Confluence (combined auction).
+function neighborIdxs(state, playerIdx) {
+  const n = state.players.length;
+  if (n <= 1) return [];
+  const left = (playerIdx - 1 + n) % n;
+  const right = (playerIdx + 1) % n;
+  return left === right ? [left] : [left, right];
+}
+function tryMillWheel(state, playerIdx) {
+  const p = state.players[playerIdx];
+  if (!hasEffect(p, 'Mill Wheel')) return;
+  // Which copyable abilities do my neighbours have built (and still active)?
+  const avail = new Set();
+  for (const nIdx of neighborIdxs(state, playerIdx)) {
+    for (const s of state.players[nIdx].built) {
+      if (effectActive(s.name)) avail.add(s.name);
     }
-    if (hasEffect(p, 'Pack Rat Burrow') && p.hand.length > 0 && state.structDiscard.length > 0) {
-      // Score discard pile against player's current built materials; pick the
-      // best swap if the discard's best card scores higher than the worst hand card.
-      const wbm = playerWorkersByMaterial(state, playerIdx);
-      const score = (s) => {
-        let deficit = 0;
-        for (const m in s.cost) deficit += Math.max(0, s.cost[m] - (wbm[m] || 0));
-        return s.vp + aiEffectValue(s, p, state) - deficit * 1.5;
-      };
-      const handScored = p.hand.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => a.sc - b.sc);
-      const discardScored = state.structDiscard.map((s, i) => ({ s, i, sc: score(s) })).sort((a, b) => b.sc - a.sc);
-      const worstHand = handScored[0];
-      const bestDiscard = discardScored[0];
-      if (bestDiscard.sc > worstHand.sc) {
-        const taken = state.structDiscard.splice(bestDiscard.i, 1)[0];
-        const dropped = p.hand.splice(worstHand.i, 1)[0];
-        state.structDiscard.push(dropped);
-        p.hand.push(taken);
-        noteEffectUse(state, 'Pack Rat Burrow');
-      }
+  }
+  // Try the most valuable applicable ability first; fire one per turn.
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  for (const s of p.hand) for (const m in s.cost) needs[m] = Math.max(needs[m], Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0)));
+  const myMats = new Set();
+  for (const s of p.hand) for (const m in s.cost) myMats.add(m);
+  if (avail.has('Salmon Run') && p.supply > 0 && p.timePos + 2 < SIM_FINISH_LINE) {
+    const t = findSalmonRunTarget(state, playerIdx, needs);
+    if (t && p.timePos + salmonRunCumulativeCost(t.n) < SIM_FINISH_LINE) {
+      doSalmonRun(state, playerIdx, t.card.id, t.n); noteEffectUse(state, 'Mill Wheel'); return;
+    }
+  }
+  if (avail.has('Trading Post') && p.timePos < SIM_FINISH_LINE - 1 && p.supply >= 2) {
+    const action = findTradingPostAction(state, playerIdx);
+    if (action) { doTradingPost(state, playerIdx, action); noteEffectUse(state, 'Mill Wheel'); return; }
+  }
+  if (avail.has('Otter Trail') && p.timePos < SIM_FINISH_LINE - 5) {
+    const t = findOtterTrailTarget(state, playerIdx);
+    if (t && p.timePos + cardCost(t.cardA) < SIM_FINISH_LINE) {
+      doOtterTrail(state, playerIdx, t.cardA.id, t.cardB.id, t.otherIdx); noteEffectUse(state, 'Mill Wheel'); return;
+    }
+  }
+  if (avail.has('Beaver Tow') && p.timePos + 2 < SIM_FINISH_LINE) {
+    const t = findBeaverTowTarget(state, playerIdx, needs);
+    if (t) { doBeaverTow(state, playerIdx, t.card.id); noteEffectUse(state, 'Mill Wheel'); return; }
+  }
+  if (avail.has('Heron Roost') && state.matDeck.length > 0 && p.timePos < SIM_FINISH_LINE - 1) {
+    const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
+    if (target !== -1) {
+      const newCard = state.matDeck.pop();
+      newCard.slot = 'pre';
+      state.prerivCards[target] = newCard;
+      state.metrics.iconsSpawned += newCard.totalIcons;
+      p.timePos += 1;
+      noteEffectUse(state, 'Mill Wheel');
+      return;
+    }
+  }
+  if (avail.has('Driftwood Snag') && p.timePos < SIM_FINISH_LINE - 1) {
+    const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
+      .filter(c => uncoveredIcons(c) >= 4 && !myMats.has(c.material));
+    if (cands.length > 0) {
+      const target = cands.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b);
+      target.blanks += 1;
+      noteBlanks(state);
+      p.timePos += 1;
+      noteEffectUse(state, 'Mill Wheel');
     }
   }
 }
@@ -296,6 +418,14 @@ let RIVER_SLOTS = 4;
 function setRiverSlots(n) { RIVER_SLOTS = n; }
 const LAP_LENGTH = 60;
 const ENDGAME_TRACK_END = 59;
+// The position the AI treats as "the finish line" when deciding whether a
+// fish-costing ability is worth it (don't waste an action you can't cash in
+// before you'd retire). Defaults to ENDGAME_TRACK_END for the legacy
+// deck-empty endgame; egPlayOut raises it to the per-count fish line during the
+// fish-line endgame so abilities keep firing through a 90/120-fish race.
+let SIM_FINISH_LINE = ENDGAME_TRACK_END;
+const FISH_LINE_BY_COUNT = { 2: 60, 3: 90, 4: 120 };
+function simFishLine(numP) { return FISH_LINE_BY_COUNT[numP] || 30 * numP; }
 const UPSTREAM_AUCTION_COST = 1;
 const MAX_TURNS = 2000; // safety net
 
@@ -758,6 +888,11 @@ function newGame(numPlayers, workersPerPlayer = null) {
       rollingFloatUsed: false,
       snareSetUsed: false,
       stoneToolUsed: false,
+      // Reworked once-per-game cards (were pass-0 / when-built).
+      woodPileUsed: false,
+      hollowedLogUsed: false,
+      packRatUsed: false,
+      springCascadeUsed: false,
     });
   }
   const matDeck = buildMaterialDeck(numPlayers);
@@ -938,13 +1073,9 @@ function advancePlayer(state, playerIdx, byTime) {
   const p = state.players[playerIdx];
   const prev = p.timePos;
   p.timePos += byTime;
-  // Mill Wheel: clamp to (boundary + 1) on lap-loop crossing.
   const prevLapBoundary = Math.floor(prev / LAP_LENGTH);
   const newLapBoundary  = Math.floor(p.timePos / LAP_LENGTH);
   const passZeroCount = Math.max(0, newLapBoundary - prevLapBoundary);
-  if (passZeroCount > 0 && hasEffect(p, 'Mill Wheel')) {
-    p.timePos = (prevLapBoundary + 1) * LAP_LENGTH + 1;
-  }
   if (passZeroCount > 0) firePassZeroEffects(state, playerIdx, passZeroCount);
   state.stackOrder = state.stackOrder.filter(i => i !== playerIdx);
   state.stackOrder.unshift(playerIdx);
@@ -1527,7 +1658,8 @@ const EFFECT_VP_FIXED = {
   'Reed Bed': 0.5,
   'Otter Slide': 2,
   'Mill Wheel': 0.5,
-  'Pack Rat Burrow': 1.5,
+  'Pack Rat Burrow': 1,
+  'Spring Cascade': 0.5,
   // One-time
   'Royal Lodge': 1,
   'Burrow Run': 1,
@@ -1562,6 +1694,10 @@ function aiEffectValue(struct, p, state) {
   if (struct.name === 'Floodgate' && p.floodgateUsed) return 0;
   if (struct.name === 'Spy Mound' && p.spyMoundUsed) return 0;
   if (struct.name === 'Tribute Stone' && p.tributeStoneUsed) return 0;
+  if (struct.name === 'Wood Pile' && p.woodPileUsed) return 0;
+  if (struct.name === 'Hollowed-out Log' && p.hollowedLogUsed) return 0;
+  if (struct.name === 'Pack Rat Burrow' && p.packRatUsed) return 0;
+  if (struct.name === 'Spring Cascade' && p.springCascadeUsed) return 0;
   // Endgame VP — state-dependent projections.
   if (struct.name === 'Pier') {
     const placed = state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length;
@@ -1778,17 +1914,17 @@ function aiChooseAction(state, playerIdx) {
     const ct = (cfg.pairing === 'any')
       ? findCombinedAuctionTargetAny(state, playerIdx, needs, triggerPool)
       : findCombinedAuctionTarget(state, playerIdx, needs, triggerPool);
-    if (ct && p.timePos + combinedTriggerCost(state, ct.A, ct.B, cfg.trigger) < ENDGAME_TRACK_END) {
+    if (ct && p.timePos + combinedTriggerCost(state, ct.A, ct.B, cfg.trigger) < SIM_FINISH_LINE) {
       candidates.push({ score: ct.score, needsTrigger: true, make: () => ({ type: 'combinedAuction', aId: ct.A.id, bId: ct.B.id }) });
     }
   }
-  if (hasEffect(p, 'Salmon Run') && p.supply > 0 && p.timePos + 2 < ENDGAME_TRACK_END) {
+  if (hasEffect(p, 'Salmon Run') && p.supply > 0 && p.timePos + 2 < SIM_FINISH_LINE) {
     const t = findSalmonRunTarget(state, playerIdx, needs);
-    if (t && p.timePos + salmonRunCumulativeCost(t.n) < ENDGAME_TRACK_END) {
+    if (t && p.timePos + salmonRunCumulativeCost(t.n) < SIM_FINISH_LINE) {
       candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'salmonRun', cardId: t.card.id, workerCount: t.n }) });
     }
   }
-  if (hasEffect(p, 'Beaver Tow') && p.timePos + 2 < ENDGAME_TRACK_END) {
+  if (hasEffect(p, 'Beaver Tow') && p.timePos + 2 < SIM_FINISH_LINE) {
     const t = findBeaverTowTarget(state, playerIdx, needs);
     if (t) candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'beaverTow', cardId: t.card.id }) });
   }
@@ -2147,8 +2283,14 @@ function findBeaverTowTarget(state, playerIdx, needs) {
 // cost 1 fish; Tribute Stone is free (once per game).
 function aiStartOfTurnAbilities(state, playerIdx) {
   const p = state.players[playerIdx];
+  // Reworked once-per-game abilities + Mill Wheel's neighbour-copy (as an action).
+  tryWoodPile(state, playerIdx);
+  tryHollowedLog(state, playerIdx);
+  tryPackRat(state, playerIdx);
+  trySpringCascade(state, playerIdx);
+  tryMillWheel(state, playerIdx);
   // Heron Roost: replace a pre-river card whose material isn't in this AI's hand.
-  if (hasEffect(p, 'Heron Roost') && state.matDeck.length > 0 && p.timePos < ENDGAME_TRACK_END - 1) {
+  if (hasEffect(p, 'Heron Roost') && state.matDeck.length > 0 && p.timePos < SIM_FINISH_LINE - 1) {
     const myMats = new Set();
     for (const s of p.hand) for (const m in s.cost) myMats.add(m);
     const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
@@ -2162,7 +2304,7 @@ function aiStartOfTurnAbilities(state, playerIdx) {
     }
   }
   // Driftwood Snag: drop a blank on a card with the most uncovered icons (disruption).
-  if (hasEffect(p, 'Driftwood Snag') && p.timePos < ENDGAME_TRACK_END - 1) {
+  if (hasEffect(p, 'Driftwood Snag') && p.timePos < SIM_FINISH_LINE - 1) {
     const myMats = new Set();
     for (const s of p.hand) for (const m in s.cost) myMats.add(m);
     const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
@@ -2177,20 +2319,20 @@ function aiStartOfTurnAbilities(state, playerIdx) {
   }
   // Tribute Stone: fire when there's a high-value opponent worker (per-item cost ≥ 3)
   // and we're not too deep into endgame (compensation is useless if the victim is already retired).
-  if (hasEffect(p, 'Tribute Stone') && !p.tributeStoneUsed && p.timePos < ENDGAME_TRACK_END - 10) {
+  if (hasEffect(p, 'Tribute Stone') && !p.tributeStoneUsed && p.timePos < SIM_FINISH_LINE - 10) {
     const target = findTributeStoneTarget(state, playerIdx);
     if (target && target.value >= 3) doTributeStone(state, playerIdx, target.victimIdx, target.card);
   }
   // Otter Trail: swap to pry an opponent off a useful material card.
-  if (hasEffect(p, 'Otter Trail') && p.timePos < ENDGAME_TRACK_END - 5) {
+  if (hasEffect(p, 'Otter Trail') && p.timePos < SIM_FINISH_LINE - 5) {
     const target = findOtterTrailTarget(state, playerIdx);
-    if (target && p.timePos + cardCost(target.cardA) < ENDGAME_TRACK_END) {
+    if (target && p.timePos + cardCost(target.cardA) < SIM_FINISH_LINE) {
       doOtterTrail(state, playerIdx, target.cardA.id, target.cardB.id, target.otherIdx);
     }
   }
   // Snare Set (mink species starter): mirrors Tribute Stone but with its own
   // once-per-game flag, so a mink with both can use each independently.
-  if (hasEffect(p, 'Snare Set') && !p.snareSetUsed && p.timePos < ENDGAME_TRACK_END - 10) {
+  if (hasEffect(p, 'Snare Set') && !p.snareSetUsed && p.timePos < SIM_FINISH_LINE - 10) {
     const target = findTributeStoneTarget(state, playerIdx);
     if (target && target.value >= 3) doSnareSet(state, playerIdx, target.victimIdx, target.card);
   }
@@ -2205,13 +2347,13 @@ function aiStartOfTurnAbilities(state, playerIdx) {
   // from supply onto uncovered icons of one card. AI fires when the swap
   // is net-useful: target card material is in our hand-need and we have
   // 3+ disposable distinct-material workers parked on lower-priority cards.
-  if (hasEffect(p, 'Trading Post') && p.timePos < ENDGAME_TRACK_END - 1 && p.supply >= 2) {
+  if (hasEffect(p, 'Trading Post') && p.timePos < SIM_FINISH_LINE - 1 && p.supply >= 2) {
     const action = findTradingPostAction(state, playerIdx);
     if (action) doTradingPost(state, playerIdx, action);
   }
   // Tail Slap (beaver species starter): drop a blank on a R1 card whose
   // material we don't need (deny opponents who do). Costs 1 fish.
-  if (hasEffect(p, 'Tail Slap') && p.timePos < ENDGAME_TRACK_END - 1) {
+  if (hasEffect(p, 'Tail Slap') && p.timePos < SIM_FINISH_LINE - 1) {
     const myMats = new Set();
     for (const s of p.hand) for (const m in s.cost) myMats.add(m);
     const cands = state.riverCards
@@ -2573,9 +2715,32 @@ function aiBurrowNetworkMove(state, playerIdx) {
   best.dst.workers[playerIdx] = (best.dst.workers[playerIdx] || 0) + 1;
 }
 
+// "When built" effects a neighbour's structure might have, that Mill Wheel can
+// copy, in rough value-to-the-copier order. Excludes Mill Wheel (no recursion)
+// and Salt Lick (info-only, no sim effect).
+const MILL_WHEEL_WHENBUILT = ['Royal Lodge', 'Sap Drip', 'Springwater Pool', 'Vine Lattice',
+  'Snag Pile', 'Beaver Dam', 'Mud Levee', 'Flush Channel', 'Stone Pool', 'Burrow Run'];
+
 function fireOnBuildEffect(state, playerIdx, struct) {
   const p = state.players[playerIdx];
   if (!effectActive(struct.name)) return;
+  if (struct.name === 'Mill Wheel') {
+    // When built: copy one "when built" effect from a left/right neighbour's
+    // built structure, resolved for us. (The repeatable as-an-action copy lives
+    // in tryMillWheel.)
+    const neighborHas = new Set();
+    for (const nIdx of neighborIdxs(state, playerIdx))
+      for (const s of state.players[nIdx].built)
+        if (effectActive(s.name)) neighborHas.add(s.name);
+    for (const name of MILL_WHEEL_WHENBUILT) {
+      if (neighborHas.has(name)) {
+        fireOnBuildEffect(state, playerIdx, { name }); // resolve that effect for us
+        noteEffectUse(state, 'Mill Wheel');
+        break;
+      }
+    }
+    return;
+  }
   if (struct.name === 'Burrow Run') {
     p.timePos = Math.max(0, p.timePos - 5);
     return;
@@ -2584,20 +2749,14 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     state.bonusTurnPlayer = playerIdx;
     return;
   }
-  if (struct.name === 'Spring Cascade') {
-    // Fire the builder's pass-0 triggers (Wood Pile / Hollowed-out Log /
-    // Pack Rat Burrow) exactly once, without actually moving them on the
-    // track. Mill Wheel is a passive movement modifier (changes WHERE the
-    // pawn stops when they would pass 0) — it has no trigger and is
-    // unaffected.
-    firePassZeroEffects(state, playerIdx, 1);
-    return;
-  }
+  // Spring Cascade is now a once-per-game on-demand ability (see
+  // trySpringCascade), not a when-built trigger — nothing fires here on build.
   if (struct.name === 'Springwater Pool') {
     // Ready all of the builder's spent once-per-game cards. Tracked flags
     // mirror the player init in newGame(): main-deck cards (granaryUsed,
-    // floodgateUsed, spyMoundUsed, tributeStoneUsed, slipstreamUsed) plus
-    // species starter cards (rollingFloatUsed, snareSetUsed, stoneToolUsed).
+    // floodgateUsed, spyMoundUsed, tributeStoneUsed, slipstreamUsed), species
+    // starters (rollingFloatUsed, snareSetUsed, stoneToolUsed), and the
+    // reworked once-per-game cards (woodPile/hollowedLog/packRat/springCascade).
     p.granaryUsed = false;
     p.floodgateUsed = false;
     p.spyMoundUsed = false;
@@ -2606,6 +2765,10 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     p.rollingFloatUsed = false;
     p.snareSetUsed = false;
     p.stoneToolUsed = false;
+    p.woodPileUsed = false;
+    p.hollowedLogUsed = false;
+    p.packRatUsed = false;
+    p.springCascadeUsed = false;
     return;
   }
   if (struct.name === 'Beaver Dam') {
@@ -3344,28 +3507,10 @@ function sweepAblation(numGamesArg, numPArg, workersArg) {
   const numGames = parseInt(numGamesArg) || 4000;
   configureMaterials(6);
 
+  // Ablation runs under the live fish-line endgame (b:fish-line + d:one-build),
+  // so fish-costing abilities are valued against the real per-count finish line.
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
-        const passed = action.type === 'pass';
-        if (reachedEnd || passed) p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   function collectResults(disabledNames) {
@@ -5232,40 +5377,54 @@ function egRunCoda(state, proc) {
   }
 }
 
+// Play an existing `state` to the chosen trigger, then run the coda — mutating
+// state in place (used by egRunGame, the fishline sweep, and the ablation). For
+// the fish-line endgame it raises SIM_FINISH_LINE so the AI's ability gates
+// track the real finish line, restoring it afterward.
+function egPlayOut(state, trigger, vpLimit, fishLimit, proc) {
+  const prevFinish = SIM_FINISH_LINE;
+  if (trigger === 'fish') SIM_FINISH_LINE = fishLimit;
+  try {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      const deckEmpty = state.matDeck.length === 0;
+      let triggered = false;
+      if (trigger === 'deck') {
+        triggered = deckEmpty;
+      } else if (trigger === 'vp') {
+        triggered = deckEmpty || state.players.some(p => !p.out && totalVP(p, state) >= vpLimit);
+      } else if (trigger === 'fish') {
+        // Deck-empty is NOT an end condition here: with the material deck dry,
+        // players keep auctioning the river/Headwaters cards already on the board
+        // until their pawns pass the line. checkGameEnd (below) still ends the
+        // game once the board is genuinely exhausted (nothing to auction/build).
+        for (const p of state.players) if (!p.out && p.timePos >= fishLimit) p.out = true;
+        triggered = state.players.every(p => p.out);
+      }
+      if (triggered) break;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      state.metrics.turns++;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      maybeFireSlipstream(state, p.idx);
+      if (checkGameEnd(state)) break;
+    }
+    egRunCoda(state, proc);
+  } finally {
+    SIM_FINISH_LINE = prevFinish;
+  }
+}
+
 // Play one game to the chosen trigger, run the coda, return summary metrics.
 function egRunGame(numP, numMats, workers, trigger, vpLimit, fishLimit, proc) {
   configureMaterials(numMats);
   const state = newGame(numP, workers);
-  for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-  while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-    const deckEmpty = state.matDeck.length === 0;
-    let triggered = false;
-    if (trigger === 'deck') {
-      triggered = deckEmpty;
-    } else if (trigger === 'vp') {
-      triggered = deckEmpty || state.players.some(p => !p.out && totalVP(p, state) >= vpLimit);
-    } else if (trigger === 'fish') {
-      // Deck-empty is NOT an end condition here: with the material deck dry,
-      // players keep auctioning the river/Headwaters cards already on the board
-      // until their pawns pass the line. checkGameEnd (below) still ends the
-      // game once the board is genuinely exhausted (nothing to auction/build).
-      for (const p of state.players) if (!p.out && p.timePos >= fishLimit) p.out = true;
-      triggered = state.players.every(p => p.out);
-    }
-    if (triggered) break;
-    const cur = pickNextPlayer(state);
-    if (cur === -1) break;
-    state.currentPlayer = cur;
-    state.metrics.turns++;
-    const p = state.players[cur];
-    aiStartOfTurnAbilities(state, p.idx);
-    const action = aiChooseAction(state, p.idx);
-    executeAction(state, p.idx, action);
-    cleanupShoreline(state);
-    maybeFireSlipstream(state, p.idx);
-    if (checkGameEnd(state)) break;
-  }
-  egRunCoda(state, proc);
+  egPlayOut(state, trigger, vpLimit, fishLimit, proc);
   const vps = state.players.map(p => totalVP(p, state)).sort((a, b) => b - a);
   let openRiver = 0;
   for (const c of state.riverCards) openRiver += uncoveredIcons(c);
