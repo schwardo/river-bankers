@@ -510,7 +510,8 @@
 <h2>Components</h2>
 <div class="col2">
   <ul>
-    <li><strong>1 game board</strong> showing the Headwaters, river, shoreline, and a 60-space fish track</li>
+    <li><strong>1 large river board</strong> — the Headwaters slots, the four river spaces, and the shoreline</li>
+    <li><strong>1 small fish-track board</strong> — the 60-space fish-track loop, with slots for the structure deck and discard pile</li>
     <li><strong>24 material cards</strong> — 6 materials × 4 icon-count variants (4, 5, 7, 8)</li>
     <li><strong>48 structure cards</strong> — the shared main deck players draw from and build out of</li>
     <li><strong>12 species starter cards</strong> — 3 per species, private to that species (used for the optional asymmetric draft at setup)</li>
@@ -519,8 +520,8 @@
       <span class="worker otter"></span> red river otter,
       <span class="worker muskrat"></span> green muskrat,
       <span class="worker mink"></span> purple mink</li>
-    <li><strong>4 fish-track pawns</strong> — one disc per species, color-matched</li>
-    <li><strong>28 blank chits</strong> — shared pool, drop onto vacated icons</li>
+    <li><strong>4 fish-track pawns</strong> — one species chit per player, color-matched; double-sided, with a <strong>"+60"</strong> lap side on the back (flip it when you pass 0)</li>
+    <li><strong>41 blank chits</strong> — shared pool, drop onto vacated icons</li>
     <li><strong>1 rulebook</strong> (this booklet)</li>
   </ul>
   <div class="card-row" style="flex-direction: column; gap: 4pt;">
@@ -532,7 +533,7 @@
 <h2>Goal</h2>
 <p>
   Score the most <span class="vp">victory points★</span> from structures you build along the bank.
-  Tiebreaker: fewer spaces advanced on the fish track.
+  Tiebreaker: the lower final fish total (your pawn ends farther back on the track).
 </p>
 
 <!-- ============================================================ -->
@@ -674,10 +675,10 @@
     that meets the condition; the triggering build itself qualifies. (Material walkways/ladders,
     Charcoal Pit, Cattail Marsh, Treaty Stone, Otter Slide.)</li>
   <li><strong>At 0 on <span style="white-space:nowrap;">🐟 track</span></strong> — fires each time
-    your pawn crosses the lap-loop boundary (i.e. wraps from space 59 back past 0). Wood Pile,
-    Hollowed-out Log, Pack Rat Burrow are the main lap-bonus cards; Mill Wheel modifies the same
-    crossing by clamping you to space 1; Spring Cascade fires your own pass-0 effects once on
-    demand.</li>
+    your pawn wraps from space 59 back past 0 (the same moment you <strong>flip your chit to its
+    "+60" side</strong>; see Fish track). Wood Pile, Hollowed-out Log, Pack Rat Burrow are the main
+    pass-0 cards; Mill Wheel modifies the same crossing by clamping you to space 1; Spring Cascade
+    fires your own pass-0 effects once on demand.</li>
   <li><strong>As an action</strong> — replaces your one turn-action (instead of Pull / Auction /
     Flush / Invent / Build). Pays the fish cost stated in the effect text. (Heron Roost, Driftwood
     Snag, Beaver Tow, Salmon Run, Otter Trail, Trading Post.)</li>
@@ -755,10 +756,15 @@
 
 <h3>Fish track</h3>
 <p>
-  A 60-space loop with one pawn per player. Pawns advance forward, wrapping back to <strong>0</strong>
-  after space 59. If a pawn is <em>lapped</em> (caught up to from behind by another pawn), it gets
-  flipped over and <strong>exhausted</strong> — it sits out, can't take turns, and can't bid in
-  auctions, until the lapper passes it again (a second time around). The next "pass" wakes it back up.
+  A 60-space loop with one pawn (a species chit) per player. Every action slides your pawn
+  <strong>forward</strong> by its fish cost; the pawn farthest back acts next (see Turn order).
+</p>
+<p>
+  When your pawn passes <strong>0</strong> (wraps past space 59 onto a new lap),
+  <strong>flip its chit over to the "+60" side</strong>. Your fish total is the space your pawn sits
+  on <em>plus 60 while the chit shows its "+60" side</em> — so a flipped pawn on space 12 is at 72.
+  The flip keeps everyone's true position readable once play runs past a full lap, and is also the
+  moment any "at 0 on 🐟 track" effects fire.
 </p>
 
 <!-- ============================================================ -->
@@ -767,10 +773,11 @@
 <div class="page-break"></div>
 <h2>Turn order</h2>
 <p>
-  There are no rounds. The next player to act is whoever's <em>non-exhausted</em> pawn is on the
-  <strong>lowest space</strong> of the fish track; if pawns share that space, the one
-  <strong>on top of the stack</strong> acts first. A pawn moving onto a space stacks on top.
-  Exhausted pawns are skipped until they're revived by the next lap pass.
+  There are no rounds. The next player to act is whoever is <strong>farthest back</strong> — the
+  lowest fish total (remember the "+60" flip when comparing pawns that have lapped). If pawns are
+  tied on the same space, the one <strong>on top of the stack</strong> acts first; a pawn moving onto
+  a space stacks on top. A player keeps taking consecutive turns as long as they stay farthest back —
+  so a big, expensive turn that buries you deep on the track hands several turns to everyone else.
 </p>
 
 <h2>Your turn</h2>
@@ -977,55 +984,48 @@
 </p>
 
 <!-- ============================================================ -->
-<!-- LAPPING                                                      -->
-<!-- ============================================================ -->
-<div class="page-break"></div>
-<h2>Lapping (and getting winded)</h2>
-<p>
-  The fish track wraps around every 60 spaces. When your pawn passes another player's pawn by going
-  all the way around the loop — i.e., your pawn catches up to their space N from behind, having gone
-  the long way around — <strong>you</strong> (the lapper) get <strong>exhausted</strong>. Flip your
-  pawn upside-down and sit out:
-</p>
-<ul>
-  <li>Your pawn doesn't take turns. The next non-exhausted pawn at the lowest space acts.</li>
-  <li>You can't bid on auctions while exhausted; you implicitly bid 0.</li>
-</ul>
-<p>
-  You stay exhausted until each player you lapped <strong>catches up to your spot on the track</strong>.
-  Each such catch-up wakes you with respect to that one player; you remain exhausted until <em>all</em>
-  the players you lapped have caught back up. Once they all have, flip your pawn back upright; you can
-  act and bid as normal.
-</p>
-<p>
-  Lapping the same player again later (after they've caught up and you've woken) exhausts you again.
-</p>
-
-<!-- ============================================================ -->
 <!-- ENDGAME                                                      -->
 <!-- ============================================================ -->
 <h2>Endgame &amp; game end</h2>
-<p>The moment the <strong>material deck runs out</strong>, the endgame begins:</p>
-<ol>
-  <li>Move all pawns to spaces <strong>1, 2, 3, …</strong> on the fish track, preserving their
-    relative order (the player with the lowest pre-endgame fish total sits at 1, next at 2, and so
-    on). Lap-shadow / exhaustion is cleared.</li>
-  <li>Play continues with the same turn order (lowest non-retired pawn acts next; ties → top of
-    stack). Legal actions: auctioning river cards, pulling from the Headwaters, inventing, and
-    building. <strong>Flushing is illegal during endgame</strong> — the material deck is empty by
-    definition.</li>
-  <li>A player <strong>retires</strong> (and their pawn is removed) when:
-    <ul>
-      <li>their action advances them to space <strong>59 or beyond</strong>, <em>or</em></li>
-      <li>they pass — they have no productive action (typically signals they've used up their hand
-        and material supply).</li>
-    </ul>
-  </li>
-  <li>Retired players don't take turns and don't bid in auctions; their built structures stay on the
-    table for scoring.</li>
-</ol>
 <p>
-  The game ends as soon as <strong>every player has retired</strong>. Total the victory points on
+  The fish track has a <strong>finish line</strong> whose position depends on the player count:
+</p>
+<table>
+  <thead><tr><th>Players</th><th>Finish line (fish total)</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td><strong>60</strong> — one full lap (pass 0 once)</td></tr>
+    <tr><td>3</td><td><strong>90</strong> — one lap, then space 30</td></tr>
+    <tr><td>4</td><td><strong>120</strong> — two full laps (pass 0 twice)</td></tr>
+  </tbody>
+</table>
+<p>
+  Play continues normally up to that point. The <strong>material deck running out does
+  <em>not</em></strong> end the game — you keep auctioning the river and Headwaters cards still on the
+  board until pawns reach the line. (Flushing just becomes illegal once the deck is empty, since
+  there are no cards to refill the Headwaters.)
+</p>
+<p>
+  <strong>Crossing the line.</strong> The moment one of your actions carries your pawn <em>to or
+  past</em> your finish line, finish that action normally, then <strong>retire</strong>: your pawn
+  takes no more turns and you bid 0 in any remaining auctions. Your built structures stay on the
+  table. Everyone else keeps playing.
+</p>
+<p>
+  <strong>Retiring early.</strong> As soon as the first pawn crosses, a <strong>Retire</strong> option
+  opens for everyone else. On your turn you may retire instead of taking an action: advance your pawn
+  to the <strong>lowest open space at or past the finish line</strong> and drop out. Spaces fill in
+  from the line upward, and a pawn that overshot the line keeps its spot — so if a crosser landed on
+  64, the next player to retire takes 60, the one after that 61, and so on. (Retiring to a low spot is
+  good for the tiebreaker.)
+</p>
+<p>
+  <strong>One final build.</strong> Once <strong>every</strong> player has retired, go around once
+  more in fish-track order (lowest first): each player may make <strong>one last build</strong> using
+  the workers they already hold. This build <em>still costs fish</em> and slides your pawn forward —
+  which can matter for the tiebreaker. A player with no affordable build simply skips.
+</p>
+<p>
+  Then the game ends. Total the victory points on
   each player's built structures, <strong>plus 1<span class="vp">★</span> per pair of same-type
   leftover workers</strong> on the board (river + shoreline). For each material, count your workers
   across all your cards of that material and score floor(workers / 2). Singletons score nothing.
@@ -1072,8 +1072,8 @@
 </table>
 
 <p>
-  Highest total wins; ties broken by fewer spaces the retired pawn ended on (i.e., whoever retired
-  earliest).
+  Highest total wins; ties broken by the <strong>lower final fish total</strong> (the pawn farther
+  back at the end — which rewards retiring efficiently to a low spot rather than overshooting).
 </p>
 
 <!-- ============================================================ -->
@@ -1222,21 +1222,21 @@
   <div class="keep">
     <h3>Turn order</h3>
     <p style="font-size: 9.5pt;">
-      Lowest non-exhausted pawn acts next. Ties → top of stack. New arrivals on a space stack on top.
+      Farthest-back pawn (lowest fish total) acts next; keeps going while still lowest. Ties → top of stack. New arrivals on a space stack on top.
     </p>
   </div>
 
   <div class="keep">
-    <h3>Lapping</h3>
+    <h3>Passing 0</h3>
     <p style="font-size: 9.5pt;">
-      Pass a pawn the long way around → <strong>you</strong> are exhausted. Stay flipped until every player you lapped catches up to your spot.
+      Wrap past space 59 → <strong>flip your chit to its "+60" side</strong>. Your total = space + 60 while flipped. (Also fires any "at 0 on 🐟" effects.)
     </p>
   </div>
 
   <div class="keep">
-    <h3>Endgame trigger</h3>
+    <h3>Endgame</h3>
     <p style="font-size: 9.5pt;">
-      Material deck empties → compress pawns to 1, 2, 3, …; play continues. Retire at space 59+ or when you pass. Game ends when all retired.
+      Finish line: <strong>60 / 90 / 120</strong> fish (2 / 3 / 4 players). Deck running out doesn't end the game. Cross the line → retire; once someone crosses, others may Retire to the lowest open spot ≥ the line. When all are out, each makes one final build, then score.
     </p>
   </div>
 
@@ -1249,7 +1249,7 @@
 </div>
 
 <div class="footer">
-  River Bankers — draft rulebook · v0.1.7 · designed by Don Schwarz · published by Left Field Games
+  River Bankers — draft rulebook · v0.1.8 · designed by Don Schwarz · published by Left Field Games
 </div>
 
 </body>
