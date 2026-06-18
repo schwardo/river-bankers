@@ -834,6 +834,7 @@ function newGame(numPlayers, workersPerPlayer = null) {
       iconsClaimed: 0,
       iconsWastedToShore: 0, // leftover icons when card moved to shoreline
       cardsBuilt: 0,
+      invents: 0, // count of Invent (browse) actions taken across the game
       flushes: 0, // count of Flush actions taken across the game
       endgameTriggered: false,
       // Endgame action breakdown (counted only between triggerEndgame and game end)
@@ -2823,6 +2824,7 @@ function executeAction(state, playerIdx, action) {
     return;
   }
   if (action.type === 'browse') {
+    state.metrics.invents++;
     const N = action.n;
     const drawCount = Math.min(N, structAvailable(state));
     const drawn = [];
@@ -5109,6 +5111,342 @@ function sweepEndgamePass0(numGamesArg, numPArg, workersArg) {
   console.log('  winPair = avg pair-VP earned by the winner\n');
 }
 
+// =============================================================================
+// ENDGAME REWORK SWEEP
+// =============================================================================
+// Explores replacement endgames for the abrupt deck-empty/snap-retire ending
+// flagged in the 2026-06-16 4P playtest. Crosses 3 TRIGGERS × 4 CODAS at
+// 2P/3P/4P and reports final VP, VP spread, cards built, auctions, and game
+// length (turns).
+//
+// Triggers (when the main phase ends):
+//   a / 'vp'   — the instant any player's score crosses a VP limit.
+//   b / 'fish' — each player retires (no more turns) the moment their pawn
+//                passes a cumulative-fish line; main phase ends once all have
+//                passed. (Faithful to "each player is out as they pass it".)
+//   c / 'deck' — the material deck empties (the current live trigger).
+//   For a/b, deck-empty is a backstop trigger so degenerate games still end.
+//
+// Codas (the final phase, run once the trigger fires; all players un-retired
+// so everyone participates):
+//   d — every player gets ONE build using resources (workers) they already hold.
+//   e — every player initiates ONE auction, then every player gets ONE build.
+//   f — each Headwaters card is auctioned, then every player builds any number.
+//   g — game ends immediately (no coda).
+//
+// Thresholds for a/b are auto-calibrated per player count: a short baseline
+// pass measures the leader's VP and the leader's cumulative fish at the moment
+// the deck empties, so triggers a/b fire at roughly the same game-time as c.
+// Scoring keeps the live ruleset (incl. end-of-game bonus + pair VP); the
+// "drop hidden-VP cards for a first-to-N race" idea from the TODO is a
+// separate downstream decision and is NOT applied here.
+
+// Highest-VP structure the player can build right now with workers on hand.
+function egBestBuild(state, idx) {
+  const p = state.players[idx];
+  const wbm = playerWorkersByMaterial(state, idx);
+  const buildables = p.hand
+    .map((s, i) => ({ s, i, vp: s.vp + aiEffectValue(s, p, state) }))
+    .filter(o => canBuild(o.s, wbm, p))
+    .sort((a, b) => b.vp - a.vp);
+  return buildables.length ? { type: 'build', handIdx: buildables[0].i } : null;
+}
+
+// Best single auction (river or Headwaters) for the player's material needs,
+// mirroring aiChooseAction's auction-target scoring. Returns null if no useful
+// auction (no needs, no trigger workers, or nothing scores positive).
+function egBestAuction(state, idx) {
+  const p = state.players[idx];
+  const wbm = playerWorkersByMaterial(state, idx);
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  for (const s of p.hand) {
+    for (const m in s.cost) needs[m] = Math.max(needs[m], Math.max(0, s.cost[m] - (wbm[m] || 0)));
+  }
+  const triggerPool = aiTriggerPool(state, idx);
+  if (triggerPool <= 0) return null;
+  let best = null, bestScore = 0;
+  for (const c of state.riverCards) {
+    if (uncoveredIcons(c) === 0) continue;
+    const need = needs[c.material];
+    if (need === 0) continue;
+    const got = Math.min(uncoveredIcons(c), triggerPool, need);
+    const score = need * got - playerCardCost(state, c, idx) * got * 0.4;
+    if (score > bestScore) { bestScore = score; best = { type: 'auction', cardId: c.id }; }
+  }
+  for (let i = 0; i < state.prerivCards.length; i++) {
+    const c = state.prerivCards[i];
+    if (!c) continue;
+    const need = needs[c.material];
+    if (need === 0) continue;
+    const got = Math.min(uncoveredIcons(c), triggerPool, need);
+    if (got === 0) continue;
+    const score = need * got - 1 * got * 0.4 - prerivTriggerCost(i) * 0.6;
+    if (score > bestScore) { bestScore = score; best = { type: 'preriv', slotIdx: i }; }
+  }
+  return best;
+}
+
+// Run the chosen coda. Counts each coda action as a turn (so game-length
+// reflects how much the coda adds). All players un-retired first.
+function egRunCoda(state, proc) {
+  if (proc === 'g') return;
+  for (const p of state.players) { p.out = false; p.exhausted = false; }
+  const order = state.players.slice()
+    .sort((a, b) => a.timePos - b.timePos ||
+      state.stackOrder.indexOf(a.idx) - state.stackOrder.indexOf(b.idx))
+    .map(p => p.idx);
+  const doBuild = (idx) => {
+    const a = egBestBuild(state, idx);
+    if (!a) return false;
+    state.metrics.turns++;
+    executeAction(state, idx, a);
+    cleanupShoreline(state);
+    return true;
+  };
+  if (proc === 'd') {
+    for (const idx of order) doBuild(idx);
+  } else if (proc === 'e') {
+    for (const idx of order) {
+      const a = egBestAuction(state, idx);
+      if (a) { state.metrics.turns++; executeAction(state, idx, a); cleanupShoreline(state); }
+    }
+    for (const idx of order) doBuild(idx);
+  } else if (proc === 'f') {
+    let k = 0;
+    for (let slot = 0; slot < state.prerivCards.length; slot++) {
+      const card = state.prerivCards[slot];
+      if (!card) continue;
+      const trig = order[k % order.length];
+      k++;
+      state.metrics.turns++;
+      runAuction(state, card, trig, 0); // open auction, no forced trigger bid
+      cleanupShoreline(state);
+    }
+    let progress = true, guard = 0;
+    while (progress && guard < order.length * 20) {
+      progress = false;
+      for (const idx of order) if (doBuild(idx)) progress = true;
+      guard++;
+    }
+  }
+}
+
+// Play one game to the chosen trigger, run the coda, return summary metrics.
+function egRunGame(numP, numMats, workers, trigger, vpLimit, fishLimit, proc) {
+  configureMaterials(numMats);
+  const state = newGame(numP, workers);
+  for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+  while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+    const deckEmpty = state.matDeck.length === 0;
+    let triggered = false;
+    if (trigger === 'deck') {
+      triggered = deckEmpty;
+    } else if (trigger === 'vp') {
+      triggered = deckEmpty || state.players.some(p => !p.out && totalVP(p, state) >= vpLimit);
+    } else if (trigger === 'fish') {
+      // Deck-empty is NOT an end condition here: with the material deck dry,
+      // players keep auctioning the river/Headwaters cards already on the board
+      // until their pawns pass the line. checkGameEnd (below) still ends the
+      // game once the board is genuinely exhausted (nothing to auction/build).
+      for (const p of state.players) if (!p.out && p.timePos >= fishLimit) p.out = true;
+      triggered = state.players.every(p => p.out);
+    }
+    if (triggered) break;
+    const cur = pickNextPlayer(state);
+    if (cur === -1) break;
+    state.currentPlayer = cur;
+    state.metrics.turns++;
+    const p = state.players[cur];
+    aiStartOfTurnAbilities(state, p.idx);
+    const action = aiChooseAction(state, p.idx);
+    executeAction(state, p.idx, action);
+    cleanupShoreline(state);
+    maybeFireSlipstream(state, p.idx);
+    if (checkGameEnd(state)) break;
+  }
+  egRunCoda(state, proc);
+  const vps = state.players.map(p => totalVP(p, state)).sort((a, b) => b - a);
+  let openRiver = 0;
+  for (const c of state.riverCards) openRiver += uncoveredIcons(c);
+  return {
+    winVP: vps[0],
+    loserVP: vps[vps.length - 1],
+    avgVP: vps.reduce((s, v) => s + v, 0) / vps.length,
+    spread: vps[0] - vps[vps.length - 1],
+    built: state.metrics.cardsBuilt,
+    invents: state.metrics.invents,
+    auc: state.metrics.auctions,
+    turns: state.metrics.turns,
+    // End-of-game board state.
+    matDeck: state.matDeck.length,
+    headwaters: state.prerivCards.filter(c => c !== null).length,
+    river: state.riverCards.length,
+    openRiver,
+  };
+}
+
+// Baseline pass: play normally until the deck empties, capture the leader's VP
+// and the leader's cumulative fish at that instant. Anchors triggers a/b.
+function egCalibrate(numP, numMats, workers, numGames) {
+  configureMaterials(numMats);
+  let sumVP = 0, sumFish = 0;
+  for (let g = 0; g < numGames; g++) {
+    const state = newGame(numP, workers);
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (state.matDeck.length === 0) break;
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      executeAction(state, p.idx, aiChooseAction(state, p.idx));
+      cleanupShoreline(state);
+      maybeFireSlipstream(state, p.idx);
+    }
+    sumVP += Math.max(...state.players.map(p => totalVP(p, state)));
+    sumFish += Math.max(...state.players.map(p => p.timePos));
+  }
+  return { vpLimit: Math.round(sumVP / numGames), fishLimit: Math.round(sumFish / numGames) };
+}
+
+function sweepEndgameRework(numGamesArg, numPArg) {
+  const numGames = parseInt(numGamesArg) || 2000;
+  const numPArgInt = parseInt(numPArg);
+  const playerCounts = numPArgInt ? [numPArgInt] : [2, 3, 4];
+  const numMats = 6;
+
+  const triggers = [
+    { code: 'a', key: 'vp',   label: 'a:VP-limit' },
+    { code: 'b', key: 'fish', label: 'b:fish-line' },
+    { code: 'c', key: 'deck', label: 'c:deck-out' },
+  ];
+  const procs = [
+    { code: 'd', label: 'd:1-build' },
+    { code: 'e', label: 'e:auc+build' },
+    { code: 'f', label: 'f:HW-auc+blds' },
+    { code: 'g', label: 'g:instant' },
+  ];
+
+  console.log(`\nRiver Bankers — endgame rework sweep  (${numGames} games/config, 6 materials)`);
+  console.log('3 triggers (a:VP-limit / b:fish-line / c:deck-out) × 4 codas');
+  console.log('(d:one build / e:one auction+one build / f:Headwaters auctions+free builds / g:instant)\n');
+
+  const tStart = Date.now();
+  for (const numP of playerCounts) {
+    const workers = defaultWorkersPerPlayer(numP);
+    const { vpLimit, fishLimit } = egCalibrate(numP, numMats, workers, Math.max(500, Math.floor(numGames / 4)));
+    console.log(`=== ${numP}P (${workers} workers) — calibrated VP limit ${vpLimit}, fish line ${fishLimit} ===`);
+    console.log(
+      pad('combo', 14) +
+      padL('winVP', 8) + padL('lastVP', 8) + padL('spread', 8) +
+      padL('built', 8) + padL('auc', 8) + padL('turns', 8)
+    );
+    console.log('-'.repeat(14 + 8 * 6));
+    for (const tr of triggers) {
+      for (const pr of procs) {
+        const rows = [];
+        for (let g = 0; g < numGames; g++) {
+          rows.push(egRunGame(numP, numMats, workers, tr.key, vpLimit, fishLimit, pr.code));
+        }
+        const combo = `${tr.code}+${pr.code}`;
+        console.log(
+          pad(combo, 14) +
+          padL(avg(rows.map(r => r.winVP)).toFixed(1), 8) +
+          padL(avg(rows.map(r => r.loserVP)).toFixed(1), 8) +
+          padL(avg(rows.map(r => r.spread)).toFixed(1), 8) +
+          padL(avg(rows.map(r => r.built)).toFixed(2), 8) +
+          padL(avg(rows.map(r => r.auc)).toFixed(2), 8) +
+          padL(avg(rows.map(r => r.turns)).toFixed(1), 8)
+        );
+      }
+      console.log();
+    }
+  }
+  console.log(`Elapsed: ${((Date.now() - tStart) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  combo   = trigger(a/b/c) + coda(d/e/f/g)');
+  console.log('  winVP   = mean winner final VP; lastVP = mean last-place final VP');
+  console.log('  spread  = mean (winnerVP − loserVP)');
+  console.log('  built   = mean structures built per game (all players)');
+  console.log('  auc     = mean auctions per game (all players)');
+  console.log('  turns   = mean total player-turns per game (game-length proxy, incl. coda)\n');
+}
+
+// =============================================================================
+// FISH-LINE SWEEP (b+d only)
+// =============================================================================
+// Fixes the endgame to b:fish-line trigger + d:one-build coda and sweeps the
+// fish-line value across 2P/3P/4P. For each line reports simulated wall-clock
+// (45s per auction), builds, avg + spread VP, and end-of-game board state
+// (structure deck remaining, Headwaters cards, river cards, open river icons).
+// deck-out remains a backstop, so very high lines converge to deck-out+d.
+function fmtTime(seconds) {
+  const total = Math.round(seconds);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function sweepFishline(numGamesArg, numPArg) {
+  const numGames = parseInt(numGamesArg) || 2000;
+  const numPArgInt = parseInt(numPArg);
+  const playerCounts = numPArgInt ? [numPArgInt] : [2, 3, 4];
+  const numMats = 6;
+  const SEC_PER_AUCTION = 90;
+  const SEC_PER_BUILD_INVENT = 15;
+  const fishLines = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300];
+
+  console.log(`\nRiver Bankers — fish-line sweep, b+d only  (${numGames} games/config, 6 materials)`);
+  console.log(`Trigger b:fish-line (retire as pawn passes the line) + coda d:one build each.`);
+  console.log(`Game time = ${SEC_PER_AUCTION}s/auction + ${SEC_PER_BUILD_INVENT}s/(build or Invent).`);
+  console.log(`After the material deck empties, players keep auctioning river/Headwaters cards`);
+  console.log(`until all pawns pass the line (or the board is fully mined out).\n`);
+
+  const tStart = Date.now();
+  for (const numP of playerCounts) {
+    const workers = defaultWorkersPerPlayer(numP);
+    console.log(`=== ${numP}P (${workers} workers) ===`);
+    console.log(
+      pad('fishLine', 9) + padL('time', 8) + padL('builds', 8) +
+      padL('avgVP', 8) + padL('spread', 8) +
+      padL('matDeck', 8) + padL('HW', 5) + padL('river', 7) + padL('openIcn', 9)
+    );
+    console.log('-'.repeat(9 + 8 + 8 + 8 + 8 + 7 + 5 + 7 + 9));
+    for (const line of fishLines) {
+      const rows = [];
+      for (let g = 0; g < numGames; g++) {
+        rows.push(egRunGame(numP, numMats, workers, 'fish', 0, line, 'd'));
+      }
+      const meanAuc = avg(rows.map(r => r.auc));
+      const meanBuildInvent = avg(rows.map(r => r.built + r.invents));
+      const gameSecs = meanAuc * SEC_PER_AUCTION + meanBuildInvent * SEC_PER_BUILD_INVENT;
+      console.log(
+        pad(String(line), 9) +
+        padL(fmtTime(gameSecs), 8) +
+        padL(avg(rows.map(r => r.built)).toFixed(2), 8) +
+        padL(avg(rows.map(r => r.avgVP)).toFixed(1), 8) +
+        padL(avg(rows.map(r => r.spread)).toFixed(1), 8) +
+        padL(avg(rows.map(r => r.matDeck)).toFixed(1), 8) +
+        padL(avg(rows.map(r => r.headwaters)).toFixed(2), 5) +
+        padL(avg(rows.map(r => r.river)).toFixed(2), 7) +
+        padL(avg(rows.map(r => r.openRiver)).toFixed(2), 9)
+      );
+    }
+    console.log();
+  }
+  console.log(`Elapsed: ${((Date.now() - tStart) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log(`  fishLine = cumulative-fish line; a player retires the turn they pass it.`);
+  console.log(`  time     = ${SEC_PER_AUCTION}s × auctions + ${SEC_PER_BUILD_INVENT}s × (builds + Invents), as M:SS.`);
+  console.log('  builds   = mean structures built/game; avgVP = mean final VP across all players.');
+  console.log('  spread   = mean (winnerVP − loserVP).');
+  console.log('  matDeck  = mean material (resource) cards left in the deck at game end.');
+  console.log('  HW       = mean Headwaters cards present; river = mean river cards present.');
+  console.log('  openIcn  = mean uncovered (open) icon spots across river cards at game end.\n');
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
@@ -5133,5 +5471,7 @@ if (require.main === module) {
   else if (mode === 'vp-rework') sweepVpRework(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'vine-ladder') sweepVineLadder(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'endgame-pass0') sweepEndgamePass0(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'endgame-rework') sweepEndgameRework(process.argv[3], process.argv[4]);
+  else if (mode === 'fishline') sweepFishline(process.argv[3], process.argv[4]);
   else sweep();
 }
