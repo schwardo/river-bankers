@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>River Bankers — Release Notes</title>
+<style>
+  @page { size: letter; margin: 0.45in 0.6in 0.4in 0.6in; }
+  :root {
+    --water-deep:#1d4e6b; --water-mid:#3a8fb7; --bank:#6b5436; --bank-light:#a0825a;
+    --shore:#d4b97a; --forest:#2f5d3a; --paper:#faf3e3; --paper-warm:#f3e8cb;
+    --ink:#2c1f15; --ink-soft:#5a4a36;
+  }
+  * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  html,body { margin:0; padding:0; background:#fff; }
+  body {
+    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    color:var(--ink); font-size:9.5pt; line-height:1.24;
+  }
+  h1,h2,h3 { font-family:inherit; color:var(--water-deep); margin:0 0 4pt; line-height:1.12; page-break-after:avoid; }
+  .masthead {
+    display:flex; align-items:baseline; justify-content:space-between;
+    border-bottom:2pt solid var(--water-mid); padding-bottom:5pt; margin-bottom:8pt;
+  }
+  .masthead h1 { font-size:21pt; letter-spacing:0.3pt; }
+  .masthead .sub { font-size:9pt; color:var(--ink-soft); font-style:italic; }
+  h2 {
+    font-size:12.5pt; border-bottom:1pt solid var(--bank-light);
+    padding-bottom:2pt; margin-top:8pt; margin-bottom:4pt;
+  }
+  h2 .tag, h3 .tag { font-size:8pt; font-style:italic; color:var(--forest); letter-spacing:0.3pt; text-transform:uppercase; }
+  h3 { font-size:10.5pt; color:var(--forest); margin-top:8pt; margin-bottom:3pt; }
+  p { margin:0 0 5pt; }
+  ul { margin:0 0 6pt 16pt; padding:0; }
+  li { margin-bottom:2.5pt; }
+  strong { color:var(--water-deep); }
+  em { color:var(--ink-soft); }
+  .lead { font-size:10.4pt; color:var(--ink); margin-bottom:6pt; }
+  .note { font-size:8.7pt; color:var(--ink-soft); font-style:italic; }
+  table { width:100%; border-collapse:collapse; font-size:8.8pt; margin:3pt 0 7pt; }
+  th,td { text-align:left; padding:2.5pt 5pt; border-bottom:0.5pt solid var(--bank-light); vertical-align:top; }
+  th { background:var(--paper-warm); color:var(--water-deep); font-weight:700; font-size:8pt; text-transform:uppercase; letter-spacing:0.3pt; }
+  td.card { white-space:nowrap; font-weight:700; color:var(--ink); }
+  .before { color:var(--ink-soft); }
+  .arrow { color:var(--water-mid); }
+  .callout {
+    background:var(--paper); border-left:3pt solid var(--forest); border-radius:3pt;
+    padding:5pt 8pt; margin:5pt 0 7pt; font-size:9pt;
+  }
+  .footer { margin-top:7pt; text-align:center; font-size:7.6pt; color:var(--ink-soft); font-style:italic; }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>River Bankers — Release Notes</h1>
+  <span class="sub">Changelog · newest version first</span>
+</div>
+
+<h2>Version v0.1.9 (June 2026)</h2>
+
+<p class="lead">A new endgame, a fresh batch of card tweaks, and one new structure. The headline
+is the <strong>endgame overhaul</strong> — the rest follows from it.</p>
+
+<h3>The endgame, reworked <span class="tag">the big change</span></h3>
+
+<div class="callout">
+  <strong>Why:</strong> in the 4-player playtest the game <em>felt</em> like it should wrap up about
+  when the material deck emptied — but the old snap-to-retirement ending dragged on past that point.
+  The new finish line gives players a clear target to race toward and a clean wind-down.
+</div>
+
+<p><strong>Before.</strong> The endgame began when the material deck emptied: all pawns snapped to
+spaces 1, 2, 3…, then play continued until each pawn reached space 59 (or passed) and retired. The
+fish track also punished over-spending with <em>lapping</em> — sprint a full lap past another pawn
+and <em>you</em> flipped over, "exhausted" and out of turns until they caught up.</p>
+
+<p><strong>After.</strong> The game now ends on a <strong>finish line</strong>, not on the deck:</p>
+<ul>
+  <li>The line is a fish total set by player count — <strong>60 (2P) · 90 (3P) · 120 (4P)</strong>.</li>
+  <li>The deck running out <em>does not end the game</em> — you keep auctioning the river and
+      Headwaters cards already on the board until pawns reach the line.</li>
+  <li>The instant your pawn reaches the line, you <strong>retire</strong>. Once the first player
+      crosses, everyone else may <strong>Retire</strong> on their turn instead of acting, sliding to
+      the lowest open space at or past the line.</li>
+  <li>When all have retired, each player makes <strong>one last build</strong>, then you score.
+      Ties break to the lower final fish position.</li>
+  <li><strong>Lapping / exhaustion is gone.</strong> Instead, <strong>flip your pawn chit to its
+      "+60" side</strong> each time you pass 0, so your true track position stays readable across laps.</li>
+</ul>
+
+<h3>New card — Confluence</h3>
+<p><strong>Confluence</strong> (Reeds 2 / Stones 2 · time 3 · 5★) — <em>As an action: pay 🐟 to run a
+single auction over two material cards with the same item type</em> (Headwaters or river), pooling
+all their uncovered icons into one larger pool; both cards then float downriver. A way to force a
+big, contested grab.</p>
+
+<h3>Card changes <span class="tag">before → after</span></h3>
+<p class="note">The new endgame caps laps (you pass 0 at most once or twice), which gutted the
+"At 0 on 🐟 track" cards — they could fire only at the very end. They've been reworked into
+once-per-game abilities; Mill Wheel's old clamp would have <em>blocked</em> you from finishing, so it
+became a copy-your-neighbour card.</p>
+<table>
+  <thead><tr><th>Card</th><th>Before</th><th>After</th></tr></thead>
+  <tbody>
+    <tr><td class="card">Wood Pile</td>
+        <td class="before">At 0 on 🐟 track: claim 1 uncovered Log icon for 1🐟.</td>
+        <td><strong>Once per game:</strong> claim 1 uncovered Log icon for 1🐟.</td></tr>
+    <tr><td class="card">Hollowed-out Log</td>
+        <td class="before">At 0 on 🐟 track: recall one worker from a river card (no blank).</td>
+        <td><strong>Once per game:</strong> recall one worker from a river card (no blank).</td></tr>
+    <tr><td class="card">Pack Rat Burrow</td>
+        <td class="before">At 0 on 🐟 track: discard 1 hand card and take one from the discard pile.</td>
+        <td><strong>Once per game:</strong> discard 1 hand card and take one <em>of your choice</em> from the discard pile.</td></tr>
+    <tr><td class="card">Spring Cascade</td>
+        <td class="before">When built: trigger each of your "0 on 🐟 track" effects once.</td>
+        <td><strong>Once per game:</strong> ready one of your other spent once-per-game cards.</td></tr>
+    <tr><td class="card">Mill Wheel</td>
+        <td class="before">When you would pass 0, stop at space 1 instead. <em>(Logs 3 / Stones 3)</em></td>
+        <td><strong>When built:</strong> copy a left/right neighbour's "when built" effect. <strong>As an action:</strong> copy a neighbour's "as an action" ability. <em>(Logs 3 / Stones 2)</em></td></tr>
+    <tr><td class="card">Quick Strike <span class="note">(Mink)</span></td>
+        <td class="before">…declare your bid last (after all other bids are revealed).</td>
+        <td>…declare your bid last. <strong>You must still bid at least 1 worker</strong>, as the trigger always does. <span class="note">(clarification)</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Components</h3>
+<ul>
+  <li><strong>Pawns.</strong> The species worker chits now double as fish-track pawns — each chit has a
+      <strong>"+60" lap back</strong> (flip it when you pass 0).</li>
+  <li><strong>Blank chits: 41</strong> (up from 28), to cover the 90th-percentile of a busy game.</li>
+  <li>Per-species structure-card backs (drawn from each species' worker icon).</li>
+</ul>
+
+<div class="footer">River Bankers — Release Notes · designed by Don Schwarz · published by Left Field Games</div>
+
+</body>
+</html>
