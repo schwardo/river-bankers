@@ -1824,7 +1824,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built: drop 2 blanks on uncovered icons in the river.' },
   { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build: advance 3 fewer 🐟 (min 1).' },
-  { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
+  { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: '+1 to your hand size. When built, draw a structure card.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built: draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 6, effect: 'When you build: 1 of your Clay workers may substitute for any other material.' },
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top of the material deck at any time.' },
@@ -1873,7 +1873,7 @@ const STRUCTURE_TEMPLATES = [
   // Beaver (Logs bias)
   { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'When you build a structure that uses Logs, advance 1 fewer fish (min 1).' },
   { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 2, species: 'beaver', effect: 'At the start of your turn, you may pay 1🐟 to drop a blank on any uncovered icon on a River 1 card.' },
-  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'Your hand size is 4 instead of 3.' },
+  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: '+1 to your hand size. When built, draw a structure card.' },
   // River Otter (Reeds bias)
   { name: 'Kelp Bed',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Reeds icons cost you 1 less fish per item (min 1).' },
   { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 1, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
@@ -1927,7 +1927,10 @@ function oncePerGameUsed(p, name) {
   if (name === 'Spring Cascade'   && p.springCascadeUsed) return true;
   return false;
 }
-function maxHandSize(p) { return 3 + (hasEffect(p, 'Cache Burrow') ? 1 : 0); }
+// Cache Burrow stacks: +1 hand size per built copy (beaver starter + main deck).
+function maxHandSize(p) {
+  return 3 + (effectActive('Cache Burrow') ? p.built.filter(s => s.name === 'Cache Burrow').length : 0);
+}
 // Returns { base, bonuses: [{name, vp, detail}], total } for end-of-game scoring.
 // `base` is the printed-VP sum of built structures; each bonus describes one
 // end-game scoring effect that fired (positive or zero).
@@ -2631,6 +2634,13 @@ function startGame() {
         .sort((a, b) => b.w - a.w);
       p.built.push(ranked[0].c);
     }
+    // Top up opening hands now that AI starters are pre-built — a drafted
+    // Cache Burrow raises hand size to 4, so draw the extra card immediately.
+    // (The human's top-up runs after their draft modal resolves.)
+    for (const p of players) {
+      if (p.isHuman) continue;
+      while (p.hand.length < maxHandSize(p) && structDeck.length) p.hand.push(structDeck.pop());
+    }
   }
 
   // No starting river cards — the river populates as cards are pulled out of the upstream queue.
@@ -2714,6 +2724,10 @@ async function runHumanSpeciesDraft() {
   );
   if (picked) {
     human.built.push(picked);
+    // A drafted Cache Burrow raises hand size to 4 — top up immediately.
+    while (human.hand.length < maxHandSize(human) && structAvailable(state) > 0) {
+      human.hand.push(popStructDeck(state));
+    }
     log(`${human.species.emoji} ${speciesLabel(human)} drafts <b>${picked.name}</b>.`);
     render();
   }

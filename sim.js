@@ -28,7 +28,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built: drop 2 blanks on uncovered icons in the river.' },
   { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build: advance 3 fewer 🐟 (min 1).' },
-  { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: 'Your hand size is 4 instead of 3.' },
+  { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: '+1 to your hand size. When built, draw a structure card.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built: draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 6, effect: 'When you build: 1 of your Clay workers may substitute for any other material.' },
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top of the material deck at any time.' },
@@ -77,7 +77,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   // Beaver (Logs bias)
   { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'When you build a structure that uses Logs, advance 1 fewer fish (min 1).' },
   { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 2, species: 'beaver', effect: 'At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card.' },
-  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'Your hand size is 4 instead of 3.' },
+  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: '+1 to your hand size. When built, draw a structure card.' },
   // River Otter (Reeds bias)
   { name: 'Kelp Bed',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Reeds icons cost you 1 less fish per item (min 1).' },
   { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 1, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
@@ -153,7 +153,10 @@ function matEndGameVP(p, cardName, defaultMult, defaultCap, materialKey) {
   const count = p.built.filter(b => (b.cost[materialKey] || 0) > 0).length;
   return Math.min(cap, mult * count);
 }
-function maxHandSize(p) { return 3 + (hasEffect(p, 'Cache Burrow') ? 1 : 0); }
+// Cache Burrow stacks: +1 hand size per built copy (beaver starter + main deck).
+function maxHandSize(p) {
+  return 3 + (effectActive('Cache Burrow') ? p.built.filter(s => s.name === 'Cache Burrow').length : 0);
+}
 function totalVP(p, state) {
   let v = p.built.reduce((s, b) => s + b.vp, 0);
   if (hasEffect(p, 'Pier')) {
@@ -921,6 +924,12 @@ function newGame(numPlayers, workersPerPlayer = null) {
       picked = ranked[0].c;
     }
     p.built.push(picked);
+  }
+  // Top up opening hands to each player's hand size now that starters are
+  // pre-built — the beaver's Cache Burrow starter raises their hand size to 4,
+  // so they draw the extra card immediately rather than waiting for a build.
+  for (const p of players) {
+    while (p.hand.length < maxHandSize(p) && structDeck.length) p.hand.push(structDeck.pop());
   }
   // Test harness: give a free turn-1 starter (printed VP 0) to one player
   // (INJECT_STARTER_PLAYER >= 0) or to ALL players (=== -2), to measure the

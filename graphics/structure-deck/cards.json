@@ -16,7 +16,7 @@
     { "name": "Reed Bed",         "cost": {"reeds": 3, "mud": 1},              "time": 2, "vp": 4,  "effect": "Reed icons cost you 1 less 🐟 per item (min 1)." },
     { "name": "Mud Levee",        "cost": {"mud": 3, "stones": 2},             "time": 3, "vp": 6,  "effect": "When built: drop 2 blanks on uncovered icons in the river." },
     { "name": "Otter Slide",      "cost": {"mud": 2, "logs": 1},               "time": 1, "vp": 2,  "effect": "When you build: advance 3 fewer 🐟 (min 1)." },
-    { "name": "Cache Burrow",     "cost": {"mud": 2, "reeds": 2},              "time": 2, "vp": 4,  "effect": "Your hand size is 4 instead of 3." },
+    { "name": "Cache Burrow",     "cost": {"mud": 2, "reeds": 2},              "time": 2, "vp": 4,  "effect": "+1 to your hand size. When built, draw a structure card." },
     { "name": "Vine Lattice",     "cost": {"vines": 3, "reeds": 2},            "time": 3, "vp": 5,  "effect": "When built: draw 3 structure cards, keep 1, discard 2." },
     { "name": "Charcoal Pit",     "cost": {"clay": 4, "logs": 2},              "time": 3, "vp": 6,  "effect": "When you build: 1 of your Clay workers may substitute for any other material." },
     { "name": "Lookout Tree",     "cost": {"logs": 5, "stones": 2},            "time": 4, "vp": 8,  "effect": "Peek at the top of the material deck at any time." },

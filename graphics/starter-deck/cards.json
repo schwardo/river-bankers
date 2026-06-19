@@ -3,7 +3,7 @@
   "cards": [
     { "name": "Lodge Foundation", "species": "beaver",  "vp": 1, "effect": "When you build a structure that uses Logs, advance 1 fewer fish (min 1)." },
     { "name": "Tail Slap",        "species": "beaver",  "vp": 2, "effect": "At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card." },
-    { "name": "Cache Burrow",     "species": "beaver",  "vp": 1, "effect": "Your hand size is 4 instead of 3." },
+    { "name": "Cache Burrow",     "species": "beaver",  "vp": 1, "effect": "+1 to your hand size. When built, draw a structure card." },
 
     { "name": "Kelp Bed",         "species": "otter",   "vp": 0, "effect": "Reeds icons cost you 1 less fish per item (min 1)." },
     { "name": "Rolling Float",    "species": "otter",   "vp": 1, "effect": "Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost." },
