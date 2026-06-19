@@ -156,6 +156,18 @@ function cardGroup(cx, cy, value, size, color) {
   ].join('');
 }
 
+// plus60Badge: a mini "+60" lap badge — a white disc with a black outline and
+// black, centered "+60". cx,cy = center, r = radius.
+function plus60Badge(cx, cy, r) {
+  const fs = (r * 0.72).toFixed(1);
+  return [
+    `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r}" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.5"/>`,
+    `<text x="${cx.toFixed(2)}" y="${cy.toFixed(2)}" text-anchor="middle" dominant-baseline="central" ` +
+      `font-family="'DejaVu Sans','Arial',sans-serif" font-weight="bold" font-size="${fs}" letter-spacing="-0.5" ` +
+      `fill="#1a1a1a">+60</text>`,
+  ].join('');
+}
+
 // ---------- assemble SVG ----------
 function buildSvg() {
   const cells = buildFishCells();
@@ -326,36 +338,9 @@ function buildSvg() {
     fill: 'none', stroke: '#7c2410', 'stroke-width': 4,
   }));
 
-  // Direction-of-travel cue: a small arrow whose left edge is flush with
-  // the right edge of the 0 space, sweeping clockwise along the top
-  // edge. A "pay 🐟" label sits past the arrowhead so the cue reads
-  // "to move clockwise → pay 1 fish."
-  const dirY = BAND + 22;
-  const dirX1 = BAND;                            // flush to right side of cell 0
-  const dirX2 = BAND + 1.4 * EDGE_CELL_LEN;      // short sweep
-  parts.push(`<line x1="${dirX1.toFixed(2)}" y1="${dirY}"
-    x2="${dirX2.toFixed(2)}" y2="${dirY}"
-    stroke="#7c2410" stroke-width="2.5" stroke-linecap="round"
-    marker-end="url(#arrow-red)" opacity="0.95"/>`);
-  // "pay 🐟" label past the arrowhead.
-  const labelGap = 10;
-  const payFontSize = 16;
-  const payX = dirX2 + labelGap;
-  parts.push(text({
-    x: payX, y: dirY + payFontSize * 0.34,
-    content: 'pay',
-    'text-anchor': 'start', 'font-size': payFontSize, 'font-style': 'italic',
-    fill: '#7c2410',
-  }));
-  // Approximate width of the "pay" word at this font, then place the fish.
-  const payTextW = payFontSize * 1.85;
-  const fishH = 22;
-  const fishW = fishH * 2;
-  const fishX = payX + payTextW + 4;
-  const fishY = dirY - fishH / 2;
-  parts.push(`<use xlink:href="#fish"
-    x="${fishX.toFixed(2)}" y="${fishY.toFixed(2)}"
-    width="${fishW.toFixed(2)}" height="${fishH.toFixed(2)}"/>`);
+  // (The old "pay 🐟 → clockwise" direction cue was removed: the top strip now
+  // holds the WHEN-YOU-PASS-0 and ENDGAME-TRIGGER boxes; direction reads from
+  // the 0→59 numbering.)
 
   // ---- center area (inside the band) ----
   // Interior is from (BAND, BAND) to (W-BAND, H-BAND) = (56,56) to (744,744)
@@ -380,8 +365,14 @@ function buildSvg() {
   // Vertical layout: balance slots + invent box within the interior, with
   // the invent box ~24 px below the slots and equal padding above/below.
   const INVENT_H_RES = 96;
-  const TOTAL_H = slotH + 24 + INVENT_H_RES;
-  const SLOTS_Y = IY0 + Math.max(20, (IH - TOTAL_H) / 2);
+  // Vertical stack: Endgame legend (top, right-aligned) · slots · Invent
+  // (centred below the slots).
+  const ENDGAME_H_RES = 124;
+  const VGAP = 16;
+  const TOTAL_H = ENDGAME_H_RES + VGAP + slotH + VGAP + INVENT_H_RES;
+  const TOP_PAD = Math.max(8, (IH - TOTAL_H) / 2);
+  const ENDGAME_Y = IY0 + TOP_PAD;
+  const SLOTS_Y = ENDGAME_Y + ENDGAME_H_RES + VGAP;
 
   // Slot frames (matched to the river board's slot framing: square
   // corners, dark river-stroke, river-fade gradient fill).
@@ -455,13 +446,14 @@ function buildSvg() {
   }));
   parts.push(`</g>`);
 
-  // ---- Invent action box ----
-  // Styled like the river board's "FLUSH HEADWATERS" info box but wider so
-  // the action description "Pay N 🐟 → draw N → discard N" fits cleanly.
+  // ---- Invent action box (centred below the deck slots) ----
+  // Styled like the river board's "FLUSH HEADWATERS" info box.
   const INVENT_W = 520;
   const INVENT_H = INVENT_H_RES;
   const INVENT_X = (W - INVENT_W) / 2;
-  const INVENT_Y = SLOTS_Y + slotH + 24;
+  // Centre vertically between the bottom of the deck slots and the top of the
+  // bottom fish-track row (IY1).
+  const INVENT_Y = (SLOTS_Y + slotH + IY1 - INVENT_H) / 2;
   parts.push(`<g id="invent">`);
   parts.push(rect({
     x: INVENT_X, y: INVENT_Y, w: INVENT_W, h: INVENT_H, rx: 10, ry: 10,
@@ -521,6 +513,118 @@ function buildSvg() {
     stroke="#244c5a" stroke-width="2.5" marker-end="url(#arrow)" opacity="0.85"/>`);
   parts.push(`<line x1="${arrowBxL1}" y1="${arrY}" x2="${arrowBxL2}" y2="${arrY}"
     stroke="#244c5a" stroke-width="2.5" marker-end="url(#arrow)" opacity="0.85"/>`);
+  parts.push(`</g>`);
+
+  // ---- Top-strip box row: PAY (left) + WHEN-YOU-PASS-0 (mid) +
+  //      ENDGAME-TRIGGER (right), same height, centred over the slots. ----
+  const TOPBOX_GAP = 18;
+  const PAY_W = 110;
+  const FLIP_W = 196;
+  const LEGEND_W = 318;
+  const ROW_TOTAL = PAY_W + TOPBOX_GAP + FLIP_W + TOPBOX_GAP + LEGEND_W;
+  const ROW_X0 = IX0 + (IW - ROW_TOTAL) / 2;
+  const TOPBOX_H = ENDGAME_H_RES;
+  const TOPBOX_Y = ENDGAME_Y;
+  const PAY_X = ROW_X0;
+  const PAIR_X = PAY_X + PAY_W + TOPBOX_GAP;   // flip box (mid)
+  // Endgame trigger box (right of the row).
+  const LEGEND_H = TOPBOX_H;
+  const LEGEND_X = PAIR_X + FLIP_W + TOPBOX_GAP;
+  const LEGEND_Y = TOPBOX_Y;
+  parts.push(`<g id="endgame-trigger">`);
+  parts.push(rect({
+    x: LEGEND_X, y: LEGEND_Y, w: LEGEND_W, h: LEGEND_H, rx: 10, ry: 10,
+    fill: '#fff', stroke: '#7c2410', 'stroke-width': 1.8,
+  }));
+  parts.push(text({
+    x: LEGEND_X + LEGEND_W / 2, y: LEGEND_Y + 24,
+    content: 'ENDGAME TRIGGER', 'text-anchor': 'middle',
+    'font-size': 15, 'font-weight': 'bold', fill: '#7c2410', 'letter-spacing': '1.5',
+  }));
+  parts.push(`<line x1="${LEGEND_X + 14}" y1="${LEGEND_Y + 32}" x2="${LEGEND_X + LEGEND_W - 14}" y2="${LEGEND_Y + 32}" stroke="#7c2410" stroke-width="1" opacity="0.4"/>`);
+  const dividerX = LEGEND_X + 56;
+  parts.push(`<line x1="${dividerX}" y1="${LEGEND_Y + 38}" x2="${dividerX}" y2="${LEGEND_Y + LEGEND_H - 10}" stroke="#d8c6b0" stroke-width="1"/>`);
+  const legRows = [
+    { label: '2P', val: '59', plus60: false },
+    { label: '3P', val: '29', plus60: true },
+    { label: '4P', val: '59', plus60: true },
+  ];
+  const ROW_H = 26;
+  const firstMid = LEGEND_Y + 54;
+  legRows.forEach((r, i) => {
+    const my = firstMid + i * ROW_H;
+    parts.push(text({
+      x: LEGEND_X + 28, y: my + 5, content: r.label,
+      'text-anchor': 'middle', 'font-size': 16, 'font-weight': 'bold', fill: '#244c5a',
+    }));
+    const preX = dividerX + 10;
+    parts.push(text({
+      x: preX, y: my + 4, content: 'any player reaches',
+      'text-anchor': 'start', 'font-size': 13, 'font-style': 'italic', fill: '#5a4a36',
+    }));
+    const numCx = preX + 128;
+    parts.push(fishGroup(numCx, my, r.val, 15, '#5a3a00'));
+    if (r.plus60) parts.push(plus60Badge(numCx + 44, my, 13));
+    if (i < legRows.length - 1) {
+      parts.push(`<line x1="${LEGEND_X + 14}" y1="${my + ROW_H / 2}" x2="${LEGEND_X + LEGEND_W - 14}" y2="${my + ROW_H / 2}" stroke="#ece2cc" stroke-width="0.8"/>`);
+    }
+  });
+  parts.push(`</g>`);
+
+  // ---- "WHEN YOU PASS 0" flip box (left of the pair, same height) ----
+  // Lap boundary 59 · 0 · 1, with a blank worker chit under 59 and a "+60"
+  // worker chit under 1, and an arrow — flip your pawn as you pass 0.
+  const FB_W = FLIP_W, FB_H = LEGEND_H;
+  const FB_X = PAIR_X;
+  const FB_Y = LEGEND_Y;
+  const FD_CX = FB_X + FB_W / 2;
+  const FD_CELL_W = 50, FD_CELL_H = 28;
+  parts.push(`<g id="flip-legend">`);
+  parts.push(rect({
+    x: FB_X, y: FB_Y, w: FB_W, h: FB_H, rx: 10, ry: 10,
+    fill: '#fff', stroke: '#7c2410', 'stroke-width': 1.8,
+  }));
+  parts.push(text({
+    x: FD_CX, y: FB_Y + 28, content: 'WHEN YOU PASS 0',
+    'text-anchor': 'middle', 'font-size': 13, 'font-weight': 'bold', fill: '#7c2410', 'letter-spacing': '1',
+  }));
+  const FD_CELL_Y = FB_Y + 38;
+  [{ n: '59', dx: -FD_CELL_W }, { n: '0', dx: 0 }, { n: '1', dx: FD_CELL_W }].forEach(c => {
+    parts.push(rect({
+      x: FD_CX + c.dx - FD_CELL_W / 2, y: FD_CELL_Y, w: FD_CELL_W, h: FD_CELL_H,
+      fill: 'url(#track-fade)', stroke: '#5a4422', 'stroke-width': 1.6,
+    }));
+    parts.push(text({
+      x: FD_CX + c.dx, y: FD_CELL_Y + FD_CELL_H / 2 + 5, content: c.n,
+      'text-anchor': 'middle', 'font-size': 15, 'font-weight': 'bold', fill: '#5a4422',
+    }));
+  });
+  const fdChitY = FD_CELL_Y + FD_CELL_H + 26;
+  const fdR = 14;
+  const blankCx = FD_CX - FD_CELL_W;   // under "59"
+  const plusCx = FD_CX + FD_CELL_W;    // under "1"
+  parts.push(`<circle cx="${blankCx}" cy="${fdChitY}" r="${fdR}" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.5"/>`);
+  parts.push(plus60Badge(plusCx, fdChitY, fdR));
+  parts.push(`<line x1="${(blankCx + fdR + 3).toFixed(1)}" y1="${fdChitY}" x2="${(plusCx - fdR - 5).toFixed(1)}" y2="${fdChitY}" stroke="#7c2410" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow-red)"/>`);
+  parts.push(`</g>`);
+
+  // ---- "Pay 🐟" box (left of the row): title + a left-to-right arrow showing
+  //      the direction your pawn advances along the fish track. ----
+  const PAY_CX = PAY_X + PAY_W / 2;
+  parts.push(`<g id="pay-fish">`);
+  parts.push(rect({
+    x: PAY_X, y: TOPBOX_Y, w: PAY_W, h: TOPBOX_H, rx: 10, ry: 10,
+    fill: '#fff', stroke: '#7c2410', 'stroke-width': 1.8,
+  }));
+  const payTitleY = TOPBOX_Y + 56;
+  const payFishW = 22, payFishH = 16;
+  parts.push(text({
+    x: PAY_CX - 4, y: payTitleY, content: 'Pay', 'text-anchor': 'end',
+    'font-size': 16, 'font-weight': 'bold', fill: '#7c2410',
+  }));
+  parts.push(`<use xlink:href="#fish" x="${(PAY_CX + 2).toFixed(2)}" y="${(payTitleY - payFishH * 0.82).toFixed(2)}" width="${payFishW}" height="${payFishH}"/>`);
+  const payArrY = TOPBOX_Y + 88;
+  parts.push(`<line x1="${(PAY_CX - 32).toFixed(1)}" y1="${payArrY}" x2="${(PAY_CX + 28).toFixed(1)}" y2="${payArrY}" stroke="#7c2410" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow-red)"/>`);
   parts.push(`</g>`);
 
   parts.push(`</svg>`);
