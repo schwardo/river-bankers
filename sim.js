@@ -71,7 +71,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Trading Post',     cost: { clay: 2, reeds: 2 },             time: 3, vp: 5, effect: 'As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.' },
   { name: 'Confluence',       cost: { reeds: 2, stones: 2 },            time: 3, vp: 5, effect: 'As an action: pay 🐟 to trigger one auction over two same-symbol cards, pooling all their uncovered icons into a single larger pool. Both cards then float downriver.' },
 
-  // Species starter structures (asymmetric play, see SPECIES.md). Each player
+  // Species starter structures (asymmetric play). Each player
   // drafts 1 of their 3 species cards at setup; picked card is pre-built in
   // their tableau. The `species` flag excludes these from the shared deck.
   // Beaver (Logs bias)
