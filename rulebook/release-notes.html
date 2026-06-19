@@ -14,7 +14,7 @@
   html,body { margin:0; padding:0; background:#fff; }
   body {
     font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
-    color:var(--ink); font-size:9.5pt; line-height:1.24;
+    color:var(--ink); font-size:9.5pt; line-height:1.2;
   }
   h1,h2,h3 { font-family:inherit; color:var(--water-deep); margin:0 0 4pt; line-height:1.12; page-break-after:avoid; }
   .masthead {
@@ -29,15 +29,15 @@
   }
   h2 .tag, h3 .tag { font-size:8pt; font-style:italic; color:var(--forest); letter-spacing:0.3pt; text-transform:uppercase; }
   h3 { font-size:10.5pt; color:var(--forest); margin-top:8pt; margin-bottom:3pt; }
-  p { margin:0 0 5pt; }
+  p { margin:0 0 4pt; }
   ul { margin:0 0 6pt 16pt; padding:0; }
-  li { margin-bottom:2.5pt; }
+  li { margin-bottom:2pt; }
   strong { color:var(--water-deep); }
   em { color:var(--ink-soft); }
   .lead { font-size:10.4pt; color:var(--ink); margin-bottom:6pt; }
   .note { font-size:8.7pt; color:var(--ink-soft); font-style:italic; }
   table { width:100%; border-collapse:collapse; font-size:8.8pt; margin:3pt 0 7pt; }
-  th,td { text-align:left; padding:2.5pt 5pt; border-bottom:0.5pt solid var(--bank-light); vertical-align:top; }
+  th,td { text-align:left; padding:2pt 5pt; border-bottom:0.5pt solid var(--bank-light); vertical-align:top; }
   th { background:var(--paper-warm); color:var(--water-deep); font-weight:700; font-size:8pt; text-transform:uppercase; letter-spacing:0.3pt; }
   td.card { white-space:nowrap; font-weight:700; color:var(--ink); }
   .before { color:var(--ink-soft); }
@@ -46,7 +46,7 @@
     background:var(--paper); border-left:3pt solid var(--forest); border-radius:3pt;
     padding:5pt 8pt; margin:5pt 0 7pt; font-size:9pt;
   }
-  .footer { margin-top:7pt; text-align:center; font-size:7.6pt; color:var(--ink-soft); font-style:italic; }
+  .footer { margin-top:4pt; text-align:center; font-size:7.6pt; color:var(--ink-soft); font-style:italic; }
 </style>
 </head>
 <body>
@@ -118,16 +118,24 @@ became a copy-your-neighbour card.</p>
     <tr><td class="card">Mill Wheel</td>
         <td class="before">When you would pass 0, stop at space 1 instead. <em>(Logs 3 / Stones 3)</em></td>
         <td><strong>When built:</strong> copy a left/right neighbour's "when built" effect. <strong>As an action:</strong> copy a neighbour's "as an action" ability. <em>(Logs 3 / Stones 2)</em></td></tr>
+    <tr><td class="card">Cache Burrow</td>
+        <td class="before">Your hand size is 4 instead of 3 (didn't stack — two still capped you at 4).</td>
+        <td><strong>+1 to your hand size</strong> (two now stack to 5). <strong>When built, draw a structure card.</strong></td></tr>
     <tr><td class="card">Quick Strike <span class="note">(Mink)</span></td>
         <td class="before">…declare your bid last (after all other bids are revealed).</td>
         <td>…declare your bid last. <strong>You must still bid at least 1 worker</strong>, as the trigger always does. <span class="note">(clarification)</span></td></tr>
   </tbody>
 </table>
+<p class="note">A few cards were also <strong>renamed</strong> to stop their titles colliding with the
+four species names — the beaver hand-size starter is now <strong>Beaver Cache</strong> (it stacks
+with the main-deck Cache Burrow), and several generic structures shed their animal prefixes.
+Cosmetic only; no rules change.</p>
 
 <h3>Components</h3>
 <ul>
-  <li><strong>Pawns.</strong> The species worker chits now double as fish-track pawns — each chit has a
-      <strong>"+60" lap back</strong> (flip it when you pass 0).</li>
+  <li><strong>Pawns.</strong> Each species now has a <strong>dedicated fish-track pawn</strong> — a chit
+      with a <strong>"+60" lap back</strong> (flip it when you pass 0). It's used only on the fish track,
+      not as a worker.</li>
   <li><strong>Blank chits: 41</strong> (up from 28), to cover the 90th-percentile of a busy game.</li>
   <li>Per-species structure-card backs (drawn from each species' worker icon).</li>
 </ul>

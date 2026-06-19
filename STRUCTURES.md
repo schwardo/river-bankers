@@ -12,40 +12,40 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Otter Slide** | 2 mud, 1 log | 1🐟 | When you build, advance 3 fewer fish (min 1). |
-| **Mill Wheel** | 3 logs, 3 stones | 4🐟 | Any time you would pass 0 on the fish track, stop at space 1 instead. |
-| **Slipstream** | 2 mud, 2 vines | 3🐟 | Once per game, take a turn immediately after another player takes their turn, even if you are not next on the fish track. |
+| **Log Flume** | 2 mud, 1 log | 1🐟 | When you build: advance 3 fewer 🐟 (min 1). |
+| **Mill Wheel** | 3 logs, 2 stones | 4🐟 | When built: activate one "when built" effect of a built structure controlled by the player to your left or right. As an action: activate the "as an action" ability of a built structure controlled by the player to your left or right. |
+| **Slipstream** | 2 mud, 2 vines | 3🐟 | Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track. |
 
 ### Bidding / auction
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Lookout Tree** | 5 logs, 2 stones | 4🐟 | Peek at the top card of the material deck at any time. |
-| **Spy Mound** | 4 stones, 1 clay | 3🐟 | Once per game, you may decide your auction bid after the other players have revealed their bids. |
-| **Otter Raft** | 4 logs, 1 reed | 3🐟 | Whenever you place fewer workers than your bid due to a jammed auction, pay fish for one fewer worker. |
-| **Heron Roost** | 3 reeds, 2 vines | 3🐟 | At the start of your turn you may pay 1 fish to replace a Headwaters card of your choice with the top card of the material deck.  The replaced card is discarded. |
-| **Driftwood Snag** | 2 logs, 2 reeds, 1 mud | 3🐟 | At the start of your turn you may pay 1 fish to add a blank to any uncovered icon — either on the river or in the Headwaters. |
+| **Lookout Tree** | 5 logs, 2 stones | 4🐟 | Peek at the top of the material deck at any time. |
+| **Spy Mound** | 4 stones, 1 clay | 3🐟 | Once per game (flip card): decide your auction bid after the other players reveal theirs. |
+| **Pontoon** | 4 logs, 1 reed | 3🐟 | When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker. |
+| **Heron Roost** | 3 reeds, 2 vines | 3🐟 | As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck. |
+| **Driftwood Snag** | 2 logs, 2 reeds, 1 mud | 3🐟 | As an action: pay 1🐟 to add a blank to any uncovered icon. |
 
 ### Material / build
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Reed Bed** | 3 reeds, 1 mud | 2🐟 | Reed icons cost you 1 less fish per item (min 1). |
-| **Charcoal Pit** | 4 clay, 2 logs | 3🐟 | When building, 1 Clay worker may substitute for any other material. |
-| **Cattail Marsh** | 4 reeds, 2 mud | 3🐟 | Each Reed worker you spend on a build counts as 2 reeds. |
-| **Treaty Stone** | 3 stones, 2 clay | 3🐟 | When building, you may spend 2 of any one material as 1 of any other material. Once per build. |
-| **Wood Pile** | 4 logs | 2🐟 | When you pass 0, claim 1 uncovered Log icon from any river card for 1🐟. |
+| **Reed Bed** | 3 reeds, 1 mud | 2🐟 | Reed icons cost you 1 less 🐟 per item (min 1). |
+| **Charcoal Pit** | 4 clay, 2 logs | 3🐟 | When you build: 1 of your Clay workers may substitute for any other material. |
+| **Cattail Marsh** | 4 reeds, 2 mud | 3🐟 | When you build: each Reed worker counts as 2 reeds. |
+| **Treaty Stone** | 3 stones, 2 clay | 3🐟 | When you build: you may spend 2 of any one material as 1 of any other. Once per build. |
+| **Wood Pile** | 4 logs | 2🐟 | Once per game (flip card): claim 1 uncovered Log icon from any river card for 1🐟. |
 
 ### Worker logistics
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Hollowed-out Log** | 3 logs, 1 reed | 2🐟 | When you pass 0, recall one worker from a river card without dropping a blank. |
-| **Pack Rat Burrow** | 2 reeds, 2 mud | 2🐟 | When you pass 0 on the fish track, you may discard 1 structure from your hand and take a structure of your choice from the discard pile. |
-| **Cache Burrow** | 2 mud, 2 reeds | 2🐟 | Your hand size is 4 instead of 3. |
-| **Granary** | 4 reeds, 1 clay | 3🐟 | Once per game, your build costs 1 fewer of one listed material (your choice). |
-| **Floodgate** | 4 mud, 3 clay | 4🐟 | Once per game, before an auction resolves, slide the auctioned card 1 space upstream — toward the Headwaters (cheaper). |
-| **Otter Den** | 3 mud, 1 vine | 2🐟 | When you recall your workers, move backwards on the fish card by the number of recalled workers. |
+| **Hollowed-out Log** | 3 logs, 1 reed | 2🐟 | Once per game (flip card): recall one worker from a river card (no blank). |
+| **Pack Rat Burrow** | 2 reeds, 2 mud | 2🐟 | Once per game (flip card): discard 1 structure from your hand and take one of your choice from the discard pile. |
+| **Cache Burrow** | 2 mud, 2 reeds | 2🐟 | +1 to your hand size. When built, draw a structure card. |
+| **Granary** | 4 reeds, 1 clay | 3🐟 | Once per game (flip card): your build costs 1 fewer of one listed material. |
+| **Floodgate** | 4 mud, 3 clay | 4🐟 | Once per game (flip card): before an auction resolves, slide the auctioned card 1 space toward the Headwaters. |
+| **Streambank Hollow** | 3 mud, 1 vine | 2🐟 | When you recall workers before an auction, slide back 1🐟 per worker recalled. |
 
 ### Shoreline / endgame scoring
 
@@ -53,14 +53,14 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Pier** | 3 logs, 2 stones | 3🐟 | End game: +2 VP per shoreline card with at least one of your workers on it (max +6). |
-| **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End game: +3 VP per built structure of yours that uses Vines. |
-| **Vine Trellis** | 3 vines, 1 stone | 2🐟 | When you build a structure that uses Vines, slide back 1🐟 on the fish track. End game: +1 VP per built structure of yours that uses Vines (max +6). |
-| **Stone Causeway** | 3 stones, 2 logs | 3🐟 | When you build a structure that uses Stones, draw 1 structure card and discard 1 from your hand. End game: +1 VP per built structure of yours that uses Stones (max +6). |
-| **Reed Walkway** | 4 reeds, 1 mud | 3🐟 | When you build a structure that uses Reeds, place 1 free worker from your supply onto an uncovered icon on a River 1 card. End game: +1 VP per built structure of yours that uses Reeds (max +6). |
-| **Clay Vault** | 3 clay, 2 vines | 3🐟 | When you build a structure that uses Clay, look at the top card of the structure deck; you may swap it with 1 card from your hand. End game: +1 VP per built structure of yours that uses Clay (max +6). |
-| **Burrow Network** | 3 mud, 2 reeds | 2🐟 | When you build a structure that uses Mud, move 1 of your workers from any river card to another river card containing at least 1 of your workers. You may replace a blank instead of an uncovered icon. End game: +1 VP per built structure of yours that uses Mud (max +6). |
-| **Cattail Patch** | 3 reeds, 2 mud | 3🐟 | End game: 1/1/2/3/5/8 VP for 1/2/3/4/5/6 distinct materials across your built structures. |
+| **Pier** | 3 logs, 2 stones | 3🐟 | End of game: +2 VP per shoreline card with at least one of your workers. |
+| **Vine Ladder** | 4 vines, 2 stones | 4🐟 | End of game: +4 VP per built structure of yours that uses Vines (max +12). |
+| **Vine Trellis** | 3 vines, 1 stone | 2🐟 | When you build a structure that uses Vines: slide back 1🐟. End of game: +2 VP per built structure of yours that uses Vines. |
+| **Stone Causeway** | 3 stones, 2 logs | 3🐟 | When you build a structure that uses Stones: draw 1 structure card and discard 1. End of game: +2 VP per built structure of yours that uses Stones (max +8). |
+| **Reed Walkway** | 4 reeds, 1 mud | 3🐟 | When you build a structure that uses Reeds: place 1 free worker on a River 1 card. End of game: +2 VP per built structure of yours that uses Reeds. |
+| **Clay Vault** | 3 clay, 2 vines | 3🐟 | When you build a structure that uses Clay: peek at the top of the structure deck; you may swap it with 1 card from your hand. End of game: +3 VP per built structure of yours that uses Clay (max +12). |
+| **Burrow Network** | 3 mud, 2 reeds | 2🐟 | When you build a structure that uses Mud: move one of your workers to another river card with at least one of your workers (may replace a blank). End of game: +3 VP per built structure of yours that uses Mud (max +9). |
+| **Cattail Patch** | 3 reeds, 2 mud | 3🐟 | End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures. |
 
 ---
 
@@ -70,38 +70,38 @@ Design notes for giving structure cards either **constant** (passive, always-on)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Royal Lodge** | 6 logs, 2 vines | 5🐟 | Take an immediate extra turn after building. |
-| **Burrow Run** | 3 vines, 1 mud | 0🐟 | Slide your pawn back 5 on the fish track. |
-| **Snag Pile** | 2 reeds, 1 stone | 2🐟 | Pull a Headwaters card to River 1 for free; an auction immediately runs on it at 1🐟/item. *(Your bid still costs at the new river rate.)* |
+| **Royal Lodge** | 6 logs, 2 vines | 5🐟 | When built: take an immediate extra turn. |
+| **Burrow Run** | 3 vines, 1 mud | 0🐟 | When built: slide your pawn back 5 on 🐟 track. |
+| **Snag Pile** | 2 reeds, 1 stone | 2🐟 | When built: pull a Headwaters card to River 1; run an auction on it at 1🐟/item. |
 
 ### Worker reshuffle
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Sap Drip** | 2 logs, 2 vines | 2🐟 | Place 2 free workers from your supply onto any uncovered icons on a single river card. No auction, no fish. |
+| **Sap Drip** | 2 logs, 2 vines | 2🐟 | When built: place 2 free workers from your supply onto uncovered icons of one river card. |
 
 ### Information / hand
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Vine Lattice** | 3 vines, 2 reeds | 3🐟 | Draw 3 structure cards, keep 1, discard 2. |
-| **Stone Pool** | 3 stones, 2 clay | 3🐟 | Look at the top 5 material cards; rearrange them in any order. |
-| **Salt Lick** | 3 stones, 2 logs, 1 clay | 3🐟 | Look at every opponent's hand of structure cards. |
+| **Vine Lattice** | 3 vines, 2 reeds | 3🐟 | When built: draw 3 structure cards, keep 1, discard 2. |
+| **Stone Pool** | 3 stones, 2 clay | 3🐟 | When built: look at the top 5 material cards and rearrange them in any order. |
+| **Salt Lick** | 3 stones, 2 logs, 1 clay | 3🐟 | When built: look at every opponent's hand of structure cards. |
 
 ### Disruption
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Beaver Dam** | 4 logs, 2 mud | 0🐟 | Wash **one** River 1 card of your choice to the shoreline (workers carry along). |
-| **Mud Levee** | 3 mud, 2 stones | 3🐟 | Drop 2 blanks on any uncovered icons in the river. |
-| **Flush Channel** | 3 mud, 1 reed | 2🐟 | Discard 1 Headwaters card of your choice (out of game). Refill that slot from the top of the material deck. No auction. |
+| **Spillway** | 4 logs, 2 mud | 0🐟 | When built: wash one card from River 1 to the shoreline (workers carry along). |
+| **Mud Levee** | 3 mud, 2 stones | 3🐟 | When built: drop 2 blanks on uncovered icons in the river. |
+| **Flush Channel** | 3 mud, 1 reed | 2🐟 | When built: discard 1 Headwaters card (out of game) and refill that slot from the material deck. No auction. |
 
 ### Conditional VP (resolved at game end)
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Hidden Cache** | 2 vines, 3 stones, 2 clay | 3🐟 | +3 VP per 2 distinct materials in your built structures (max +9). |
-| **Heron Watch** | 4 stones, 2 logs | 4🐟 | End game: +1 VP per shoreline card on the table, max +6 VP. |
+| **Hidden Cache** | 2 vines, 3 stones, 2 clay | 3🐟 | End of game: +3 VP per 2 distinct materials in your built structures (max +9). |
+| **Heron Watch** | 4 stones, 2 logs | 4🐟 | End of game: +1 VP per shoreline card on the table (max +6). |
 
 ---
 
@@ -124,18 +124,18 @@ Brainstormed in `games/board-games.org` ("Design more structure cards with novel
 
 | Name | Cost | Time | Effect |
 |------|------|------|--------|
-| **Otter Trail** | 3 vines, 2 stones | 3🐟 | At the start of your turn, pick one of your workers on a river card A and another worker (yours or an opponent's) on a different river card B. Pay A's per-item cost in fish; swap the two workers. No blanks drop. |
-| **Tribute Stone** | 2 clay, 2 stones | 3🐟 | Once per game, at the start of your turn, force an opponent to recall one of their workers from the river. The opponent slides back 3🐟 in compensation. |
-| **Salmon Run** | 4 logs, 2 vines | 4🐟 | As your main action, place 1–5 workers from your supply onto uncovered icons of a single river card (no auction). Cumulative fish cost for 1/2/3/4/5 workers placed is 1🐟 / 3🐟 / 6🐟 / 11🐟 / 19🐟 (marginal: 1/2/3/5/8). |
-| **Beaver Tow** | 4 mud, 2 clay, 1 vine | 4🐟 | As your main action, pay 2🐟 to slide a river card one slot upstream (toward the Headwaters). |
+| **Portage** | 3 vines, 2 stones | 3🐟 | As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card's per-item cost in 🐟. |
+| **Tribute Stone** | 2 clay, 2 stones | 3🐟 | Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back 3🐟 in compensation. |
+| **Salmon Run** | 4 logs, 2 vines | 4🐟 | As an action: place 1-5 workers from your supply onto uncovered icons of one river card. 🐟 cost escalates 1/2/3/5/8 per successive worker. |
+| **Tow Line** | 4 mud, 2 clay, 1 vine | 4🐟 | As an action: pay 2🐟 to slide a river card 1 space toward the Headwaters. |
 
 **Pricing anchors:**
-- *Otter Trail* ↔ Heron Roost (3 reeds, 2 vines, 3🐟) — same utility footprint; the per-item cost gates abuse so no per-turn cap is needed in the first draft.
+- *Portage* ↔ Heron Roost (3 reeds, 2 vines, 3🐟) — same utility footprint; the per-item cost gates abuse so no per-turn cap is needed in the first draft.
 - *Tribute Stone* ↔ Spy Mound (4 stones, 1 clay, 3🐟) — same once-per-game anti-opponent footprint; slightly cheaper because the 3🐟 compensation softens the attack. Other "mean-with-comp" variants worth simming: discard from hand for 2🐟, steal a Headwaters card for 4🐟.
 - *Salmon Run* ↔ Royal Lodge (6 logs, 2 vines, 5🐟) — one tier down on time/mats because each use is a main action, not a free extra turn. Escalation 1/2/3/5/8 keeps 1–2 worker placements near R1-auction parity but makes 3–4 worker dumps a real bulk-grab at R2+ (6🐟 for 3 workers vs ~10🐟 at R2; 11🐟 for 4 vs ~13🐟 at R2).
-- *Beaver Tow* ↔ Floodgate (4 mud, 3 clay, 4🐟) — repeatable version swaps 1 clay for 1 vine to widen material draw; per-use 2🐟 self-limits.
+- *Tow Line* ↔ Floodgate (4 mud, 3 clay, 4🐟) — repeatable version swaps 1 clay for 1 vine to widen material draw; per-use 2🐟 self-limits.
 
-**Watch list.** Salmon Run and Beaver Tow both bypass core auction tension — sim first; expect retuning.
+**Watch list.** Salmon Run and Tow Line both bypass core auction tension — sim first; expect retuning.
 
 ---
 

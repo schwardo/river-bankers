@@ -26,8 +26,8 @@ Each species (Beaver, River Otter, Muskrat, Mink) has a private pool of **3 them
 | Name | VP | Type | Effect |
 |------|----|------|--------|
 | **Lodge Foundation** ⭐ | 1 | Constant — material bonus | When you build a structure that uses Logs, advance 1 fewer fish (min 1). |
-| **Tail Slap** | 2 | Constant — disruption | At the start of your turn, you may pay 1🐟 to drop a blank on any uncovered icon on a River 1 card. |
-| **Cache Burrow** | 1 | Constant — worker logistics | Your hand size is 4 instead of 3. (Same as the main-deck card of the same name.) |
+| **Tail Slap** | 2 | Constant — disruption | At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card. |
+| **Beaver Cache** | 1 | Constant — worker logistics | +1 to your hand size. When built, draw a structure card. |
 
 ⭐ = material-bias starter
 
@@ -38,8 +38,8 @@ Each species (Beaver, River Otter, Muskrat, Mink) has a private pool of **3 them
 | Name | VP | Type | Effect |
 |------|----|------|--------|
 | **Kelp Bed** ⭐ | 0 | Constant — material bonus | Reeds icons cost you 1 less fish per item (min 1). |
-| **Rolling Float** | 1 | Constant — worker swap | Once per game, swap one of your workers on a river card with another worker (yours or an opponent's) on another card in the **same river slot**. No fish cost. |
-| **Stone Tool** | 0 | Constant — build flexibility | Once per game, when building, 1 of your Stones workers may substitute for any other material. (Mirrors Charcoal Pit's effect for Stones, gated to a single use.) |
+| **Rolling Float** | 1 | Constant — worker swap | Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost. |
+| **Stone Tool** | 0 | Constant — build flexibility | Once per game, when building, 1 of your Stones workers may substitute for any other material. |
 
 ---
 
@@ -48,8 +48,8 @@ Each species (Beaver, River Otter, Muskrat, Mink) has a private pool of **3 them
 | Name | VP | Type | Effect |
 |------|----|------|--------|
 | **Mud Burrow** ⭐ | 0 | Constant — material bonus | Mud icons cost you 1 less fish per item (min 1). |
-| **Channel Clearer** | 0 | Constant — soft attack | At the start of your turn, you may discard 1 Reed worker from any river card (yours or an opponent's). The worker returns to that player's supply without a blank. |
-| **Marsh Lookout** | 2 | Constant — information | Peek at the top card of the material deck at any time. (Same as the main-deck Lookout Tree card.) |
+| **Channel Clearer** | 0 | Constant — soft attack | At the start of your turn, you may discard 1 Reed worker from any river card; returns to that player's supply without a blank. |
+| **Marsh Lookout** | 2 | Constant — information | Peek at the top card of the material deck at any time. |
 
 ---
 
@@ -59,7 +59,7 @@ Each species (Beaver, River Otter, Muskrat, Mink) has a private pool of **3 them
 |------|----|------|--------|
 | **Clay Den** ⭐ | 0 | Constant — material bonus | Clay icons cost you 2 less fish per item (min 1). |
 | **Quick Strike** | 2 | Constant — bidding | When you trigger an auction, you may declare your bid last (after all other bids are revealed). You must still bid at least 1 worker, as the trigger always does. |
-| **Snare Set** | 1 | Constant — disruption, once-per-game | Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3🐟 in compensation. (Same as the main-deck Tribute Stone card.) |
+| **Snare Set** | 1 | Constant — disruption, once-per-game | Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3 fish in compensation. |
 
 > **Printed VP** values were calibrated via per-starter forced-pick ablation. Underperforming cards get bumps; over-target cards stay at 0 VP (since printed VP can't go negative). See "Balance notes" below.
 
@@ -90,7 +90,7 @@ At game start, after each player picks a species:
 - **Effect-fire reuse.** Most of the starters re-use existing structure effects (Cache Burrow, Lookout Tree, Tribute Stone, Charcoal-Pit-style substitution, Otter-Trail-style swap). The new effect machinery needed:
   - **Lodge Foundation / Kelp Bed / Mud Burrow / Clay Den** — per-item-cost discount per material. Reed Bed already implements the same shape for Reeds; generalize `playerCardCost` to handle any (effect-name, material) pair.
   - **Tail Slap** — per-turn paid blank-drop with River-1 restriction. Variant of Driftwood Snag.
-  - **Rolling Float** — once-per-game neighbor-swap. Variant of Otter Trail (with a `rollingFloatUsed` flag).
+  - **Rolling Float** — once-per-game neighbor-swap. Variant of Portage (with a `rollingFloatUsed` flag).
   - **Channel Clearer** — start-of-turn worker eviction. Soft attack (no blank, no fish compensation).
   - **Quick Strike** — auction deferral. Variant of Spy Mound (with no use limit).
 
@@ -99,7 +99,7 @@ At game start, after each player picks a species:
 ## Balance notes (pre-sim)
 
 - Material-bonus cards (the ⭐ row) are intentionally the safest in each pool: same effect family as Reed Bed, very tunable.
-- The other two cards per species range from utility (Cache Burrow, Marsh Lookout) to interaction (Channel Clearer, Snare Set, Quick Strike). Power should sit in the same band as their main-deck cousins; if any species' draft pool ends up dominated by one card, we'll know from the ablation pass.
+- The other two cards per species range from utility (Beaver Cache, Marsh Lookout) to interaction (Channel Clearer, Snare Set, Quick Strike). Power should sit in the same band as their main-deck cousins; if any species' draft pool ends up dominated by one card, we'll know from the ablation pass.
 - **Don't ship until** the [structure-card rebalance](board-games.org "Rebalance all structure cards") is stable and a **species-specific ablation harness** is in place. Asymmetry on top of an unstable baseline is double-jeopardy.
 - **Target:** win-rate within ±5% of the no-asymmetry baseline per species; per-game ΔVP within ±1 like the structure-card rebalance band.
 

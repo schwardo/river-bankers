@@ -1817,13 +1817,13 @@ function buildMaterialDeck(numPlayers) {
 //   decorative. For human play, add a small persistent peek widget (e.g., a "🔭 Top of deck:
 //   <material> <icons>" indicator) that's visible whenever the human has Lookout Tree built.
 const STRUCTURE_TEMPLATES = [
-  { name: 'Beaver Dam',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built: wash one card from River 1 to the shoreline (workers carry along).' },
+  { name: 'Spillway',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built: wash one card from River 1 to the shoreline (workers carry along).' },
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'Once per game (flip card): recall one worker from a river card (no blank).' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built: pull a Headwaters card to River 1; run an auction on it at 1🐟/item.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End of game: +1 VP per shoreline card on the table (max +6).' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built: drop 2 blanks on uncovered icons in the river.' },
-  { name: 'Otter Slide',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build: advance 3 fewer 🐟 (min 1).' },
+  { name: 'Log Flume',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build: advance 3 fewer 🐟 (min 1).' },
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: '+1 to your hand size. When built, draw a structure card.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built: draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 6, effect: 'When you build: 1 of your Clay workers may substitute for any other material.' },
@@ -1832,14 +1832,14 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build: each Reed worker counts as 2 reeds.' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck.' },
-  { name: 'Otter Raft',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
+  { name: 'Pontoon',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 2 },            time: 4, vp: 6, effect: 'When built: activate one "when built" effect of a built structure controlled by the player to your left or right.\n\nAs an action: activate the "as an action" ability of a built structure controlled by the player to your left or right.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When built: look at the top 5 material cards and rearrange them in any order.' },
   { name: 'Flush Channel',  cost: { mud: 3, reeds: 1 },              time: 2, vp: 6, effect: 'When built: discard 1 Headwaters card (out of game) and refill that slot from the material deck. No auction.' },
   { name: 'Granary',        cost: { reeds: 4, clay: 1 },             time: 3, vp: 3, effect: 'Once per game (flip card): your build costs 1 fewer of one listed material.' },
   { name: 'Granite Spire',  cost: { stones: 6 },                     time: 4, vp: 7 },
   { name: 'Royal Lodge',    cost: { logs: 6, vines: 2 },             time: 5, vp: 10, effect: 'When built: take an immediate extra turn.' },
-  { name: 'Otter Den',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you recall workers before an auction, slide back 1🐟 per worker recalled.' },
+  { name: 'Streambank Hollow',      cost: { mud: 3, vines: 1 },              time: 2, vp: 4, effect: 'When you recall workers before an auction, slide back 1🐟 per worker recalled.' },
   { name: 'Floodgate',      cost: { mud: 4, clay: 3 },               time: 4, vp: 8, effect: 'Once per game (flip card): before an auction resolves, slide the auctioned card 1 space toward the Headwaters.' },
   { name: 'Burrow Run',     cost: { vines: 3, mud: 1 },              time: 0, vp: 4, effect: 'When built: slide your pawn back 5 on 🐟 track.' },
   { name: 'Sap Drip',       cost: { logs: 2, vines: 2 },             time: 2, vp: 4, effect: 'When built: place 2 free workers from your supply onto uncovered icons of one river card.' },
@@ -1857,8 +1857,8 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
   { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'Once per game (flip card): discard 1 structure from your hand and take one of your choice from the discard pile.' },
   { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back 3🐟 in compensation.' },
-  { name: 'Beaver Tow',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'As an action: pay 2🐟 to slide a river card 1 space toward the Headwaters.' },
-  { name: 'Otter Trail',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.' },
+  { name: 'Tow Line',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'As an action: pay 2🐟 to slide a river card 1 space toward the Headwaters.' },
+  { name: 'Portage',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.' },
   { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 6, effect: 'As an action: place 1-5 workers from your supply onto uncovered icons of one river card. 🐟 cost escalates 1/2/3/5/8 per successive worker.' },
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track.' },
   { name: 'Trophy Lodge',   cost: { clay: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +3 VP per ?-VP structure you control, including this one (max +12).' },
@@ -1873,7 +1873,7 @@ const STRUCTURE_TEMPLATES = [
   // Beaver (Logs bias)
   { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'When you build a structure that uses Logs, advance 1 fewer fish (min 1).' },
   { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 2, species: 'beaver', effect: 'At the start of your turn, you may pay 1🐟 to drop a blank on any uncovered icon on a River 1 card.' },
-  { name: 'Cache Burrow',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: '+1 to your hand size. When built, draw a structure card.' },
+  { name: 'Beaver Cache',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: '+1 to your hand size. When built, draw a structure card.' },
   // River Otter (Reeds bias)
   { name: 'Kelp Bed',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Reeds icons cost you 1 less fish per item (min 1).' },
   { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 1, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
@@ -1895,7 +1895,7 @@ const SPECIES_DRAFT_WEIGHT = {
   'Lodge Foundation': 5, 'Kelp Bed': 5, 'Mud Burrow': 5, 'Clay Den': 5,
   'Quick Strike': 5, 'Snare Set': 4,
   'Stone Tool': 4, 'Rolling Float': 3, 'Tail Slap': 3, 'Channel Clearer': 3,
-  'Cache Burrow': 3, 'Marsh Lookout': 2,
+  'Beaver Cache': 3, 'Marsh Lookout': 2,
 };
 
 // Cattail Patch end-game schedule, indexed by distinct-material count (0..6).
@@ -1927,9 +1927,13 @@ function oncePerGameUsed(p, name) {
   if (name === 'Spring Cascade'   && p.springCascadeUsed) return true;
   return false;
 }
-// Cache Burrow stacks: +1 hand size per built copy (beaver starter + main deck).
+// Hand-size cards stack: +1 per built copy. The main-deck "Cache Burrow" and
+// the beaver starter "Beaver Cache" both carry the bonus and stack with each
+// other; each is independently ablatable via effectActive(name).
 function maxHandSize(p) {
-  return 3 + (effectActive('Cache Burrow') ? p.built.filter(s => s.name === 'Cache Burrow').length : 0);
+  return 3 + p.built.filter(s =>
+    (s.name === 'Cache Burrow' || s.name === 'Beaver Cache') && effectActive(s.name)
+  ).length;
 }
 // Returns { base, bonuses: [{name, vp, detail}], total } for end-of-game scoring.
 // `base` is the printed-VP sum of built structures; each bonus describes one
@@ -2635,7 +2639,7 @@ function startGame() {
       p.built.push(ranked[0].c);
     }
     // Top up opening hands now that AI starters are pre-built — a drafted
-    // Cache Burrow raises hand size to 4, so draw the extra card immediately.
+    // Beaver Cache raises hand size to 4, so draw the extra card immediately.
     // (The human's top-up runs after their draft modal resolves.)
     for (const p of players) {
       if (p.isHuman) continue;
@@ -2724,7 +2728,7 @@ async function runHumanSpeciesDraft() {
   );
   if (picked) {
     human.built.push(picked);
-    // A drafted Cache Burrow raises hand size to 4 — top up immediately.
+    // A drafted Beaver Cache raises hand size to 4 — top up immediately.
     while (human.hand.length < maxHandSize(human) && structAvailable(state) > 0) {
       human.hand.push(popStructDeck(state));
     }
@@ -2827,7 +2831,7 @@ function humanCrossWarnHTML(addedCost) {
 // so we hide/skip it. During normal play `timePos` is cumulative across laps
 // (no finish line), so the cap should never fire — callers used to compare raw
 // `timePos` against ENDGAME_TRACK_END and lost their action-granting structures
-// (e.g. Salmon Run, Beaver Tow) mid-game once cumulative pos crossed ~57.
+// (e.g. Salmon Run, Tow Line) mid-game once cumulative pos crossed ~57.
 function canAffordTimeCost(p, fishCost) {
   return !state.endgame || p.timePos + fishCost < ENDGAME_TRACK_END;
 }
@@ -3258,6 +3262,8 @@ function prerivCardClickOpts(slotIdx) {
   if (state.phase === 'combined-pick') {
     const card = state.prerivCards[slotIdx];
     if (!card || uncoveredIcons(card) === 0) return {};
+    // Confluence ('same') needs an exact symbol match — wild cards aren't selectable.
+    if (combinedConfig().pairing === 'same' && card.wildAlt) return {};
     return {
       selectable: true,
       selected: !!(state.combinedPick && state.combinedPick.first === card.id),
@@ -3294,6 +3300,9 @@ function riverCardClickOpts(card) {
   if (uncoveredIcons(card) === 0) return opts;
   // Combined-auction (Confluence / Double Vision): pick two cards on the board.
   if (state.phase === 'combined-pick') {
+    // Confluence ('same' pairing) needs an exact symbol match, so wild cards
+    // (Driftwood Tangle / Mud Slick) aren't selectable; Double Vision ('any') allows them.
+    if (combinedConfig().pairing === 'same' && card.wildAlt) return opts;
     opts.selectable = true;
     opts.selected = !!(state.combinedPick && state.combinedPick.first === card.id);
     opts.onClick = `humanSelectCombinedCard('${card.id}')`;
@@ -3582,12 +3591,12 @@ function renderActionPanel() {
         Object.keys(c.workers).some(k => parseInt(k) !== cur.idx && c.workers[k] > 0));
       if (anyOpponentWorker) abilityBtns.push(`<button class="ability-btn" onclick="humanUseTributeStone()">${MATERIALS.stones.icon} Tribute Stone (once per game): force opponent recall</button>`);
     }
-    if (hasEffect(cur, 'Otter Trail')) {
+    if (hasEffect(cur, 'Portage')) {
       const haveMine = state.riverCards.some(c => typeof c.slot === 'number' && workersOnCard(c, cur.idx) > 0);
       const haveOther = state.riverCards.some(c =>
         typeof c.slot === 'number' && Object.keys(c.workers).some(k => c.workers[k] > 0 && (parseInt(k) !== cur.idx || workersOnCard(c, cur.idx) > 1)));
       if (haveMine && haveOther && canAffordTimeCost(cur, 2)) {
-        abilityBtns.push(`<button class="ability-btn" onclick="humanUseOtterTrail()">🦦 Otter Trail (pay source 🐟): swap a river worker</button>`);
+        abilityBtns.push(`<button class="ability-btn" onclick="humanUseOtterTrail()">🦦 Portage (pay source 🐟): swap a river worker</button>`);
       }
     }
     // Trading Post: 3-for-2 material consolidation. Costs 1🐟. Needs workers on
@@ -3667,7 +3676,7 @@ function renderActionPanel() {
       : '';
     // Worker pool that can fund a triggered auction = supply + placed (you can recall before bidding).
     const triggerPool = cur.supply + placed;
-    const beaverTowAvail = hasEffect(cur, 'Beaver Tow')
+    const beaverTowAvail = hasEffect(cur, 'Tow Line')
       && canAffordTimeCost(cur, 2)
       && state.riverCards.some(c => typeof c.slot === 'number' && c.slot > 0);
     const salmonRunAvail = hasEffect(cur, 'Salmon Run')
@@ -3688,7 +3697,7 @@ function renderActionPanel() {
         <button onclick="humanChooseAction('flush')" ${(triggerPool > 0 && state.matDeck.length > 0) ? '' : 'disabled'}>3. Flush Headwaters (5🐟)</button>
         <button onclick="humanChooseAction('browse')" ${structAvailable(state) > 0 ? '' : 'disabled'}>4. Draw structure cards (N🐟)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>5. Build a structure</button>
-        ${beaverTowAvail ? `<button onclick="humanChooseAction('beaverTow')">6. Beaver Tow (2🐟): slide a river card upstream</button>` : ''}
+        ${beaverTowAvail ? `<button onclick="humanChooseAction('beaverTow')">6. Tow Line (2🐟): slide a river card upstream</button>` : ''}
         ${salmonRunAvail ? `<button onclick="humanChooseAction('salmonRun')">7. Salmon Run (1/2/3/5/8🐟): place workers on a single card</button>` : ''}
         ${combinedAvail ? `<button onclick="humanChooseAction('confluence')">8. ${combinedLabel}</button>` : ''}
         ${state.retireUnlocked ? `<button class="ghost" onclick="humanRetire()">🏁 Retire (advance to space ${lowestFreeFinishSpot()}🐟)</button>` : ''}
@@ -4087,11 +4096,11 @@ function callWorkersHome(playerIdx, recallSpec) {
   }
   if (total > 0) {
     log(`🏠 ${speciesLabel(p)} calls ${total} worker${total === 1 ? '' : 's'} home.`);
-    // Otter Den: slide back 1 fish per worker recalled.
-    if (hasEffect(p, 'Otter Den')) {
+    // Streambank Hollow: slide back 1 fish per worker recalled.
+    if (hasEffect(p, 'Streambank Hollow')) {
       const before = p.timePos;
       p.timePos = Math.max(0, p.timePos - total);
-      log(`🦦 Otter Den: ${speciesLabel(p)} slides back ${before - p.timePos} on the fish track.`);
+      log(`🦦 Streambank Hollow: ${speciesLabel(p)} slides back ${before - p.timePos} on the fish track.`);
     }
   }
   cleanupShoreline();
@@ -4383,9 +4392,9 @@ function resolveAuction(card, bids) {
       }
       // Pay-for-bid: every worker you bid costs time, even those that won nothing.
       // Workers that didn't clinch an icon return to your supply for free.
-      // Otter Raft: when jammed (got < bid), pay fish for one fewer worker.
+      // Pontoon: when jammed (got < bid), pay fish for one fewer worker.
       let billable = bid;
-      if (got < bid && hasEffect(p, 'Otter Raft')) billable = Math.max(0, bid - 1);
+      if (got < bid && hasEffect(p, 'Pontoon')) billable = Math.max(0, bid - 1);
       const timeAdvance = billable * playerCardCost(card, idx);
       advancePlayer(idx, timeAdvance);
       result.takings[idx] = got;
@@ -4587,7 +4596,7 @@ async function resolveCombinedAuction(virtual, bids, triggerPlayerIdx) {
     let g = bid, billable = bid;
     if (isJam) {
       g = Math.max(0, Math.min(bid, open - (totalBid - bid)));
-      if (g < bid && hasEffect(p, 'Otter Raft')) billable = Math.max(0, bid - 1);
+      if (g < bid && hasEffect(p, 'Pontoon')) billable = Math.max(0, bid - 1);
     }
     got[idx] = g;
     p.supply -= g;
@@ -4651,8 +4660,10 @@ function findCombinedAuctionTarget(playerIdx, needs, triggerPool) {
   for (const mat of MAT_KEYS) {
     const need = needs[mat];
     if (need === 0) continue;
+    // Confluence requires an exact symbol match — wild cards (Driftwood Tangle /
+    // Mud Slick) carry two materials, so they can't be a same-symbol pair member.
     const cards = [...state.riverCards, ...state.prerivCards.filter(c => c)]
-      .filter(c => c.material === mat && uncoveredIcons(c) > 0);
+      .filter(c => c.material === mat && !c.wildAlt && uncoveredIcons(c) > 0);
     if (cards.length < 2) continue;
     cards.sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
     const A = cards[0], B = cards[1];
@@ -4695,8 +4706,9 @@ function findCombinedTarget(playerIdx, needs, triggerPool) {
 function combinedAvailable() {
   const open = [...state.riverCards, ...state.prerivCards.filter(c => c)].filter(c => uncoveredIcons(c) > 0);
   if (combinedConfig().pairing === 'any') return open.length >= 2;
+  // Confluence ('same'): only exact same-symbol pairs count — wild cards excluded.
   const byMat = {};
-  for (const c of open) byMat[c.material] = (byMat[c.material] || 0) + 1;
+  for (const c of open) if (!c.wildAlt) byMat[c.material] = (byMat[c.material] || 0) + 1;
   return Object.values(byMat).some(n => n >= 2);
 }
 
@@ -4834,10 +4846,11 @@ const EFFECT_VP_FIXED = {
   'Charcoal Pit': 2,
   'Treaty Stone': 2,
   'Cattail Marsh': 1,
-  'Otter Raft': 1,
+  'Pontoon': 1,
   'Cache Burrow': 1,
+  'Beaver Cache': 1,
   'Reed Bed': 0.5,
-  'Otter Slide': 2,
+  'Log Flume': 2,
   'Mill Wheel': 0.5,
   'Pack Rat Burrow': 1,
   'Spring Cascade': 0.5,
@@ -4846,18 +4859,18 @@ const EFFECT_VP_FIXED = {
   'Sap Drip': 1,
   'Snag Pile': 1,
   'Vine Lattice': 0.5,
-  'Beaver Dam': 0.5,
+  'Spillway': 0.5,
   'Mud Levee': 0.5,
   'Wood Pile': 0,
   'Hollowed-out Log': 0,
-  'Otter Den': 0,
+  'Streambank Hollow': 0,
   'Heron Roost': 0,
   'Driftwood Snag': 0,
   'Floodgate': 0,
   'Spy Mound': 0,
   'Tribute Stone': 0.5,
-  'Beaver Tow': 1,
-  'Otter Trail': 1.5,
+  'Tow Line': 1,
+  'Portage': 1.5,
   'Salmon Run': 2,
   'Stone Pool': 0,
   'Flush Channel': 0,
@@ -4874,7 +4887,7 @@ function aiEffectValue(struct, p, state) {
   if (struct.name === 'Hollowed-out Log' && p.hollowedLogUsed) return 0;
   if (struct.name === 'Pack Rat Burrow' && p.packRatUsed) return 0;
   if (struct.name === 'Spring Cascade' && p.springCascadeUsed) return 0;
-  // Otter Trail's value depends on having opponent workers on useful materials;
+  // Portage's value depends on having opponent workers on useful materials;
   // first-pass uses the flat EFFECT_VP_FIXED entry.
   if (struct.name === 'Pier') {
     const placed = state.shorelineCards.filter(c => workersOnCard(c, p.idx) > 0).length;
@@ -5006,9 +5019,9 @@ function aiChooseAction(playerIdx) {
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'preriv'; bestPrerivIdx = i; }
   }
   // 2.2) Pick the best material-gaining action across single auctions, the
-  // combined (Confluence) auction, Salmon Run, and Beaver Tow — all scored on
+  // combined (Confluence) auction, Salmon Run, and Tow Line — all scored on
   // the same need-weighted scale. Folding them into one comparison keeps Salmon
-  // Run / Beaver Tow reachable: a single auction used to return first, so they
+  // Run / Tow Line reachable: a single auction used to return first, so they
   // fired ~never even when cheaper.
   const candidates = [];
   if (bestCard) {
@@ -5027,7 +5040,7 @@ function aiChooseAction(playerIdx) {
       candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'salmonRun', cardId: t.card.id, workerCount: t.n }) });
     }
   }
-  if (hasEffect(p, 'Beaver Tow') && canAffordTimeCost(p, 2)) {
+  if (hasEffect(p, 'Tow Line') && canAffordTimeCost(p, 2)) {
     const t = findBeaverTowTarget(playerIdx, needs);
     if (t) candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'beaverTow', cardId: t.card.id }) });
   }
@@ -5095,7 +5108,7 @@ function doTributeStone(playerIdx, victimIdx, card) {
   return true;
 }
 
-// Otter Trail: swap a worker of yours on river card A with a worker (any player's)
+// Portage: swap a worker of yours on river card A with a worker (any player's)
 // on a different river card B. You pay A's per-item cost in fish. No blanks drop.
 function doOtterTrail(playerIdx, cardAId, cardBId, otherPlayerIdx) {
   const p = state.players[playerIdx];
@@ -5113,7 +5126,7 @@ function doOtterTrail(playerIdx, cardAId, cardBId, otherPlayerIdx) {
   cardB.workers[playerIdx] = (cardB.workers[playerIdx] || 0) + 1;
   advancePlayer(playerIdx, cardCost(cardA));
   const other = state.players[otherPlayerIdx];
-  log(`🦦 Otter Trail: ${speciesLabel(p)} pays ${cardCost(cardA)}🐟 and swaps a worker on ${MATERIALS[cardA.material].name} with ${speciesLabel(other)}'s worker on ${MATERIALS[cardB.material].name}.`);
+  log(`🦦 Portage: ${speciesLabel(p)} pays ${cardCost(cardA)}🐟 and swaps a worker on ${MATERIALS[cardA.material].name} with ${speciesLabel(other)}'s worker on ${MATERIALS[cardB.material].name}.`);
   return true;
 }
 
@@ -5165,7 +5178,7 @@ function findOtterTrailTarget(playerIdx) {
 
 // Salmon Run: marginal fish cost for the 1st/2nd/3rd/4th/5th worker placed.
 const SALMON_RUN_COSTS = [1, 2, 3, 5, 8];
-// Turn-delay penalty for Beaver Tow: towing spends a whole action now to set up
+// Turn-delay penalty for Tow Line: towing spends a whole action now to set up
 // a cheaper auction later, so the future grab must be sizable to beat just
 // auctioning the card outright this turn.
 const BEAVER_TOW_DELAY = 1.5;
@@ -5217,7 +5230,7 @@ function findSalmonRunTarget(playerIdx, needs) {
   return best;
 }
 
-// Beaver Tow: pay 2🐟, slide a river card 1 slot upstream (toward Headwaters).
+// Tow Line: pay 2🐟, slide a river card 1 slot upstream (toward Headwaters).
 // Returns true on success.
 function doBeaverTow(playerIdx, cardId) {
   const p = state.players[playerIdx];
@@ -5225,15 +5238,15 @@ function doBeaverTow(playerIdx, cardId) {
   if (!card || typeof card.slot !== 'number' || card.slot === 0) return false;
   card.slot -= 1;
   advancePlayer(playerIdx, 2);
-  log(`🦫 Beaver Tow: ${speciesLabel(p)} pays 2🐟 to slide ${MATERIALS[card.material].name} to River ${card.slot + 1} (${riverSlotCost(card.slot)}🐟/item).`);
+  log(`🦫 Tow Line: ${speciesLabel(p)} pays 2🐟 to slide ${MATERIALS[card.material].name} to River ${card.slot + 1} (${riverSlotCost(card.slot)}🐟/item).`);
   return true;
 }
 
-// Pick the best river card for Beaver Tow to slide: highest-slot useful-material card
+// Pick the best river card for Tow Line to slide: highest-slot useful-material card
 // with ≥4 uncovered icons. Returns the card or null.
 function findBeaverTowTarget(playerIdx, needs) {
   const p = state.players[playerIdx];
-  // Beaver Tow's slide makes the card cheaper for *everyone* who auctions
+  // Tow Line's slide makes the card cheaper for *everyone* who auctions
   // it next, so only tow when the builder is the dominant beneficiary:
   //   (1) No opponent has any hand structure that needs this material.
   //   (2) Builder has trigger pool to auction the slid card themselves.
@@ -5380,8 +5393,8 @@ function aiStartOfTurnAbilities(playerIdx) {
       doTributeStone(playerIdx, target.victimIdx, target.card);
     }
   }
-  // Otter Trail: swap to pry an opponent off a useful material card.
-  if (hasEffect(p, 'Otter Trail') && canAffordTimeCost(p, 5)) {
+  // Portage: swap to pry an opponent off a useful material card.
+  if (hasEffect(p, 'Portage') && canAffordTimeCost(p, 5)) {
     const target = findOtterTrailTarget(playerIdx);
     if (target && canAffordTimeCost(p, cardCost(target.cardA))) {
       doOtterTrail(playerIdx, target.cardA.id, target.cardB.id, target.otherIdx);
@@ -5562,13 +5575,13 @@ function aiTryMillWheel(playerIdx) {
     const a = findTradingPostAction(playerIdx);
     if (a) { doTradingPost(playerIdx, a); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Trading Post.`); return; }
   }
-  if (avail.has('Otter Trail')) {
+  if (avail.has('Portage')) {
     const t = findOtterTrailTarget(playerIdx);
-    if (t && canAffordTimeCost(p, cardCost(t.cardA))) { doOtterTrail(playerIdx, t.cardA.id, t.cardB.id, t.otherIdx); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Otter Trail.`); return; }
+    if (t && canAffordTimeCost(p, cardCost(t.cardA))) { doOtterTrail(playerIdx, t.cardA.id, t.cardB.id, t.otherIdx); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Portage.`); return; }
   }
-  if (avail.has('Beaver Tow')) {
+  if (avail.has('Tow Line')) {
     const t = findBeaverTowTarget(playerIdx, needs);
-    if (t) { doBeaverTow(playerIdx, t.card.id); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Beaver Tow.`); return; }
+    if (t) { doBeaverTow(playerIdx, t.card.id); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Tow Line.`); return; }
   }
 }
 
@@ -5768,8 +5781,8 @@ async function humanUseMillWheel() {
   let fired = false;
   if (pick === 'Salmon Run' && h.supply > 0) { const t = findSalmonRunTarget(h.idx, needs); if (t) { doSalmonRun(h.idx, t.card.id, t.n); fired = true; } }
   else if (pick === 'Trading Post' && h.supply >= 2) { const a = findTradingPostAction(h.idx); if (a) { doTradingPost(h.idx, a); fired = true; } }
-  else if (pick === 'Otter Trail') { const t = findOtterTrailTarget(h.idx); if (t) { doOtterTrail(h.idx, t.cardA.id, t.cardB.id, t.otherIdx); fired = true; } }
-  else if (pick === 'Beaver Tow') { const t = findBeaverTowTarget(h.idx, needs); if (t) { doBeaverTow(h.idx, t.card.id); fired = true; } }
+  else if (pick === 'Portage') { const t = findOtterTrailTarget(h.idx); if (t) { doOtterTrail(h.idx, t.cardA.id, t.cardB.id, t.otherIdx); fired = true; } }
+  else if (pick === 'Tow Line') { const t = findBeaverTowTarget(h.idx, needs); if (t) { doBeaverTow(h.idx, t.card.id); fired = true; } }
   else if (pick === 'Heron Roost' && state.matDeck.length > 0) {
     const myMats = new Set();
     for (const s of h.hand) for (const m in s.cost) myMats.add(m);
@@ -5808,14 +5821,14 @@ async function humanUseDriftwoodSnag() {
 
 async function humanUseOtterTrail() {
   const human = state.players.find(p => p.isHuman);
-  if (!human || !hasEffect(human, 'Otter Trail')) return;
+  if (!human || !hasEffect(human, 'Portage')) return;
   // Step 1: pick source card (one with your worker).
   const sourceCands = state.riverCards
     .filter(c => typeof c.slot === 'number' && workersOnCard(c, human.idx) > 0)
     .map(c => ({ card: c }));
   if (sourceCands.length === 0) return;
   const sourcePick = await pickFromList(
-    '🦦 Otter Trail — pick YOUR worker to swap out',
+    '🦦 Portage — pick YOUR worker to swap out',
     'Pick the river card whose worker you want to move. You will pay this card\'s per-item cost in fish.',
     sourceCands,
     x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
@@ -5833,7 +5846,7 @@ async function humanUseOtterTrail() {
   }
   if (targetCands.length === 0) return;
   const targetPick = await pickFromList(
-    '🦦 Otter Trail — pick the worker to swap IN',
+    '🦦 Portage — pick the worker to swap IN',
     `That worker will move to ${MATERIALS[sourcePick.card.material].name}; your worker takes its place.`,
     targetCands,
     x => `${speciesLabel(state.players[x.otherIdx])} on River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
@@ -6090,12 +6103,12 @@ async function humanSalmonRun() {
 
 async function humanBeaverTow() {
   const human = state.players.find(p => p.isHuman);
-  if (!human || !hasEffect(human, 'Beaver Tow')) return;
+  if (!human || !hasEffect(human, 'Tow Line')) return;
   const cands = state.riverCards.filter(c => typeof c.slot === 'number' && c.slot > 0);
   if (cands.length === 0) return;
   state.lastHumanActionType = 'beaverTow';
   const pick = await pickFromList(
-    '🦫 Beaver Tow — slide a river card upstream',
+    '🦫 Tow Line — slide a river card upstream',
     'Pick a river card to slide one slot toward the Headwaters (cheaper per-item cost). Costs 2🐟.',
     cands,
     c => `River ${c.slot + 1} → River ${c.slot} (${riverSlotCost(c.slot)}🐟 → ${riverSlotCost(c.slot - 1)}🐟/item): ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${uncoveredIcons(c)} open)`,
@@ -6126,9 +6139,11 @@ function humanSelectCombinedCard(cardId) {
   if (!first) { state.combinedPick = { first: cardId }; render(); return; }
   if (cardId === first) { state.combinedPick = { first: null }; render(); return; }
   const cardA = findBoardCard(first);
-  // 'same' pairing: a different-material second click re-selects the first pick.
-  if (cfg.pairing === 'same' && card.material !== cardA.material) {
-    state.combinedPick = { first: cardId };
+  // 'same' pairing (Confluence): an exact symbol match is required — a different
+  // material, or a wild card (Driftwood Tangle / Mud Slick, which carries two
+  // materials), can't pair, so re-select the clicked card as the new first pick.
+  if (cfg.pairing === 'same' && (card.wildAlt || cardA.wildAlt || card.material !== cardA.material)) {
+    state.combinedPick = { first: card.wildAlt ? null : cardId };
     render();
     return;
   }
@@ -6416,9 +6431,9 @@ async function performBuild(playerIdx, handIdx) {
     if (p.isHuman) await humanVineCurtainRearrange(playerIdx);
     else aiVineCurtainRearrange(playerIdx);
   }
-  // Build cost in time — Otter Slide reduces by 3 (min 1) when active. Cards with printed time 0 stay 0.
+  // Build cost in time — Log Flume reduces by 3 (min 1) when active. Cards with printed time 0 stay 0.
   // Lodge Foundation (beaver species starter): -1 fish on Logs-using builds.
-  const slideDiscount = hasEffect(p, 'Otter Slide') ? 3 : 0;
+  const slideDiscount = hasEffect(p, 'Log Flume') ? 3 : 0;
   const lodgeDiscount = (hasEffect(p, 'Lodge Foundation') && (struct.cost.logs || 0) > 0) ? 1 : 0;
   const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount - lodgeDiscount);
   advancePlayer(playerIdx, timeCost);
@@ -6739,8 +6754,8 @@ function neighborIdxs(playerIdx) {
 // excludes Mill Wheel (no recursion) and info-only Salt Lick; as-an-action set
 // matches the sim (Confluence excluded).
 const MILL_WHEEL_WHENBUILT = ['Royal Lodge', 'Sap Drip', 'Springwater Pool', 'Vine Lattice',
-  'Snag Pile', 'Beaver Dam', 'Mud Levee', 'Flush Channel', 'Stone Pool', 'Burrow Run'];
-const MILL_WHEEL_ASACTION = ['Salmon Run', 'Trading Post', 'Otter Trail', 'Beaver Tow',
+  'Snag Pile', 'Spillway', 'Mud Levee', 'Flush Channel', 'Stone Pool', 'Burrow Run'];
+const MILL_WHEEL_ASACTION = ['Salmon Run', 'Trading Post', 'Portage', 'Tow Line',
   'Heron Roost', 'Driftwood Snag'];
 
 // One-time on-build effects fire here (web). Each card's effect is triggered by name.
@@ -6798,16 +6813,16 @@ async function fireOnBuildEffect(playerIdx, struct) {
     }
     return;
   }
-  if (struct.name === 'Beaver Dam') {
+  if (struct.name === 'Spillway') {
     const r1 = state.riverCards.filter(c => c.slot === 0);
     if (r1.length === 0) {
-      log(`🦫 Beaver Dam: no River 1 cards to wash.`);
+      log(`🦫 Spillway: no River 1 cards to wash.`);
       return;
     }
     let target;
     if (isHuman) {
       target = await pickFromList(
-        '🦫 Beaver Dam — wash a River 1 card',
+        '🦫 Spillway — wash a River 1 card',
         'Pick one River 1 card to wash to the shoreline (workers carry along).',
         r1,
         c => `${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} · ${uncoveredIcons(c)} open · ${Object.values(c.workers).reduce((s, n) => s + n, 0)} worker${Object.values(c.workers).reduce((s, n) => s + n, 0) === 1 ? '' : 's'}`,
@@ -6832,7 +6847,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
       target = sorted[0];
     }
     moveCardToShoreline(target);
-    log(`🦫 Beaver Dam washes ${MATERIALS[target.material].name} (R1) to the shoreline.`);
+    log(`🦫 Spillway washes ${MATERIALS[target.material].name} (R1) to the shoreline.`);
     return;
   }
   if (struct.name === 'Mud Levee') {
