@@ -424,7 +424,9 @@ const ENDGAME_TRACK_END = 59;
 // deck-empty endgame; egPlayOut raises it to the per-count fish line during the
 // fish-line endgame so abilities keep firing through a 90/120-fish race.
 let SIM_FINISH_LINE = ENDGAME_TRACK_END;
-const FISH_LINE_BY_COUNT = { 2: 60, 3: 90, 4: 120 };
+// 59/89/119 (not 60/90/120) so every finish lands within a single "+60" chit
+// flip: 2P at 59 = lap 1 (no flip), 3P 89 / 4P 119 = the +60 side at space 29 / 59.
+const FISH_LINE_BY_COUNT = { 2: 59, 3: 89, 4: 119 };
 function simFishLine(numP) { return FISH_LINE_BY_COUNT[numP] || 30 * numP; }
 const UPSTREAM_AUCTION_COST = 1;
 const MAX_TURNS = 2000; // safety net

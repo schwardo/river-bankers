@@ -2788,7 +2788,9 @@ const ENDGAME_TRACK_END = 59;
 // Each player retires the moment their pawn passes the per-count finish line;
 // once everyone has, each player gets one final build. Lines tuned so average
 // VP lands ~13-14 across counts while length/builds scale with the table.
-const FISH_LINE_BY_COUNT = { 2: 60, 3: 90, 4: 120 };
+// 59/89/119 (not 60/90/120) so every finish fits a single "+60" chit flip:
+// 2P at 59 = lap 1 (no flip); 3P 89 / 4P 119 = the +60 side at space 29 / 59.
+const FISH_LINE_BY_COUNT = { 2: 59, 3: 89, 4: 119 };
 function fishFinishLine() {
   return FISH_LINE_BY_COUNT[state.players.length] || 30 * state.players.length;
 }
