@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>River Bankers — Strategy Guide</title>
+<style>
+  @page {
+    size: letter;
+    margin: 0.55in 0.6in 0.6in 0.6in;
+  }
+  :root {
+    --water-deep:   #1d4e6b;
+    --water-mid:    #3a8fb7;
+    --water-light:  #c4dde9;
+    --bank:         #6b5436;
+    --bank-light:   #a0825a;
+    --shore:        #d4b97a;
+    --shore-light:  #ecd9a8;
+    --forest:       #2f5d3a;
+    --forest-light: #4a8056;
+    --reed-green:   #6ba14a;
+    --paper:        #faf3e3;
+    --paper-warm:   #f3e8cb;
+    --ink:          #2c1f15;
+    --ink-soft:     #5a4a36;
+    --beaver:       #8b5a2b;
+    --otter:        #b04545;
+    --muskrat:      #4a8056;
+    --mink:         #6a4a8a;
+  }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    color: var(--ink);
+    font-size: 10.3pt;
+    line-height: 1.35;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    color: var(--water-deep);
+    margin: 0 0 6pt;
+    line-height: 1.15;
+    page-break-after: avoid;
+  }
+  h1 { font-size: 26pt; letter-spacing: 0.5pt; }
+  h2 {
+    font-size: 16pt;
+    border-bottom: 1.5pt solid var(--water-mid);
+    padding-bottom: 3pt;
+    margin-top: 14pt;
+    margin-bottom: 8pt;
+  }
+  h3 {
+    font-size: 12pt;
+    color: var(--forest);
+    margin-top: 10pt;
+    margin-bottom: 3pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+  }
+  h4 {
+    font-size: 10.5pt;
+    color: var(--bank);
+    margin-top: 8pt;
+    margin-bottom: 2pt;
+  }
+  p { margin: 0 0 6pt; }
+  ul, ol { margin: 0 0 7pt 18pt; padding: 0; }
+  li { margin-bottom: 3pt; }
+  strong { color: var(--water-deep); }
+  em { color: var(--ink-soft); }
+  a { color: var(--water-deep); text-decoration: none; }
+
+  /* ============ COVER ============ */
+  .cover {
+    height: 9.4in;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    page-break-after: always;
+    background:
+      radial-gradient(ellipse at center top, var(--water-light) 0%, transparent 60%),
+      linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);
+    padding: 0.5in 0;
+  }
+  .cover img.logo {
+    width: 6.5in;
+    height: auto;
+    max-height: 5.2in;
+    filter: drop-shadow(0 4pt 8pt rgba(0,0,0,0.25));
+    margin-bottom: 0.3in;
+  }
+  .cover .guide-banner {
+    font-size: 13pt;
+    text-transform: uppercase;
+    letter-spacing: 4pt;
+    color: var(--water-deep);
+    font-weight: 700;
+    margin-bottom: 0.35in;
+  }
+  .cover .tagline {
+    font-size: 14pt;
+    color: var(--ink-soft);
+    font-style: italic;
+    max-width: 5.6in;
+    line-height: 1.5;
+    margin: 0 auto 0.4in;
+  }
+  .cover .meta {
+    font-size: 11pt;
+    color: var(--ink-soft);
+    letter-spacing: 1pt;
+    text-transform: uppercase;
+  }
+  .cover .meta span { margin: 0 0.3in; }
+  .cover .meta strong { color: var(--water-deep); }
+  .cover .credits {
+    margin-top: 0.45in;
+    font-size: 10pt;
+    color: var(--ink-soft);
+    letter-spacing: 0.5pt;
+    line-height: 1.6;
+  }
+  .cover .credits .designer { font-style: italic; }
+  .cover .credits .designer strong {
+    color: var(--water-deep);
+    font-style: normal;
+    letter-spacing: 0.6pt;
+  }
+  .cover .credits .publisher {
+    margin-top: 4pt;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 1.5pt;
+    color: var(--forest);
+    font-weight: 700;
+  }
+  .cover .play-qr {
+    margin-top: 0.3in;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4pt;
+  }
+  .cover .play-qr img {
+    width: 1.2in;
+    height: 1.2in;
+    border: 4pt solid #ffffff;
+    background: #ffffff;
+    border-radius: 3pt;
+    box-shadow: 0 1pt 4pt rgba(0,0,0,0.18);
+  }
+  .cover .play-qr .qr-label {
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 1.4pt;
+    color: var(--water-deep);
+    font-weight: 700;
+  }
+  .cover .play-qr .qr-url {
+    font-size: 8.5pt;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    color: var(--ink-soft);
+  }
+
+  /* ============ LAYOUT ============ */
+  .col2 { column-count: 2; column-gap: 0.3in; }
+  .col2 h3, .col2 h4 { break-after: avoid; }
+  .col2 .keep { break-inside: avoid; }
+
+  .lead {
+    font-size: 11.2pt;
+    line-height: 1.45;
+    color: var(--ink);
+    margin-bottom: 10pt;
+  }
+
+  /* ============ CARDS / GRAPHICS ============ */
+  img.card {
+    border-radius: 6pt;
+    box-shadow: 0 1pt 3pt rgba(0,0,0,0.18);
+    background: var(--paper);
+  }
+  .card-row {
+    display: flex;
+    gap: 8pt;
+    align-items: center;
+    justify-content: center;
+    margin: 6pt 0;
+  }
+  .card-row img.card { width: 1.55in; height: auto; }
+  .caption {
+    font-size: 8.5pt; color: var(--ink-soft); font-style: italic;
+    text-align: center; margin-top: -2pt; line-height: 1.3;
+  }
+
+  /* ============ INLINE TOKENS ============ */
+  .fish { display: inline-block; color: #c25c2f; font-weight: 700; }
+  .vp   { display: inline-block; color: var(--forest); font-weight: 700; }
+  .worker {
+    display: inline-block;
+    width: 0.13in; height: 0.13in;
+    border-radius: 50%;
+    vertical-align: -1pt;
+    margin: 0 1pt;
+    border: 0.5pt solid rgba(0,0,0,0.35);
+  }
+  .worker.beaver  { background: var(--beaver); }
+  .worker.otter   { background: var(--otter); }
+  .worker.muskrat { background: var(--muskrat); }
+  .worker.mink    { background: var(--mink); }
+
+  /* ============ CALLOUT BLOCKS ============ */
+  .callout {
+    background: var(--paper);
+    border-left: 3pt solid var(--water-mid);
+    padding: 6pt 9pt;
+    margin: 6pt 0;
+    font-size: 9.7pt;
+    line-height: 1.4;
+    break-inside: avoid;
+    border-radius: 0 4pt 4pt 0;
+  }
+  .callout .label {
+    text-transform: uppercase;
+    letter-spacing: 1pt;
+    font-size: 8pt;
+    font-weight: 700;
+    margin-bottom: 3pt;
+  }
+  .callout.example { border-left-color: var(--forest); background: #f4f1e3; }
+  .callout.example .label { color: var(--forest); }
+  .callout.note { border-left-color: var(--bank); background: #faf3e3; }
+  .callout.note .label { color: var(--bank); }
+  .callout.tip { border-left-color: var(--water-mid); background: #eef4f7; }
+  .callout.tip .label { color: var(--water-deep); }
+  .callout.trap { border-left-color: var(--otter); background: #f7eded; }
+  .callout.trap .label { color: var(--otter); }
+
+  /* ============ TABLES ============ */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin: 4pt 0 8pt;
+  }
+  th, td {
+    text-align: left;
+    padding: 3pt 5pt;
+    border-bottom: 0.5pt solid var(--bank-light);
+    vertical-align: top;
+  }
+  th {
+    background: var(--paper-warm);
+    color: var(--water-deep);
+    font-weight: 700;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+  }
+
+  /* ============ PAGE BREAKS / FOOTER ============ */
+  .page-break { page-break-before: always; }
+  .footer {
+    margin-top: 16pt;
+    text-align: center;
+    font-size: 8pt;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- COVER                                                        -->
+<!-- ============================================================ -->
+<section class="cover">
+  <img class="logo" src="../artwork/logo.png" alt="River Bankers">
+  <div class="guide-banner">Strategy Guide</div>
+  <div class="tagline">
+    Read a shifting river. Win only the bids that matter.<br>
+    Spend tempo like a miser, and outbid like a baron<br>
+    on the one structure that completes your engine.
+  </div>
+  <div class="meta">
+    <span><strong>2–4</strong> Players</span>
+    <span><strong>30–60</strong> Minutes</span>
+    <span>Ages <strong>10+</strong></span>
+  </div>
+  <div class="credits">
+    <div class="designer">Designed by <strong>Don Schwarz</strong></div>
+    <div class="publisher">Left Field Games</div>
+  </div>
+  <div class="play-qr">
+    <div class="qr-label">Play in your browser</div>
+    <img src="../graphics/qr/play-qr.png" alt="QR code to leftfield.games/games/river-bankers">
+    <div class="qr-url">leftfield.games/games/river-bankers</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- WHAT THINGS ARE WORTH                                        -->
+<!-- ============================================================ -->
+<h1 style="text-align:center; margin-bottom: 4pt;">What Things Are Worth</h1>
+<p class="lead" style="text-align:center; max-width: 6.1in; margin: 0 auto 12pt;">
+  This guide assumes you know the rules. It won't re-teach the turn structure — it teaches how to
+  <em>win</em>: how to read what materials are worth at your table, when to commit to your species,
+  and how to spend tempo so the river hands you bargains instead of bills.
+</p>
+
+<p>
+  River Bankers has no price tags. Open the box and you will not find a single number that tells you
+  what a card is "worth." A pile of logs drifting at the head of the river is nearly free; the same
+  pile two auctions later, washed downstream, costs more than double. A clay seep nobody else needs
+  is a steal; the one structure three players all want is a knife-fight. <strong>Value here is never
+  printed — it is set, in the moment, by where a card sits and by how badly the animals around the
+  table want it.</strong>
+</p>
+<p>
+  That is the whole game, and it is the lever every strong play pulls. You are not buying materials
+  at a fixed shop. You are reading a market that moves every turn, deciding what <em>you</em> are
+  willing to make things cost, and — just as often — quietly letting a rival overpay for something
+  you were happy to let go.
+</p>
+
+<h3>The three ways value moves</h3>
+<table>
+  <thead>
+    <tr><th>Lever</th><th>How value shifts</th><th>What it means for you</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Position — the shifting market</strong></td>
+      <td>A card's per-item price is its slot. Headwaters is <span class="fish">1🐟</span>/item;
+        the river climbs <span class="fish">2 → 3 → 4 → 5🐟</span> as a card drifts downstream.
+        Every auction that leaves icons uncovered pushes the card one slot deeper and one fish dearer.</td>
+      <td>The same material gets steadily more expensive the longer it sits. Buy upstream when it's
+        cheap — or let a card you don't need ripen into someone else's overpriced problem.</td>
+    </tr>
+    <tr>
+      <td><strong>The auction — contested value</strong></td>
+      <td>Bids are sealed and simultaneous. Demand from the <em>other</em> players is what actually
+        sets the clearing price: an uncontested card costs the minimum, a card three of you want jams
+        and burns fish for everyone.</td>
+      <td>You decide what to make things cost. Drive a rival's price up by contesting; or bluff a
+        minimum bid and scavenge the leftovers nobody fought for.</td>
+    </tr>
+    <tr>
+      <td><strong>Workers — held inventory</strong></td>
+      <td>A worker you win sits on its card as <em>your</em> stock until you spend it on a build. You
+        are never forced to cash in.</td>
+      <td>Hold a commodity until the structure that needs it is in your hand, then complete your engine
+        in one satisfying move — the windfall is the timing.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout tip">
+  <div class="label">The one currency that matters</div>
+  Fish are not money — they are <strong>time</strong>. Every fish you spend pushes your pawn forward,
+  and the pawn <em>farthest back</em> always acts next. So the real question on every purchase isn't
+  "can I afford it?" (the track is effectively unbounded — you can always afford it). It's
+  "<strong>is this worth the turns it costs me?</strong>" A 4-worker haul at River 2 buries you 8
+  spaces back and hands several turns to everyone else. Spend tempo like it's the scarcest thing at
+  the table, because it is.
+</div>
+
+<!-- ============================================================ -->
+<!-- READING THE MARKET                                           -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Reading the market: what each material is worth</h2>
+<p>
+  Every material is equally <em>available</em> — the deck carries the same four cards (4, 5, 7, 8
+  icons) for all six. What differs is <strong>demand</strong>: how many structures call for it, how
+  much VP it pays per unit, and whether any species gets a discount on it. That mix decides whether a
+  material is a safe staple or a feast-or-famine specialty.
+</p>
+
+<table>
+  <thead>
+    <tr><th>Material</th><th>Role</th><th>How contested</th><th>VP per unit</th><th>Species discount</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Logs</strong></td><td>Staple</td><td>Highest</td><td>Lowest</td><td>−1 (Beaver, Lodge Foundation)</td></tr>
+    <tr><td><strong>Stones</strong></td><td>Staple</td><td>High</td><td>Low</td><td>none</td></tr>
+    <tr><td><strong>Mud</strong></td><td>Workhorse</td><td>Middle</td><td>Middle</td><td>−1 (Muskrat, Mud Burrow)</td></tr>
+    <tr><td><strong>Reeds</strong></td><td>Workhorse</td><td>Middle</td><td>Middle</td><td>−1 (Otter, Kelp Bed)</td></tr>
+    <tr><td><strong>Clay</strong></td><td>Specialist</td><td>Lowest</td><td><strong>Highest</strong></td><td><strong>−2 (Mink, Clay Den)</strong></td></tr>
+    <tr><td><strong>Vines</strong></td><td>Specialist</td><td>Low</td><td>Middle</td><td>none</td></tr>
+  </tbody>
+</table>
+
+<h3>Logs &amp; Stones — the staples</h3>
+<p>
+  These show up in the most structures and pay the least per unit. They are never a wrong buy and
+  rarely a great one — you'll move them constantly. Because everyone wants them, they're also the
+  materials most likely to <strong>jam</strong>. Don't get into a four-worker shoving match over logs
+  when a quieter material would finish the same structure cheaper.
+</p>
+
+<h3>Clay — the specialist that pays</h3>
+<p>
+  Clay is the contrarian's darling. Fewest structures want it, so it's the <em>least contested</em>
+  material at the table — you'll routinely take it uncontested at the Headwaters rate. Yet it pays the
+  <strong>most VP per unit</strong>, and the Mink's Clay Den gives the single biggest discount in the
+  game (<strong>−2</strong>). Less competition → cheaper to win → and it pays more when you cash it in.
+  If clay structures are flowing into your hand, leaning clay is one of the most efficient lines in
+  the game.
+</p>
+
+<div class="callout note">
+  <div class="label">Why "less wanted" can mean "more valuable"</div>
+  This is the whole game in one material. Clay's <em>list</em> price (icons) is identical
+  to every other material's — but its <em>real</em> price is set by demand, and demand is low. The
+  card nobody else bids on is the card you win for one fish an icon. Scarcity of <em>competition</em>,
+  not scarcity of supply, is where the bargains live.
+</div>
+
+<h3>Vines — the trap specialist</h3>
+<p>
+  Vines look like Clay's twin — another low-demand specialty — but they're the one material to be
+  wary of committing to. There's <strong>no species discount</strong> on vines, and a large share of
+  the demand for them is locked in structures that score <strong>0 VP on their own</strong> (engine
+  and end-game cards like Vine Ladder and Vine Trellis). Take vines to <em>feed a specific card you
+  already hold</em>, not as a general stockpile. A pile of unspent vines is the likeliest material to
+  end the game doing nothing.
+</p>
+
+<h3>Mud &amp; Reeds — the flexible middle</h3>
+<p>
+  Middle demand, middle payoff, and each carries a −1 species discount (Muskrat on mud, Otter on
+  reeds). These are your flex picks: contested enough to matter, cheap enough to win, and they keep
+  your options open while you wait to see which engine your hand wants to build.
+</p>
+
+<div class="callout tip">
+  <div class="label">Rule of thumb</div>
+  Build with <strong>staples</strong> (logs, stones) when you just need to get a structure down and
+  keep tempo. Reach for <strong>Clay</strong> when you want maximum VP for minimum fish and the table
+  isn't fighting you for it. Touch <strong>Vines</strong> only with a card in hand that pays you for
+  them.
+</div>
+
+<!-- ============================================================ -->
+<!-- SPECIES                                                      -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Your species: commit or stay nimble</h2>
+<p>
+  In the asymmetric game each player drafts <strong>one of three starter structures</strong>, built
+  for free from turn 1. Every species' three-card pool is the same shape: one
+  <strong>material-bias card</strong> (the ★) that discounts your signature material, and two
+  <strong>tactical cards</strong> that trade that discount for a sharper tool. The choice is the
+  guide's central fork: <em>do you commit to a material specialty, or stay flexible?</em>
+</p>
+
+<table>
+  <thead>
+    <tr><th>Species</th><th>Bias material</th><th>★ Bias starter</th><th>Two tactical starters</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="worker beaver"></span> Beaver</td><td>Logs</td><td>Lodge Foundation</td><td>Tail Slap · Beaver Cache</td></tr>
+    <tr><td><span class="worker otter"></span> River Otter</td><td>Reeds</td><td>Kelp Bed</td><td>Rolling Float · Stone Tool</td></tr>
+    <tr><td><span class="worker muskrat"></span> Muskrat</td><td>Mud</td><td>Mud Burrow</td><td>Channel Clearer · Marsh Lookout</td></tr>
+    <tr><td><span class="worker mink"></span> Mink</td><td>Clay</td><td>Clay Den</td><td>Quick Strike · Snare Set</td></tr>
+  </tbody>
+</table>
+
+<div class="card-row" style="margin-top: 8pt;">
+  <img class="card" src="../starter-deck/LodgeFoundation.png" alt="Lodge Foundation">
+  <img class="card" src="../starter-deck/KelpBed.png" alt="Kelp Bed">
+  <img class="card" src="../starter-deck/MudBurrow.png" alt="Mud Burrow">
+  <img class="card" src="../starter-deck/ClayDen.png" alt="Clay Den">
+</div>
+<div class="caption">The four ★ material-bias starters — a standing discount on your signature material.</div>
+
+<h3>When to take the ★ bias card</h3>
+<p>
+  Take the bias starter when you want a <strong>standing discount you'll use all game</strong>. It
+  quietly lowers the per-item cost of your material on every auction, which compounds: a Mink with
+  Clay Den is winning the cheapest, highest-paying material in the game at a further −2. The bias
+  cards mostly print little or no VP of their own (Kelp Bed, Mud Burrow, and Clay Den print
+  <span class="vp">0★</span>; Lodge Foundation just <span class="vp">1★</span>) — <strong>you pick
+  them for the engine, not for points.</strong> Commit early: a discount only pays off if you actually
+  steer your builds toward that material.
+</p>
+
+<h3>When to take a tactical card instead</h3>
+<p>
+  The tactical starters give up the discount for a one-shot or repeatable edge — extra reach in an
+  auction, a hand-cycling boost, a tempo swing. Take one when your opening hand doesn't point at your
+  bias material, or when you'd rather stay flexible and read the table before committing. But choose
+  carefully: <strong>not every tactical card is the upgrade it looks like.</strong>
+</p>
+
+<div class="callout trap">
+  <div class="label">Trap pick — Quick Strike</div>
+  Of all twelve starters, the Mink's <strong>Quick Strike</strong> is the one that consistently
+  underperforms its reputation. It reads like a powerful tempo weapon, and players reach for it — then
+  finish last. In our 4-player table-test, the Quick Strike player built it into his whole plan,
+  tried to linger at the back of the fish track to keep firing it, and came dead last with under 10
+  points. The lesson is double: the card is a <strong>trap pick</strong> over the Mink's own Clay Den,
+  <em>and</em> the "stay back to keep acting" plan it tempts you into is its own trap (see the next
+  page). If you're the Mink, <strong>Clay Den is almost always the stronger draft.</strong>
+</div>
+
+<div class="callout tip">
+  <div class="label">Strong pick — Stone Tool</div>
+  At the other extreme, the Otter's <strong>Stone Tool</strong> gives a real edge in auctions —
+  strong enough that it was reined in to fire only <em>once per game</em>. When you draft it, save
+  that one use for an auction that genuinely decides a structure, not a routine grab.
+</div>
+
+<p>
+  Across thousands of games the species land within a few percent of each other — there is no
+  "best animal." Beaver is a touch forgiving (logs are everywhere, so its discount is the easiest to
+  use), and the rest are a wash. <strong>Your draft and your reads matter far more than your color.</strong>
+</p>
+
+<div class="callout note">
+  <div class="label">First game? Play symmetric.</div>
+  Skipping the starter draft (nobody builds at setup) is the cleaner way to learn. All the
+  value-and-tempo tension is already there without asymmetry. Layer the species starters in once the
+  auction rhythm feels natural.
+</div>
+
+<!-- ============================================================ -->
+<!-- BIDDING & TEMPO                                              -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Bidding &amp; the fish-track: spending tempo</h2>
+<p>
+  Auctions are where value is actually set, and the fish track is the price you pay to set it. Master
+  the relationship between the two and you've mastered the game.
+</p>
+
+<h3>Keep the chair</h3>
+<p>
+  The farthest-back pawn acts next — and keeps acting until someone else falls behind it. That means
+  cheap turns let you <strong>chain</strong>. A single-worker grab at River 1 nudges you forward only
+  <span class="fish">2🐟</span> and you'll very likely still be lowest, so you go again. A greedy
+  four-worker haul buries you and gifts the table a lap of turns. The strongest rhythm is often a
+  string of small, cheap, decisive actions that keep returning the chair to you — not one big
+  splashy buy.
+</p>
+
+<h3>Pay-for-bid keeps everyone honest</h3>
+<p>
+  Every worker you bid costs fish <em>whether or not it wins an icon</em>. So an over-aggressive bid
+  doesn't just risk losing — it burns tempo even when it loses. This cuts both ways:
+</p>
+<ul>
+  <li><strong>Don't overbid to "be safe."</strong> If a card has 5 icons and you bid 5 against a
+    rival's 4, the jam still charges you for all 5 workers while you take only a couple. You paid full
+    freight for materials that bounced back to your supply.</li>
+  <li><strong>Make rivals pay.</strong> When you can tell an opponent <em>needs</em> a card, a token
+    contesting bid forces them to bid high to clinch it — and the fish they spend is tempo you just
+    cost them, even if you win nothing.</li>
+</ul>
+
+<div class="callout example">
+  <div class="label">Example — driving up a rival's price</div>
+  <span class="worker mink"></span> The Mink clearly needs 3 clay to finish a structure on a 4-icon
+  card at River 1. <span class="worker beaver"></span> You don't need clay at all, but you bid
+  <strong>2</strong> anyway. Now the Mink must bid the full 4 to be sure of 3 after the overbid — and
+  pays <strong>4 × 2🐟 = 8🐟</strong> for the privilege, eight spaces of tempo. You spent
+  <strong>4🐟</strong> to cost them double. Sometimes the point of a bid isn't what you win — it's
+  what you make the table pay.
+</div>
+
+<h3>The bluffed zero (and the minimum trigger)</h3>
+<p>
+  You can trigger an auction and commit the bare minimum — one worker — hoping rivals stay out and you
+  scoop uncovered icons cheap, or that a jam hands you leftovers. Played well, the
+  <strong>minimum-commitment trigger</strong> is how you keep tempo low while still pulling materials.
+  Don't reflexively pile on workers; the table that bids conservatively and scavenges efficiently ends
+  the game having traveled far less of the track — and in a tiebreak, the pawn farther back wins.
+</p>
+
+<div class="callout trap">
+  <div class="label">Trap — "staying back to act sooner"</div>
+  It's tempting to deliberately hang at the back of the track to soak up extra turns. But turns are
+  only worth what you <em>do</em> with them. A player who lingers at the rear taking tiny actions,
+  without converting them into built structures, simply takes a lot of cheap turns and scores
+  nothing — exactly how the Quick Strike player finished last in our playtest. Tempo is a means, not
+  an end. <strong>Cash your turns into structures.</strong>
+</div>
+
+<h3>Buy upstream; let dead cards drift</h3>
+<p>
+  A card is cheapest the instant it enters the river and gets dearer with every auction that leaves it
+  uncovered. If you know you want a material, <strong>take it early</strong> — Headwaters at
+  <span class="fish">1🐟</span>/item or River 1 at <span class="fish">2🐟</span> — rather than letting
+  it drift to the <span class="fish">4–5🐟</span> back slots. Conversely, a card you <em>don't</em>
+  need is a weapon: leave it drifting, and a rival who needs it later pays the inflated downstream
+  price. You never have to be the one who pays to move it along.
+</p>
+
+<!-- ============================================================ -->
+<!-- TIMING & THE WINDFALL                                        -->
+<!-- ============================================================ -->
+<h2>Holding for the windfall</h2>
+<p>
+  Winning a worker doesn't force you to use it. A worker sits on its card as your private stock —
+  there until you spend it on a build or call it home. That patience is a strategy in itself.
+</p>
+<ul>
+  <li><strong>Acquire toward a known structure.</strong> The cleanest engines win the materials first
+    and slap the structure down the moment it's affordable — ideally a build that fires several of
+    your passive "when you build with X" effects at once for a chain of free value.</li>
+  <li><strong>Recall is free.</strong> Just before any auction you may pull your own workers back from
+    river cards for nothing, dropping a blank behind them. Stage your workers where they threaten,
+    then recall and redeploy them into the auction that actually matters.</li>
+  <li><strong>Don't strand inventory.</strong> Materials still sitting on cards at game end score only
+    <span class="vp">1★</span> per matched pair (singletons score nothing). Held stock is potential,
+    not points — convert it before the finish line.</li>
+</ul>
+
+<div class="callout tip">
+  <div class="label">Aim at the big end-game scorers</div>
+  The fattest point swings live in the variable-VP "engine" structures — the material walkways and
+  ladders, Hidden Cache, Heron Watch, Cattail Patch — which can each pay far more than a printed
+  number if you've built toward them. They print little or nothing up front, so rivals undervalue
+  them; commit to one early and feed it all game.
+</div>
+
+<div class="card-row" style="margin-top: 6pt;">
+  <img class="card" src="../graphics/structure-deck/out/web/HiddenCache.png" alt="Hidden Cache">
+  <img class="card" src="../graphics/structure-deck/out/web/HeronWatch.png" alt="Heron Watch">
+  <img class="card" src="../graphics/structure-deck/out/web/CattailPatch.png" alt="Cattail Patch">
+  <img class="card" src="../graphics/structure-deck/out/web/VineLadder.png" alt="Vine Ladder">
+</div>
+<div class="caption">Four end-game scorers that reward a player who quietly built toward them.</div>
+
+<!-- ============================================================ -->
+<!-- ENDGAME                                                      -->
+<!-- ============================================================ -->
+<h2>Racing the finish line</h2>
+<p>
+  The game ends when pawns reach the finish line (59 / 89 / 119 fish at 2 / 3 / 4 players). Two things
+  flip in the final stretch:
+</p>
+<ul>
+  <li><strong>Don't overshoot.</strong> The instant your action carries you to or past the line you
+    retire — and the tiebreaker rewards the pawn that ends <em>farther back</em>. Crossing on a small
+    action and landing just past the line beats lunging across on a big one. Plan your last few buys so
+    you finish lean.</li>
+  <li><strong>One last build for everyone.</strong> After all players retire, each gets a single final
+    build with the workers they're holding. Don't end the game with materials stranded on cards if a
+    structure in hand could turn them into points — that last build is free VP you've already paid for.</li>
+</ul>
+
+<div class="callout note">
+  <div class="label">The deck running dry doesn't end the game</div>
+  Even after the material deck empties, you keep auctioning the cards still on the river and Headwaters
+  until pawns reach the line. Tempo, not the deck, is the clock — so the same "spend turns wisely"
+  discipline runs right to the end.
+</div>
+
+<!-- ============================================================ -->
+<!-- CHEAT SHEET                                                  -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>Strategy at a glance</h2>
+<div class="col2">
+  <div class="keep">
+    <h3>Read value</h3>
+    <ul style="font-size: 9.6pt;">
+      <li>Price = position. Buy upstream cheap; let cards you don't need drift dear.</li>
+      <li>Demand sets the real price, not the icon count. The card nobody wants is your bargain.</li>
+      <li>Clay: least contested, pays the most — lean it when it flows.</li>
+      <li>Vines: only with a card in hand that pays for them.</li>
+      <li>Logs &amp; stones: reliable, but the likeliest to jam.</li>
+    </ul>
+  </div>
+  <div class="keep">
+    <h3>Spend tempo</h3>
+    <ul style="font-size: 9.6pt;">
+      <li>Fish are turns. Cheap actions keep the chair; big hauls hand it away.</li>
+      <li>You pay for every worker you bid, win or lose — don't overbid to feel safe.</li>
+      <li>A token bid can make a rival overpay; the cost you impose can beat the prize you win.</li>
+      <li>Bluff the minimum trigger and scavenge leftovers.</li>
+      <li>Staying back only helps if you cash the turns into structures.</li>
+    </ul>
+  </div>
+  <div class="keep">
+    <h3>Pick your species</h3>
+    <ul style="font-size: 9.6pt;">
+      <li>★ bias card = standing discount; commit your builds to that material.</li>
+      <li>Bias cards score ~0 VP — draft them for the engine, not points.</li>
+      <li>Tactical card = flexibility when your hand doesn't point at your material.</li>
+      <li>Mink: take Clay Den over Quick Strike (the trap pick).</li>
+      <li>Otter: save Stone Tool's one use for an auction that decides a structure.</li>
+    </ul>
+  </div>
+  <div class="keep">
+    <h3>Close it out</h3>
+    <ul style="font-size: 9.6pt;">
+      <li>Build toward a big variable-VP scorer early; feed it all game.</li>
+      <li>Convert held materials before the end — pairs score 1★, singletons 0★.</li>
+      <li>Cross the line lean; the farther-back pawn wins ties.</li>
+      <li>Use your free final build to empty your stock into points.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="footer">
+  River Bankers — Strategy Guide · companion to the rulebook (v0.1.9) · designed by Don Schwarz · published by Left Field Games
+</div>
+
+</body>
+</html>
