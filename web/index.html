@@ -1736,7 +1736,8 @@ const TIER_3PLUS_ICONS = [4];
 const TIER_4PLUS_ICONS = [8];
 
 // =============================================================================
-// MATERIAL CARD EFFECTS (see MATERIALS.md). 8 of the 24 deck slots are
+// MATERIAL CARD EFFECTS (design spec in hobbies board-games.org, River
+// Bankers → "Material effect-card spec"). 8 of the 24 deck slots are
 // effect-bearing, keyed by (material, icons). Vanilla cards have effect = null.
 // =============================================================================
 const EFFECT_CARDS = [
@@ -4022,7 +4023,8 @@ function slidesSandbarUpstream(card) {
 function jamCardDownriver(card) {
   if (card.slot === 'pre') {
     // Upstream card drifts down: it normally enters River 1 (slot 0). Refill upstream queue.
-    // Slipping Sandbar enters at River 4 instead (see MATERIALS.md).
+    // Slipping Sandbar enters at River 4 instead (see design spec in
+    // board-games.org, "Material effect-card spec").
     const idx = prerivIndexOf(card);
     card.slot = (card.effect === 'slipping-sandbar') ? 3 : 0;
     state.riverCards.push(card);
