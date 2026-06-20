@@ -1296,7 +1296,10 @@ function collectAuctionBids(state, card, triggerPlayerIdx, minBidTrigger) {
     }
   }
   if (deferred === -1) {
+    // Quick Strike only fires when its owner is the one who triggered the
+    // auction (per the card text), unlike Spy Mound which works on any auction.
     for (const p of state.players) {
+      if (p.idx !== triggerPlayerIdx) continue;
       if (hasEffect(p, 'Quick Strike') && !p.exhausted && !p.out) {
         if (wantsMaterial(p)) { deferred = p.idx; deferredViaQuickStrike = true; break; }
       }

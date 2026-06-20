@@ -4173,8 +4173,11 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     }
   }
   if (deferredAi === -1) {
+    // Quick Strike only fires when its owner triggered the auction (per the
+    // card text), unlike Spy Mound which works on any auction.
     for (const p of state.players) {
       if (p.isHuman) continue;
+      if (p.idx !== triggerPlayerIdx) continue;
       if (hasEffect(p, 'Quick Strike') && !p.exhausted && !p.out && wantsMaterial(p)) {
         deferredAi = p.idx;
         deferredAiViaQuickStrike = true;
@@ -4203,7 +4206,7 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
         deferredHuman = human.idx;
         human.spyMoundUsed = true;
       }
-    } else if (hasEffect(human, 'Quick Strike')) {
+    } else if (hasEffect(human, 'Quick Strike') && human.idx === triggerPlayerIdx) {
       startHumanTimer();
       let useIt;
       try {
