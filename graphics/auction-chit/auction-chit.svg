@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  River Bankers — Auction chit
+  Designed against TGC's 1" x 2" Domino Chit template
+  (https://s3.amazonaws.com/www.thegamecrafter.com/templates/domino-chit.svg).
+
+  Template geometry (72 user units = 1 inch, matching the other chits):
+    Full canvas / bleed : 90 x 162  (1.25" x 2.25")
+    Trim / cut          : 72 x 144  (1" x 2"), inset 9 on every side -> x[9,81] y[9,153]
+    Safe zone           : 54 x 126  (0.75" x 1.75"), inset 18        -> x[18,72] y[18,144]
+
+  Design: full-bleed material-deck back art (artwork/material-deck-back.png,
+  2816x1536 landscape) used as the chit face. The landscape scene is rotated
+  -90 deg so its wide axis becomes the chit's long axis: the rotated aspect
+  (1536/2816 = 0.545) nearly matches the chit's 1:2 portrait (0.5), so the
+  whole river scene survives with only ~2% cropped off the long edges by the
+  slice fit — versus cropping a thin vertical strip out of the upright image.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.0.dtd"
+     width="1.25in" height="2.25in"
+     viewBox="0 0 90 162"
+     version="1.1"
+     id="svg-auction-chit">
+
+  <!-- Bleed: full-canvas dark fill behind the art (shows only if the slice
+       leaves a sliver; the art is sized to cover the whole 90x162 canvas). -->
+  <rect x="0" y="0" width="90" height="162" fill="#2c3a3f"/>
+
+  <!-- Face art: deck-back river scene, rotated -90 about the chit center
+       (45, 81) and slice-filled to cover the full bleed canvas. -->
+  <g transform="translate(45 81) rotate(-90)">
+    <image x="-81" y="-45" width="162" height="90"
+           preserveAspectRatio="xMidYMid slice"
+           xlink:href="../../artwork/material-deck-back.png"
+           href="../../artwork/material-deck-back.png"/>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- Template guide (hide before exporting print art).             -->
+  <!-- ============================================================ -->
+  <g inkscape:groupmode="layer" inkscape:label="Template guide"
+     id="layer-guide" style="display:none" sodipodi:insensitive="true">
+    <!-- Trim / cut rectangle (1" x 2") -->
+    <rect x="9" y="9" width="72" height="144" fill="none"
+          stroke="#ec1c24" stroke-width="0.4"/>
+    <!-- Safe zone -->
+    <rect x="18" y="18" width="54" height="126" fill="none"
+          stroke="#007dff" stroke-width="0.4" stroke-dasharray="2 2"/>
+  </g>
+</svg>
