@@ -204,6 +204,13 @@
     box-shadow: 0 1px 2px rgba(0,0,0,0.3);
   }
   .pawn.next-up { animation: pulse 1.2s infinite; }
+  /* "+60" lap side: once a pawn passes space 59 (timePos ≥ 60) it flips to its
+     +60 chit face — the species color still identifies the player. */
+  .pawn .lap-plus60 {
+    font-size: 9px; font-weight: 800; color: #fff;
+    letter-spacing: -0.5px;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.65);
+  }
   .pawn.exhausted {
     transform: rotate(180deg);
     filter: grayscale(0.7) brightness(0.7);
@@ -2974,7 +2981,10 @@ function renderTimeTrack() {
       const p = state.players[idx];
       const isNext = idx === state.currentPlayer && !state.gameOver && !p.exhausted;
       const exh = p.exhausted ? ' exhausted' : '';
-      pawns += `<div class="pawn${isNext ? ' next-up' : ''}${exh}" data-pawn="${idx}" style="background-color:${p.species.color}" title="${p.species.name}${p.exhausted ? ' (exhausted)' : ''}">${speciesIcon(p.species)}</div>`;
+      // Past space 59 the pawn flips to its "+60" lap side (the back of the chit).
+      const lapped = p.timePos >= LAP_LENGTH;
+      const glyph = lapped ? '<span class="lap-plus60">+60</span>' : speciesIcon(p.species);
+      pawns += `<div class="pawn${isNext ? ' next-up' : ''}${exh}${lapped ? ' lapped' : ''}" data-pawn="${idx}" style="background-color:${p.species.color}" title="${p.species.name}${lapped ? ' (+60 lap)' : ''}${p.exhausted ? ' (exhausted)' : ''}">${glyph}</div>`;
     }
     const isLapMark = (i === 0); // visual mark at the lap boundary
     const isFinish = onFinishLap && i === finishCell;
