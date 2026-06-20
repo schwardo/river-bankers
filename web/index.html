@@ -2809,13 +2809,14 @@ function pickNextPlayer() {
 
 const ENDGAME_TRACK_END = 59;
 
-// Fish-line endgame (trigger "b" + coda "d", per the 2026-06-17 design sweep).
-// Each player retires the moment their pawn passes the per-count finish line;
-// once everyone has, each player gets one final build. Lines tuned so average
-// VP lands ~13-14 across counts while length/builds scale with the table.
-// 59/89/119 (not 60/90/120) so every finish fits a single "+60" chit flip:
-// 2P at 59 = lap 1 (no flip); 3P 89 / 4P 119 = the +60 side at space 29 / 59.
-const FISH_LINE_BY_COUNT = { 2: 59, 3: 89, 4: 119 };
+// Fish-line endgame (trigger "b" + coda "d"). Each player retires the moment
+// their pawn passes the finish line; once everyone has, each gets one final
+// build. Uniform 119 for every count (2026-06-20 turn-clock re-tune): under the
+// 30s/turn timing model the old climbing 59/89/119 ran far too short at 2P/3P,
+// and more players ⇒ more turns per fish-space, so a flat line centres all
+// counts (~40-54 min for 2P/3P; 4P longer). 119 = lap-2 space 59 — one "+60"
+// chit flip, the same finish marker for every count.
+const FISH_LINE_BY_COUNT = { 2: 119, 3: 119, 4: 119 };
 function fishFinishLine() {
   return FISH_LINE_BY_COUNT[state.players.length] || 30 * state.players.length;
 }
@@ -7552,7 +7553,8 @@ async function runOneTurn() {
   if (!p.out && p.timePos >= fishFinishLine()) {
     p.out = true;
     state.retireUnlocked = true;
-    log(`🏁 ${speciesLabel(p)} crosses the ${fishFinishLine()}🐟 finish line and retires.`);
+    settleFinishSpot(p);
+    log(`🏁 ${speciesLabel(p)} crosses the finish line and retires to space ${p.timePos}🐟.`);
   }
   state.phase = 'idle';
   render();
@@ -7573,21 +7575,34 @@ async function runOneTurn() {
 
 // Retire any player whose pawn has reached/passed the finish line (backstop for
 // pawns pushed over by another player's effect; the acting player is retired
-// inline). A natural crossing keeps the player at their (overshoot) position.
+// inline). A natural crossing keeps the player at their overshoot position,
+// sliding forward only if that exact spot is already taken (settleFinishSpot).
 function retirePastFinishLine() {
   const line = fishFinishLine();
   for (const p of state.players) {
     if (!p.out && p.timePos >= line) {
       p.out = true;
       state.retireUnlocked = true;
-      log(`🏁 ${speciesLabel(p)} crosses the ${line}🐟 finish line and retires.`);
+      settleFinishSpot(p);
+      log(`🏁 ${speciesLabel(p)} crosses the ${line}🐟 finish line and retires to space ${p.timePos}🐟.`);
     }
   }
 }
 
-// Lowest open space at or beyond the finish line. Natural crossers occupy their
-// overshoot spots; a Retire action packs the retiree into the lowest gap from
-// the line up (so after a 64-crosser, the next retiree lands on 60).
+// Settle a just-crossed pawn onto its finish spot: it keeps its overshoot
+// position, but if another retired pawn already sits there it slides forward to
+// the next open space. Keeps every finish spot UNIQUE so the tiebreaker (lower
+// final spot wins) can never be shared — without this a late crosser could land
+// exactly on an early retiree's spot and steal a tie for the better position,
+// which warps the incentive to retire early.
+function settleFinishSpot(p) {
+  const occupied = new Set(state.players.filter(o => o.out && o !== p).map(o => o.timePos));
+  while (occupied.has(p.timePos)) p.timePos++;
+}
+
+// Lowest open space at or beyond the finish line. Crossers hold their (settled,
+// unique) overshoot spots; a Retire action packs the retiree into the lowest gap
+// from the line up (so after a 64-crosser, the next retiree lands on 60).
 function lowestFreeFinishSpot() {
   const line = fishFinishLine();
   const occupied = new Set(state.players.filter(p => p.out).map(p => p.timePos));

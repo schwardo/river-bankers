@@ -100,6 +100,12 @@ const SPECIES_KEYS = ['beaver', 'otter', 'muskrat', 'mink'];
 let FORCED_SPECIES_STARTER = null;
 function setForcedSpeciesStarter(map) { FORCED_SPECIES_STARTER = map; }
 
+// Asymmetric play toggle (web "Use species starter cards" checkbox, default on).
+// When false, newGame skips the species-starter draft entirely so every player
+// begins with an empty tableau — symmetric play. The tune sweep runs both.
+let USE_SPECIES_STARTERS = true;
+function setUseSpeciesStarters(b) { USE_SPECIES_STARTERS = b; }
+
 // AI draft preference for species starters (higher = more attractive). Plain
 // per-name weights — keeps the species-draft decision local and avoids
 // pulling in aiEffectValue's full machinery.
@@ -431,9 +437,12 @@ const ENDGAME_TRACK_END = 59;
 // deck-empty endgame; egPlayOut raises it to the per-count fish line during the
 // fish-line endgame so abilities keep firing through a 90/120-fish race.
 let SIM_FINISH_LINE = ENDGAME_TRACK_END;
-// 59/89/119 (not 60/90/120) so every finish lands within a single "+60" chit
-// flip: 2P at 59 = lap 1 (no flip), 3P 89 / 4P 119 = the +60 side at space 29 / 59.
-const FISH_LINE_BY_COUNT = { 2: 59, 3: 89, 4: 119 };
+// Uniform 119 for every count (2026-06-20 turn-clock re-tune, board-games.org):
+// under the web 30s/turn timing model the old climbing 59/89/119 lines ran far
+// too short at 2P/3P (~12/18 min). More players ⇒ more turns per fish-space, so
+// a flat line centres all three (~40-54 min @45-60s/turn for 2P/3P; 4P longer).
+// 119 = lap-2 space 59 — one "+60" chit flip, the same finish marker for all counts.
+const FISH_LINE_BY_COUNT = { 2: 119, 3: 119, 4: 119 };
 function simFishLine(numP) { return FISH_LINE_BY_COUNT[numP] || 30 * numP; }
 const UPSTREAM_AUCTION_COST = 1;
 const MAX_TURNS = 2000; // safety net
@@ -914,7 +923,10 @@ function newGame(numPlayers, workersPerPlayer = null) {
   // weight (tie-break random). Other 2 cards leave the game; the drafted
   // starter is pre-built in the player's tableau before turn 1. The
   // FORCED_SPECIES_STARTER override is honored when set (measurement tool).
+  // Skipped entirely under symmetric play (USE_SPECIES_STARTERS = false) —
+  // the web "Use species starter cards" checkbox; the tune sweep runs both.
   for (const p of players) {
+    if (!USE_SPECIES_STARTERS) break;
     const speciesCards = STRUCTURE_TEMPLATES
       .filter(s => s.species === p.species)
       .map((s, i) => ({ ...s, id: 'ss' + p.idx + '_' + i, cost: { ...s.cost } }));
@@ -1243,6 +1255,15 @@ function callWorkersHome(state, playerIdx, recallSpec) {
 // =============================================================================
 // AUCTIONS
 // =============================================================================
+// Engagement tracking for the dead-trailing-turn metric (tune-dead sweep).
+// Active only when state._engage is present: records the latest turn index at
+// which a player "engaged" — participated in an auction (placed a bid > 0, which
+// includes the trigger's mandatory bid) or built a structure. Zero overhead when
+// state._engage is absent (every other sweep / live play).
+function markEngage(state, idx) {
+  if (state._engage && !state._engage.frozen) state._engage.last[idx] = state.metrics.turns;
+}
+
 function runAuction(state, card, triggerPlayerIdx, minBidTrigger) {
   state.metrics.auctions++;
   // Floodgate: triggerer (only) auto-uses if available and card.slot >= 1.
@@ -1342,6 +1363,7 @@ function resolveAuction(state, card, bids) {
   const playerBidPairs = Object.entries(bids)
     .filter(([_, b]) => b > 0)
     .map(([idx, b]) => ({ idx: parseInt(idx), bid: b }));
+  for (const { idx } of playerBidPairs) markEngage(state, idx);
 
   if (totalBid <= open) {
     state.metrics.plentyAuctions++;
@@ -1507,6 +1529,7 @@ function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing, tri
     .filter(([_, b]) => b > 0)
     .map(([idx, b]) => ({ idx: parseInt(idx), bid: b }))
     .sort((a, b) => cwDist(a.idx) - cwDist(b.idx));
+  for (const { idx } of playerBidPairs) markEngage(state, idx);
   const isJam = totalBid > open;
   if (!isJam) {
     state.metrics.plentyAuctions++;
@@ -2599,6 +2622,7 @@ function performBuild(state, playerIdx, handIdx) {
   p.hand.splice(handIdx, 1);
   p.built.push(struct);
   state.metrics.cardsBuilt++;
+  markEngage(state, playerIdx);
   fireOnBuildEffect(state, playerIdx, struct);
   // Replace from deck up to maxHandSize (Cache Burrow → 4).
   while (p.hand.length < maxHandSize(p) && structAvailable(state) > 0) {
@@ -5429,6 +5453,7 @@ function egPlayOut(state, trigger, vpLimit, fishLimit, proc) {
       if (cur === -1) break;
       state.currentPlayer = cur;
       state.metrics.turns++;
+      if (state._engage) state._engage.ownTurns[cur].push(state.metrics.turns);
       const p = state.players[cur];
       aiStartOfTurnAbilities(state, p.idx);
       const action = aiChooseAction(state, p.idx);
@@ -5437,6 +5462,10 @@ function egPlayOut(state, trigger, vpLimit, fishLimit, proc) {
       maybeFireSlipstream(state, p.idx);
       if (checkGameEnd(state)) break;
     }
+    // Freeze engagement tracking before the coda: the coda is a structured
+    // one-build-each finale, not the boring trailing grind we're measuring, so
+    // a coda build must not reset a player's main-loop last-engagement turn.
+    if (state._engage) state._engage.frozen = true;
     egRunCoda(state, proc);
   } finally {
     SIM_FINISH_LINE = prevFinish;
@@ -5571,6 +5600,503 @@ function fmtTime(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// =============================================================================
+// TUNE SWEEP — fish-line + material-card player-limit calibration
+// =============================================================================
+// Calibrates the game to the 30–60 minute target across 2P/3P/4P, with and
+// without asymmetric (species-starter) play. The simulation produces a TURN
+// count per game; wall-clock minutes are turns × secPerTurn / 60. The web
+// prototype's AI_TURN_FAKE_MS = 30s is a self-described placeholder pending
+// real human timing, and it disagrees ~2.3× with the auction-based heuristic,
+// so this sweep evaluates a plausible human range — TUNE_SPTS = [45, 60] s/turn
+// — from the SAME runs (the turn distribution is heuristic-independent; only
+// the minute axis rescales). Best lines are chosen for robustness across the
+// whole range (maximize the worst-case in-band % over both endpoints).
+//
+// Two design levers are swept:
+//   1. fish line — FISH_LINE_BY_COUNT[numP]; the pawn-track space a player must
+//      pass to retire. The primary length knob. Candidates are restricted to
+//      "+60-chit-friendly" spaces (≡29 or ≡59 mod 60) so the printed finish
+//      marker always lands within a single chit flip, per the existing rule.
+//   2. material-card player limits — which icon-count cards enter the deck at
+//      which player count (the "2P/3P/4P" badge on each material card). Encoded
+//      by setDeckTuning({always, tier3, tier4}); the deck-config pass holds the
+//      recommended fish line and compares tier variants for length + variance.
+const TUNE_SPTS = [45, 60];           // seconds-per-turn endpoints to bracket
+const TUNE_SPT_PRIMARY = 60;          // histograms + median display use this end
+function pctl(sorted, q) {
+  if (!sorted.length) return 0;
+  const i = (sorted.length - 1) * q;
+  const lo = Math.floor(i), hi = Math.ceil(i);
+  return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+// Run N fish-line-endgame games at one (numP, fishLine, asym, deckTuning) and
+// return the per-game TURN counts (sorted ascending). Minutes are derived later
+// per seconds-per-turn so one run serves every timing heuristic.
+function tuneRun(numP, fishLine, asym, numGames, deckTuning) {
+  const workers = defaultWorkersPerPlayer(numP);
+  setUseSpeciesStarters(asym);
+  if (deckTuning) setDeckTuning(deckTuning);
+  const turns = [];
+  for (let g = 0; g < numGames; g++) {
+    const r = egRunGame(numP, 6, workers, 'fish', 0, fishLine, 'd');
+    turns.push(r.turns);
+  }
+  turns.sort((a, b) => a - b);
+  return turns;
+}
+
+// Minute-domain stats for a sorted turns array at a given seconds-per-turn.
+function tuneStats(turnsSorted, spt) {
+  const mins = turnsSorted.map(t => t * spt / 60);
+  const inBand = mins.filter(m => m >= 30 && m <= 60).length;
+  return {
+    mean: avg(mins), median: pctl(mins, 0.5),
+    p10: pctl(mins, 0.10), p90: pctl(mins, 0.90),
+    iqr: pctl(mins, 0.75) - pctl(mins, 0.25),
+    inBandPct: 100 * inBand / mins.length,
+    tailPct: 100 * mins.filter(m => m > 60).length / mins.length,
+  };
+}
+// Robustness score for line selection: worst-case in-band % across the SPT
+// range, lightly tie-broken toward a 45-min center at the primary heuristic.
+function tuneScore(turnsSorted) {
+  const inBands = TUNE_SPTS.map(spt => tuneStats(turnsSorted, spt).inBandPct);
+  const worst = Math.min(...inBands);
+  const med = pctl(turnsSorted, 0.5) * TUNE_SPT_PRIMARY / 60;
+  return worst - Math.abs(med - 45) * 0.3;
+}
+
+// ASCII histogram of minutes (at TUNE_SPT_PRIMARY) in 10-min bins, target
+// band bracketed.
+const TUNE_BINS = [
+  { lo: 0,   hi: 20,  label: '<20' },
+  { lo: 20,  hi: 30,  label: '20-30' },
+  { lo: 30,  hi: 40,  label: '30-40' },
+  { lo: 40,  hi: 50,  label: '40-50' },
+  { lo: 50,  hi: 60,  label: '50-60' },
+  { lo: 60,  hi: 75,  label: '60-75' },
+  { lo: 75,  hi: 1e9, label: '75+' },
+];
+function tuneHistogram(turnsSorted, spt) {
+  const mins = turnsSorted.map(t => t * spt / 60);
+  const counts = TUNE_BINS.map(b => mins.filter(m => m >= b.lo && m < b.hi).length);
+  const max = Math.max(1, ...counts);
+  const lines = [];
+  for (let i = 0; i < TUNE_BINS.length; i++) {
+    const b = TUNE_BINS[i];
+    const n = counts[i];
+    const bar = '█'.repeat(Math.round((n / max) * 40));
+    const inBand = b.lo >= 30 && b.hi <= 60;
+    lines.push('  ' + padL(b.label, 6) + ' ' + padL((100 * n / mins.length).toFixed(1) + '%', 7) + ' ' + bar + (inBand ? ' ◀band' : ''));
+  }
+  return lines.join('\n');
+}
+
+// Chit-friendly fish lines: spaces ≡29 or ≡59 mod 60 (finish marker lands
+// within a single +60 chit flip). Spans ~30min (line 59) to long games.
+const TUNE_FISH_LINES = [59, 89, 119, 149, 179, 209, 239];
+
+function sweepTune(numGamesArg) {
+  const numGames = parseInt(numGamesArg) || 5000;
+  const playerCounts = [2, 3, 4];
+  const tStart = Date.now();
+  configureMaterials(6);
+
+  console.log(`\nRiver Bankers — TUNE sweep  (${numGames} games/config, 6 materials)`);
+  console.log(`Endgame: b:fish-line trigger + d:one-build coda (the live web model).`);
+  console.log(`Timing heuristic range: ${TUNE_SPTS.join('–')} s/turn  ⇒  minutes = turns × s/turn / 60.`);
+  console.log(`Tables show minutes at BOTH endpoints; best line = best worst-case in-band fit.`);
+  console.log(`Target window: 30–60 minutes at every player count.\n`);
+
+  // ---- PASS 1: fish-line sweep, asym ON and OFF, current deck tiers ----
+  const recommend = {}; // recommend[asymKey][numP] = best fish line
+  for (const asym of [true, false]) {
+    const asymKey = asym ? 'on' : 'off';
+    console.log('='.repeat(78));
+    console.log(`PASS 1 — fish-line sweep, asymmetric play ${asym ? 'ON ' : 'OFF'} (species starters ${asymKey})`);
+    console.log('='.repeat(78));
+    recommend[asymKey] = {};
+    for (const numP of playerCounts) {
+      console.log(`\n--- ${numP}P (${defaultWorkersPerPlayer(numP)} workers) ---  (med/in-band at 45s | 60s per turn)`);
+      console.log(
+        pad('fishLine', 9) + padL('med45', 7) + padL('in45', 7) +
+        padL('med60', 7) + padL('in60', 7) + padL('IQR60', 7) + '   verdict'
+      );
+      console.log('-'.repeat(9 + 7 * 5 + 11));
+      let best = null;
+      const rows = [];
+      for (const line of TUNE_FISH_LINES) {
+        const turns = tuneRun(numP, line, asym, numGames, null);
+        const s45 = tuneStats(turns, 45), s60 = tuneStats(turns, 60);
+        const score = tuneScore(turns);
+        rows.push({ line, s45, s60 });
+        if (!best || score > best.score) best = { line, turns, score, s45, s60 };
+      }
+      for (const r of rows) {
+        console.log(
+          pad(String(r.line), 9) +
+          padL(r.s45.median.toFixed(1), 7) + padL(r.s45.inBandPct.toFixed(0) + '%', 7) +
+          padL(r.s60.median.toFixed(1), 7) + padL(r.s60.inBandPct.toFixed(0) + '%', 7) +
+          padL(r.s60.iqr.toFixed(1), 7) +
+          (r.line === best.line ? '   ◀ best fit' : '')
+        );
+      }
+      recommend[asymKey][numP] = best.line;
+      console.log(`\n  Histogram @ fishLine ${best.line} (best fit, asym ${asymKey}, ${numP}P, @${TUNE_SPT_PRIMARY}s/turn):`);
+      console.log(tuneHistogram(best.turns, TUNE_SPT_PRIMARY));
+    }
+    console.log();
+  }
+
+  // ---- Recommendation summary ----
+  console.log('='.repeat(78));
+  console.log('RECOMMENDED fish lines (best worst-case 30-60min fit over 45–60 s/turn):');
+  console.log('='.repeat(78));
+  console.log(pad('', 14) + padL('2P', 8) + padL('3P', 8) + padL('4P', 8));
+  console.log(pad('asym ON', 14) + padL(recommend.on[2], 8) + padL(recommend.on[3], 8) + padL(recommend.on[4], 8));
+  console.log(pad('asym OFF', 14) + padL(recommend.off[2], 8) + padL(recommend.off[3], 8) + padL(recommend.off[4], 8));
+  console.log(`  (current live FISH_LINE_BY_COUNT = { 2:59, 3:89, 4:119 })`);
+
+  // ---- PASS 2: JOINT (fish-line × material-card player-limit) optimum ----
+  // The two levers interact: a fish line set so high that the material deck
+  // empties long before pawns retire produces a dragging "dry-river churn" tail
+  // (the 75+ histogram bin). Adding material cards (richer player limits) lets a
+  // LOWER fish line fill the same minutes with real auctioning instead of churn.
+  // So we don't hold the line fixed — for each deck variant we re-find the best
+  // fish line, then recommend the (variant, line) pair that best centers 30-60.
+  // Variant naming: which icon-counts sit in always(2P+)/tier3(3P+)/tier4(4P+).
+  const deckVariants = [
+    { name: 'baseline',  t: { always: [5, 7], tier3: [4], tier4: [8] } },
+    { name: '2P-rich',   t: { always: [5, 7, 4], tier3: [8], tier4: [] } },   // 2P+ gets a 3rd card/mat; 8s drop to 3P+
+    { name: '4P-lean',   t: { always: [5, 7], tier3: [4, 8], tier4: [] } },   // collapse 4P-only premium into 3P+ tier
+    { name: 'flat',      t: { always: [4, 5, 7], tier3: [], tier4: [8] } },   // 3 cards/mat at every count
+  ];
+  console.log('\n' + '='.repeat(78));
+  console.log('PASS 2 — JOINT fish-line × material-card player-limit optimum, asym ON');
+  console.log('='.repeat(78));
+  console.log('Deck tiers: always=2P+, tier3=3P+, tier4=4P+. For each deck variant the best');
+  console.log('fish line is re-found. in-band/IQR/tail shown at the 60 s/turn endpoint.');
+  const jointBest = {}; // jointBest[numP] = {variant, line, st}
+  for (const numP of playerCounts) {
+    console.log(`\n--- ${numP}P (asym ON, @60s/turn) ---`);
+    console.log(pad('variant', 11) + pad('cards/mat', 11) + padL('bestLine', 9) +
+      padL('med', 7) + padL('IQR', 7) + padL('in30-60', 9) + padL('tail>60', 9));
+    console.log('-'.repeat(11 + 11 + 9 + 7 * 2 + 9 + 9));
+    for (const v of deckVariants) {
+      const cpm = v.t.always.length + (numP >= 3 ? v.t.tier3.length : 0) + (numP >= 4 ? v.t.tier4.length : 0);
+      let best = null;
+      for (const line of TUNE_FISH_LINES) {
+        const turns = tuneRun(numP, line, true, numGames, v.t);
+        const score = tuneScore(turns);
+        if (!best || score > best.score) best = { line, turns, score };
+      }
+      const st = tuneStats(best.turns, 60);
+      const isWinner = !jointBest[numP] || best.score > jointBest[numP].score;
+      if (isWinner) jointBest[numP] = { variant: v.name, line: best.line, st, score: best.score, t: v.t };
+      console.log(
+        pad(v.name, 11) + pad(cpm + ' cards', 11) + padL(String(best.line), 9) +
+        padL(st.median.toFixed(1), 7) + padL(st.iqr.toFixed(1), 7) +
+        padL(st.inBandPct.toFixed(0) + '%', 9) + padL(st.tailPct.toFixed(0) + '%', 9)
+      );
+    }
+  }
+  console.log('\n' + '='.repeat(78));
+  console.log('JOINT RECOMMENDATION (asym ON, @60s/turn) — best (deck variant, fish line) per count:');
+  console.log('='.repeat(78));
+  for (const numP of playerCounts) {
+    const b = jointBest[numP];
+    console.log(`  ${numP}P:  deck "${b.variant}"  fishLine ${b.line}  →  median ${b.st.median.toFixed(0)}min, ` +
+      `${b.st.inBandPct.toFixed(0)}% in band, IQR ${b.st.iqr.toFixed(0)}, tail>60 ${b.st.tailPct.toFixed(0)}%`);
+  }
+  // Restore live deck tiers.
+  setDeckTuning({ always: [5, 7], tier3: [4], tier4: [8] });
+  setUseSpeciesStarters(true);
+
+  console.log(`\nElapsed: ${((Date.now() - tStart) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log(`  Minutes = turns × s/turn / 60, evaluated at ${TUNE_SPTS.join(' and ')} s/turn (human range).`);
+  console.log('  medXX/inXX = median minutes / % in 30-60 band at XX s/turn; IQR = p75−p25.');
+  console.log('  best line maximizes the worse of the two in-band %s (robust across the range).');
+  console.log('  PASS 2 IQR is the key 4P-variance readout — lower = more consistent length.\n');
+}
+
+// Focused head-to-head of explicit (numP, fishLine) configs — same fish-line
+// endgame, current deck tiers, asym ON. Prints percentiles + a histogram for
+// each so specific candidates can be compared side by side. Configs default to
+// the "2P @ 89 vs 119, in context with 3P/4P @ 89" question; override with an
+// arg like "2:89,2:119,3:89,4:89".
+function sweepTuneCmp(numGamesArg, configArg) {
+  const numGames = parseInt(numGamesArg) || 5000;
+  const spec = (configArg || '2:89,2:119,3:89,4:89')
+    .split(',').map(s => { const [p, l] = s.split(':').map(Number); return { numP: p, line: l }; });
+  configureMaterials(6);
+  console.log(`\nRiver Bankers — config comparison  (${numGames} games each, baseline deck, asym ON)`);
+  console.log(`Minutes = turns × s/turn / 60, shown at ${TUNE_SPTS.join(' and ')} s/turn.\n`);
+  console.log(
+    pad('config', 12) + padL('p10', 7) + padL('med', 7) + padL('p90', 7) + padL('IQR', 7) +
+    padL('in30-60', 9) + padL('tail>60', 9) + '   @ s/turn'
+  );
+  console.log('-'.repeat(12 + 7 * 4 + 9 + 9 + 12));
+  const hists = [];
+  for (const { numP, line } of spec) {
+    const turns = tuneRun(numP, line, true, numGames, null);
+    for (const spt of TUNE_SPTS) {
+      const st = tuneStats(turns, spt);
+      console.log(
+        pad(`${numP}P @ ${line}`, 12) +
+        padL(st.p10.toFixed(1), 7) + padL(st.median.toFixed(1), 7) + padL(st.p90.toFixed(1), 7) +
+        padL(st.iqr.toFixed(1), 7) + padL(st.inBandPct.toFixed(0) + '%', 9) +
+        padL(st.tailPct.toFixed(0) + '%', 9) + padL(spt + 's', 11)
+      );
+    }
+    hists.push({ numP, line, turns });
+  }
+  for (const spt of TUNE_SPTS) {
+    console.log(`\n=== Histograms @ ${spt}s/turn ===`);
+    for (const h of hists) {
+      console.log(`\n  ${h.numP}P @ fishLine ${h.line}:`);
+      console.log(tuneHistogram(h.turns, spt));
+    }
+  }
+  console.log();
+}
+
+// End-of-game board-state + build stats for the fish-line endgame, across
+// 2P/3P/4P at the candidate lines (default 89 and 119), baseline deck, asym ON.
+// These are timing-heuristic-independent. Reports cards left in the material
+// deck, Headwaters cards, river cards, open river icons, and structures built
+// per player (cardsBuilt / numP) — plus median length for context.
+function sweepTuneBoard(numGamesArg, linesArg, deckArg) {
+  const numGames = parseInt(numGamesArg) || 5000;
+  const lines = (linesArg || '89,119').split(',').map(Number);
+  // Seat configs: numP with an explicit worker supply. 4P is shown at both 7
+  // (live default) and 8 workers to isolate the worker count's effect on the
+  // 4P build gradient.
+  const seats = [
+    { numP: 2, workers: 8 },
+    { numP: 3, workers: 8 },
+    { numP: 3, workers: 7 },
+    { numP: 4, workers: 8 },
+    { numP: 4, workers: 7 },
+    { numP: 4, workers: 6 },
+  ];
+  // Deck variants: 'baseline' = live tiers; 'shifted' = pull each tier's player
+  // limit down one step (3P→2P, 4P→3P): the 4-icon cards become 2P+, the 8-icon
+  // cards become 3P+, no 4P-exclusive cards. (2P=18, 3P=24, 4P=24 cards.)
+  const DECKS = {
+    baseline: { always: [5, 7], tier3: [4], tier4: [8] },
+    shifted:  { always: [4, 5, 7], tier3: [8], tier4: [] },
+    lean4p:   { always: [5, 7], tier3: [4], tier4: [] },   // drop the 8-icon cards; 4P=18 (2P/3P unchanged)
+  };
+  const deckName = (deckArg && DECKS[deckArg]) ? deckArg : 'baseline';
+  const deckTuning = DECKS[deckName];
+  configureMaterials(6);
+  console.log(`\nRiver Bankers — board-state & builds  (${numGames} games each, ${deckName} deck, asym ON)`);
+  const cpmAt = (np) => deckTuning.always.length + (np >= 3 ? deckTuning.tier3.length : 0) + (np >= 4 ? deckTuning.tier4.length : 0);
+  console.log(`Fish-line endgame (b+d). Deck starts at ${6 * cpmAt(2)}/${6 * cpmAt(3)}/${6 * cpmAt(4)} cards for 2P/3P/4P.`);
+  console.log(`Deck tiers: always(2P+)=[${deckTuning.always}] tier3(3P+)=[${deckTuning.tier3}] tier4(4P+)=[${deckTuning.tier4}] icons.`);
+  console.log(`matDeck/HW/river/openIcn = mean cards (or icons) on the board at game end.`);
+  console.log(`built/P = mean structures built per player; med60 = median minutes @60s/turn.\n`);
+  console.log(
+    pad('config', 14) + padL('deckStart', 8) + padL('matLeft', 9) + padL('deckOut%', 9) +
+    padL('HW', 6) + padL('river', 7) + padL('openIcn', 9) + padL('built/P', 9) + padL('med60', 8)
+  );
+  console.log('-'.repeat(14 + 8 + 9 + 9 + 6 + 7 + 9 + 9 + 8));
+  for (const line of lines) {
+    for (const { numP, workers } of seats) {
+      const deckStart = 6 * cpmAt(numP);
+      setUseSpeciesStarters(true);
+      setDeckTuning(deckTuning);
+      const rows = [];
+      for (let g = 0; g < numGames; g++) rows.push(egRunGame(numP, 6, workers, 'fish', 0, line, 'd'));
+      const matLeft = avg(rows.map(r => r.matDeck));
+      const deckOutPct = 100 * rows.filter(r => r.matDeck === 0).length / rows.length;
+      const med60 = pctl(rows.map(r => r.turns).sort((a, b) => a - b), 0.5);
+      console.log(
+        pad(`${numP}P/${workers}w @ ${line}`, 14) + padL(String(deckStart), 8) +
+        padL(matLeft.toFixed(2), 9) + padL(deckOutPct.toFixed(0) + '%', 9) +
+        padL(avg(rows.map(r => r.headwaters)).toFixed(2), 6) +
+        padL(avg(rows.map(r => r.river)).toFixed(2), 7) +
+        padL(avg(rows.map(r => r.openRiver)).toFixed(1), 9) +
+        padL(avg(rows.map(r => r.built / numP)).toFixed(2), 9) +
+        padL(med60.toFixed(0), 8)   // minutes @60s/turn == median turns
+      );
+    }
+    console.log();
+  }
+  console.log('Legend:');
+  console.log('  matLeft  = mean material cards still in the draw deck at game end.');
+  console.log('  deckOut% = share of games where the material deck fully emptied.');
+  console.log('  HW       = mean Headwaters (pre-river) cards on the board at end.');
+  console.log('  river    = mean river cards present; openIcn = mean uncovered river icons.');
+  console.log('  built/P  = mean structures built per player over the game.\n');
+}
+
+// Fish-line target finder: for the live seat configs (2P/8w, 3P/8w, 4P/7w),
+// baseline deck, asym ON, scan fish lines and flag the value(s) that satisfy
+// ALL THREE targets at once: deck-out ≥ 50%, builds/player > 2, and median
+// length in 30–60 min. Length shown at both 45 and 60 s/turn; the ✓ flag uses
+// the 60 s endpoint (looser/longer — the binding one for the upper bound).
+function sweepTuneTarget(numGamesArg, linesArg) {
+  const numGames = parseInt(numGamesArg) || 5000;
+  const lines = linesArg
+    ? linesArg.split(',').map(Number)
+    : [89, 99, 109, 119, 129, 139, 149, 159, 169, 179, 189, 199, 209, 219, 229, 239];
+  const seats = [{ numP: 2, workers: 8 }, { numP: 3, workers: 8 }, { numP: 4, workers: 7 }];
+  configureMaterials(6);
+  const DECK = { always: [5, 7], tier3: [4], tier4: [8] };
+  console.log(`\nRiver Bankers — fish-line target finder  (${numGames} games each, baseline deck, asym ON)`);
+  console.log(`Targets:  deck-out ≥ 50%   AND   builds/player > 2   AND   median length 30–60 min.`);
+  console.log(`Length at both 45 and 60 s/turn; ✓ uses med60 (the binding upper bound).\n`);
+  for (const { numP, workers } of seats) {
+    const deckStart = 6 * (DECK.always.length + (numP >= 3 ? DECK.tier3.length : 0) + (numP >= 4 ? DECK.tier4.length : 0));
+    console.log(`--- ${numP}P / ${workers}w  (deck ${deckStart} cards) ---`);
+    console.log(pad('fishLine', 9) + padL('deckOut%', 9) + padL('built/P', 9) + padL('med45', 7) + padL('med60', 7) + '   targets met');
+    console.log('-'.repeat(9 + 9 + 9 + 7 + 7 + 16));
+    for (const line of lines) {
+      setUseSpeciesStarters(true);
+      setDeckTuning(DECK);
+      const rows = [];
+      for (let g = 0; g < numGames; g++) rows.push(egRunGame(numP, 6, workers, 'fish', 0, line, 'd'));
+      const deckOut = 100 * rows.filter(r => r.matDeck === 0).length / rows.length;
+      const builtP = avg(rows.map(r => r.built / numP));
+      const turns = rows.map(r => r.turns).sort((a, b) => a - b);
+      const med45 = pctl(turns, 0.5) * 45 / 60, med60 = pctl(turns, 0.5) * 60 / 60;
+      const okDeck = deckOut >= 50, okBuilt = builtP > 2, okLen = med60 >= 30 && med60 <= 60;
+      const flags = `${okDeck ? '✓' : '✗'}deck ${okBuilt ? '✓' : '✗'}build ${okLen ? '✓' : '✗'}len`;
+      const allOk = okDeck && okBuilt && okLen;
+      console.log(
+        pad(String(line), 9) + padL(deckOut.toFixed(0) + '%', 9) + padL(builtP.toFixed(2), 9) +
+        padL(med45.toFixed(0), 7) + padL(med60.toFixed(0), 7) + '   ' + flags + (allOk ? '   ◀ ALL' : '')
+      );
+    }
+    console.log();
+  }
+}
+
+// Auction-quality comparison for explicit seat configs: jam rate and, crucially,
+// zero-clinch auctions (total bids > 0 but nobody clinched a single icon — the
+// "everyone bid, nobody got anything" outcome that motivated 4P=7w). Runs the
+// fish-line endgame and reads state.metrics directly (egRunGame doesn't expose
+// these). Default: 4P @ 119, 7w vs 8w, baseline deck, asym ON.
+function sweepTuneJam(numGamesArg, lineArg, seatsArg) {
+  const numGames = parseInt(numGamesArg) || 5000;
+  const line = parseInt(lineArg) || 119;
+  const seats = (seatsArg || '4:7,4:8').split(',')
+    .map(s => { const [p, w] = s.split(':').map(Number); return { numP: p, workers: w }; });
+  const DECK = { always: [5, 7], tier3: [4], tier4: [8] };
+  configureMaterials(6);
+  console.log(`\nRiver Bankers — auction quality  (${numGames} games each, fishLine ${line}, baseline deck, asym ON)`);
+  console.log(`jam = total bid > open icons; zeroClinch = bids placed but 0 icons clinched (dead auction).\n`);
+  console.log(
+    pad('config', 11) + padL('med45', 7) + padL('med60', 7) + padL('aucs/g', 8) + padL('jam%', 7) + padL('jams/g', 8) +
+    padL('zcAuc%', 8) + padL('zc/g', 7) + padL('zcBid%', 8) + padL('waste%', 8)
+  );
+  console.log('-'.repeat(11 + 7 + 7 + 8 + 7 + 8 + 8 + 7 + 8 + 8));
+  for (const { numP, workers } of seats) {
+    setUseSpeciesStarters(true);
+    setDeckTuning(DECK);
+    const acc = { auc: 0, jam: 0, zcAuc: 0, zcBid: 0, nob: 0, wasted: 0, spawned: 0 };
+    const jamPcts = [], zcAucPcts = [], turnsArr = [];
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      egPlayOut(state, 'fish', 0, line, 'd');
+      const m = state.metrics;
+      acc.auc += m.auctions; acc.jam += m.jamAuctions; acc.zcAuc += m.zeroClinchAuctions;
+      acc.zcBid += m.zeroClinchBidders; acc.nob += m.nonZeroBidders;
+      acc.wasted += m.iconsWastedToShore; acc.spawned += m.iconsSpawned;
+      jamPcts.push(pct(m.jamAuctions, m.auctions));
+      zcAucPcts.push(pct(m.zeroClinchAuctions, m.auctions));
+      turnsArr.push(m.turns);
+    }
+    turnsArr.sort((a, b) => a - b);
+    const medTurns = pctl(turnsArr, 0.5);
+    console.log(
+      pad(`${numP}P / ${workers}w`, 11) +
+      padL((medTurns * 45 / 60).toFixed(0), 7) + padL(medTurns.toFixed(0), 7) +
+      padL((acc.auc / numGames).toFixed(1), 8) +
+      padL(avg(jamPcts).toFixed(1) + '%', 7) +
+      padL((acc.jam / numGames).toFixed(2), 8) +
+      padL(avg(zcAucPcts).toFixed(1) + '%', 8) +
+      padL((acc.zcAuc / numGames).toFixed(2), 7) +
+      padL(pct(acc.zcBid, acc.nob).toFixed(1) + '%', 8) +
+      padL(pct(acc.wasted, acc.spawned).toFixed(1) + '%', 8)
+    );
+  }
+  console.log('\nLegend:');
+  console.log('  aucs/g  = mean auctions per game;  jams/g = mean jammed auctions per game.');
+  console.log('  zcAuc%  = % of auctions that were zero-clinch (nobody got anything).');
+  console.log('  zc/g    = mean zero-clinch (dead) auctions per game — the key 7w-vs-8w stat.');
+  console.log('  zcBid%  = of all (bidder with bid>0), the % who clinched 0 icons.');
+  console.log('  waste%  = open icons carried unclaimed to the shoreline / icons spawned.\n');
+}
+
+// "Dead trailing turns" sweep: per player, the number of their own turns at the
+// END of the main game (before retiring / game end) that came AFTER their last
+// engagement — i.e. turns spent neither participating in an auction (bid > 0)
+// nor building. These are the "boring" turns that game-length and jam stats miss
+// (a player Inventing toward the finish line with nothing left to contest). The
+// coda (one-build-each finale) is excluded. Default: the chosen configs @119.
+function sweepTuneDead(numGamesArg, lineArg, seatsArg) {
+  const numGames = parseInt(numGamesArg) || 5000;
+  const line = parseInt(lineArg) || 119;
+  const seats = (seatsArg || '2:8,3:8,4:6,4:7,4:8').split(',')
+    .map(s => { const [p, w] = s.split(':').map(Number); return { numP: p, workers: w }; });
+  const DECK = { always: [5, 7], tier3: [4], tier4: [8] };
+  configureMaterials(6);
+  console.log(`\nRiver Bankers — dead trailing turns  (${numGames} games each, fishLine ${line}, baseline deck, asym ON)`);
+  console.log(`A player's "dead trail" = their own end-of-game turns after their LAST auction-bid/build`);
+  console.log(`(coda excluded). Counts turns spent idling/Inventing toward retirement with nothing to do.\n`);
+  console.log(
+    pad('config', 11) + padL('med60', 7) + padL('mean/P', 8) + padL('worstP', 8) +
+    padL('p90 worst', 11) + padL('max worst', 11) + padL('≥3 trail%', 11)
+  );
+  console.log('-'.repeat(11 + 7 + 8 + 8 + 11 + 11 + 11));
+  for (const { numP, workers } of seats) {
+    setUseSpeciesStarters(true);
+    setDeckTuning(DECK);
+    const perPlayerAll = [];        // every player's dead-trail count
+    const worstPerGame = [];        // per game, the max dead-trail across players
+    const turnsArr = [];
+    let gamesWithLongTrail = 0;      // games where some player had ≥3 dead trailing turns
+    for (let g = 0; g < numGames; g++) {
+      configureMaterials(6);
+      const state = newGame(numP, workers);
+      state._engage = { last: new Array(numP).fill(-1), ownTurns: Array.from({ length: numP }, () => []), frozen: false };
+      egPlayOut(state, 'fish', 0, line, 'd');
+      const e = state._engage;
+      let worst = 0;
+      for (let i = 0; i < numP; i++) {
+        const dead = e.ownTurns[i].filter(t => t > e.last[i]).length;
+        perPlayerAll.push(dead);
+        if (dead > worst) worst = dead;
+      }
+      worstPerGame.push(worst);
+      if (worst >= 3) gamesWithLongTrail++;
+      turnsArr.push(state.metrics.turns);
+    }
+    worstPerGame.sort((a, b) => a - b);
+    turnsArr.sort((a, b) => a - b);
+    console.log(
+      pad(`${numP}P / ${workers}w`, 11) +
+      padL(pctl(turnsArr, 0.5).toFixed(0), 7) +
+      padL(avg(perPlayerAll).toFixed(2), 8) +
+      padL(avg(worstPerGame).toFixed(2), 8) +
+      padL(pctl(worstPerGame, 0.90).toFixed(0), 11) +
+      padL(String(worstPerGame[worstPerGame.length - 1]), 11) +
+      padL((100 * gamesWithLongTrail / numGames).toFixed(1) + '%', 11)
+    );
+  }
+  console.log('\nLegend:');
+  console.log('  med60     = median game length in minutes @60s/turn (context).');
+  console.log('  mean/P    = mean dead trailing turns per player (averaged over all players, all games).');
+  console.log('  worstP    = mean across games of the single most-stranded player\'s dead-trail count.');
+  console.log('  p90/max worst = 90th-percentile and worst-ever value of that per-game worst player.');
+  console.log('  ≥3 trail% = share of games where some player sat through ≥3 dead trailing turns.\n');
+}
+
 function sweepFishline(numGamesArg, numPArg) {
   const numGames = parseInt(numGamesArg) || 2000;
   const numPArgInt = parseInt(numPArg);
@@ -5655,5 +6181,11 @@ if (require.main === module) {
   else if (mode === 'endgame-pass0') sweepEndgamePass0(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'endgame-rework') sweepEndgameRework(process.argv[3], process.argv[4]);
   else if (mode === 'fishline') sweepFishline(process.argv[3], process.argv[4]);
+  else if (mode === 'tune') sweepTune(process.argv[3]);
+  else if (mode === 'tune-cmp') sweepTuneCmp(process.argv[3], process.argv[4]);
+  else if (mode === 'tune-board') sweepTuneBoard(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'tune-target') sweepTuneTarget(process.argv[3], process.argv[4]);
+  else if (mode === 'tune-jam') sweepTuneJam(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'tune-dead') sweepTuneDead(process.argv[3], process.argv[4], process.argv[5]);
   else sweep();
 }

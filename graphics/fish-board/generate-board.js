@@ -534,41 +534,44 @@ function buildSvg() {
   parts.push(`<g id="endgame-trigger">`);
   parts.push(rect({
     x: LEGEND_X, y: LEGEND_Y, w: LEGEND_W, h: LEGEND_H, rx: 10, ry: 10,
-    fill: '#fff', stroke: '#7c2410', 'stroke-width': 1.8,
+    fill: '#fff', stroke: '#244c5a', 'stroke-width': 1.8,
   }));
   parts.push(text({
     x: LEGEND_X + LEGEND_W / 2, y: LEGEND_Y + 24,
-    content: 'ENDGAME TRIGGER', 'text-anchor': 'middle',
-    'font-size': 15, 'font-weight': 'bold', fill: '#7c2410', 'letter-spacing': '1.5',
+    content: 'Game ends when', 'text-anchor': 'middle',
+    'font-size': 16, 'font-weight': 'bold', fill: '#244c5a', 'letter-spacing': '0.3',
   }));
-  parts.push(`<line x1="${LEGEND_X + 14}" y1="${LEGEND_Y + 32}" x2="${LEGEND_X + LEGEND_W - 14}" y2="${LEGEND_Y + 32}" stroke="#7c2410" stroke-width="1" opacity="0.4"/>`);
-  const dividerX = LEGEND_X + 56;
-  parts.push(`<line x1="${dividerX}" y1="${LEGEND_Y + 38}" x2="${dividerX}" y2="${LEGEND_Y + LEGEND_H - 10}" stroke="#d8c6b0" stroke-width="1"/>`);
-  const legRows = [
-    { label: '2P', val: '59', plus60: false },
-    { label: '3P', val: '29', plus60: true },
-    { label: '4P', val: '59', plus60: true },
-  ];
-  const ROW_H = 26;
-  const firstMid = LEGEND_Y + 54;
-  legRows.forEach((r, i) => {
-    const my = firstMid + i * ROW_H;
-    parts.push(text({
-      x: LEGEND_X + 28, y: my + 5, content: r.label,
-      'text-anchor': 'middle', 'font-size': 16, 'font-weight': 'bold', fill: '#244c5a',
-    }));
-    const preX = dividerX + 10;
-    parts.push(text({
-      x: preX, y: my + 4, content: 'any player reaches',
-      'text-anchor': 'start', 'font-size': 13, 'font-style': 'italic', fill: '#5a4a36',
-    }));
-    const numCx = preX + 128;
-    parts.push(fishGroup(numCx, my, r.val, 15, '#5a3a00'));
-    if (r.plus60) parts.push(plus60Badge(numCx + 44, my, 13));
-    if (i < legRows.length - 1) {
-      parts.push(`<line x1="${LEGEND_X + 14}" y1="${my + ROW_H / 2}" x2="${LEGEND_X + LEGEND_W - 14}" y2="${my + ROW_H / 2}" stroke="#ece2cc" stroke-width="0.8"/>`);
-    }
-  });
+  parts.push(`<line x1="${LEGEND_X + 14}" y1="${LEGEND_Y + 32}" x2="${LEGEND_X + LEGEND_W - 14}" y2="${LEGEND_Y + 32}" stroke="#244c5a" stroke-width="1" opacity="0.4"/>`);
+  // Uniform finish line across all player counts (2026-06-20 turn-clock re-tune):
+  // the game ends once ALL players reach 119 fish (board space 59 on the "+60"
+  // lap side). Line 3 states the no-shared-finish-space retire rule.
+  const egCx = LEGEND_X + LEGEND_W / 2;
+  parts.push(text({
+    x: egCx, y: LEGEND_Y + 54, content: 'all players reach',
+    'text-anchor': 'middle', 'font-size': 14, 'font-style': 'italic', fill: '#5a4a36',
+  }));
+  // Line 2: big "119 🐟", then a smaller "(59 🐟 +60)" board-position note.
+  const egLineY = LEGEND_Y + 78;
+  const big = 19, sm = 12;
+  const wBig  = big * 0.62 * 3 + big * 0.18 + big * 1.35;   // "119" + fish
+  const wSm59 = sm * 0.62 * 2 + sm * 0.18 + sm * 1.35;      // "59" + fish
+  const wParen = 6, wBadge = 20, gapAB = 12, gapFB = 6, gapBC = 8;
+  const egTotalW = wBig + gapAB + wParen + wSm59 + gapFB + wBadge + gapBC + wParen;
+  let egCur = egCx - egTotalW / 2;
+  parts.push(fishGroup(egCur + wBig / 2, egLineY, '119', big, '#5a3a00'));
+  egCur += wBig + gapAB;
+  parts.push(text({ x: egCur, y: egLineY + sm * 0.32, content: '(', 'text-anchor': 'start', 'font-size': 16, fill: '#5a4a36' }));
+  egCur += wParen;
+  parts.push(fishGroup(egCur + wSm59 / 2, egLineY, '59', sm, '#5a4a36'));
+  egCur += wSm59 + gapFB;
+  parts.push(plus60Badge(egCur + wBadge / 2, egLineY, wBadge / 2));
+  egCur += wBadge + gapBC;
+  parts.push(text({ x: egCur, y: egLineY + sm * 0.32, content: ')', 'text-anchor': 'start', 'font-size': 16, fill: '#5a4a36' }));
+  // Line 3: the retire / no-shared-space rule.
+  parts.push(text({
+    x: egCx, y: LEGEND_Y + 109, content: 'RETIRE: jump to next open spot after 119',
+    'text-anchor': 'middle', 'font-size': 12.5, 'font-weight': 'bold', fill: '#244c5a',
+  }));
   parts.push(`</g>`);
 
   // ---- "WHEN YOU PASS 0" flip box (left of the pair, same height) ----
@@ -582,13 +585,14 @@ function buildSvg() {
   parts.push(`<g id="flip-legend">`);
   parts.push(rect({
     x: FB_X, y: FB_Y, w: FB_W, h: FB_H, rx: 10, ry: 10,
-    fill: '#fff', stroke: '#7c2410', 'stroke-width': 1.8,
+    fill: '#fff', stroke: '#244c5a', 'stroke-width': 1.8,
   }));
   parts.push(text({
-    x: FD_CX, y: FB_Y + 28, content: 'WHEN YOU PASS 0',
-    'text-anchor': 'middle', 'font-size': 13, 'font-weight': 'bold', fill: '#7c2410', 'letter-spacing': '1',
+    x: FD_CX, y: FB_Y + 24, content: 'When you pass 0',
+    'text-anchor': 'middle', 'font-size': 16, 'font-weight': 'bold', fill: '#244c5a', 'letter-spacing': '0.3',
   }));
-  const FD_CELL_Y = FB_Y + 38;
+  parts.push(`<line x1="${FB_X + 14}" y1="${FB_Y + 32}" x2="${FB_X + FB_W - 14}" y2="${FB_Y + 32}" stroke="#244c5a" stroke-width="1" opacity="0.4"/>`);
+  const FD_CELL_Y = FB_Y + 44;
   [{ n: '59', dx: -FD_CELL_W }, { n: '0', dx: 0 }, { n: '1', dx: FD_CELL_W }].forEach(c => {
     parts.push(rect({
       x: FD_CX + c.dx - FD_CELL_W / 2, y: FD_CELL_Y, w: FD_CELL_W, h: FD_CELL_H,
@@ -605,7 +609,7 @@ function buildSvg() {
   const plusCx = FD_CX + FD_CELL_W;    // under "1"
   parts.push(`<circle cx="${blankCx}" cy="${fdChitY}" r="${fdR}" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.5"/>`);
   parts.push(plus60Badge(plusCx, fdChitY, fdR));
-  parts.push(`<line x1="${(blankCx + fdR + 3).toFixed(1)}" y1="${fdChitY}" x2="${(plusCx - fdR - 5).toFixed(1)}" y2="${fdChitY}" stroke="#7c2410" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow-red)"/>`);
+  parts.push(`<line x1="${(blankCx + fdR + 3).toFixed(1)}" y1="${fdChitY}" x2="${(plusCx - fdR - 5).toFixed(1)}" y2="${fdChitY}" stroke="#244c5a" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>`);
   parts.push(`</g>`);
 
   // ---- "Pay 🐟" box (left of the row): title + a left-to-right arrow showing
@@ -614,17 +618,17 @@ function buildSvg() {
   parts.push(`<g id="pay-fish">`);
   parts.push(rect({
     x: PAY_X, y: TOPBOX_Y, w: PAY_W, h: TOPBOX_H, rx: 10, ry: 10,
-    fill: '#fff', stroke: '#7c2410', 'stroke-width': 1.8,
+    fill: '#fff', stroke: '#244c5a', 'stroke-width': 1.8,
   }));
   const payTitleY = TOPBOX_Y + 56;
   const payFishW = 22, payFishH = 16;
   parts.push(text({
     x: PAY_CX - 4, y: payTitleY, content: 'Pay', 'text-anchor': 'end',
-    'font-size': 16, 'font-weight': 'bold', fill: '#7c2410',
+    'font-size': 16, 'font-weight': 'bold', fill: '#244c5a',
   }));
   parts.push(`<use xlink:href="#fish" x="${(PAY_CX + 2).toFixed(2)}" y="${(payTitleY - payFishH * 0.82).toFixed(2)}" width="${payFishW}" height="${payFishH}"/>`);
   const payArrY = TOPBOX_Y + 88;
-  parts.push(`<line x1="${(PAY_CX - 32).toFixed(1)}" y1="${payArrY}" x2="${(PAY_CX + 28).toFixed(1)}" y2="${payArrY}" stroke="#7c2410" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow-red)"/>`);
+  parts.push(`<line x1="${(PAY_CX - 32).toFixed(1)}" y1="${payArrY}" x2="${(PAY_CX + 28).toFixed(1)}" y2="${payArrY}" stroke="#244c5a" stroke-width="2.5" stroke-linecap="round" marker-end="url(#arrow)"/>`);
   parts.push(`</g>`);
 
   parts.push(`</svg>`);
