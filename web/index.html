@@ -1593,7 +1593,7 @@
     <div class="optional-rules-title">Optional Rules</div>
     <label><input type="checkbox" id="use-starters" checked> Use species starter cards</label>
     <label title="When on, every player may pool any two cards into one auction (pay the pricier card's trigger; bill items at the pricier rate). Winners place each clinched worker on whichever of the two cards they need more; both cards then float downriver.">
-      <input type="checkbox" id="opt-double-vision"> allow double-card auctions (faster game)
+      <input type="checkbox" id="opt-double-vision"> allow double-card auctions (experimental)
     </label>
   </div>
   <div class="setup-row">
@@ -3771,13 +3771,13 @@ function renderActionPanel() {
   } else if (state.phase === 'browse-N') {
     html = `<div class="action-panel-title">Draw structure cards — how many?</div>
       <div class="bid-slider-row">
-        <span class="small-note">1</span>
-        <input id="browse-n" class="bid-slider" type="range" min="1" max="5" value="1"
+        <span class="small-note">2</span>
+        <input id="browse-n" class="bid-slider" type="range" min="2" max="5" value="2"
                oninput="document.getElementById('browse-n-current').textContent = this.value; document.getElementById('browse-cross-warn').innerHTML = humanCrossWarnHTML(Number(this.value));">
         <span class="small-note">5</span>
-        <div id="browse-n-current" class="bid-current">1</div>
+        <div id="browse-n-current" class="bid-current">2</div>
       </div>
-      <div id="browse-cross-warn">${humanCrossWarnHTML(1)}</div>
+      <div id="browse-cross-warn">${humanCrossWarnHTML(2)}</div>
       <div class="action-buttons" style="margin-top:8px;">
         <button class="primary" onclick="humanConfirmBrowseN()">Draw N, then discard N</button>
         <button class="ghost" onclick="humanUndoLastMove()">↶ Undo</button>
@@ -5093,10 +5093,12 @@ function aiChooseAction(playerIdx) {
     return { type: 'flush' };
   }
 
-  // 5) Last resort: browse if possible (unless pair-VP cash-out beats it)
+  // 5) Last resort: browse if possible (unless pair-VP cash-out beats it).
+  // Min Invent is 2 fish (2026-06-20 rule): idle Inventing advances 2/turn, so
+  // a stranded player reaches the finish line faster — fewer boring trailing turns.
   if (cashOut) return { type: 'pass' };
   if (structAvailable(state) > 0) {
-    const N = Math.min(1, structAvailable(state));
+    const N = Math.min(2, structAvailable(state));
     return { type: 'browse', n: N };
   }
 

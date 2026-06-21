@@ -106,6 +106,13 @@ function setForcedSpeciesStarter(map) { FORCED_SPECIES_STARTER = map; }
 let USE_SPECIES_STARTERS = true;
 function setUseSpeciesStarters(b) { USE_SPECIES_STARTERS = b; }
 
+// Minimum fish a player must spend (cards drawn) when Inventing. Live rule = 2
+// (2026-06-20): an idle player Inventing to kill time advances 2 fish/turn
+// instead of 1, halving the boring end-game trailing turns (and the repetitive
+// Invent count) with no build cost — see the tune-invent sweep / board-games.org.
+let MIN_INVENT_N = 2;
+function setMinInventN(n) { MIN_INVENT_N = n; }
+
 // AI draft preference for species starters (higher = more attractive). Plain
 // per-name weights — keeps the species-draft decision local and avoids
 // pulling in aiEffectValue's full machinery.
@@ -1989,7 +1996,7 @@ function aiChooseAction(state, playerIdx) {
 
   if (totalNeed === 0 || p.hand.length === 0) {
     if (cashOut) return { type: 'pass' };
-    if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(2, structAvailable(state)) };
+    if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(Math.max(MIN_INVENT_N, 2), structAvailable(state)) };
   }
   const upstreamHasNeeded = state.prerivCards.some(c => c && needs[c.material] > 0);
   const upstreamHasAny = state.prerivCards.some(c => c !== null);
@@ -2000,7 +2007,7 @@ function aiChooseAction(state, playerIdx) {
     return { type: 'flush' };
   }
   if (cashOut) return { type: 'pass' };
-  if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(1, structAvailable(state)) };
+  if (structAvailable(state) > 0) return { type: 'browse', n: Math.min(Math.max(MIN_INVENT_N, 1), structAvailable(state)) };
   return { type: 'pass' };
 }
 
@@ -6097,6 +6104,220 @@ function sweepTuneDead(numGamesArg, lineArg, seatsArg) {
   console.log('  ≥3 trail% = share of games where some player sat through ≥3 dead trailing turns.\n');
 }
 
+// Double Vision impact at the final live settings (fishLine 119, baseline deck,
+// 8/8/7 workers, asym ON). Double Vision is the "Optional Rules" card that grants
+// the combined two-card auction (any/max/max) to ALL players. Compares DV off vs
+// on across the same panel we tuned on: length, builds, scoring, auction quality,
+// boredom, and how often the combined auction actually fires.
+function sweepTuneDV(numGamesArg, lineArg) {
+  const numGames = parseInt(numGamesArg) || 5000;
+  const line = parseInt(lineArg) || 119;
+  const DECK = { always: [5, 7], tier3: [4], tier4: [8] };
+  configureMaterials(6);
+  console.log(`\nRiver Bankers — Double Vision impact  (${numGames} games each, fishLine ${line}, baseline deck, asym ON)`);
+  console.log(`Double Vision grants the combined two-card auction (any/max/max) to ALL players.`);
+  console.log(`(DV off still has some combined auctions from the Confluence structure card.)`);
+  console.log(`med60 = median minutes @60s/turn; deadTrail = mean per-game worst-player idle trailing turns.\n`);
+  console.log(
+    pad('config', 11) + padL('med60', 7) + padL('built/P', 9) + padL('avgVP', 8) + padL('spread', 8) +
+    padL('jam%', 7) + padL('deadAuc%', 10) + padL('deadTrail', 11) + padL('cmb/g', 8)
+  );
+  console.log('-'.repeat(11 + 7 + 9 + 8 + 8 + 7 + 10 + 11 + 8));
+  for (const numP of [2, 3, 4]) {
+    const workers = defaultWorkersPerPlayer(numP);
+    for (const dv of [false, true]) {
+      setUseSpeciesStarters(true);
+      setDeckTuning(DECK);
+      setDoubleVisionActive(dv);
+      let sJam = 0, sDead = 0, sAuc = 0, sBuilt = 0, sCmb = 0, sVP = 0, sSpread = 0, sTrail = 0;
+      const turnsArr = [];
+      for (let g = 0; g < numGames; g++) {
+        const state = newGame(numP, workers);
+        state._engage = { last: new Array(numP).fill(-1), ownTurns: Array.from({ length: numP }, () => []), frozen: false };
+        egPlayOut(state, 'fish', 0, line, 'd');
+        const m = state.metrics;
+        sJam += m.jamAuctions; sDead += m.zeroClinchAuctions; sAuc += m.auctions;
+        sBuilt += m.cardsBuilt; sCmb += m.combinedAuctions;
+        const vps = state.players.map(p => totalVP(p, state));
+        sVP += vps.reduce((a, b) => a + b, 0) / vps.length;
+        sSpread += Math.max(...vps) - Math.min(...vps);
+        turnsArr.push(m.turns);
+        let worst = 0;
+        for (let i = 0; i < numP; i++) {
+          const d = state._engage.ownTurns[i].filter(t => t > state._engage.last[i]).length;
+          if (d > worst) worst = d;
+        }
+        sTrail += worst;
+      }
+      turnsArr.sort((a, b) => a - b);
+      console.log(
+        pad(`${numP}P ${dv ? 'DV on' : 'DV off'}`, 11) +
+        padL(pctl(turnsArr, 0.5).toFixed(0), 7) +
+        padL((sBuilt / numP / numGames).toFixed(2), 9) +
+        padL((sVP / numGames).toFixed(1), 8) +
+        padL((sSpread / numGames).toFixed(1), 8) +
+        padL(pct(sJam, sAuc).toFixed(1) + '%', 7) +
+        padL(pct(sDead, sAuc).toFixed(1) + '%', 10) +
+        padL((sTrail / numGames).toFixed(2), 11) +
+        padL((sCmb / numGames).toFixed(2), 8)
+      );
+    }
+    console.log();
+  }
+  setDoubleVisionActive(false);
+  console.log('Legend:');
+  console.log('  med60   = median game length, minutes @60s/turn;  built/P = mean structures built per player.');
+  console.log('  avgVP/spread = mean final VP across players / mean (winner − loser) VP.');
+  console.log('  jam%    = % of auctions over-bid; deadAuc% = % where nobody clinched an icon.');
+  console.log('  deadTrail = mean worst-player idle trailing turns; cmb/g = combined auctions per game.\n');
+}
+
+// "Double Vision as a structure card" valuation: measures the builder ΔVP of the
+// combined-auction ability (any/max/max) given to ONE builder, under the live
+// fish-line endgame at `line`, at 2P/3P/4P. Confluence's own config (same/min/min)
+// is shown for reference (it's a built structure costing 4 materials / time 3 /
+// printed VP 5). effectVP = avgVP(builder, effect on) − avgVP(builder, effect off).
+// Cost heuristic (sweepBalance): 1 material = 1.0 VP, 1 time = 0.3 VP; a fair card
+// has printed VP + effectVP = costEquiv, i.e. fairVP@cost = costEquiv − effectVP.
+function sweepTuneDVCard(numGamesArg, lineArg) {
+  const numGames = parseInt(numGamesArg) || 5000;
+  const line = parseInt(lineArg) || 119;
+  const DECK = { always: [5, 7], tier3: [4], tier4: [8] };
+  const CONFLUENCE_MATS = 4, CONFLUENCE_TIME = 3;
+  const confluenceCostEq = CONFLUENCE_MATS * 1.0 + CONFLUENCE_TIME * 0.3; // 4.9
+  configureMaterials(6);
+
+  function builderVP(numP, workers, cfg, effectOn) {
+    setUseSpeciesStarters(true);
+    setDeckTuning(DECK);
+    setDoubleVisionActive(false);
+    clearCombinedAuctionConfig();
+    if (effectOn) {
+      delete STRUCTURE_EFFECT_DISABLED['Confluence'];
+      setCombinedAuctionPairing(cfg.pairing);
+      setCombinedAuctionTriggerMode(cfg.trig);
+      setCombinedAuctionCostMode(cfg.item);
+    } else {
+      STRUCTURE_EFFECT_DISABLED['Confluence'] = true;
+    }
+    let builders = 0, vpSum = 0, combined = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      egPlayOut(state, 'fish', 0, line, 'd');
+      combined += state.metrics.combinedAuctions;
+      for (const p of state.players) {
+        if (p.built.some(s => s.name === 'Confluence')) { builders++; vpSum += totalVP(p, state); }
+      }
+    }
+    delete STRUCTURE_EFFECT_DISABLED['Confluence'];
+    clearCombinedAuctionConfig();
+    return { avgVP: builders ? vpSum / builders : NaN, builders, fires: builders ? combined / builders : NaN };
+  }
+
+  console.log(`\nRiver Bankers — combined-auction ability as a structure card  (${numGames} games each, fishLine ${line}, baseline deck, asym ON)`);
+  console.log(`effectVP = builder avgVP (effect on − off); the ability granted to the builder only (not all players).`);
+  console.log(`Cost heuristic: 1 material = 1.0 VP, 1 time = 0.3 VP. fairVP = (cost VP-equiv) − effectVP for a net-0 card.`);
+  console.log(`Reference cost = Confluence's 4 materials + time 3 = ${confluenceCostEq.toFixed(1)} VP-equiv.\n`);
+
+  const CFGS = [
+    { name: 'Confluence  (same/min/min)', cfg: { pairing: 'same', trig: 'min', item: 'min' } },
+    { name: 'DoubleVision (any/max/max)', cfg: { pairing: 'any', trig: 'max', item: 'max' } },
+  ];
+  for (const { name, cfg } of CFGS) {
+    console.log(`--- ${name} ---`);
+    console.log(pad('count', 7) + padL('builders', 9) + padL('onVP', 8) + padL('offVP', 8) +
+      padL('effectVP', 9) + padL('fires/bld', 11) + padL('net@VP5', 9) + padL('fairVP@4.9', 11));
+    console.log('-'.repeat(7 + 9 + 8 + 8 + 9 + 11 + 9 + 11));
+    let effSum = 0, n = 0;
+    for (const numP of [2, 3, 4]) {
+      const workers = defaultWorkersPerPlayer(numP);
+      const on = builderVP(numP, workers, cfg, true);
+      const off = builderVP(numP, workers, cfg, false);
+      const eff = on.avgVP - off.avgVP;
+      effSum += eff; n++;
+      const net = 5 + eff - confluenceCostEq;          // net if printed VP were 5 at Confluence's cost
+      const fairVP = confluenceCostEq - eff;            // printed VP for a net-0 card at that cost
+      console.log(
+        pad(`${numP}P`, 7) + padL(String(on.builders), 9) +
+        padL(on.avgVP.toFixed(2), 8) + padL(off.avgVP.toFixed(2), 8) +
+        padL((eff >= 0 ? '+' : '') + eff.toFixed(2), 9) +
+        padL(on.fires.toFixed(2), 11) +
+        padL((net >= 0 ? '+' : '') + net.toFixed(2), 9) +
+        padL(fairVP.toFixed(1), 11)
+      );
+    }
+    console.log(`  mean effectVP across counts: ${(effSum / n).toFixed(2)}\n`);
+  }
+  console.log('Legend:');
+  console.log('  onVP/offVP = mean final VP of players who built the card, effect on / off.');
+  console.log('  effectVP   = on − off, the ability\'s VP contribution to the builder.');
+  console.log('  fires/bld  = combined auctions per builder (how much they use it).');
+  console.log('  net@VP5    = printed-5 card balance at cost 4.9 (printed + effect − costEq); ~0 = fair.');
+  console.log('  fairVP@4.9 = printed VP that makes the card net-0 at a Confluence-like 4-material/time-3 cost.\n');
+}
+
+// Minimum-Invent-cost sweep: compares the live "Invent ≥ 1 fish" rule against
+// "Invent ≥ 2 fish" at the final settings (fishLine 119, baseline deck, 8/8/7
+// workers, asym ON). The idle end-game Invent is the main source of boring
+// trailing turns; forcing ≥2 fish advances stranded pawns to the line faster.
+// Reports game length + the dead-trail (boredom) metric + builds (side effect).
+function sweepTuneInvent(numGamesArg, lineArg) {
+  const numGames = parseInt(numGamesArg) || 5000;
+  const line = parseInt(lineArg) || 119;
+  const DECK = { always: [5, 7], tier3: [4], tier4: [8] };
+  configureMaterials(6);
+  console.log(`\nRiver Bankers — minimum Invent cost  (${numGames} games each, fishLine ${line}, baseline deck, asym ON)`);
+  console.log(`Compares Invent ≥1 fish (live) vs ≥2 fish. med = median minutes; dead-trail = end-of-game`);
+  console.log(`turns a player takes with no bid/build (the boring trailing turns).\n`);
+  console.log(
+    pad('config', 13) + padL('med45', 7) + padL('med60', 7) + padL('built/P', 9) +
+    padL('trail/P', 9) + padL('worstTrail', 11) + padL('inv/g', 7)
+  );
+  console.log('-'.repeat(13 + 7 + 7 + 9 + 9 + 11 + 7));
+  for (const numP of [2, 3, 4]) {
+    const workers = defaultWorkersPerPlayer(numP);
+    for (const minInv of [1, 2]) {
+      setUseSpeciesStarters(true);
+      setDeckTuning(DECK);
+      setDoubleVisionActive(false);
+      setMinInventN(minInv);
+      const turnsArr = [], perPlayerTrail = [], worstPerGame = [];
+      let sInv = 0, sBuilt = 0;
+      for (let g = 0; g < numGames; g++) {
+        const state = newGame(numP, workers);
+        state._engage = { last: new Array(numP).fill(-1), ownTurns: Array.from({ length: numP }, () => []), frozen: false };
+        egPlayOut(state, 'fish', 0, line, 'd');
+        sInv += state.metrics.invents; sBuilt += state.metrics.cardsBuilt;
+        turnsArr.push(state.metrics.turns);
+        let worst = 0;
+        for (let i = 0; i < numP; i++) {
+          const d = state._engage.ownTurns[i].filter(t => t > state._engage.last[i]).length;
+          perPlayerTrail.push(d);
+          if (d > worst) worst = d;
+        }
+        worstPerGame.push(worst);
+      }
+      turnsArr.sort((a, b) => a - b);
+      console.log(
+        pad(`${numP}P inv≥${minInv}`, 13) +
+        padL((pctl(turnsArr, 0.5) * 45 / 60).toFixed(0), 7) +
+        padL(pctl(turnsArr, 0.5).toFixed(0), 7) +
+        padL((sBuilt / numP / numGames).toFixed(2), 9) +
+        padL(avg(perPlayerTrail).toFixed(2), 9) +
+        padL(avg(worstPerGame).toFixed(2), 11) +
+        padL((sInv / numGames).toFixed(1), 7)
+      );
+    }
+    console.log();
+  }
+  setMinInventN(2);
+  console.log('Legend:');
+  console.log('  med45/med60 = median game length in minutes at 45 / 60 s per turn.');
+  console.log('  built/P     = mean structures built per player (watch for a hand-cycling side effect).');
+  console.log('  trail/P     = mean dead trailing turns per player; worstTrail = mean per-game worst player.');
+  console.log('  inv/g       = mean Invent actions per game.\n');
+}
+
 function sweepFishline(numGamesArg, numPArg) {
   const numGames = parseInt(numGamesArg) || 2000;
   const numPArgInt = parseInt(numPArg);
@@ -6187,5 +6408,8 @@ if (require.main === module) {
   else if (mode === 'tune-target') sweepTuneTarget(process.argv[3], process.argv[4]);
   else if (mode === 'tune-jam') sweepTuneJam(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'tune-dead') sweepTuneDead(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'tune-dv') sweepTuneDV(process.argv[3], process.argv[4]);
+  else if (mode === 'tune-dvcard') sweepTuneDVCard(process.argv[3], process.argv[4]);
+  else if (mode === 'tune-invent') sweepTuneInvent(process.argv[3], process.argv[4]);
   else sweep();
 }

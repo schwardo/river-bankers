@@ -460,26 +460,17 @@ function buildSvg() {
     fill: '#fff',
     stroke: '#244c5a', 'stroke-width': 1.8,
   }));
-  // Vertical content layout, derived so padding above the INVENT title
-  // equals padding below the chip row.
-  //   • title cap-top  at INVENT_Y + PAD
-  //   • title baseline at INVENT_Y + PAD + 16   (~cap-height of 20px font)
-  //   • gap to labels                + 8
-  //   • label baseline                + 11
-  //   • gap to chip top              + 6
-  //   • chip glyph height            + 25       (portrait card height)
-  //   • PAD
-  // total = 96 = 2*PAD + 66 → PAD = 15
-  const PAD = 15;
-  const titleBaseY = INVENT_Y + PAD + 16;
-  const labelBaseY = titleBaseY + 8 + 11;
-  const rowY = labelBaseY + 6 + 12;    // chip vertical center
-  parts.push(text({
-    x: INVENT_X + INVENT_W / 2, y: titleBaseY,
-    content: 'INVENT',
-    'text-anchor': 'middle', 'font-size': 20, 'font-weight': 'bold',
-    fill: '#244c5a', 'letter-spacing': '3',
-  }));
+  // Title row: "INVENT" with the "(choose N from 2–5)" range inline; the label
+  // row + chip row are centered below (box height 96).
+  const titleBaseY = INVENT_Y + 31;
+  const labelBaseY = INVENT_Y + 50;
+  const rowY = INVENT_Y + 68;          // chip vertical center
+  parts.push(
+    `<text x="${INVENT_X + INVENT_W / 2}" y="${titleBaseY}" text-anchor="middle" font-weight="bold" fill="#244c5a">` +
+    `<tspan font-size="20" letter-spacing="3">INVENT</tspan>` +
+    `<tspan font-size="13" font-style="italic" fill="#5a4a36"> (choose N from 2 – 5)</tspan>` +
+    `</text>`
+  );
   // Description row: PAY N🐟 → DRAW N(card) → DISCARD N(card)
   const chipFont = 22;
   // Chip widths are eyeballed to fit the box; centers placed evenly.
