@@ -2654,6 +2654,16 @@ function startGame() {
     }
   }
 
+  // Randomize the starting stack order (rulebook: "the last player to cross a
+  // river goes first" — there's no canonical seat order in a digital game, so we
+  // shuffle). All pawns start tied at space 0, so the top of this stack takes the
+  // first turn and the rest of the order breaks subsequent ties (Fisher–Yates).
+  const stackOrder = players.map((_, i) => i);
+  for (let i = stackOrder.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [stackOrder[i], stackOrder[j]] = [stackOrder[j], stackOrder[i]];
+  }
+
   // No starting river cards — the river populates as cards are pulled out of the upstream queue.
   const riverCards = [];
 
@@ -2678,8 +2688,9 @@ function startGame() {
     structDiscard: [],
     log: [],
     // turn-order stack: list of player indices, top of stack acts first when tied
-    // We model "stacked at space 0 with first player on top": stackOrder = [0,1,2,..]
-    stackOrder: players.map((_, i) => i),
+    // We model "stacked at space 0 with first player on top": stackOrder is the
+    // shuffled order computed above, so the first turn goes to a random player.
+    stackOrder,
     currentPlayer: 0,
     gameOver: false,
     phase: 'idle',

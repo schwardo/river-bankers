@@ -977,6 +977,14 @@ function newGame(numPlayers, workersPerPlayer = null) {
     c.slot = 'pre';
     prerivCards[i] = c;
   }
+  // Random starting stack order (rulebook: "last player to cross a river goes
+  // first"). All pawns start tied at space 0, so the stack top takes turn 1 —
+  // randomizing it keeps first-player advantage from biasing win-rate ablations.
+  const stackOrder = players.map((_, i) => i);
+  for (let i = stackOrder.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [stackOrder[i], stackOrder[j]] = [stackOrder[j], stackOrder[i]];
+  }
   return {
     players,
     riverCards: [],
@@ -985,7 +993,7 @@ function newGame(numPlayers, workersPerPlayer = null) {
     matDeck,
     structDeck,
     structDiscard: [],
-    stackOrder: players.map((_, i) => i),
+    stackOrder,
     currentPlayer: 0,
     gameOver: false,
     shadowedBy: {},
@@ -4624,6 +4632,106 @@ function sweepSpeciesWinRate(numGamesArg, numPArg, workersArg) {
   console.log('  starter mix = top-2 starter cards drafted by AI for that species + %\n');
 }
 
+// Fairness audit: in one sweep, measure win rate by (a) initial turn-order seat
+// (stack position 0 = first player) and (b) species. Both should sit at the
+// uniform baseline 100/numP within noise. Reports a 95% CI half-width per cell
+// (≈1.96·√(p(1−p)/n)); a |Δ base| larger than its CI is a real, not-noise edge.
+function sweepFairness(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || 8;
+  const numGames = parseInt(numGamesArg) || 20000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
+        const passed = action.type === 'pass';
+        if (reachedEnd || passed) p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  // seat[k] = stats for the player who started k-th in turn order (k=0 first).
+  const seat = Array.from({ length: numP }, () => ({ games: 0, wins: 0, totalVP: 0 }));
+  const spc = {};
+  for (const sp of SPECIES_KEYS) spc[sp] = { games: 0, wins: 0, totalVP: 0 };
+
+  console.log(`\nRiver Bankers fairness audit (turn order + species)`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games.`);
+  console.log(`Baseline: 1/${numP} = ${(100 / numP).toFixed(1)}% each; |Δ| beyond its 95% CI is a real edge.\n`);
+
+  const t0 = Date.now();
+  for (let g = 0; g < numGames; g++) {
+    if ((g + 1) % 1000 === 0) process.stderr.write(`\rGames ${g + 1}/${numGames}`);
+    const state = newGame(numP, workers);
+    const startStack = state.stackOrder.slice(); // snapshot before play reorders it
+    const startPosOf = {};                         // player idx -> initial seat (0=first)
+    startStack.forEach((idx, pos) => { startPosOf[idx] = pos; });
+    runOneGame(state);
+    const scored = state.players.map(p => ({
+      idx: p.idx, species: p.species, vp: totalVP(p, state), timePos: p.timePos,
+    }));
+    scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+    const winner = scored[0];
+    for (const s of scored) {
+      const pos = startPosOf[s.idx];
+      seat[pos].games += 1; seat[pos].totalVP += s.vp;
+      spc[s.species].games += 1; spc[s.species].totalVP += s.vp;
+    }
+    seat[startPosOf[winner.idx]].wins += 1;
+    spc[winner.species].wins += 1;
+  }
+  process.stderr.write('\r' + ' '.repeat(60) + '\r');
+
+  const baseline = 100 / numP;
+  const ordinal = ['1st (first)', '2nd', '3rd', '4th'];
+  const printRow = (label, t) => {
+    const winPct = t.games > 0 ? (100 * t.wins / t.games) : 0;
+    const p = winPct / 100;
+    const ci = t.games > 0 ? 100 * 1.96 * Math.sqrt(p * (1 - p) / t.games) : 0;
+    const delta = winPct - baseline;
+    const sig = Math.abs(delta) > ci ? '  <- exceeds CI' : '';
+    const avgVP = t.games > 0 ? (t.totalVP / t.games) : 0;
+    console.log(
+      pad(label, 14) + padL(t.games, 8) + padL(t.wins, 8) +
+      padL(winPct.toFixed(1) + '%', 8) +
+      padL('±' + ci.toFixed(1), 8) +
+      padL((delta >= 0 ? '+' : '') + delta.toFixed(1), 9) +
+      padL(avgVP.toFixed(1), 8) + sig
+    );
+  };
+
+  const header = pad('', 14) + padL('games', 8) + padL('wins', 8) + padL('win%', 8) + padL('95%CI', 8) + padL('Δ base', 9) + padL('avgVP', 8);
+  console.log('TURN ORDER (initial stack position)');
+  console.log(header);
+  console.log('-'.repeat(63));
+  for (let k = 0; k < numP; k++) printRow(ordinal[k] || `${k + 1}th`, seat[k]);
+  console.log('\nSPECIES');
+  console.log(header);
+  console.log('-'.repeat(63));
+  for (const sp of SPECIES_KEYS) printRow(sp, spc[sp]);
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  win%   = wins / games-played for that seat or species (ties broken by lower fish total).');
+  console.log('  95%CI  = half-width of the 95% confidence interval on win%.');
+  console.log('  Δ base = win% minus uniform baseline (100/numP). |Δ| > CI ⇒ a real edge, not noise.\n');
+}
+
 // totalVP_ alias (the local `totalVP` accumulator inside the next function
 // shadows the global totalVP function, so we grab a fresh reference here).
 const totalVP_ = totalVP;
@@ -6392,6 +6500,7 @@ if (require.main === module) {
   else if (mode === 'balance') sweepBalance(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'game-length') sweepGameLength(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-winrate') sweepSpeciesWinRate(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'fairness') sweepFairness(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-starters') sweepSpeciesStarters(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'river-slots') sweepRiverSlots();
   else if (mode === 'blanks') sweepBlanks();
