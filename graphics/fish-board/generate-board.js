@@ -533,35 +533,36 @@ function buildSvg() {
     'font-size': 16, 'font-weight': 'bold', fill: '#244c5a', 'letter-spacing': '0.3',
   }));
   parts.push(`<line x1="${LEGEND_X + 14}" y1="${LEGEND_Y + 32}" x2="${LEGEND_X + LEGEND_W - 14}" y2="${LEGEND_Y + 32}" stroke="#244c5a" stroke-width="1" opacity="0.4"/>`);
-  // Uniform finish line across all player counts (2026-06-20 turn-clock re-tune):
-  // the game ends once ALL players reach 119 fish (board space 59 on the "+60"
-  // lap side). Line 3 states the no-shared-finish-space retire rule.
+  // Climbing finish line per player count (2026-06-22 organic-ending re-tune):
+  // 2P=89, 3P=109, 4P=119 fish (all on the "+60" lap-2 side). Line "deck empty"
+  // states the auto-advance drift; last line is the no-shared-space retire rule.
   const egCx = LEGEND_X + LEGEND_W / 2;
   parts.push(text({
-    x: egCx, y: LEGEND_Y + 54, content: 'all players reach',
-    'text-anchor': 'middle', 'font-size': 14, 'font-style': 'italic', fill: '#5a4a36',
+    x: egCx, y: LEGEND_Y + 48, content: 'all players cross the finish line',
+    'text-anchor': 'middle', 'font-size': 12.5, 'font-style': 'italic', fill: '#5a4a36',
   }));
-  // Line 2: big "119 🐟", then a smaller "(59 🐟 +60)" board-position note.
-  const egLineY = LEGEND_Y + 78;
-  const big = 19, sm = 12;
-  const wBig  = big * 0.62 * 3 + big * 0.18 + big * 1.35;   // "119" + fish
-  const wSm59 = sm * 0.62 * 2 + sm * 0.18 + sm * 1.35;      // "59" + fish
-  const wParen = 6, wBadge = 20, gapAB = 12, gapFB = 6, gapBC = 8;
-  const egTotalW = wBig + gapAB + wParen + wSm59 + gapFB + wBadge + gapBC + wParen;
-  let egCur = egCx - egTotalW / 2;
-  parts.push(fishGroup(egCur + wBig / 2, egLineY, '119', big, '#5a3a00'));
-  egCur += wBig + gapAB;
-  parts.push(text({ x: egCur, y: egLineY + sm * 0.32, content: '(', 'text-anchor': 'start', 'font-size': 16, fill: '#5a4a36' }));
-  egCur += wParen;
-  parts.push(fishGroup(egCur + wSm59 / 2, egLineY, '59', sm, '#5a4a36'));
-  egCur += wSm59 + gapFB;
-  parts.push(plus60Badge(egCur + wBadge / 2, egLineY, wBadge / 2));
-  egCur += wBadge + gapBC;
-  parts.push(text({ x: egCur, y: egLineY + sm * 0.32, content: ')', 'text-anchor': 'start', 'font-size': 16, fill: '#5a4a36' }));
-  // Line 3: the retire / no-shared-space rule.
+  // Per-count finish lines as one centered bold line with a trailing fish icon.
+  const egLineY = LEGEND_Y + 70;
+  const egLabel = '2P 89 · 3P 109 · 4P 119';
+  const lblSize = 16;
+  const lblW = egLabel.length * lblSize * 0.44;
+  const fishSz = 17;
+  const grpW = lblW + 7 + fishSz * 1.1;
+  const grpX0 = egCx - grpW / 2;
   parts.push(text({
-    x: egCx, y: LEGEND_Y + 109, content: 'RETIRE: jump to next open spot after 119',
-    'text-anchor': 'middle', 'font-size': 12.5, 'font-weight': 'bold', fill: '#244c5a',
+    x: grpX0, y: egLineY + lblSize * 0.32, content: egLabel,
+    'text-anchor': 'start', 'font-size': lblSize, 'font-weight': 'bold', fill: '#5a3a00',
+  }));
+  parts.push(`<use xlink:href="#fish" x="${(grpX0 + lblW + 7).toFixed(2)}" y="${(egLineY - fishSz / 2).toFixed(2)}" width="${(fishSz * 1.1).toFixed(2)}" height="${fishSz.toFixed(2)}"/>`);
+  // Deck-empty auto-advance drift.
+  parts.push(text({
+    x: egCx, y: LEGEND_Y + 91, content: 'material deck empty → drift +1 fish / turn',
+    'text-anchor': 'middle', 'font-size': 11.5, fill: '#5a4a36',
+  }));
+  // Retire / no-shared-space rule.
+  parts.push(text({
+    x: egCx, y: LEGEND_Y + 111, content: 'RETIRE: jump to next open spot at the line',
+    'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 'bold', fill: '#244c5a',
   }));
   parts.push(`</g>`);
 

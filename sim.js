@@ -441,13 +441,24 @@ const ENDGAME_TRACK_END = 59;
 // deck-empty endgame; egPlayOut raises it to the per-count fish line during the
 // fish-line endgame so abilities keep firing through a 90/120-fish race.
 let SIM_FINISH_LINE = ENDGAME_TRACK_END;
-// Uniform 119 for every count (2026-06-20 turn-clock re-tune, board-games.org):
-// under the web 30s/turn timing model the old climbing 59/89/119 lines ran far
-// too short at 2P/3P (~12/18 min). More players ⇒ more turns per fish-space, so
-// a flat line centres all three (~40-54 min @45-60s/turn for 2P/3P; 4P longer).
-// 119 = lap-2 space 59 — one "+60" chit flip, the same finish marker for all counts.
-const FISH_LINE_BY_COUNT = { 2: 119, 3: 119, 4: 119 };
+// Climbing line 89/109/119 for 2P/3P/4P (2026-06-22 organic-ending re-tune,
+// board-games.org). The uniform 119 was calibrated to the LEADER's fish at
+// deck-empty, but the game runs past deck-empty, so at 2P uniform 119 ended ~38%
+// of games on the checkGameEnd board-exhaustion backstop rather than organically
+// (pawns crossing the line). The natural board-exhaustion depth scales with
+// player count (laggard median ~130/169/210 for 2/3/4P), so the line must climb:
+// 89/109/119 lands each count below its exhaustion depth (~0-6% backstop) while
+// keeping reasonable builds/VP. Paired with AUTO_ADVANCE_DECK_EMPTY below, which
+// erases the residual 2P backstop. (See `node sim.js fishline-end` diagnostic.)
+const FISH_LINE_BY_COUNT = { 2: 89, 3: 109, 4: 119 };
 function simFishLine(numP) { return FISH_LINE_BY_COUNT[numP] || 30 * numP; }
+
+// Live endgame-speedup rule: once the material deck is empty, the active player
+// advances 1 extra fish at the end of their turn, pushing pawns toward the line
+// so the dead-board tail can't drag (and converting would-be backstop endings
+// into organic line-crossings). Default on; toggled off only for rule sweeps.
+let AUTO_ADVANCE_DECK_EMPTY = true;
+function setAutoAdvanceDeckEmpty(b) { AUTO_ADVANCE_DECK_EMPTY = b; }
 const UPSTREAM_AUCTION_COST = 1;
 const MAX_TURNS = 2000; // safety net
 
@@ -5589,6 +5600,11 @@ function egPlayOut(state, trigger, vpLimit, fishLimit, proc) {
       executeAction(state, p.idx, action);
       cleanupShoreline(state);
       maybeFireSlipstream(state, p.idx);
+      // Deck-empty auto-advance (live rule): nudge the active player toward the
+      // line once the material deck is dry, so the tail can't drag.
+      if (AUTO_ADVANCE_DECK_EMPTY && trigger === 'fish' && state.matDeck.length === 0 && !p.out) {
+        advancePlayer(state, p.idx, 1);
+      }
       if (checkGameEnd(state)) break;
     }
     // Freeze engagement tracking before the coda: the coda is a structured
@@ -5886,7 +5902,7 @@ function sweepTune(numGamesArg) {
   console.log(pad('', 14) + padL('2P', 8) + padL('3P', 8) + padL('4P', 8));
   console.log(pad('asym ON', 14) + padL(recommend.on[2], 8) + padL(recommend.on[3], 8) + padL(recommend.on[4], 8));
   console.log(pad('asym OFF', 14) + padL(recommend.off[2], 8) + padL(recommend.off[3], 8) + padL(recommend.off[4], 8));
-  console.log(`  (current live FISH_LINE_BY_COUNT = { 2:59, 3:89, 4:119 })`);
+  console.log(`  (current live FISH_LINE_BY_COUNT = { 2:89, 3:109, 4:119 })`);
 
   // ---- PASS 2: JOINT (fish-line × material-card player-limit) optimum ----
   // The two levers interact: a fish line set so high that the material deck
@@ -6498,6 +6514,225 @@ function sweepFishline(numGamesArg, numPArg) {
   console.log('  openIcn  = mean uncovered (open) icon spots across river cards at game end.\n');
 }
 
+// =============================================================================
+// FISH-LINE ENDING DIAGNOSTIC (fishline-end)
+// =============================================================================
+// Q (2026-06-21): the uniform 119 fish line was calibrated to the LEADER's fish
+// at deck-empty (egCalibrate), but the game runs well past deck-empty, so the
+// laggards' ending is actually driven by the checkGameEnd board-exhaustion
+// backstop ("no card has open icons, nobody can build"), not by pawns crossing
+// the line. We want a fish value where the game ends ORGANICALLY (all pawns
+// cross the line) WITHOUT getting near that backstop — i.e. without players
+// pass-grinding 1 fish/turn through a dead board to reach the line.
+//
+// This diagnostic measures, per player count:
+//   Part A — natural exhaustion depth: with the fish line disabled (huge), play
+//            to the backstop and record where pawns are (cumulative fish) when
+//            the board genuinely dies. That's the ceiling: any line at/above the
+//            laggard's depth means the board dies before the slowest pawn arrives.
+//   Part B — for a range of candidate lines, the split between FISH-trigger and
+//            BACKSTOP endings, the late pass-grind, and the board life remaining
+//            at the end (open icons / deck). A good line: ~0% backstop, low grind,
+//            still-living board (openIcn > 0), reasonable builds/VP.
+//
+// "near the backstop" is flagged two ways: %backstop (game literally ended on
+// the exhaustion rule) and deadEnd% (even on a fish-trigger end, checkGameEnd
+// was ALSO true at that instant — the line fired exactly as the board died).
+
+// Instrumented fish-line playout (mirrors egPlayOut trigger='fish' + coda, but
+// records why the main phase ended, how much board life remained, and how many
+// pure pass-advances happened). Returns a metrics row; does NOT print.
+function instrFishPlayout(state, fishLimit, proc, autoAdvanceEmpty = false) {
+  const prevFinish = SIM_FINISH_LINE;
+  SIM_FINISH_LINE = fishLimit;
+  let endReason = 'maxturns';
+  let passes = 0;          // total 'pass' actions (1-fish grind with no build/auction)
+  try {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      for (const p of state.players) if (!p.out && p.timePos >= fishLimit) p.out = true;
+      if (state.players.every(p => p.out)) { endReason = 'fish'; break; }
+      const cur = pickNextPlayer(state);
+      if (cur === -1) { endReason = 'noplayer'; break; }
+      state.currentPlayer = cur;
+      state.metrics.turns++;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      if (action.type === 'pass') passes++;
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      maybeFireSlipstream(state, p.idx);
+      // Proposed endgame-speedup rule: once the material deck is empty, the
+      // active player advances 1 extra fish at the end of their turn, pushing
+      // pawns toward the line so the dead-board tail doesn't drag.
+      if (autoAdvanceEmpty && state.matDeck.length === 0 && !p.out) advancePlayer(state, p.idx, 1);
+      if (checkGameEnd(state)) { endReason = 'backstop'; break; }
+    }
+    // Board life remaining at the moment the main phase ended (pre-coda).
+    let openIcn = 0;
+    for (const c of state.riverCards) openIcn += uncoveredIcons(c);
+    const deadEnd = checkGameEnd(state); // true => line fired exactly as board died
+    const leadFish = Math.max(...state.players.map(p => p.timePos));
+    const lagFish = Math.min(...state.players.map(p => p.timePos));
+    egRunCoda(state, proc);
+    const vps = state.players.map(p => totalVP(p, state)).sort((a, b) => b - a);
+    return {
+      endReason, passes, openIcn, deadEnd, leadFish, lagFish,
+      matDeck: state.matDeck.length,
+      headwaters: state.prerivCards.filter(c => c !== null).length,
+      built: state.metrics.cardsBuilt,
+      auc: state.metrics.auctions,
+      invents: state.metrics.invents,
+      avgVP: vps.reduce((s, v) => s + v, 0) / vps.length,
+      spread: vps[0] - vps[vps.length - 1],
+    };
+  } finally {
+    SIM_FINISH_LINE = prevFinish;
+  }
+}
+
+function pctl(sorted, q) {
+  if (sorted.length === 0) return NaN;
+  const i = Math.min(sorted.length - 1, Math.max(0, Math.round(q * (sorted.length - 1))));
+  return sorted[i];
+}
+
+function sweepFishlineEnd(numGamesArg, numPArg) {
+  const numGames = parseInt(numGamesArg) || 1000;
+  const numPArgInt = parseInt(numPArg);
+  const playerCounts = numPArgInt ? [numPArgInt] : [2, 3, 4];
+  const numMats = 6;
+  const proc = 'd'; // live coda: one build each
+  const DISABLED = 100000;
+  const candidateLines = [60, 70, 80, 90, 100, 110, 119, 130, 140, 150];
+
+  console.log(`\nRiver Bankers — fish-line ENDING diagnostic  (${numGames} games/config, 6 materials, coda d)`);
+  console.log(`Goal: a line where the game ends by pawns crossing it (FISH), not by the`);
+  console.log(`checkGameEnd board-exhaustion backstop (BACKSTOP) or a dead-board pass-grind.\n`);
+
+  const tStart = Date.now();
+  for (const numP of playerCounts) {
+    const workers = defaultWorkersPerPlayer(numP);
+
+    // ---- Part A: natural exhaustion depth (line disabled) ----
+    const lagDepths = [], leadDepths = [];
+    for (let g = 0; g < numGames; g++) {
+      configureMaterials(numMats);
+      const state = newGame(numP, workers);
+      const r = instrFishPlayout(state, DISABLED, proc);
+      lagDepths.push(r.lagFish); leadDepths.push(r.leadFish);
+    }
+    lagDepths.sort((a, b) => a - b); leadDepths.sort((a, b) => a - b);
+    console.log(`=== ${numP}P (${workers} workers) ===`);
+    console.log(`Natural board-exhaustion depth (no fish line) — cumulative fish when checkGameEnd fires:`);
+    console.log(`  laggard (slowest pawn): p10 ${pctl(lagDepths,0.1)}  median ${pctl(lagDepths,0.5)}  mean ${avg(lagDepths).toFixed(1)}  p90 ${pctl(lagDepths,0.9)}`);
+    console.log(`  leader  (fastest pawn): p10 ${pctl(leadDepths,0.1)}  median ${pctl(leadDepths,0.5)}  mean ${avg(leadDepths).toFixed(1)}  p90 ${pctl(leadDepths,0.9)}`);
+    console.log(`  => a fish line at/above the laggard depth means the board dies before the slowest pawn arrives.\n`);
+
+    // ---- Part B: candidate-line sweep ----
+    console.log(
+      pad('fishLine', 9) + padL('%fish', 7) + padL('%back', 7) + padL('dead%', 7) +
+      padL('passes', 8) + padL('openIcn', 9) + padL('matDk', 7) +
+      padL('builds', 8) + padL('avgVP', 8) + padL('spread', 8)
+    );
+    console.log('-'.repeat(9 + 7 + 7 + 7 + 8 + 9 + 7 + 8 + 8 + 8));
+    for (const line of candidateLines) {
+      const rows = [];
+      for (let g = 0; g < numGames; g++) {
+        configureMaterials(numMats);
+        const state = newGame(numP, workers);
+        rows.push(instrFishPlayout(state, line, proc));
+      }
+      const n = rows.length;
+      const pct = (k) => (100 * rows.filter(k).length / n).toFixed(0);
+      console.log(
+        pad(String(line), 9) +
+        padL(pct(r => r.endReason === 'fish'), 7) +
+        padL(pct(r => r.endReason === 'backstop'), 7) +
+        padL(pct(r => r.deadEnd), 7) +
+        padL(avg(rows.map(r => r.passes)).toFixed(1), 8) +
+        padL(avg(rows.map(r => r.openIcn)).toFixed(1), 9) +
+        padL(avg(rows.map(r => r.matDeck)).toFixed(1), 7) +
+        padL(avg(rows.map(r => r.built)).toFixed(2), 8) +
+        padL(avg(rows.map(r => r.avgVP)).toFixed(1), 8) +
+        padL(avg(rows.map(r => r.spread)).toFixed(1), 8)
+      );
+    }
+    console.log();
+  }
+  console.log(`Elapsed: ${((Date.now() - tStart) / 1000).toFixed(1)}s.`);
+  console.log('\nLegend:');
+  console.log('  %fish  = games ended by all pawns crossing the line (organic, what we want).');
+  console.log('  %back  = games ended by the checkGameEnd board-exhaustion backstop (avoid).');
+  console.log('  dead%  = games where, even on a fish-trigger end, the board was ALSO dead at that');
+  console.log('           instant (line fired exactly as the board died — still "near the backstop").');
+  console.log('  passes = mean pure 1-fish pass-advances per game (dead-board grind toward the line).');
+  console.log('  openIcn= mean uncovered river icons left when the main phase ended (board life/margin).');
+  console.log('  matDk  = mean material cards left in deck at end; builds/avgVP/spread as usual.\n');
+}
+
+// Targeted: report the requested stats for specific candidate lines at each
+// player count (3x3 matrix of {89,109,119} x {2P,3P,4P}). Same fish-line
+// endgame + coda d as the live model. Game length uses the web turn-clock model
+// (90s/auction + 15s/(build|Invent)).
+function sweepFishlinePick(numGamesArg) {
+  const numGames = parseInt(numGamesArg) || 1000;
+  const numMats = 6;
+  const proc = 'd';
+  const SEC_PER_AUCTION = 90;
+  const SEC_PER_BUILD_INVENT = 15;
+  // Lines per player count (2P extended down to 59).
+  const linesByCount = { 2: [59, 89, 109, 119], 3: [89, 109, 119], 4: [89, 109, 119] };
+  const playerCounts = [2, 3, 4];
+
+  function runRow(numP, workers, line, autoAdv) {
+    const rows = [];
+    for (let g = 0; g < numGames; g++) {
+      configureMaterials(numMats);
+      const state = newGame(numP, workers);
+      rows.push(instrFishPlayout(state, line, proc, autoAdv));
+    }
+    const n = rows.length;
+    const meanAuc = avg(rows.map(r => r.auc));
+    const meanBI = avg(rows.map(r => r.built + r.invents));
+    const gameSecs = meanAuc * SEC_PER_AUCTION + meanBI * SEC_PER_BUILD_INVENT;
+    const meanBuilt = avg(rows.map(r => r.built));
+    console.log(
+      pad(`${numP}P`, 6) + pad(String(line), 6) + pad(autoAdv ? 'auto' : 'base', 6) +
+      padL(fmtTime(gameSecs), 8) +
+      padL(avg(rows.map(r => r.matDeck)).toFixed(1), 7) +
+      padL(avg(rows.map(r => r.headwaters)).toFixed(1), 5) +
+      padL((meanBuilt / numP).toFixed(2), 8) +
+      padL(meanBuilt.toFixed(2), 7) +
+      padL((100 * rows.filter(r => r.endReason === 'fish').length / n).toFixed(0), 7) +
+      padL((100 * rows.filter(r => r.endReason === 'backstop').length / n).toFixed(0), 7)
+    );
+  }
+
+  console.log(`\nRiver Bankers — fish-line pick  (${numGames} games/config, 6 materials, coda d)`);
+  console.log(`Game length = ${SEC_PER_AUCTION}s/auction + ${SEC_PER_BUILD_INVENT}s/(build or Invent).`);
+  console.log(`rule: base = current; auto = +1 fish at end of turn once the material deck is empty.\n`);
+  console.log(
+    pad('count', 6) + pad('line', 6) + pad('rule', 6) + padL('length', 8) +
+    padL('matDk', 7) + padL('HW', 5) + padL('blds/p', 8) +
+    padL('blds', 7) + padL('%fish', 7) + padL('%back', 7)
+  );
+  console.log('-'.repeat(6 + 6 + 6 + 8 + 7 + 5 + 8 + 7 + 7 + 7));
+  for (const numP of playerCounts) {
+    const workers = defaultWorkersPerPlayer(numP);
+    for (const line of linesByCount[numP]) {
+      runRow(numP, workers, line, false);
+      runRow(numP, workers, line, true);
+    }
+    console.log();
+  }
+  console.log('Legend: rule base/auto = without/with the deck-empty +1-fish auto-advance;');
+  console.log('  length = wall-clock game time (M:SS); matDk = material cards left in deck;');
+  console.log('  HW = Headwaters cards present at end; blds/p = builds per player; blds = total builds;');
+  console.log('  %fish/%back = ended by pawns crossing the line / by the board-exhaustion backstop.\n');
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
@@ -6525,6 +6760,8 @@ if (require.main === module) {
   else if (mode === 'endgame-pass0') sweepEndgamePass0(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'endgame-rework') sweepEndgameRework(process.argv[3], process.argv[4]);
   else if (mode === 'fishline') sweepFishline(process.argv[3], process.argv[4]);
+  else if (mode === 'fishline-end') sweepFishlineEnd(process.argv[3], process.argv[4]);
+  else if (mode === 'fishline-pick') sweepFishlinePick(process.argv[3]);
   else if (mode === 'tune') sweepTune(process.argv[3]);
   else if (mode === 'tune-cmp') sweepTuneCmp(process.argv[3], process.argv[4]);
   else if (mode === 'tune-board') sweepTuneBoard(process.argv[3], process.argv[4], process.argv[5]);

@@ -2822,12 +2822,12 @@ const ENDGAME_TRACK_END = 59;
 
 // Fish-line endgame (trigger "b" + coda "d"). Each player retires the moment
 // their pawn passes the finish line; once everyone has, each gets one final
-// build. Uniform 119 for every count (2026-06-20 turn-clock re-tune): under the
-// 30s/turn timing model the old climbing 59/89/119 ran far too short at 2P/3P,
-// and more players ⇒ more turns per fish-space, so a flat line centres all
-// counts (~40-54 min for 2P/3P; 4P longer). 119 = lap-2 space 59 — one "+60"
-// chit flip, the same finish marker for every count.
-const FISH_LINE_BY_COUNT = { 2: 119, 3: 119, 4: 119 };
+// build. Climbing line 89/109/119 for 2P/3P/4P (2026-06-22 organic-ending
+// re-tune): the natural board-exhaustion depth scales with player count, so a
+// flat line ended too many 2P games on the board-exhaustion backstop instead of
+// organically (pawns crossing). 89/109/119 sits each count below its exhaustion
+// depth. Paired with the deck-empty auto-advance below.
+const FISH_LINE_BY_COUNT = { 2: 89, 3: 109, 4: 119 };
 function fishFinishLine() {
   return FISH_LINE_BY_COUNT[state.players.length] || 30 * state.players.length;
 }
@@ -7574,6 +7574,15 @@ async function runOneTurn() {
 
   // Pack Rat Burrow: if pass-0 queued any swap prompts for the human, resolve them now.
   if (state.pendingPackRatSwaps > 0) await resolvePendingPackRatSwaps();
+
+  // Endgame speedup: once the material deck is empty, the active player drifts
+  // 1 extra fish at the end of their turn, pushing pawns toward the finish line
+  // so the dead-board tail can't drag. Applied before the finish check so the
+  // drift can carry them across this turn.
+  if (!p.out && state.matDeck.length === 0) {
+    advancePlayer(p.idx, 1);
+    log(`🌀 Material deck empty — ${speciesLabel(p)} drifts downstream +1🐟.`);
+  }
 
   // Fish-line retirement: the active player retires if their own action carried
   // their pawn to/over the finish line this turn. (Voluntary Retire already set
