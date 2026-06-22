@@ -6584,6 +6584,7 @@ function instrFishPlayout(state, fishLimit, proc, autoAdvanceEmpty = false) {
       built: state.metrics.cardsBuilt,
       auc: state.metrics.auctions,
       invents: state.metrics.invents,
+      turns: state.metrics.turns,
       avgVP: vps.reduce((s, v) => s + v, 0) / vps.length,
       spread: vps[0] - vps[vps.length - 1],
     };
@@ -6733,6 +6734,63 @@ function sweepFishlinePick(numGamesArg) {
   console.log('  %fish/%back = ended by pawns crossing the line / by the board-exhaustion backstop.\n');
 }
 
+// Game-length histogram for the live configs (per-count line + auto-advance).
+// Reports the length distribution, percentiles, action composition, and the
+// implied average seconds/turn (length is action-weighted, not flat/turn).
+function sweepFishlineHist(numGamesArg, aucSecsArg) {
+  const numGames = parseInt(numGamesArg) || 3000;
+  const numMats = 6;
+  const proc = 'd';
+  const SEC_PER_AUCTION = parseInt(aucSecsArg) || 90;
+  const SEC_PER_BUILD_INVENT = 15;
+  const configs = [{ numP: 2, line: 89 }, { numP: 3, line: 109 }, { numP: 4, line: 119 }];
+  const BIN = 5; // minutes per histogram bin
+
+  console.log(`\nRiver Bankers — game-length histogram  (${numGames} games/config, live: per-count line + auto-advance)`);
+  console.log(`Length model = ${SEC_PER_AUCTION}s/auction + ${SEC_PER_BUILD_INVENT}s/(build or Invent). NOT a flat per-turn time.\n`);
+
+  for (const { numP, line } of configs) {
+    const workers = defaultWorkersPerPlayer(numP);
+    const mins = [], aucs = [], bis = [], turnsArr = [];
+    for (let g = 0; g < numGames; g++) {
+      configureMaterials(numMats);
+      const state = newGame(numP, workers);
+      const r = instrFishPlayout(state, line, proc, true);
+      const secs = r.auc * SEC_PER_AUCTION + (r.built + r.invents) * SEC_PER_BUILD_INVENT;
+      mins.push(secs / 60); aucs.push(r.auc); bis.push(r.built + r.invents); turnsArr.push(r.turns);
+    }
+    mins.sort((a, b) => a - b);
+    const mean = avg(mins);
+    const meanAuc = avg(aucs), meanBI = avg(bis), meanTurns = avg(turnsArr);
+    const implSecPerTurn = (mean * 60) / meanTurns;
+    console.log(`=== ${numP}P @ line ${line} (${workers} workers) ===`);
+    console.log(
+      `  min ${pctl(mins,0).toFixed(0)}  p10 ${pctl(mins,0.1).toFixed(0)}  p25 ${pctl(mins,0.25).toFixed(0)}  ` +
+      `median ${pctl(mins,0.5).toFixed(0)}  mean ${mean.toFixed(0)}  p75 ${pctl(mins,0.75).toFixed(0)}  ` +
+      `p90 ${pctl(mins,0.9).toFixed(0)}  p99 ${pctl(mins,0.99).toFixed(0)}  max ${pctl(mins,1).toFixed(0)} min`
+    );
+    console.log(
+      `  composition: ${meanAuc.toFixed(1)} auctions + ${meanBI.toFixed(1)} builds/Invents over ` +
+      `${meanTurns.toFixed(1)} turns ⇒ implied ${implSecPerTurn.toFixed(0)}s/turn avg`
+    );
+    // Histogram.
+    const maxMin = pctl(mins, 1);
+    const nbins = Math.ceil(maxMin / BIN) + 1;
+    const counts = new Array(nbins).fill(0);
+    for (const m of mins) counts[Math.floor(m / BIN)]++;
+    const peak = Math.max(...counts);
+    const BARW = 50;
+    for (let b = 0; b < nbins; b++) {
+      if (counts[b] === 0 && b * BIN > maxMin) continue;
+      const lo = b * BIN, hi = lo + BIN;
+      const bar = '#'.repeat(Math.round((counts[b] / peak) * BARW));
+      const pctStr = (100 * counts[b] / mins.length).toFixed(0);
+      console.log(`  ${String(lo).padStart(3)}-${String(hi).padStart(3)}m | ${bar.padEnd(BARW)} ${pctStr.padStart(3)}%`);
+    }
+    console.log();
+  }
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
@@ -6762,6 +6820,7 @@ if (require.main === module) {
   else if (mode === 'fishline') sweepFishline(process.argv[3], process.argv[4]);
   else if (mode === 'fishline-end') sweepFishlineEnd(process.argv[3], process.argv[4]);
   else if (mode === 'fishline-pick') sweepFishlinePick(process.argv[3]);
+  else if (mode === 'fishline-hist') sweepFishlineHist(process.argv[3], process.argv[4]);
   else if (mode === 'tune') sweepTune(process.argv[3]);
   else if (mode === 'tune-cmp') sweepTuneCmp(process.argv[3], process.argv[4]);
   else if (mode === 'tune-board') sweepTuneBoard(process.argv[3], process.argv[4], process.argv[5]);
