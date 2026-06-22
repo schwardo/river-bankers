@@ -6523,26 +6523,29 @@ async function performBuild(playerIdx, handIdx) {
 
 async function firePassiveBuildEffects(playerIdx, struct) {
   const p = state.players[playerIdx];
-  if (hasEffect(p, 'Vine Trellis') && (struct.cost.vines || 0) > 0) {
+  // A card's effect doesn't apply to the build that creates it — only to later
+  // qualifying builds. This runs after struct joined p.built, so each perk skips
+  // when the just-built card is its own source (struct.name !== source).
+  if (hasEffect(p, 'Vine Trellis') && struct.name !== 'Vine Trellis' && (struct.cost.vines || 0) > 0) {
     const before = p.timePos;
     p.timePos = Math.max(0, p.timePos - 1);
     if (p.timePos < before) {
       log(`🪜 ${speciesLabel(p)} slides back ${before - p.timePos} on the fish track (Vine Trellis).`);
     }
   }
-  if (hasEffect(p, 'Stone Causeway') && (struct.cost.stones || 0) > 0) {
+  if (hasEffect(p, 'Stone Causeway') && struct.name !== 'Stone Causeway' && (struct.cost.stones || 0) > 0) {
     if (p.isHuman) await humanStoneCausewayDraw(playerIdx);
     else aiStoneCausewayDraw(playerIdx);
   }
-  if (hasEffect(p, 'Reed Walkway') && (struct.cost.reeds || 0) > 0) {
+  if (hasEffect(p, 'Reed Walkway') && struct.name !== 'Reed Walkway' && (struct.cost.reeds || 0) > 0) {
     if (p.isHuman) await humanReedWalkwayPlace(playerIdx);
     else aiReedWalkwayPlace(playerIdx);
   }
-  if (hasEffect(p, 'Clay Vault') && (struct.cost.clay || 0) > 0) {
+  if (hasEffect(p, 'Clay Vault') && struct.name !== 'Clay Vault' && (struct.cost.clay || 0) > 0) {
     if (p.isHuman) await humanClayVaultSwap(playerIdx);
     else aiClayVaultSwap(playerIdx);
   }
-  if (hasEffect(p, 'Burrow Network') && (struct.cost.mud || 0) > 0) {
+  if (hasEffect(p, 'Burrow Network') && struct.name !== 'Burrow Network' && (struct.cost.mud || 0) > 0) {
     if (p.isHuman) await humanBurrowNetworkMove(playerIdx);
     else aiBurrowNetworkMove(playerIdx);
   }

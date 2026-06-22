@@ -2679,24 +2679,27 @@ function performBuild(state, playerIdx, handIdx) {
 // to the just-completed build based on the built struct's material set.
 function firePassiveBuildEffects(state, playerIdx, struct) {
   const p = state.players[playerIdx];
+  // A card's effect doesn't apply to the build that creates it — only to later
+  // qualifying builds. This runs after struct joined p.built, so each perk skips
+  // when the just-built card is its own source (struct.name !== source).
   // Vine Trellis: slide back 1 fish on each Vines-cost build.
-  if (hasEffect(p, 'Vine Trellis') && (struct.cost.vines || 0) > 0) {
+  if (hasEffect(p, 'Vine Trellis') && struct.name !== 'Vine Trellis' && (struct.cost.vines || 0) > 0) {
     p.timePos = Math.max(0, p.timePos - 1);
   }
   // Stone Causeway: draw 1 extra structure card, then discard worst in hand.
-  if (hasEffect(p, 'Stone Causeway') && (struct.cost.stones || 0) > 0) {
+  if (hasEffect(p, 'Stone Causeway') && struct.name !== 'Stone Causeway' && (struct.cost.stones || 0) > 0) {
     aiStoneCausewayDraw(state, playerIdx);
   }
   // Reed Walkway: place 1 free worker on a River 1 uncovered icon.
-  if (hasEffect(p, 'Reed Walkway') && (struct.cost.reeds || 0) > 0) {
+  if (hasEffect(p, 'Reed Walkway') && struct.name !== 'Reed Walkway' && (struct.cost.reeds || 0) > 0) {
     aiReedWalkwayPlace(state, playerIdx);
   }
   // Clay Vault: peek top of structure deck; swap with worst hand card if better.
-  if (hasEffect(p, 'Clay Vault') && (struct.cost.clay || 0) > 0) {
+  if (hasEffect(p, 'Clay Vault') && struct.name !== 'Clay Vault' && (struct.cost.clay || 0) > 0) {
     aiClayVaultSwap(state, playerIdx);
   }
   // Burrow Network: move one of your workers to another card you already occupy.
-  if (hasEffect(p, 'Burrow Network') && (struct.cost.mud || 0) > 0) {
+  if (hasEffect(p, 'Burrow Network') && struct.name !== 'Burrow Network' && (struct.cost.mud || 0) > 0) {
     aiBurrowNetworkMove(state, playerIdx);
   }
 }
