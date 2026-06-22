@@ -13,3 +13,4 @@ graphics/worker-chits/*.svg filter=lfs diff=lfs merge=lfs -text
 rulebook/*.png filter=lfs diff=lfs merge=lfs -text
 rulebook/*.pdf filter=lfs diff=lfs merge=lfs -text
 graphics/auction-chit/*.png filter=lfs diff=lfs merge=lfs -text
+playtest-*.png filter=lfs diff=lfs merge=lfs -text
