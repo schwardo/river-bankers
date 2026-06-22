@@ -35,7 +35,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +2 VP per shoreline card with at least one of your workers.' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build: each Reed worker counts as 2 reeds.' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any river card for 1🐟.' },
-  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck.' },
+  { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck; shuffle the replaced card back into the deck.' },
   { name: 'Pontoon',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 2 },            time: 4, vp: 6, effect: 'When built: activate one "when built" effect of a built structure controlled by the player to your left or right.\n\nAs an action: activate the "as an action" ability of a built structure controlled by the player to your left or right.' },
   { name: 'Stone Pool',     cost: { stones: 3, clay: 2 },            time: 3, vp: 6, effect: 'When built: look at the top 5 material cards and rearrange them in any order.' },
@@ -376,10 +376,7 @@ function tryMillWheel(state, playerIdx) {
   if (avail.has('Heron Roost') && state.matDeck.length > 0 && p.timePos < SIM_FINISH_LINE - 1) {
     const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
     if (target !== -1) {
-      const newCard = state.matDeck.pop();
-      newCard.slot = 'pre';
-      state.prerivCards[target] = newCard;
-      state.metrics.iconsSpawned += newCard.totalIcons;
+      heronReplacePreriv(state, target);
       p.timePos += 1;
       noteEffectUse(state, 'Mill Wheel');
       return;
@@ -1236,6 +1233,26 @@ function refillPreriv(state, emptiedIdx) {
     state.prerivCards[0] = c;
     state.metrics.iconsSpawned += c.totalIcons;
   }
+}
+// Heron Roost (and Mill Wheel's copy of it): replace the Headwaters card at
+// `idx` with the top of the material deck, and recycle the displaced card back
+// into the deck (reshuffled) rather than removing it from the game — same rule
+// as the Flush action (FLUSH_RETURNS_TO_DECK). Keeps the material deck a closed
+// pool so these effects don't shrink it over the game.
+function heronReplacePreriv(state, idx) {
+  const displaced = state.prerivCards[idx];
+  const newCard = state.matDeck.pop();
+  newCard.slot = 'pre';
+  state.prerivCards[idx] = newCard;
+  state.metrics.iconsSpawned += newCard.totalIcons;
+  if (displaced) {
+    displaced.slot = null;
+    displaced.workers = {};
+    displaced.blanks = 0;
+    state.matDeck.push(displaced);
+    state.matDeck = shuffle(state.matDeck);
+  }
+  return newCard;
 }
 function prerivIndexOf(state, card) { return state.prerivCards.indexOf(card); }
 function cleanupShoreline(state) {
@@ -2356,10 +2373,7 @@ function aiStartOfTurnAbilities(state, playerIdx) {
     for (const s of p.hand) for (const m in s.cost) myMats.add(m);
     const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
     if (target !== -1) {
-      const newCard = state.matDeck.pop();
-      newCard.slot = 'pre';
-      state.prerivCards[target] = newCard;
-      state.metrics.iconsSpawned += newCard.totalIcons;
+      heronReplacePreriv(state, target);
       p.timePos += 1; // 1 fish cost
       noteEffectUse(state, 'Heron Roost');
     }
