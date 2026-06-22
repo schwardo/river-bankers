@@ -2386,17 +2386,30 @@ function effectiveCoverage(targetCost, workersByMat) {
   return have;
 }
 
-function affordabilityPills(structure, workersByMat) {
-  const haveByMat = effectiveCoverage(structure.cost, workersByMat);
-  return Object.entries(structure.cost).map(([m, n]) => {
+function affordabilityPills(structure, workersByMat, p = null) {
+  // Render against the SAME effect-adjusted requirements canBuild uses, so a
+  // card the green "buildable" border calls ready always shows all-satisfied
+  // pills. Using the raw printed cost here made cards with built cost-reducers
+  // (Cattail Marsh halving reeds, Treaty Stone / Charcoal Pit / Stone Tool
+  // substitutions) look unaffordable beside a green border — the canBuild
+  // "over-permissive" bug was actually this pill/border mismatch.
+  const eff = p ? effectiveBuildCost(structure, p, workersByMat).eff : structure.cost;
+  const haveByMat = effectiveCoverage(eff, workersByMat);
+  // Pills show the printed materials only; any extra material the effects add
+  // to `eff` (e.g. Treaty Stone's +2 surplus source) is one the player provably
+  // already has, so it's always satisfied and omitted to avoid clutter.
+  return Object.keys(structure.cost).map((m) => {
+    const n = eff[m] != null ? eff[m] : structure.cost[m];
     const pure = workersByMat[m] || 0;
     const have = haveByMat[m] || 0;
     const wildAdd = have - pure;
     const ok = have >= n;
+    const reduced = n < structure.cost[m];
+    const title = reduced ? ` title="reduced from ${structure.cost[m]} by your built effects"` : '';
     const label = wildAdd > 0
       ? `${MATERIALS[m].icon}${pure}+${wildAdd}/${n}`
       : `${MATERIALS[m].icon}${have}/${n}`;
-    return `<span class="req-pill ${ok ? 'satisfied' : ''}">${label}</span>`;
+    return `<span class="req-pill ${ok ? 'satisfied' : ''}"${title}>${label}${reduced ? '*' : ''}</span>`;
   }).join('');
 }
 
@@ -3471,7 +3484,7 @@ function renderHand() {
   let html = '';
   human.hand.forEach((s, i) => {
     const buildable = canBuild(s, wbm, human);
-    const reqs = affordabilityPills(s, wbm);
+    const reqs = affordabilityPills(s, wbm, human);
     const cls = ['struct-card', 'has-art'];
     if (buildable) cls.push('buildable');
     const isHumanTurn = state.currentPlayer === human.idx;
@@ -3514,7 +3527,7 @@ function renderHand() {
   // Browse drawn cards (each with same keep/discard styling)
   if (state.phase === 'browse-keep' && state.browseDrawn) {
     state.browseDrawn.forEach((s, i) => {
-      const reqs = affordabilityPills(s, wbm);
+      const reqs = affordabilityPills(s, wbm, human);
       const cls = ['struct-card', 'has-art', 'selectable'];
       const isKeep = state.browseSelected && state.browseSelected.has('d' + i);
       cls.push(isKeep ? 'keep-selected' : 'will-discard');
