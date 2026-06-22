@@ -2041,6 +2041,20 @@ function playerCardCost(card, playerIdx) {
   return Math.max(1, base - total);
 }
 
+// Per-item rate breakdown for an auction-result log line, e.g. "4×1🐟/item
+// [Kelp Bed]". Explains why two players bidding the same count pay different
+// fish (a material-bias discount), which otherwise reads as a bug.
+function auctionRateNote(card, playerIdx, billable) {
+  const base = cardCost(card);
+  const rate = playerCardCost(card, playerIdx);
+  const p = state.players[playerIdx];
+  const discounters = MATERIAL_DISCOUNT_CARDS[card.material] || {};
+  const sources = [];
+  for (const name in discounters) if (hasEffect(p, name)) sources.push(name);
+  const src = (rate < base && sources.length) ? ` [${sources.join(', ')}]` : '';
+  return `${billable}×${rate}🐟/item${src}`;
+}
+
 // Pass-0 freebies fire when a player crosses lap-loop boundary (timePos % LAP_LENGTH wraps).
 // Each crossing fires the effects once.
 // Pass-0 (lap-crossing) effects. Wood Pile / Hollowed-out Log / Pack Rat Burrow
@@ -4409,7 +4423,7 @@ function resolveAuction(card, bids) {
       advancePlayer(idx, timeAdvance);
       result.takings[idx] = bid;
       result.timeAdvances[idx] = timeAdvance;
-      log(`✅ ${speciesLabel(p)} wins ${bid} icon${bid === 1 ? '' : 's'} (advance ${timeAdvance}🐟).`);
+      log(`✅ ${speciesLabel(p)} wins ${bid} icon${bid === 1 ? '' : 's'} (advance ${timeAdvance}🐟 = ${auctionRateNote(card, idx, bid)}).`);
     }
     result.leftover = open - totalBid;
     if (result.leftover > 0) {
@@ -4458,9 +4472,9 @@ function resolveAuction(card, bids) {
       result.takings[idx] = got;
       result.timeAdvances[idx] = timeAdvance;
       if (got > 0) {
-        log(`✅ ${speciesLabel(p)} bid ${bid}, took ${got} (advance ${timeAdvance}🐟).`);
+        log(`✅ ${speciesLabel(p)} bid ${bid}, took ${got} (advance ${timeAdvance}🐟 = ${auctionRateNote(card, idx, billable)}).`);
       } else {
-        log(`✗ ${speciesLabel(p)} bid ${bid}, took 0 (advance ${timeAdvance}🐟 for the bid).`);
+        log(`✗ ${speciesLabel(p)} bid ${bid}, took 0 (advance ${timeAdvance}🐟 for the bid = ${auctionRateNote(card, idx, billable)}).`);
       }
       totalTaken += got;
     }
@@ -4661,9 +4675,9 @@ async function resolveCombinedAuction(virtual, bids, triggerPlayerIdx) {
     const timeAdvance = billable * playerCardCost(virtual, idx);
     advancePlayer(idx, timeAdvance);
     result.takings[idx] = g; result.timeAdvances[idx] = timeAdvance;
-    if (!isJam) log(`✅ ${speciesLabel(p)} wins ${g} icon${g === 1 ? '' : 's'} (advance ${timeAdvance}🐟).`);
-    else if (g > 0) log(`✅ ${speciesLabel(p)} bid ${bid}, took ${g} (advance ${timeAdvance}🐟).`);
-    else log(`✗ ${speciesLabel(p)} bid ${bid}, took 0 (advance ${timeAdvance}🐟 for the bid).`);
+    if (!isJam) log(`✅ ${speciesLabel(p)} wins ${g} icon${g === 1 ? '' : 's'} (advance ${timeAdvance}🐟 = ${auctionRateNote(virtual, idx, billable)}).`);
+    else if (g > 0) log(`✅ ${speciesLabel(p)} bid ${bid}, took ${g} (advance ${timeAdvance}🐟 = ${auctionRateNote(virtual, idx, billable)}).`);
+    else log(`✗ ${speciesLabel(p)} bid ${bid}, took 0 (advance ${timeAdvance}🐟 for the bid = ${auctionRateNote(virtual, idx, billable)}).`);
     totalTaken += g;
   }
   result.leftover = open - totalTaken;
@@ -6414,6 +6428,11 @@ async function performBuild(playerIdx, handIdx) {
   if (stoneToolUsed) {
     p.stoneToolUsed = true;
     log(`🦪 ${speciesLabel(p)} uses Stone Tool — 1 Stones worker substitutes for any other material.`);
+  }
+  // Cattail Marsh: each reed worker counts as 2 reeds — log the saving so a build
+  // that consumes fewer reed workers than the printed cost doesn't look like a bug.
+  if (hasEffect(p, 'Cattail Marsh') && Math.ceil((struct.cost.reeds || 0) / 2) < (struct.cost.reeds || 0)) {
+    log(`${MATERIALS.reeds.icon} ${speciesLabel(p)} — Cattail Marsh: each reed worker counts as 2 reeds (reeds ${struct.cost.reeds} → ${Math.ceil(struct.cost.reeds / 2)}).`);
   }
   // Two-pass consumption: vanilla cards first (preserves wild capacity for
   // materials with no vanilla source), wild cards second to cover deficits.
