@@ -2712,7 +2712,7 @@ function startGame() {
   document.getElementById('setup-screen').classList.add('hidden');
   document.getElementById('game-screen').classList.remove('hidden');
   document.body.classList.add('in-game');
-  log(`Game starts. ${players.length} players. ${humanPlays ? 'You are ' + SPECIES[humanIdx].name + '.' : 'All AI.'}`);
+  log(`Game starts. ${players.length} players. ${humanPlays ? 'You are ' + players[humanIdx].species.name + '.' : 'All AI.'}`);
 
   render();
   startSimTimeTicker();
