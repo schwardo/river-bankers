@@ -181,7 +181,7 @@ function totalVP(p, state) {
   }
   if (hasEffect(p, 'Cattail Patch')) {
     const mats = new Set();
-    for (const b of p.built) for (const m in b.cost) mats.add(m);
+    for (const b of p.built) for (const m in b.cost) if (b.cost[m] > 0) mats.add(m);
     v += CATTAIL_PATCH_VP[Math.min(mats.size, CATTAIL_PATCH_VP.length - 1)];
   }
   // VP_OVERRIDES per-card hooks let sweepVpRework swap the end-game
@@ -195,7 +195,7 @@ function totalVP(p, state) {
   v += matEndGameVP(p, 'Burrow Network', 3, 9,  'mud');
   if (hasEffect(p, 'Hidden Cache')) {
     const mats = new Set();
-    for (const b of p.built) for (const m in b.cost) mats.add(m);
+    for (const b of p.built) for (const m in b.cost) if (b.cost[m] > 0) mats.add(m);
     v += Math.min(9, Math.floor(mats.size / 2) * 3);
   }
   if (hasEffect(p, 'Heron Watch')) {
@@ -1793,11 +1793,11 @@ function aiEffectValue(struct, p, state) {
   }
   if (struct.name === 'Cattail Patch') {
     const mats = new Set();
-    for (const b of p.built) for (const m in b.cost) mats.add(m);
-    for (const m in struct.cost) mats.add(m);
+    for (const b of p.built) for (const m in b.cost) if (b.cost[m] > 0) mats.add(m);
+    for (const m in struct.cost) if (struct.cost[m] > 0) mats.add(m);
     // Project: assume up to 2 hand structures will get built and contribute their materials.
     const handMats = new Set();
-    for (const s of p.hand) for (const m in s.cost) handMats.add(m);
+    for (const s of p.hand) for (const m in s.cost) if (s.cost[m] > 0) handMats.add(m);
     let projected = mats.size;
     for (const m of handMats) {
       if (!mats.has(m) && projected < 6) projected += 1;
@@ -1861,10 +1861,10 @@ function aiEffectValue(struct, p, state) {
   }
   if (struct.name === 'Hidden Cache') {
     const mats = new Set();
-    for (const b of p.built) for (const m in b.cost) mats.add(m);
+    for (const b of p.built) for (const m in b.cost) if (b.cost[m] > 0) mats.add(m);
     // Project a couple more materials from hand builds, then apply the 3-per-2 curve.
     const handMats = new Set();
-    for (const s of p.hand) for (const m in s.cost) handMats.add(m);
+    for (const s of p.hand) for (const m in s.cost) if (s.cost[m] > 0) handMats.add(m);
     let projected = mats.size;
     for (const m of handMats) {
       if (!mats.has(m) && projected < 6) projected += 1;
