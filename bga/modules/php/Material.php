@@ -1,6 +1,6 @@
 <?php
 /**
- * River Bankers — card catalogs (generated from graphics/*/cards.json).
+ * River Bankers — card catalogs (generated from the graphics deck cards.json files).
  * card_type_arg in the `card` table = the 0-based index into the matching array.
  * Effects are descriptive text for now; effect *logic* is implemented in the
  * state machine (Phase 4), not here.

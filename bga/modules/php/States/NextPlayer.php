@@ -32,12 +32,8 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         
         $this->game->activeNextPlayer();
 
-        // Go to another gamestate
-        $gameEnd = false; // Here, we would detect if the game is over to make the appropriate transition
-        if ($gameEnd) {
-            return EndScore::class;
-        } else {
-            return PlayerTurn::class;
-        }
+        // TODO (Phase 4): detect game end (all players retired + final builds
+        // done) and return EndScore::class; until then, always continue play.
+        return PlayerTurn::class;
     }
 }

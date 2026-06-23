@@ -296,7 +296,7 @@ namespace Bga\GameFramework {
          */
         public function build(): GameState
         {
-            return new class extends GameState{}();
+            return new class() extends GameState {}; // local fix: parens must precede `extends` (BGA stub shipped `{}()`, which doesn't parse)
         }
     }
 
@@ -2641,7 +2641,7 @@ namespace Bga\GameFramework\Components {
          * @return Deck a new Deck object
          */
         public function createDeck(string $tableName): Deck {
-            return new class extends Deck{}();
+            return new class() extends Deck {};
         }
     }
 
@@ -2675,7 +2675,7 @@ namespace Bga\GameFramework\Components\Counters {
          * @return PlayerCounter a new PlayerCounter object
          */
         public function createPlayerCounter(string $name, ?int $min = 0, ?int $max = null, CounterVisibility $visibility = CounterVisibility::VISIBLE, bool $useNo = false, ?bool $strict = null,): PlayerCounter {
-            return new class extends PlayerCounter {}();
+            return new class() extends PlayerCounter {};
         }
 
         /**
@@ -2687,7 +2687,7 @@ namespace Bga\GameFramework\Components\Counters {
          * @return TableCounter a new TableCounter object
          */
         public function createTableCounter(string $name, ?int $min = 0, ?int $max = null): TableCounter {
-            return new class extends TableCounter{}();
+            return new class() extends TableCounter {};
         }
     }
 
