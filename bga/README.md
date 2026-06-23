@@ -15,6 +15,9 @@ attributes (no Dojo).
 
 - BGA Studio is the source of record for the running game; this `bga/`
   dir is the version-controlled mirror, synced to/from Studio over SFTP.
+- **SFTP:** `sftp://1.studio.boardgamearena.com:2022`, remote project path
+  **`/riverbankers`** (lowercase). Pull: `lftp ... mirror /riverbankers <bga/>`;
+  push: `lftp ... mirror -R --only-newer --exclude README.md <bga/> /riverbankers`.
 - The implementation checklist lives in the repo's
   `games/board-games.org` under
   *River Bankers → BoardGameArena multiplayer implementation →

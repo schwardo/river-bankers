@@ -6,18 +6,20 @@
 */
 {
     // Name of the game in English (will serve as the basis for translation)
-    "game_name": "My Great Game",
+    "game_name": "River Bankers",
 
     // Game publisher (use empty string if there is no publisher)
-    "publisher": "My Publishing Company",
+    "publisher": "",
 
     // Url of game publisher website
-    "publisher_website": "http://www.mypublishingcompany.com/",
+    "publisher_website": "https://leftfield.games/",
 
     // Board Game Geek ID of the publisher
-    "publisher_bgg_id": 1234,
+    // TODO: no BGG publisher entry yet; 0 = none.
+    "publisher_bgg_id": 0,
 
     // Board game geek ID of the game
+    // TODO: not listed on BGG yet; 0 = none.
     "bgg_id": 0,
 
     // Players configuration that can be played (ex: 2 to 4 players)
@@ -32,7 +34,7 @@
     // "not_recommend_player_number": [2, 3],      // <= example: this is not recommended to play this game with 2 or 3 players
 
     // Estimated game duration, in minutes (used only for the launch, afterward the real duration is computed)
-    "estimated_duration": 30,
+    "estimated_duration": 40,
 
     // Time in second add to a player when "giveExtraTime" is called (speed profile = fast)
     "fast_additional_time": 30,
@@ -49,7 +51,10 @@
     // Note: if you are NOT using any tie breaker, leave the empty string.
     //
     // Example: "tie_breaker_description": "Number of remaining cards in hand",
-    "tie_breaker_description": "",
+    // River Bankers: highest VP wins; ties broken in favour of the player
+    // furthest back on the fish track (fewest fish spent). Implement via
+    // player_score_aux = -(fish-track position) so higher aux = better.
+    "tie_breaker_description": "Furthest back on the fish track (fewest fish spent)",
 
     // If in the game, all losers are equal (no score to rank them or explicit in the rules that losers are not ranked between them), set this to true
     // The game end result will display "Winner" for the 1st player and "Loser" for all other players
@@ -64,14 +69,16 @@
     // Language dependency. If false or not set, there is no language dependency. If true, all players at the table must speak the same language.
     // If an array of shortcode languages such as { "1": "en", "2": "fr", "3": "it" } then all players at the table must speak the same language, and this language must be one of the listed languages.
     // NB: the default will be the first language in this list spoken by the player, so you should list them by popularity/preference.
-    "language_dependency": false,
+    "language_dependency": {"1": "en"},
 
-    // Colors attributed to players
-    "player_colors": ["ff0000", "008000", "0000ff", "ffa500", "e94190", "982fff", "72c3b1", "f07f16", "bdd002", "7b7b7b", "000000", "ffffff"],                       
+    // Colors attributed to players — per-species worker-chit background colours
+    // (beaver, otter, muskrat, mink); see web/index.html SPECIES map +
+    // graphics/worker-chits/*-back.svg full-tile rect fills.
+    "player_colors": ["8b4513", "b8362a", "4a7a3a", "4b2a5b"],
 
     // Favorite colors support : if set to "true", support attribution of favorite colors based on player's preferences (see reattributeColorsBasedOnPreferences PHP method)
     // NB: this parameter is used only to flag games supporting this feature; you must use (or not use) reattributeColorsBasedOnPreferences PHP method to actually enable or disable the feature.
-    "favorite_colors_support": true,
+    "favorite_colors_support": false,
 
     // When doing a rematch, the player order is swapped using a "rotation" so the starting player is not the same
     // If you want to disable this, set this to true
