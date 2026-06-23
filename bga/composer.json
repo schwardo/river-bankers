@@ -3,7 +3,7 @@
     "description": "Local lint + test tooling for the River Bankers BGA port. NOT deployed to BGA Studio.",
     "license": "proprietary",
     "require-dev": {
-        "phpstan/phpstan": "^1.12",
+        "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^10.5"
     },
     "autoload": {
