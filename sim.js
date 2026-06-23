@@ -473,14 +473,18 @@ const MAX_TURNS = 2000; // safety net
 let SPECULATIVE_BID_PROB = 0;
 function setSpeculativeBidProb(p) { SPECULATIVE_BID_PROB = p; }
 
-// Passive-hoarding probe: when set to a player index, that player becomes a
-// "miser" who never contests an auction — it bids only the forced minimum (0 as
-// a non-trigger bidder, the min-bid as the triggerer), collecting plenty-auction
-// leftovers and hoarding fish instead of fighting for materials. Models the
-// human "spend like a miser, let rivals tap out, sweep" exploit so the
-// `miser` sweep can check whether it still beats the conservative K=1 field.
-let MISER_IDX = -1;
-function setMiserIdx(i) { MISER_IDX = i; }
+// Deviant-strategy probe: when DEVIANT_IDX is a player index, that player plays
+// an extreme fixed bidding strategy instead of the normal AI, so the `deviant`
+// sweep can confirm neither extreme beats the conservative K=1 field:
+//   'miser' — never contests; bids only the forced minimum (0 as a non-trigger
+//             bidder, the min-bid as triggerer), hoarding fish and taking only
+//             plenty-auction leftovers (the human "let rivals tap out, sweep").
+//   'max'   — always over-commits; bids the most workers it can (min of open
+//             icons and its safe pool) into every auction, ignoring need and
+//             contention (the pre-fix over-bidding pathology as a strategy).
+let DEVIANT_IDX = -1;
+let DEVIANT_MODE = null;
+function setDeviant(idx, mode) { DEVIANT_IDX = idx; DEVIANT_MODE = mode || null; }
 
 // Contention-aware bid restraint. Sealed bidders can't see opponents' bids, but
 // a rational player discounts the open-icon pool by an estimate of how many
@@ -1767,8 +1771,11 @@ function aiDecideBid(state, playerIdx, card, minBid) {
       target = Math.min(target, Math.ceil(clinchable));
     }
   }
-  // Miser probe: never contest — bid only the forced minimum.
-  if (playerIdx === MISER_IDX) target = minBid;
+  // Deviant-strategy probe: override the normal target with an extreme.
+  if (playerIdx === DEVIANT_IDX) {
+    if (DEVIANT_MODE === 'miser') target = minBid;                  // never contest
+    else if (DEVIANT_MODE === 'max') target = Math.min(open, safePool); // always over-commit
+  }
   target = Math.max(target, minBid);
   // Cap at safe pool unless we need fallback to satisfy the trigger min-bid.
   target = Math.min(target, target > safePool && minBid > 0 ? totalPool : safePool);
@@ -6914,12 +6921,15 @@ function sweepBidDiag(numGamesArg, ksArg) {
   console.log('  built/p = avg structures built per player; spread/margin = VP win/last and win/runner-up gaps\n');
 }
 
-// Passive-hoarding probe. Makes player 0 a "miser" (never contests an auction —
-// bids only the forced minimum, collects plenty-auction leftovers, hoards fish)
-// and pits it against a field of normal K=1 AIs. If the miser's win rate is at
-// or below the 1/numP baseline, the "spend like a miser, let rivals tap out,
-// sweep" exploit no longer dominates now that the fixed bidder doesn't self-jam.
-function sweepMiser(numGamesArg, numPArg, workersArg) {
+// Deviant-strategy probe. Makes player 0 play an extreme fixed strategy and
+// pits it against a field of normal K=1 AIs, for each strategy in turn:
+//   'miser' — never contests (bids the minimum, hoards, sweeps leftovers): the
+//             human "let rivals tap out, sweep" exploit.
+//   'max'   — always over-commits (bids min(open, safe pool) into every
+//             auction): the pre-fix over-bidding pathology.
+// If neither's win rate exceeds the 1/numP baseline, the conservative K=1 AI is
+// not beaten by either extreme — i.e. the meta isn't a degenerate hoard-or-blast.
+function sweepDeviant(numGamesArg, numPArg, workersArg) {
   const numP = parseInt(numPArg) || 4;
   const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
   const numGames = parseInt(numGamesArg) || 8000;
@@ -6947,52 +6957,57 @@ function sweepMiser(numGamesArg, numPArg, workersArg) {
     }
   }
 
-  // role[0] = miser (idx 0), role[1] = field (idx 1..numP-1, pooled).
-  const role = [
-    { name: `MISER (idx 0)`, games: 0, wins: 0, vp: 0, built: 0, fish: 0 },
-    { name: `field/player`,  games: 0, wins: 0, vp: 0, built: 0, fish: 0 },
-  ];
-  setMiserIdx(0);
-  const t0 = Date.now();
-  for (let g = 0; g < numGames; g++) {
-    if ((g + 1) % 1000 === 0) process.stderr.write(`\rGames ${g + 1}/${numGames}`);
-    const state = newGame(numP, workers);
-    runOneGame(state);
-    const scored = state.players.map(p => ({
-      idx: p.idx, vp: totalVP(p, state), timePos: p.timePos, built: p.built.length,
-    }));
-    scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
-    const winnerIdx = scored[0].idx;
-    for (const s of scored) {
-      const r = s.idx === 0 ? role[0] : role[1];
-      r.games += 1; r.vp += s.vp; r.built += s.built; r.fish += s.timePos;
-      if (s.idx === winnerIdx) r.wins += 1;
-    }
-  }
-  setMiserIdx(-1);
-  process.stderr.write('\r' + ' '.repeat(60) + '\r');
-
   const baseline = 100 / numP;
-  console.log(`\nRiver Bankers — passive-hoarding probe (miser vs K=1 field)`);
-  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games. Player 0 never contests (bids the minimum, hoards).`);
-  console.log(`Baseline win% = 1/${numP} = ${baseline.toFixed(1)}%. miser win% ≫ baseline ⇒ passive hoarding still dominates.\n`);
-  console.log(pad('role', 15) + padL('win%', 8) + padL('95%CI', 8) + padL('Δbase', 8) + padL('avgVP', 8) + padL('built', 8) + padL('endFish', 8));
-  console.log('-'.repeat(15 + 8 * 6));
-  for (const r of role) {
-    const winPct = 100 * r.wins / r.games;
-    const p = winPct / 100;
-    const ci = 100 * 1.96 * Math.sqrt(p * (1 - p) / r.games);
-    const delta = winPct - baseline;
-    console.log(
-      pad(r.name, 15) + padL(winPct.toFixed(1) + '%', 8) + padL('±' + ci.toFixed(1), 8) +
-      padL((delta >= 0 ? '+' : '') + delta.toFixed(1), 8) +
-      padL((r.vp / r.games).toFixed(1), 8) + padL((r.built / r.games).toFixed(2), 8) +
-      padL((r.fish / r.games).toFixed(0), 8)
-    );
+  console.log(`\nRiver Bankers — deviant-strategy probe (player 0 deviates vs K=1 field)`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games/strategy.`);
+  console.log(`Baseline win% = 1/${numP} = ${baseline.toFixed(1)}%. A deviant win% ≫ baseline ⇒ that extreme dominates the conservative AI.\n`);
+  console.log(pad('strategy', 16) + pad('role', 14) + padL('win%', 8) + padL('95%CI', 8) + padL('Δbase', 8) + padL('avgVP', 8) + padL('built', 8) + padL('endFish', 8));
+  console.log('-'.repeat(16 + 14 + 8 * 6));
+
+  const t0 = Date.now();
+  for (const mode of ['miser', 'max']) {
+    // role[0] = deviant (idx 0), role[1] = field (idx 1..numP-1, pooled).
+    const role = [
+      { name: 'deviant (idx 0)', games: 0, wins: 0, vp: 0, built: 0, fish: 0 },
+      { name: 'field/player',    games: 0, wins: 0, vp: 0, built: 0, fish: 0 },
+    ];
+    setDeviant(0, mode);
+    for (let g = 0; g < numGames; g++) {
+      if ((g + 1) % 1000 === 0) process.stderr.write(`\r${mode} ${g + 1}/${numGames}`);
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      const scored = state.players.map(p => ({
+        idx: p.idx, vp: totalVP(p, state), timePos: p.timePos, built: p.built.length,
+      }));
+      scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+      const winnerIdx = scored[0].idx;
+      for (const s of scored) {
+        const r = s.idx === 0 ? role[0] : role[1];
+        r.games += 1; r.vp += s.vp; r.built += s.built; r.fish += s.timePos;
+        if (s.idx === winnerIdx) r.wins += 1;
+      }
+    }
+    setDeviant(-1, null);
+    process.stderr.write('\r' + ' '.repeat(60) + '\r');
+    role.forEach((r, i) => {
+      const winPct = 100 * r.wins / r.games;
+      const p = winPct / 100;
+      const ci = 100 * 1.96 * Math.sqrt(p * (1 - p) / r.games);
+      const delta = winPct - baseline;
+      console.log(
+        pad(i === 0 ? `${mode}` : '', 16) + pad(r.name, 14) +
+        padL(winPct.toFixed(1) + '%', 8) + padL('±' + ci.toFixed(1), 8) +
+        padL((delta >= 0 ? '+' : '') + delta.toFixed(1), 8) +
+        padL((r.vp / r.games).toFixed(1), 8) + padL((r.built / r.games).toFixed(2), 8) +
+        padL((r.fish / r.games).toFixed(0), 8)
+      );
+    });
+    console.log('-'.repeat(16 + 14 + 8 * 6));
   }
   console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
-  console.log('Legend: win% per player (miser = 1 player/game; field = pooled over the other ' + (numP - 1) + ').');
-  console.log('  avgVP/built/endFish = per-player-game averages; endFish = final fish-track position (hoarders advance less).\n');
+  console.log('Legend: win% per player (deviant = 1 player/game; field = pooled over the other ' + (numP - 1) + ').');
+  console.log("  miser = never contest (bid minimum, hoard); max = always over-commit (bid min(open, pool)).");
+  console.log('  avgVP/built/endFish = per-player-game averages; endFish = final fish-track position.\n');
 }
 
 // Worker-count revisit under the live model (fish-line endgame + auto-advance,
@@ -7045,7 +7060,7 @@ if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
   else if (mode === 'bid-diag') sweepBidDiag(process.argv[3], process.argv[4]);
-  else if (mode === 'miser') sweepMiser(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'deviant' || mode === 'miser') sweepDeviant(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'workers') sweepWorkers(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'rule') sweepRule();
   else if (mode === 'deck') sweepDeck(process.argv[3]);
