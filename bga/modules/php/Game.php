@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 namespace Bga\Games\RiverBankers;
 
-use Bga\Games\RiverBankers\States\PlayerTurn;
+use Bga\Games\RiverBankers\States\NextPlayer;
 
 class Game extends \Bga\GameFramework\Table
 {
@@ -167,16 +167,50 @@ class Game extends \Bga\GameFramework\Table
 
         // TODO (Phase 5): init stats here once stats.json is defined.
 
-        // Activate first player (top of the space-0 stack).
+        // Provisional active player; NextPlayer immediately recomputes the real
+        // first actor (top of the space-0 stack) via Rules\TurnOrder.
         $this->activeNextPlayer();
 
-        return PlayerTurn::class;
+        return NextPlayer::class;
     }
 
     /** Build one VALUES tuple for the `card` insert. */
     private function cardRow(string $type, int $typeArg, string $location, int $locationArg): string
     {
         return sprintf("('%s', %d, '%s', %d)", $type, $typeArg, $location, $locationArg);
+    }
+
+    /**
+     * Player rows shaped for Rules\TurnOrder::nextActor().
+     *
+     * @return list<array{id:int, fish:int, stack:int, retired:bool}>
+     */
+    public function getTurnOrderRows(): array
+    {
+        $rows = $this->getObjectListFromDB(
+            "SELECT `player_id`, `player_fish_pos`, `player_stack_order`, `player_retired` FROM `player`"
+        );
+        return array_map(fn(array $r) => [
+            'id' => (int) $r['player_id'],
+            'fish' => (int) $r['player_fish_pos'],
+            'stack' => (int) $r['player_stack_order'],
+            'retired' => (bool) (int) $r['player_retired'],
+        ], $rows);
+    }
+
+    /**
+     * Player with a pending bonus turn (e.g. Royal Lodge's extra turn), or null.
+     * Stored in the global key/value store; consumed once by NextPlayer.
+     */
+    public function getBonusTurnPlayer(): ?int
+    {
+        $v = (int) $this->globals->get("bonus_turn_player", 0);
+        return $v > 0 ? $v : null;
+    }
+
+    public function clearBonusTurnPlayer(): void
+    {
+        $this->globals->set("bonus_turn_player", 0);
     }
 
     public function debug_goToState(int $state = 3)

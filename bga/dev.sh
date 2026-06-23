@@ -6,8 +6,11 @@ cd "$(dirname "$0")"
 
 [ -d vendor ] || composer install
 
-echo "== regenerate auction fixture from the sim.js oracle =="
-node tests/oracle/gen_auction_vectors.js > tests/fixtures/auction_vectors.json
+echo "== regenerate fixtures from the sim.js oracles =="
+for gen in tests/oracle/gen_*.js; do
+  out="tests/fixtures/$(basename "$gen" .js | sed 's/^gen_//').json"
+  node "$gen" > "$out" && echo "  $out"
+done
 
 echo "== php -l (syntax) =="
 find modules/php -name '*.php' -print0 | xargs -0 -n1 php -l >/dev/null && echo "syntax OK"

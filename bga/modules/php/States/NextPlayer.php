@@ -6,10 +6,16 @@ namespace Bga\Games\RiverBankers\States;
 
 use Bga\GameFramework\StateType;
 use Bga\Games\RiverBankers\Game;
+use Bga\Games\RiverBankers\Rules\TurnOrder;
 
+/**
+ * Turn-order pivot. River Bankers has no rounds: the active (non-retired) player
+ * furthest back on the fish track acts next (ties -> top of stack), and may take
+ * several turns in a row. This GAME state recomputes that after every action via
+ * Rules\TurnOrder and hands control to PlayerTurn.
+ */
 class NextPlayer extends \Bga\GameFramework\States\GameState
 {
-
     function __construct(
         protected Game $game,
     ) {
@@ -20,20 +26,23 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         );
     }
 
-    /**
-     * Game state action, example content.
-     *
-     * The onEnteringState method of state `nextPlayer` is called everytime the current game state is set to `nextPlayer`.
-     */
-    function onEnteringState(int $activePlayerId) {
+    function onEnteringState()
+    {
+        $next = TurnOrder::nextActor(
+            $this->game->getTurnOrderRows(),
+            $this->game->getBonusTurnPlayer(),
+        );
 
-        // Give some extra time to the active player when he completed an action
-        $this->game->giveExtraTime($activePlayerId);
-        
-        $this->game->activeNextPlayer();
+        if ($next === null) {
+            // Everyone has retired.
+            // TODO (Phase 4): run the "one final build" round before scoring.
+            return EndScore::class;
+        }
 
-        // TODO (Phase 4): detect game end (all players retired + final builds
-        // done) and return EndScore::class; until then, always continue play.
+        $this->game->clearBonusTurnPlayer();
+        $this->gamestate->changeActivePlayer($next);
+        $this->game->giveExtraTime($next);
+
         return PlayerTurn::class;
     }
 }
