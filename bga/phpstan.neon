@@ -1,0 +1,11 @@
+parameters:
+    level: 5
+    paths:
+        - modules/php
+    # _ide_helper.php declares the whole BGA framework (Table, GameState,
+    # notify, globals, DbQuery, ...) — load its symbols so calls resolve,
+    # without reporting errors inside the stub itself.
+    scanFiles:
+        - _ide_helper.php
+    excludePaths:
+        - src-disabled/*

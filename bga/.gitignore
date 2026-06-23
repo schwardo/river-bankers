@@ -1,0 +1,5 @@
+# Local dev tooling (not part of the BGA deploy)
+/vendor/
+/.phpunit.cache/
+/.phpunit.result.cache
+/composer.lock
