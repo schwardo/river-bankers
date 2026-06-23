@@ -2508,9 +2508,9 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // SIMULATED GAME TIME
 // =============================================================================
 // Real wall-clock time accrues while the human is making a decision (own turn or
-// reacting to an auction). AI turns add a hardcoded chunk per turn — refine
-// AI_TURN_FAKE_MS later from observed per-turn human times.
-const AI_TURN_FAKE_MS = 30000;
+// reacting to an auction). AI turns add a hardcoded chunk per turn: 45s/turn, the
+// same flat per-turn estimate the sim length model uses (see sim.js SEC_PER_TURN).
+const AI_TURN_FAKE_MS = 45000;
 
 function startHumanTimer() {
   if (!state) return;
@@ -2627,7 +2627,7 @@ function startGame() {
       idx: i,
       species: seats[i].sp,
       isHuman: seats[i].role === 'you',
-      supply: numPlayers >= 4 ? 7 : 8,
+      supply: 8, // flat 8 workers at every player count (2026-06-22; see sim.js defaultWorkersPerPlayer)
       timePos: 0,
       hand: [],
       built: [],
@@ -2849,12 +2849,13 @@ const ENDGAME_TRACK_END = 59;
 
 // Fish-line endgame (trigger "b" + coda "d"). Each player retires the moment
 // their pawn passes the finish line; once everyone has, each gets one final
-// build. Climbing line 89/109/119 for 2P/3P/4P (2026-06-22 organic-ending
-// re-tune): the natural board-exhaustion depth scales with player count, so a
-// flat line ended too many 2P games on the board-exhaustion backstop instead of
-// organically (pawns crossing). 89/109/119 sits each count below its exhaustion
-// depth. Paired with the deck-empty auto-advance below.
-const FISH_LINE_BY_COUNT = { 2: 89, 3: 109, 4: 119 };
+// build. Recalibrated 2026-06-22 for the contention-aware bidder (matches
+// sim.js BID_CONTENTION_K = 1): with jams no longer burning ~45% of bids the AI
+// builds more efficiently and pawns reach the line later, so the old climbing
+// 89/109/119 ran long & backstop-heavy. A single FLAT line of 90 now ends all
+// counts organically (2P 98% / 3P 91% / 4P 100% fish-crossings) with healthy
+// builds — simpler for players. Paired with the deck-empty auto-advance below.
+const FISH_LINE_BY_COUNT = { 2: 90, 3: 90, 4: 90 };
 function fishFinishLine() {
   return FISH_LINE_BY_COUNT[state.players.length] || 30 * state.players.length;
 }
@@ -4891,6 +4892,26 @@ function aiDecideBid(playerIdx, card, minBid) {
   if (r < 0.15 && target > 0) target -= 1;
   else if (r > 0.85 && target < safePool && target < open) target += 1;
 
+  // Contention-aware restraint (matches sim.js BID_CONTENTION_K = 1): a sealed
+  // bidder can't see rivals' bids, so it discounts the open pool by ~1 icon per
+  // still-active opponent. If fewer than one icon is plausibly still clinchable,
+  // a free (non-trigger) bidder declines rather than feed a jam it can't win
+  // (a forced trigger bid is left to the min-bid floor below). This stops the AI
+  // from piling onto contested staples it can't win — see the over-bidding fix.
+  const BID_CONTENTION_K = 1;
+  if (open > 0) {
+    let activeOpps = 0;
+    for (const q of state.players) {
+      if (q.idx !== playerIdx && !q.exhausted && !q.out) activeOpps++;
+    }
+    const clinchable = open - BID_CONTENTION_K * activeOpps;
+    if (clinchable < 1) {
+      if (minBid === 0) target = 0;
+    } else {
+      target = Math.min(target, Math.ceil(clinchable));
+    }
+  }
+
   // Respect minBid
   target = Math.max(target, minBid);
   // Allow fallback only when needed to meet a min-bid trigger requirement.
@@ -4917,19 +4938,19 @@ const EFFECT_VP_FIXED = {
   'Granary': 3,
   'Charcoal Pit': 2,
   'Treaty Stone': 2,
-  'Cattail Marsh': 1,
+  'Cattail Marsh': 2,
   'Pontoon': 1,
-  'Cache Burrow': 1,
+  'Cache Burrow': 0.5,
   'Beaver Cache': 1,
   'Reed Bed': 0.5,
-  'Log Flume': 2,
+  'Log Flume': 1,
   'Mill Wheel': 0.5,
   'Pack Rat Burrow': 1,
   'Spring Cascade': 0.5,
   'Royal Lodge': 1,
-  'Burrow Run': 1,
+  'Burrow Run': 0.5,
   'Sap Drip': 1,
-  'Snag Pile': 1,
+  'Snag Pile': 0.5,
   'Vine Lattice': 0.5,
   'Spillway': 0.5,
   'Mud Levee': 0.5,
@@ -4941,9 +4962,9 @@ const EFFECT_VP_FIXED = {
   'Floodgate': 0,
   'Spy Mound': 0,
   'Tribute Stone': 0.5,
-  'Tow Line': 1,
-  'Portage': 1.5,
-  'Salmon Run': 2,
+  'Tow Line': 0.5,
+  'Portage': 0.5,
+  'Salmon Run': 1,
   'Stone Pool': 0,
   'Flush Channel': 0,
   'Salt Lick': 0,

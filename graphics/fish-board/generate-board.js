@@ -533,17 +533,17 @@ function buildSvg() {
     'font-size': 16, 'font-weight': 'bold', fill: '#244c5a', 'letter-spacing': '0.3',
   }));
   parts.push(`<line x1="${LEGEND_X + 14}" y1="${LEGEND_Y + 32}" x2="${LEGEND_X + LEGEND_W - 14}" y2="${LEGEND_Y + 32}" stroke="#244c5a" stroke-width="1" opacity="0.4"/>`);
-  // Climbing finish line per player count (2026-06-22 organic-ending re-tune):
-  // 2P=89, 3P=109, 4P=119 fish (all on the "+60" lap-2 side). Line "deck empty"
-  // states the auto-advance drift; last line is the no-shared-space retire rule.
+  // Flat finish line, same at every player count (2026-06-22 recalibration for
+  // the contention-aware bidder): 90 fish on the "+60" lap-2 side. Line "deck
+  // empty" states the auto-advance drift; last line is the no-shared-space retire.
   const egCx = LEGEND_X + LEGEND_W / 2;
   parts.push(text({
     x: egCx, y: LEGEND_Y + 48, content: 'all players cross the finish line',
     'text-anchor': 'middle', 'font-size': 12.5, 'font-style': 'italic', fill: '#5a4a36',
   }));
-  // Per-count finish lines as one centered bold line with a trailing fish icon.
+  // Single flat finish line as one centered bold line with a trailing fish icon.
   const egLineY = LEGEND_Y + 70;
-  const egLabel = '2P 89 · 3P 109 · 4P 119';
+  const egLabel = '90';
   const lblSize = 16;
   const lblW = egLabel.length * lblSize * 0.44;
   const fishSz = 17;

@@ -445,12 +445,18 @@ let SIM_FINISH_LINE = ENDGAME_TRACK_END;
 // board-games.org). The uniform 119 was calibrated to the LEADER's fish at
 // deck-empty, but the game runs past deck-empty, so at 2P uniform 119 ended ~38%
 // of games on the checkGameEnd board-exhaustion backstop rather than organically
-// (pawns crossing the line). The natural board-exhaustion depth scales with
-// player count (laggard median ~130/169/210 for 2/3/4P), so the line must climb:
-// 89/109/119 lands each count below its exhaustion depth (~0-6% backstop) while
-// keeping reasonable builds/VP. Paired with AUTO_ADVANCE_DECK_EMPTY below, which
-// erases the residual 2P backstop. (See `node sim.js fishline-end` diagnostic.)
-const FISH_LINE_BY_COUNT = { 2: 89, 3: 109, 4: 119 };
+// (pawns crossing the line). Recalibrated 2026-06-22 for the contention-aware
+// bidder (BID_CONTENTION_K = 1): with jams no longer burning ~45% of bids, pawns
+// reach the line much later, so the old climbing 89/109/119 lines ran long and
+// backstop-heavy (3P@109 fell to ~62% organic). The fixed bidder also builds
+// more efficiently, so a single FLAT line of 90 now ends all counts organically
+// (auto rule: 2P 98% / 3P 91% / 4P 100% fish-crossings) with healthy builds
+// (2P 3.7 / 3P 3.2 / 4P 2.6 per player) at ~28/39/55 min (flat 45s/turn model) —
+// a flat line a player can actually remember, which the old over-bidding
+// dynamics couldn't support.
+// Paired with AUTO_ADVANCE_DECK_EMPTY below.
+// (See `node sim.js fishline-pick` / `fishline-end`; toggle the old bidder with BID_K=0.)
+const FISH_LINE_BY_COUNT = { 2: 90, 3: 90, 4: 90 };
 function simFishLine(numP) { return FISH_LINE_BY_COUNT[numP] || 30 * numP; }
 
 // Live endgame-speedup rule: once the material deck is empty, the active player
@@ -466,6 +472,28 @@ const MAX_TURNS = 2000; // safety net
 // on a useful (in-hand) material at a cheap river slot (per-item cost <= 2).
 let SPECULATIVE_BID_PROB = 0;
 function setSpeculativeBidProb(p) { SPECULATIVE_BID_PROB = p; }
+
+// Passive-hoarding probe: when set to a player index, that player becomes a
+// "miser" who never contests an auction — it bids only the forced minimum (0 as
+// a non-trigger bidder, the min-bid as the triggerer), collecting plenty-auction
+// leftovers and hoarding fish instead of fighting for materials. Models the
+// human "spend like a miser, let rivals tap out, sweep" exploit so the
+// `miser` sweep can check whether it still beats the conservative K=1 field.
+let MISER_IDX = -1;
+function setMiserIdx(i) { MISER_IDX = i; }
+
+// Contention-aware bid restraint. Sealed bidders can't see opponents' bids, but
+// a rational player discounts the open-icon pool by an estimate of how many
+// icons rivals will claim before committing fish. We model expected opposing
+// demand as BID_CONTENTION_K icons per still-active opponent and cap a
+// non-trigger bid at the icons we could still plausibly clinch
+// (open - expOpp). When that's < 1, a non-trigger AI declines to bid rather
+// than feed a jam it can't win. K = 0 reproduces the old indiscriminate bidder;
+// K = 1 ("expect each rival to take ~1 icon") is the tuned default — see the
+// bid-diag sweep: it cuts the 4P jam rate 37%→7% and zero-clinch tempo waste
+// 281→41 fish/game while leaving builds/player and VP spread unchanged.
+let BID_CONTENTION_K = process.env.BID_K !== undefined ? Number(process.env.BID_K) : 1;
+function setBidContentionK(k) { BID_CONTENTION_K = k; }
 
 // Live rule: ANY plenty-to-go-around with leftover icons slides the card one
 // slot downstream (pre→R1, R1→R2, ..., R4→shore) instead of graduating it to
@@ -896,7 +924,11 @@ function buildStructureDeck(numPlayers) {
 // =============================================================================
 // STATE / TURN ORDER
 // =============================================================================
-function defaultWorkersPerPlayer(numPlayers) { return numPlayers >= 4 ? 7 : 8; }
+// Flat 8 workers at every player count (2026-06-22): with the contention-aware
+// bidder, 4P/8 gives ~50-min games and ~3.2 builds/player — matching 2P/3P — at
+// only ~13% jam (was ~37% pre-fix), so the old 4P=7 worker reduction (which
+// existed only to tame the over-bidding AI's jams/length) is no longer needed.
+function defaultWorkersPerPlayer(numPlayers) { return 8; }
 
 function newGame(numPlayers, workersPerPlayer = null) {
   if (workersPerPlayer == null) workersPerPlayer = defaultWorkersPerPlayer(numPlayers);
@@ -1039,6 +1071,8 @@ function newGame(numPlayers, workersPerPlayer = null) {
       nonZeroBidders: 0,          // count of (auction, bidder) pairs with bid > 0
       zeroClinchBidders: 0,       // of those, bidders that clinched 0 icons (only possible in jams)
       zeroClinchAuctions: 0,      // auctions where total bids > 0 but total clinched = 0
+      zeroClinchFish: 0,          // total 🐟 advanced by bidders who clinched 0 icons (pure tempo waste)
+      bidHist: [0, 0, 0, 0, 0],   // distribution of sealed bid sizes (index 0..4, clamped) over all bidders
       peakBlanks: 0,              // max total blanks across all river/preriv cards at any point
     },
   };
@@ -1399,6 +1433,10 @@ function collectAuctionBids(state, card, triggerPlayerIdx, minBidTrigger) {
 function resolveAuction(state, card, bids) {
   const open = uncoveredIcons(card);
   const totalBid = Object.values(bids).reduce((s, n) => s + n, 0);
+  // Bid-size distribution over every player who placed a worker (bid > 0).
+  for (const b of Object.values(bids)) {
+    if (b > 0) state.metrics.bidHist[Math.min(b, 4)]++;
+  }
   if (totalBid === 0) {
     state.metrics.noBidAuctions++;
     return;
@@ -1456,7 +1494,10 @@ function resolveAuction(state, card, bids) {
       advancePlayer(state, idx, timeAdvance);
       state.metrics.iconsClaimed += got;
       state.metrics.nonZeroBidders++;
-      if (got === 0) state.metrics.zeroClinchBidders++;
+      if (got === 0) {
+        state.metrics.zeroClinchBidders++;
+        state.metrics.zeroClinchFish += timeAdvance;
+      }
       totalClinched += got;
     }
     if (totalClinched === 0) state.metrics.zeroClinchAuctions++;
@@ -1708,6 +1749,26 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   ) {
     target = 1;
   }
+  // Contention-aware restraint: a sealed bidder can't see rivals' bids, but it
+  // can discount the open pool by an estimate of how many icons still-active
+  // opponents will claim (BID_CONTENTION_K icons/opponent). If fewer than one
+  // icon is plausibly still clinchable, a free (non-trigger) bidder declines
+  // rather than feed a jam it can't win; a forced trigger bid is left to the
+  // min-bid floor below. Otherwise the bid is capped at what it could clinch.
+  if (BID_CONTENTION_K > 0 && open > 0) {
+    let activeOpps = 0;
+    for (const q of state.players) {
+      if (q.idx !== playerIdx && !q.exhausted && !q.out) activeOpps++;
+    }
+    const clinchable = open - BID_CONTENTION_K * activeOpps;
+    if (clinchable < 1) {
+      if (minBid === 0) target = 0;
+    } else {
+      target = Math.min(target, Math.ceil(clinchable));
+    }
+  }
+  // Miser probe: never contest — bid only the forced minimum.
+  if (playerIdx === MISER_IDX) target = minBid;
   target = Math.max(target, minBid);
   // Cap at safe pool unless we need fallback to satisfy the trigger min-bid.
   target = Math.min(target, target > safePool && minBid > 0 ? totalPool : safePool);
@@ -1737,21 +1798,21 @@ const EFFECT_VP_FIXED = {
   'Granary': 3,
   'Charcoal Pit': 2,
   'Treaty Stone': 2,
-  'Cattail Marsh': 1,
+  'Cattail Marsh': 2,
   'Pontoon': 1,
-  'Cache Burrow': 1,
+  'Cache Burrow': 0.5,
   'Beaver Cache': 1,
   // Mid-low constants
   'Reed Bed': 0.5,
-  'Log Flume': 2,
+  'Log Flume': 1,
   'Mill Wheel': 0.5,
   'Pack Rat Burrow': 1,
   'Spring Cascade': 0.5,
   // One-time
   'Royal Lodge': 1,
-  'Burrow Run': 1,
+  'Burrow Run': 0.5,
   'Sap Drip': 1,
-  'Snag Pile': 1,
+  'Snag Pile': 0.5,
   'Vine Lattice': 0.5,
   'Spillway': 0.5,
   'Mud Levee': 0.5,
@@ -1764,10 +1825,10 @@ const EFFECT_VP_FIXED = {
   'Floodgate': 0,
   'Spy Mound': 0,
   'Tribute Stone': 0.5,
-  'Tow Line': 1,
-  'Portage': 1.5,
-  'Salmon Run': 2,
-  'Confluence': 1.5,
+  'Tow Line': 0.5,
+  'Portage': 0.5,
+  'Salmon Run': 1,
+  'Confluence': 0.5,
   'Stone Pool': 0,
   'Flush Channel': 0,
   // Sim no-ops (would be > 0 with smarter AI)
@@ -3548,9 +3609,9 @@ function sweepRule() {
       const wstPct = avg(trials.map(m => pct(m.iconsWastedToShore, m.iconsSpawned)));
       const built = avg(trials.map(m => m.cardsBuilt));
       const winVP = avg(trials.map(m => m.winnerVP));
-      // Play-time estimate: 30s per AI turn matches the web prototype's AI_TURN_FAKE_MS.
-      // Treats every turn (real or AI) as 30s — proxy for live play with humans-as-AIs.
-      const estMin = (turns * 30) / 60;
+      // Play-time estimate: 45s per turn matches the web prototype's AI_TURN_FAKE_MS.
+      // Treats every turn (real or AI) as 45s — proxy for live play with humans-as-AIs.
+      const estMin = (turns * 45) / 60;
       console.log(
         pad(numP, 5) + pad(useB ? '(b)' : 'base', 8) +
         padL(turns.toFixed(0), 6) +
@@ -3683,7 +3744,7 @@ function sweepAblation(numGamesArg, numPArg, workersArg) {
 // ±1 net-VP balance band. Run with `cpulimit -l 50 -f -m --` per the sim rule.
 function sweepConfluence(numGamesArg, numPArg, workersArg) {
   const numP = parseInt(numPArg) || 4;
-  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
   const numGames = parseInt(numGamesArg) || 4000;
   configureMaterials(6);
   const CARD = 'Confluence';
@@ -3787,7 +3848,7 @@ function sweepConfluence(numGamesArg, numPArg, workersArg) {
 // with `cpulimit -l 50 -f -m --` per the sim-ablations rule.
 function sweepConfluencePairing(numGamesArg, numPArg, workersArg) {
   const numP = parseInt(numPArg) || 4;
-  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
   const numGames = parseInt(numGamesArg) || 4000;
   configureMaterials(6);
   const CARD = 'Confluence';
@@ -3891,7 +3952,7 @@ function sweepConfluencePairing(numGamesArg, numPArg, workersArg) {
 // pairing rules. Run with `cpulimit -l 50 -f -m --` per the sim-ablations rule.
 function sweepConfluenceStarter(numGamesArg, numPArg, workersArg) {
   const numP = parseInt(numPArg) || 4;
-  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
   const numGames = parseInt(numGamesArg) || 5000;
   configureMaterials(6);
 
@@ -3981,7 +4042,7 @@ function sweepConfluenceStarter(numGamesArg, numPArg, workersArg) {
 // (per-item billing) held at 'min'. Run with `cpulimit -l 50 -f -m --`.
 function sweepConfluenceTrigger(numGamesArg, numPArg, workersArg, pairingArg) {
   const numP = parseInt(numPArg) || 4;
-  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
   const numGames = parseInt(numGamesArg) || 4000;
   const pairing = (pairingArg === 'same') ? 'same' : 'any';
   configureMaterials(6);
@@ -4080,7 +4141,7 @@ function sweepConfluenceTrigger(numGamesArg, numPArg, workersArg, pairingArg) {
 // board-churn proxies. Run with `cpulimit -l 50 -f -m --`.
 function sweepGameLength(numGamesArg, numPArg, workersArg) {
   const numP = parseInt(numPArg) || 4;
-  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
   const numGames = parseInt(numGamesArg) || 5000;
   configureMaterials(6);
 
@@ -4170,7 +4231,7 @@ function sweepGameLength(numGamesArg, numPArg, workersArg) {
 // Run with `cpulimit -l 50 -f -m --`.
 function sweepBalance(numGamesArg, numPArg, workersArg) {
   const numP = parseInt(numPArg) || 4;
-  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
   const numGames = parseInt(numGamesArg) || 3000;
   configureMaterials(6);
 
@@ -4330,7 +4391,7 @@ function sweepBalance(numGamesArg, numPArg, workersArg) {
 // to show how the knobs would behave.) Run with `cpulimit -l 50 -f -m --`.
 function sweepConfluenceMatrix(numGamesArg, numPArg, workersArg) {
   const numP = parseInt(numPArg) || 4;
-  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
   const numGames = parseInt(numGamesArg) || 3000;
   configureMaterials(6);
 
@@ -4477,7 +4538,7 @@ function sweepConfluenceMatrix(numGamesArg, numPArg, workersArg) {
 // defaults. Run with `cpulimit -l 50 -f -m --` per the sim-ablations rule.
 function sweepEffectUse(numGamesArg, numPArg, workersArg, pairingArg) {
   const numP = parseInt(numPArg) || 4;
-  const workers = parseInt(workersArg) || (numP >= 4 ? 7 : 8);
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
   const numGames = parseInt(numGamesArg) || 4000;
   // Optional 4th arg sets Confluence's pairing rule for this run ('same'|'any'),
   // so its usage can be read against the rest of the cohort under either rule.
@@ -5753,13 +5814,12 @@ function fmtTime(seconds) {
 // =============================================================================
 // Calibrates the game to the 30–60 minute target across 2P/3P/4P, with and
 // without asymmetric (species-starter) play. The simulation produces a TURN
-// count per game; wall-clock minutes are turns × secPerTurn / 60. The web
-// prototype's AI_TURN_FAKE_MS = 30s is a self-described placeholder pending
-// real human timing, and it disagrees ~2.3× with the auction-based heuristic,
-// so this sweep evaluates a plausible human range — TUNE_SPTS = [45, 60] s/turn
-// — from the SAME runs (the turn distribution is heuristic-independent; only
-// the minute axis rescales). Best lines are chosen for robustness across the
-// whole range (maximize the worst-case in-band % over both endpoints).
+// count per game; wall-clock minutes are turns × secPerTurn / 60. The live
+// length model (web Sim chip AI_TURN_FAKE_MS and the fishline sweeps) is a flat
+// 45s/turn; this sweep evaluates a plausible human range — TUNE_SPTS = [45, 60]
+// s/turn — from the SAME runs (the turn distribution is heuristic-independent;
+// only the minute axis rescales). Best lines are chosen for robustness across
+// the whole range (maximize the worst-case in-band % over both endpoints).
 //
 // Two design levers are swept:
 //   1. fish line — FISH_LINE_BY_COUNT[numP]; the pawn-track space a player must
@@ -6464,13 +6524,12 @@ function sweepFishline(numGamesArg, numPArg) {
   const numPArgInt = parseInt(numPArg);
   const playerCounts = numPArgInt ? [numPArgInt] : [2, 3, 4];
   const numMats = 6;
-  const SEC_PER_AUCTION = 90;
-  const SEC_PER_BUILD_INVENT = 15;
+  const SEC_PER_TURN = 45;
   const fishLines = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300];
 
   console.log(`\nRiver Bankers — fish-line sweep, b+d only  (${numGames} games/config, 6 materials)`);
   console.log(`Trigger b:fish-line (retire as pawn passes the line) + coda d:one build each.`);
-  console.log(`Game time = ${SEC_PER_AUCTION}s/auction + ${SEC_PER_BUILD_INVENT}s/(build or Invent).`);
+  console.log(`Game time = ${SEC_PER_TURN}s/turn (flat).`);
   console.log(`After the material deck empties, players keep auctioning river/Headwaters cards`);
   console.log(`until all pawns pass the line (or the board is fully mined out).\n`);
 
@@ -6489,9 +6548,8 @@ function sweepFishline(numGamesArg, numPArg) {
       for (let g = 0; g < numGames; g++) {
         rows.push(egRunGame(numP, numMats, workers, 'fish', 0, line, 'd'));
       }
-      const meanAuc = avg(rows.map(r => r.auc));
-      const meanBuildInvent = avg(rows.map(r => r.built + r.invents));
-      const gameSecs = meanAuc * SEC_PER_AUCTION + meanBuildInvent * SEC_PER_BUILD_INVENT;
+      const meanTurns = avg(rows.map(r => r.turns));
+      const gameSecs = meanTurns * SEC_PER_TURN;
       console.log(
         pad(String(line), 9) +
         padL(fmtTime(gameSecs), 8) +
@@ -6509,7 +6567,7 @@ function sweepFishline(numGamesArg, numPArg) {
   console.log(`Elapsed: ${((Date.now() - tStart) / 1000).toFixed(1)}s.`);
   console.log('\nLegend:');
   console.log(`  fishLine = cumulative-fish line; a player retires the turn they pass it.`);
-  console.log(`  time     = ${SEC_PER_AUCTION}s × auctions + ${SEC_PER_BUILD_INVENT}s × (builds + Invents), as M:SS.`);
+  console.log(`  time     = ${SEC_PER_TURN}s × turns (flat per-turn estimate), as M:SS.`);
   console.log('  builds   = mean structures built/game; avgVP = mean final VP across all players.');
   console.log('  spread   = mean (winnerVP − loserVP).');
   console.log('  matDeck  = mean material (resource) cards left in the deck at game end.');
@@ -6590,6 +6648,7 @@ function instrFishPlayout(state, fishLimit, proc, autoAdvanceEmpty = false) {
       turns: state.metrics.turns,
       avgVP: vps.reduce((s, v) => s + v, 0) / vps.length,
       spread: vps[0] - vps[vps.length - 1],
+      jamPct: pct(state.metrics.jamAuctions, state.metrics.auctions),
     };
   } finally {
     SIM_FINISH_LINE = prevFinish;
@@ -6678,16 +6737,16 @@ function sweepFishlineEnd(numGamesArg, numPArg) {
 
 // Targeted: report the requested stats for specific candidate lines at each
 // player count (3x3 matrix of {89,109,119} x {2P,3P,4P}). Same fish-line
-// endgame + coda d as the live model. Game length uses the web turn-clock model
-// (90s/auction + 15s/(build|Invent)).
+// endgame + coda d as the live model. Game length uses a flat 45s/turn estimate
+// (matches the web Sim chip's AI_TURN_FAKE_MS).
 function sweepFishlinePick(numGamesArg) {
   const numGames = parseInt(numGamesArg) || 1000;
   const numMats = 6;
   const proc = 'd';
-  const SEC_PER_AUCTION = 90;
-  const SEC_PER_BUILD_INVENT = 15;
+  const SEC_PER_TURN = 45;
   // Lines per player count (2P extended down to 59).
-  const linesByCount = { 2: [59, 89, 109, 119], 3: [89, 109, 119], 4: [89, 109, 119] };
+  // Live flat line (90) first in each list, plus neighbours / old lines as a ladder.
+  const linesByCount = { 2: [90, 109], 3: [90, 109, 119], 4: [90, 100, 119] };
   const playerCounts = [2, 3, 4];
 
   function runRow(numP, workers, line, autoAdv) {
@@ -6698,9 +6757,7 @@ function sweepFishlinePick(numGamesArg) {
       rows.push(instrFishPlayout(state, line, proc, autoAdv));
     }
     const n = rows.length;
-    const meanAuc = avg(rows.map(r => r.auc));
-    const meanBI = avg(rows.map(r => r.built + r.invents));
-    const gameSecs = meanAuc * SEC_PER_AUCTION + meanBI * SEC_PER_BUILD_INVENT;
+    const gameSecs = avg(rows.map(r => r.turns)) * SEC_PER_TURN;
     const meanBuilt = avg(rows.map(r => r.built));
     console.log(
       pad(`${numP}P`, 6) + pad(String(line), 6) + pad(autoAdv ? 'auto' : 'base', 6) +
@@ -6715,7 +6772,7 @@ function sweepFishlinePick(numGamesArg) {
   }
 
   console.log(`\nRiver Bankers — fish-line pick  (${numGames} games/config, 6 materials, coda d)`);
-  console.log(`Game length = ${SEC_PER_AUCTION}s/auction + ${SEC_PER_BUILD_INVENT}s/(build or Invent).`);
+  console.log(`Game length = ${SEC_PER_TURN}s/turn (flat).`);
   console.log(`rule: base = current; auto = +1 fish at end of turn once the material deck is empty.\n`);
   console.log(
     pad('count', 6) + pad('line', 6) + pad('rule', 6) + padL('length', 8) +
@@ -6738,19 +6795,18 @@ function sweepFishlinePick(numGamesArg) {
 }
 
 // Game-length histogram for the live configs (per-count line + auto-advance).
-// Reports the length distribution, percentiles, action composition, and the
-// implied average seconds/turn (length is action-weighted, not flat/turn).
-function sweepFishlineHist(numGamesArg, aucSecsArg) {
+// Reports the length distribution, percentiles, and action composition under a
+// flat per-turn time model (default 45s/turn; override via the CLI arg).
+function sweepFishlineHist(numGamesArg, sptArg) {
   const numGames = parseInt(numGamesArg) || 3000;
   const numMats = 6;
   const proc = 'd';
-  const SEC_PER_AUCTION = parseInt(aucSecsArg) || 90;
-  const SEC_PER_BUILD_INVENT = 15;
-  const configs = [{ numP: 2, line: 89 }, { numP: 3, line: 109 }, { numP: 4, line: 119 }];
+  const SEC_PER_TURN = parseInt(sptArg) || 45;
+  const configs = [{ numP: 2, line: 90 }, { numP: 3, line: 90 }, { numP: 4, line: 90 }];
   const BIN = 5; // minutes per histogram bin
 
   console.log(`\nRiver Bankers — game-length histogram  (${numGames} games/config, live: per-count line + auto-advance)`);
-  console.log(`Length model = ${SEC_PER_AUCTION}s/auction + ${SEC_PER_BUILD_INVENT}s/(build or Invent). NOT a flat per-turn time.\n`);
+  console.log(`Length model = ${SEC_PER_TURN}s/turn (flat).\n`);
 
   for (const { numP, line } of configs) {
     const workers = defaultWorkersPerPlayer(numP);
@@ -6759,13 +6815,12 @@ function sweepFishlineHist(numGamesArg, aucSecsArg) {
       configureMaterials(numMats);
       const state = newGame(numP, workers);
       const r = instrFishPlayout(state, line, proc, true);
-      const secs = r.auc * SEC_PER_AUCTION + (r.built + r.invents) * SEC_PER_BUILD_INVENT;
+      const secs = r.turns * SEC_PER_TURN;
       mins.push(secs / 60); aucs.push(r.auc); bis.push(r.built + r.invents); turnsArr.push(r.turns);
     }
     mins.sort((a, b) => a - b);
     const mean = avg(mins);
     const meanAuc = avg(aucs), meanBI = avg(bis), meanTurns = avg(turnsArr);
-    const implSecPerTurn = (mean * 60) / meanTurns;
     console.log(`=== ${numP}P @ line ${line} (${workers} workers) ===`);
     console.log(
       `  min ${pctl(mins,0).toFixed(0)}  p10 ${pctl(mins,0.1).toFixed(0)}  p25 ${pctl(mins,0.25).toFixed(0)}  ` +
@@ -6774,7 +6829,7 @@ function sweepFishlineHist(numGamesArg, aucSecsArg) {
     );
     console.log(
       `  composition: ${meanAuc.toFixed(1)} auctions + ${meanBI.toFixed(1)} builds/Invents over ` +
-      `${meanTurns.toFixed(1)} turns ⇒ implied ${implSecPerTurn.toFixed(0)}s/turn avg`
+      `${meanTurns.toFixed(1)} turns ⇒ ${(meanTurns * SEC_PER_TURN / 60).toFixed(0)} min @ ${SEC_PER_TURN}s/turn`
     );
     // Histogram.
     const maxMin = pctl(mins, 1);
@@ -6794,9 +6849,204 @@ function sweepFishlineHist(numGamesArg, aucSecsArg) {
   }
 }
 
+// AI over-bidding diagnostic. For each live config (2P/3P @ 8 workers, 4P @ 7)
+// sweeps the contention-restraint knob BID_CONTENTION_K and reports the bid-size
+// distribution, jam rate, zero-clinch waste, builds, and VP spread so we can see
+// (a) how badly the indiscriminate bidder (K=0) jams and wastes tempo, and
+// (b) whether restraint fixes it without breaking balance.
+function sweepBidDiag(numGamesArg, ksArg) {
+  const N = parseInt(numGamesArg) || 1200;
+  const numMats = 6;
+  const ks = ksArg ? ksArg.split(',').map(Number) : [0, 0.5, 1, 1.5, 2];
+  const configs = [{ numP: 2, w: 8 }, { numP: 3, w: 8 }, { numP: 4, w: 7 }];
+
+  console.log(`\nRiver Bankers — AI over-bidding diagnostic  (${N} games/cell, ${numMats} materials, live worker counts)`);
+  console.log(`K = BID_CONTENTION_K (expected rival icons/opponent the AI discounts before bidding). K=0 = current bidder.\n`);
+  console.log(
+    pad('cfg', 6) + padL('K', 5) + padL('aucs', 6) + padL('jam%', 7) + padL('nob%', 7) +
+    padL('bid1%', 7) + padL('bid2%', 7) + padL('bid3%', 7) + padL('bid4%', 7) + padL('avgBid', 7) +
+    padL('zclr%', 7) + padL('zcfish', 7) + padL('built/p', 8) +
+    padL('winVP', 7) + padL('spread', 8) + padL('margin', 8)
+  );
+  console.log('-'.repeat(6 + 5 + 6 + 7 * 6 + 7 + 7 + 8 + 7 + 8 + 8));
+  for (const { numP, w } of configs) {
+    for (const k of ks) {
+      setBidContentionK(k);
+      const trials = [];
+      for (let t = 0; t < N; t++) trials.push(runGame(numP, numMats, w));
+      const aucs = avg(trials.map(m => m.auctions));
+      const jamPct = avg(trials.map(m => pct(m.jamAuctions, m.auctions)));
+      const nobPct = avg(trials.map(m => pct(m.noBidAuctions, m.auctions)));
+      // Bid-size distribution, pooled across all games in the cell.
+      const hist = [0, 0, 0, 0, 0];
+      for (const m of trials) for (let b = 1; b <= 4; b++) hist[b] += m.bidHist[b];
+      const totBids = hist[1] + hist[2] + hist[3] + hist[4];
+      const bp = b => pct(hist[b], totBids);
+      const avgBid = totBids === 0 ? 0 : (hist[1] + 2 * hist[2] + 3 * hist[3] + 4 * hist[4]) / totBids;
+      // Zero-clinch rate: of all placed bids, the share that won nothing; and the
+      // average fish/game burned by those losing bids.
+      const zclr = avg(trials.map(m => pct(m.zeroClinchBidders, m.nonZeroBidders)));
+      const zcfish = avg(trials.map(m => m.zeroClinchFish));
+      const built = avg(trials.map(m => m.cardsBuilt));
+      const winVP = avg(trials.map(m => m.winnerVP));
+      const spread = avg(trials.map(m => m.vpSpread));
+      const margin = avg(trials.map(m => m.winMargin));
+      console.log(
+        pad(`${numP}P/${w}`, 6) + padL(k, 5) + padL(aucs.toFixed(1), 6) +
+        padL(jamPct.toFixed(1), 7) + padL(nobPct.toFixed(1), 7) +
+        padL(bp(1).toFixed(0), 7) + padL(bp(2).toFixed(0), 7) + padL(bp(3).toFixed(0), 7) + padL(bp(4).toFixed(0), 7) +
+        padL(avgBid.toFixed(2), 7) +
+        padL(zclr.toFixed(1), 7) + padL(zcfish.toFixed(1), 7) + padL((built / numP).toFixed(1), 8) +
+        padL(winVP.toFixed(1), 7) + padL(spread.toFixed(1), 8) + padL(margin.toFixed(1), 8)
+      );
+    }
+    console.log();
+  }
+  setBidContentionK(1); // restore the live default
+  console.log('Legend:');
+  console.log('  K       = contention discount (icons/opponent) the AI subtracts from the open pool before bidding');
+  console.log('  jam%    = auctions where total bid > open icons (card slides, allocation by overbid math)');
+  console.log('  nob%    = auctions with zero bids (nobody contested)');
+  console.log('  bidN%   = share of placed bids that were N workers (N=4 is clamped 4+)');
+  console.log('  avgBid  = mean worker count of a placed bid');
+  console.log('  zclr%   = zero-clinch rate: placed bids that won 0 icons / all placed bids');
+  console.log('  zcfish  = avg fish/game advanced by bids that clinched nothing (pure tempo waste)');
+  console.log('  built/p = avg structures built per player; spread/margin = VP win/last and win/runner-up gaps\n');
+}
+
+// Passive-hoarding probe. Makes player 0 a "miser" (never contests an auction —
+// bids only the forced minimum, collects plenty-auction leftovers, hoards fish)
+// and pits it against a field of normal K=1 AIs. If the miser's win rate is at
+// or below the 1/numP baseline, the "spend like a miser, let rivals tap out,
+// sweep" exploit no longer dominates now that the fixed bidder doesn't self-jam.
+function sweepMiser(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 8000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  // role[0] = miser (idx 0), role[1] = field (idx 1..numP-1, pooled).
+  const role = [
+    { name: `MISER (idx 0)`, games: 0, wins: 0, vp: 0, built: 0, fish: 0 },
+    { name: `field/player`,  games: 0, wins: 0, vp: 0, built: 0, fish: 0 },
+  ];
+  setMiserIdx(0);
+  const t0 = Date.now();
+  for (let g = 0; g < numGames; g++) {
+    if ((g + 1) % 1000 === 0) process.stderr.write(`\rGames ${g + 1}/${numGames}`);
+    const state = newGame(numP, workers);
+    runOneGame(state);
+    const scored = state.players.map(p => ({
+      idx: p.idx, vp: totalVP(p, state), timePos: p.timePos, built: p.built.length,
+    }));
+    scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+    const winnerIdx = scored[0].idx;
+    for (const s of scored) {
+      const r = s.idx === 0 ? role[0] : role[1];
+      r.games += 1; r.vp += s.vp; r.built += s.built; r.fish += s.timePos;
+      if (s.idx === winnerIdx) r.wins += 1;
+    }
+  }
+  setMiserIdx(-1);
+  process.stderr.write('\r' + ' '.repeat(60) + '\r');
+
+  const baseline = 100 / numP;
+  console.log(`\nRiver Bankers — passive-hoarding probe (miser vs K=1 field)`);
+  console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games. Player 0 never contests (bids the minimum, hoards).`);
+  console.log(`Baseline win% = 1/${numP} = ${baseline.toFixed(1)}%. miser win% ≫ baseline ⇒ passive hoarding still dominates.\n`);
+  console.log(pad('role', 15) + padL('win%', 8) + padL('95%CI', 8) + padL('Δbase', 8) + padL('avgVP', 8) + padL('built', 8) + padL('endFish', 8));
+  console.log('-'.repeat(15 + 8 * 6));
+  for (const r of role) {
+    const winPct = 100 * r.wins / r.games;
+    const p = winPct / 100;
+    const ci = 100 * 1.96 * Math.sqrt(p * (1 - p) / r.games);
+    const delta = winPct - baseline;
+    console.log(
+      pad(r.name, 15) + padL(winPct.toFixed(1) + '%', 8) + padL('±' + ci.toFixed(1), 8) +
+      padL((delta >= 0 ? '+' : '') + delta.toFixed(1), 8) +
+      padL((r.vp / r.games).toFixed(1), 8) + padL((r.built / r.games).toFixed(2), 8) +
+      padL((r.fish / r.games).toFixed(0), 8)
+    );
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('Legend: win% per player (miser = 1 player/game; field = pooled over the other ' + (numP - 1) + ').');
+  console.log('  avgVP/built/endFish = per-player-game averages; endFish = final fish-track position (hoarders advance less).\n');
+}
+
+// Worker-count revisit under the live model (fish-line endgame + auto-advance,
+// K=1 bidder, 45s/turn length). Compares a player count across worker counts so
+// the 4P 7-vs-8 question can be re-decided on the current rules rather than the
+// old climbing-line + over-bidding ones. node sim.js workers [numP] [workersCsv].
+function sweepWorkers(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const numGames = parseInt(numGamesArg) || 4000;
+  const numMats = 6;
+  const SEC_PER_TURN = 45;
+  const line = simFishLine(numP);
+  const workerSet = workersArg ? workersArg.split(',').map(Number) : [6, 7, 8];
+
+  console.log(`\nRiver Bankers — worker-count revisit  (${numGames} games/cell, ${numP}P, fish line ${line}, auto rule, K=1, ${SEC_PER_TURN}s/turn)`);
+  console.log(
+    pad('wkrs', 6) + padL('length', 8) + padL('turns', 7) + padL('aucs', 7) +
+    padL('jam%', 7) + padL('built/p', 8) + padL('%fish', 7) + padL('%back', 7) +
+    padL('avgVP', 7) + padL('spread', 8) + padL('matDk', 7)
+  );
+  console.log('-'.repeat(6 + 8 + 7 + 7 + 7 + 8 + 7 + 7 + 7 + 8 + 7));
+  for (const w of workerSet) {
+    const rows = [];
+    for (let g = 0; g < numGames; g++) {
+      configureMaterials(numMats);
+      const state = newGame(numP, w);
+      rows.push(instrFishPlayout(state, line, 'd', true));
+    }
+    const n = rows.length;
+    const meanTurns = avg(rows.map(r => r.turns));
+    console.log(
+      pad(String(w), 6) +
+      padL(fmtTime(meanTurns * SEC_PER_TURN), 8) +
+      padL(meanTurns.toFixed(0), 7) +
+      padL(avg(rows.map(r => r.auc)).toFixed(1), 7) +
+      padL(avg(rows.map(r => r.jamPct)).toFixed(1), 7) +
+      padL((avg(rows.map(r => r.built)) / numP).toFixed(2), 8) +
+      padL((100 * rows.filter(r => r.endReason === 'fish').length / n).toFixed(0), 7) +
+      padL((100 * rows.filter(r => r.endReason === 'backstop').length / n).toFixed(0), 7) +
+      padL(avg(rows.map(r => r.avgVP)).toFixed(1), 7) +
+      padL(avg(rows.map(r => r.spread)).toFixed(1), 8) +
+      padL(avg(rows.map(r => r.matDeck)).toFixed(1), 7)
+    );
+  }
+  console.log('\nLegend: length = turns×45s; built/p = structures/player; %fish/%back = organic vs backstop ending;');
+  console.log('  avgVP/spread = mean final VP / (winner−last) gap; matDk = material cards left at end.\n');
+}
+
 if (require.main === module) {
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
+  else if (mode === 'bid-diag') sweepBidDiag(process.argv[3], process.argv[4]);
+  else if (mode === 'miser') sweepMiser(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'workers') sweepWorkers(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'rule') sweepRule();
   else if (mode === 'deck') sweepDeck(process.argv[3]);
   else if (mode === 'uniform') sweepUniform();
