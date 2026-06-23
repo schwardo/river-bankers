@@ -52,20 +52,15 @@ class PlayerTurn extends GameState
             throw new UserException('Invalid card choice');
         }
 
-        // Add your game logic to play a card here.
-        $card_name = Game::$CARD_TYPES[$card_id]['card_name'];
+        // TODO (Phase 4): replace this placeholder with the real turn actions
+        // (Pull / Auction / Flush / Invent / Build).
 
         // Notify all players about the card played.
-        $this->bga->notify->all("cardPlayed", clienttranslate('${player_name} plays ${card_name}'), [
+        $this->bga->notify->all("cardPlayed", clienttranslate('${player_name} plays a card'), [
             "player_id" => $activePlayerId,
             "player_name" => $this->game->getPlayerNameById($activePlayerId), // remove this line if you uncomment notification decorator
-            "card_name" => $card_name, // remove this line if you uncomment notification decorator
             "card_id" => $card_id,
-            "i18n" => ['card_name'], // remove this line if you uncomment notification decorator
         ]);
-
-        // in this example, the player gains 1 points each time he plays a card
-        $this->bga->playerScore->inc($activePlayerId, 1);
 
         // at the end of the action, move to the next state
         return NextPlayer::class;
@@ -85,9 +80,6 @@ class PlayerTurn extends GameState
             "player_id" => $activePlayerId,
             "player_name" => $this->game->getPlayerNameById($activePlayerId), // remove this line if you uncomment notification decorator
         ]);
-
-        // in this example, the player gains 1 energy each time he passes
-        $this->game->playerEnergy->inc($activePlayerId, 1);
 
         // at the end of the action, move to the next state
         return NextPlayer::class;
