@@ -67,6 +67,7 @@ class Game extends \Bga\GameFramework\Table
         $result["fishLine"] = (int) $this->globals->get("fish_line", self::FISH_LINE);
         $result["board"] = $this->getBoardView();
         $result["built"] = $this->getBuiltViewAll();
+        $result["materials"] = $this->getMaterialsAll();
         $result["hand"] = $this->getHandView($currentPlayerId); // private: only this player's hand
 
         return $result;
@@ -740,6 +741,20 @@ class Game extends \Bga\GameFramework\Table
         );
     }
 
+    /**
+     * Per-player worker holdings by material (for the player panels).
+     *
+     * @return array<int, array{fixed: array<string,int>, wild: list<array{materials:array{0:string,1:string}, count:int}>}>
+     */
+    public function getMaterialsAll(): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB("SELECT `player_id` FROM `player`") as $p) {
+            $out[(int) $p['player_id']] = $this->getLeftoverWorkers((int) $p['player_id']);
+        }
+        return $out;
+    }
+
     /** Payload for the `boardUpdate` notification (public board + player panels). */
     public function boardUpdatePayload(): array
     {
@@ -747,6 +762,7 @@ class Game extends \Bga\GameFramework\Table
             'board' => $this->getBoardView(),
             'players' => $this->getPlayersPublic(),
             'built' => $this->getBuiltViewAll(),
+            'materials' => $this->getMaterialsAll(),
         ];
     }
 

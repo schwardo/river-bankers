@@ -7,6 +7,7 @@ namespace Bga\Games\RiverBankers\States;
 use Bga\GameFramework\StateType;
 use Bga\GameFramework\States\GameState;
 use Bga\Games\RiverBankers\Game;
+use Bga\Games\RiverBankers\Material;
 use Bga\Games\RiverBankers\Rules\Auction as AuctionRules;
 use Bga\Games\RiverBankers\Rules\Cost;
 
@@ -61,10 +62,22 @@ class ResolveAuction extends GameState
         }
         $this->game->clearAuction($auctionId);
 
-        $this->notify->all('auctionResolved', clienttranslate('Auction resolved'), [
-            'card_id' => $cardId,
-            'placed' => $placed,
-        ]);
+        // Report what each bidder won (and that empty-handed bidders still paid).
+        $material = Material::$MATERIAL[(int) $cardRow['card_type_arg']]['material'] ?? '';
+        foreach ($bids as $pid => $bid) {
+            $got = $clinched[$pid];
+            $msg = $got > 0
+                ? clienttranslate('${player_name} wins ${n} ${material} (paid ${paid}🐟)')
+                : clienttranslate('${player_name} wins nothing (paid ${paid}🐟)');
+            $this->notify->all('auctionResolved', $msg, [
+                'player_id' => $pid,
+                'player_name' => $this->game->getPlayerNameById($pid),
+                'n' => $got,
+                'material' => $material,
+                'paid' => $billable[$pid] * $perItem,
+                'i18n' => ['material'],
+            ]);
+        }
 
         return NextPlayer::class;
     }

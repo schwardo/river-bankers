@@ -126,6 +126,7 @@ export class Game {
                     <span id="fish-${p.id}">${p.fish}</span> 🐟 (line ${gamedatas.fishLine})
                     &nbsp; <span id="supply-${p.id}">${p.supply}</span> 👷
                     &nbsp; <span id="score-${p.id}">${p.score}</span> ★
+                    <div id="materials-${p.id}" class="rb-mats"></div>
                     <div id="built-${p.id}" class="rb-built"></div>
                 </div>
             `);
@@ -134,6 +135,7 @@ export class Game {
         this.renderBoard(gamedatas.board);
         this.renderHand(gamedatas.hand);
         this.renderBuilt(gamedatas.built);
+        this.renderMaterials(gamedatas.materials);
         this.setupNotifications();
     }
 
@@ -180,6 +182,17 @@ export class Game {
         });
     }
 
+    renderMaterials(materials) {
+        Object.entries(materials || {}).forEach(([pid, held]) => {
+            const el = document.getElementById(`materials-${pid}`);
+            if (!el) return;
+            const fixed = Object.entries(held.fixed || {}).map(([m, n]) => `${n}${MAT_GLYPH[m] || m}`);
+            const wild = (held.wild || []).map(w => `${w.count}${MAT_GLYPH[w.materials[0]] || ''}/${MAT_GLYPH[w.materials[1]] || ''}`);
+            const all = [...fixed, ...wild];
+            el.innerHTML = all.length ? all.join(' ') : '<span class="rb-empty">no workers placed</span>';
+        });
+    }
+
     // ---- helpers ----
 
     myId() { return Number(this.bga.players.getCurrentPlayerId()); }
@@ -211,6 +224,7 @@ export class Game {
     async notif_boardUpdate(args) {
         this.renderBoard(args.board);
         this.renderBuilt(args.built);
+        this.renderMaterials(args.materials);
         Object.values(args.players).forEach(p => {
             this.players[p.id] = { ...this.players[p.id], ...p };
             const set = (pfx, v) => { const e = document.getElementById(`${pfx}-${p.id}`); if (e) e.textContent = v; };
