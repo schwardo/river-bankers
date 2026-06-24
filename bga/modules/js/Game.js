@@ -112,15 +112,12 @@ export class Game {
         // Setting up player boards
         Object.values(gamedatas.players).forEach(player => {
             // example of setting up players boards
+            // Fish-track position (River Bankers' money + turn-order key) and
+            // unplaced worker supply. TODO: live updates via notifications.
             this.bga.playerPanels.getElement(player.id).insertAdjacentHTML('beforeend', `
-                <span id="energy-player-counter-${player.id}"></span> Energy
+                <span id="fish-player-counter-${player.id}">${player.fish}</span> 🐟
+                &nbsp; <span id="worker-player-counter-${player.id}">${player.supply}</span> 👷
             `);
-            const counter = new ebg.counter();
-            counter.create(`energy-player-counter-${player.id}`, {
-                value: player.energy,
-                playerCounter: 'energy',
-                playerId: player.id
-            });
 
             // example of adding a div for each player
             document.getElementById('player-tables').insertAdjacentHTML('beforeend', `
