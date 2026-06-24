@@ -661,9 +661,8 @@ class Game extends \Bga\GameFramework\Table
                 $shorelineTotal,
                 $this->getShorelineCountWithWorkers($pid),
             );
-            $this->DbQuery(
-                "UPDATE `player` SET `player_score` = $vp, `player_score_aux` = " . (-$row['fish']) . " WHERE `player_id` = $pid"
-            );
+            $this->playerScore->set($pid, $vp);
+            $this->playerScoreAux->set($pid, -$row['fish']);
         }
     }
 
