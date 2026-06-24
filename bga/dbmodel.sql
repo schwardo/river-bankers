@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS `card` (
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS `worker` (
   `player_id` INT UNSIGNED NOT NULL,
-  `card_id` INT UNSIGNED NOT NULL,            -- the river/shoreline card
+  `card_id` INT UNSIGNED NOT NULL,
   `workers` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   PRIMARY KEY (`player_id`, `card_id`),
   KEY `card_id` (`card_id`)
@@ -107,9 +107,9 @@ ALTER TABLE `player` ADD `player_hand_limit` TINYINT UNSIGNED NOT NULL DEFAULT 3
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS `auction` (
   `auction_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `lot_card_id` INT UNSIGNED NOT NULL,        -- card being auctioned
-  `lot_card_id2` INT UNSIGNED NULL,           -- 2nd card for combined auctions
-  `trigger_player` INT UNSIGNED NOT NULL,     -- player who triggered (always bids >= 1)
+  `lot_card_id` INT UNSIGNED NOT NULL,
+  `lot_card_id2` INT UNSIGNED NULL,
+  `trigger_player` INT UNSIGNED NOT NULL,
   -- forced per-item fish rate when an effect overrides the slot-derived cost
   -- (e.g. Snag Pile auctions at 1/item); NULL = derive from card slot per player
   `forced_rate` TINYINT UNSIGNED NULL,
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS `auction_bid` (
   `player_id` INT UNSIGNED NOT NULL,
   `workers_bid` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `workers_clinched` TINYINT UNSIGNED NULL,
-  `status` VARCHAR(8) NOT NULL DEFAULT 'in',  -- in | passed | deferred
+  `status` VARCHAR(8) NOT NULL DEFAULT 'in',
   PRIMARY KEY (`auction_id`, `player_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
