@@ -39,7 +39,28 @@ class PlayerTurn extends GameState
             "headwatersCards" => $this->game->getHeadwatersCards(),
             "handStructureIds" => $this->game->getPlayerHand($playerId),
             "canFlush" => $this->game->getMaterialDeckCount() > 0,
+            "canRetire" => $this->game->endgameTriggered(),
         ];
+    }
+
+    /**
+     * Retire early (only once the endgame is underway): jump to the lowest open
+     * space at or past the fish line and drop out, instead of taking an action.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actRetire(int $activePlayerId, array $args)
+    {
+        if (!$args['canRetire']) {
+            throw new UserException('You can only retire once another player has crossed the line.');
+        }
+        $this->game->retirePlayer($activePlayerId, $this->game->getFishLine());
+        $this->notify->all('retire', clienttranslate('${player_name} retires'), [
+            'player_id' => $activePlayerId,
+            'player_name' => $this->game->getPlayerNameById($activePlayerId),
+        ]);
+        return NextPlayer::class;
     }
 
     /**

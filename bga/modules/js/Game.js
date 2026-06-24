@@ -36,6 +36,21 @@ class PlayerTurn {
         if (args.canFlush) {
             this.bga.statusBar.addActionButton(_('Flush (5🐟)'), () => this.bga.actions.performAction('actFlush'), { color: 'secondary' });
         }
+        if (args.canRetire) {
+            this.bga.statusBar.addActionButton(_('Retire'), () => this.bga.actions.performAction('actRetire'), { color: 'secondary' });
+        }
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class FinalBuild {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Final build — build one structure or skip') : _('Final builds…'));
+        if (!isActive) return;
+        this.game.setHint(_('One last build: click a hand card, or skip.'));
+        this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actFinalBuild', { cardId: id }));
+        this.bga.statusBar.addActionButton(_('Skip'), () => this.bga.actions.performAction('actSkipFinal'), { color: 'secondary' });
     }
     onLeavingState() { this.game.clearClickable(); }
 }
@@ -116,6 +131,7 @@ export class Game {
         this.bga.states.register('Auction', new Auction(this, bga));
         this.bga.states.register('InventDiscard', new InventDiscard(this, bga));
         this.bga.states.register('FlushChoose', new FlushChoose(this, bga));
+        this.bga.states.register('FinalBuild', new FinalBuild(this, bga));
     }
 
     setup(gamedatas) {
@@ -252,4 +268,5 @@ export class Game {
     async notif_build() {}
     async notif_flush() {}
     async notif_invent() {}
+    async notif_retire() {}
 }

@@ -28,6 +28,21 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
 
     function onEnteringState()
     {
+        // Deck-empty drift: the player whose turn just ended drifts +1 fish once
+        // the material deck is exhausted, so the endgame can't grind on forever.
+        $turnPlayer = (int) $this->globals->get('turn_player', 0);
+        if ($turnPlayer > 0 && $this->game->getMaterialDeckCount() === 0) {
+            $this->game->advanceFish($turnPlayer, 1);
+        }
+
+        // Retire anyone whose pawn reached or crossed the fish line.
+        $line = $this->game->getFishLine();
+        foreach ($this->game->getTurnOrderRows() as $r) {
+            if (!$r['retired'] && $r['fish'] >= $line) {
+                $this->game->retirePlayer($r['id'], $r['fish']);
+            }
+        }
+
         // Refresh every client's public board after the just-completed action.
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
 
@@ -37,12 +52,16 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         );
 
         if ($next === null) {
-            // Everyone has retired.
-            // TODO (Phase 4): run the "one final build" round before scoring.
-            return EndScore::class;
+            // Everyone has retired — go round once more for a final build (lowest
+            // fish first), then score.
+            $rows = $this->game->getTurnOrderRows();
+            usort($rows, fn($a, $b) => $a['fish'] <=> $b['fish']);
+            $this->globals->set('final_order', array_map(fn($r) => $r['id'], $rows));
+            return FinalBuildNext::class;
         }
 
         $this->game->clearBonusTurnPlayer();
+        $this->globals->set('turn_player', $next);
         $this->gamestate->changeActivePlayer($next);
         $this->game->giveExtraTime($next);
 

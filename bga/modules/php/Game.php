@@ -15,7 +15,9 @@ declare(strict_types=1);
 namespace Bga\Games\RiverBankers;
 
 use Bga\Games\RiverBankers\States\NextPlayer;
+use Bga\Games\RiverBankers\Rules\Build;
 use Bga\Games\RiverBankers\Rules\CardMovement;
+use Bga\Games\RiverBankers\Rules\Endgame;
 use Bga\Games\RiverBankers\Rules\Scoring;
 
 class Game extends \Bga\GameFramework\Table
@@ -764,6 +766,50 @@ class Game extends \Bga\GameFramework\Table
             'built' => $this->getBuiltViewAll(),
             'materials' => $this->getMaterialsAll(),
         ];
+    }
+
+    // =====================================================================
+    // Endgame (Phase 4)
+    // =====================================================================
+
+    public function getFishLine(): int
+    {
+        return (int) $this->globals->get("fish_line", self::FISH_LINE);
+    }
+
+    /** True once at least one pawn has retired (the endgame is underway). */
+    public function endgameTriggered(): bool
+    {
+        return (int) $this->getUniqueValueFromDB("SELECT COUNT(*) FROM `player` WHERE `player_retired` = 1") > 0;
+    }
+
+    /**
+     * Retire a pawn at the lowest open space >= $startPos (crossers pass their
+     * landed position; early retirers pass the fish line). No two share a space.
+     */
+    public function retirePlayer(int $pid, int $startPos): void
+    {
+        $occupied = array_map('intval', $this->getObjectListFromDB(
+            "SELECT `player_fish_pos` FROM `player` WHERE `player_retired` = 1", true
+        ));
+        $pos = Endgame::retireSpace($startPos, $occupied);
+        $this->DbQuery("UPDATE `player` SET `player_retired` = 1, `player_fish_pos` = $pos WHERE `player_id` = $pid");
+    }
+
+    /**
+     * Build a structure if affordable: pay its fish + materials, place it.
+     * Returns false (no change) if the player can't pay the materials.
+     */
+    public function tryBuild(int $playerId, int $structureCardId): bool
+    {
+        $def = Material::$STRUCTURE[(int) $this->getCardRow($structureCardId)['card_type_arg']];
+        $alloc = Build::allocate($def['cost'], $this->getPlayerHoldings($playerId));
+        if ($alloc === null) {
+            return false;
+        }
+        $this->advanceFish($playerId, (int) $def['time']);
+        $this->applyBuild($playerId, $structureCardId, $alloc);
+        return true;
     }
 
     /** Compute and store every player's final score + tie-breaker (aux = -fish). */
