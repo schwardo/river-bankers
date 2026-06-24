@@ -43,13 +43,21 @@ class PlayerTurn {
 class Auction {
     constructor(game, bga) { this.game = game; this.bga = bga; }
 
+    // MULTIPLE_ACTIVE_PLAYER: players are not yet active in onEnteringState, so
+    // the bid buttons must be (re)built in onPlayerActivationChange.
     onEnteringState(args, isActive) {
+        this.args = args;
         this.bga.statusBar.setTitle(_('Auction — submit your sealed worker bid'));
-        if (!isActive) return;
-        const supply = this.game.mySupply();
-        const maxBid = Math.min(args.open, supply);
-        const minBid = (this.game.myId() === Number(args.triggerPlayer)) ? 1 : 0;
-        this.game.setHint(_('Up to ') + maxBid + _(' workers (this lot has ') + args.open + _(' open icons).'));
+        this.onPlayerActivationChange(args, isActive);
+    }
+
+    onPlayerActivationChange(args, isActive) {
+        this.bga.statusBar.removeActionButtons();
+        if (!isActive) { this.game.setHint(_('Waiting for the other bidders…')); return; }
+        const a = args || this.args;
+        const maxBid = Math.min(a.open, this.game.mySupply());
+        const minBid = (this.game.myId() === Number(a.triggerPlayer)) ? 1 : 0;
+        this.game.setHint(_('Bid up to ') + maxBid + _(' workers (this lot has ') + a.open + _(' open icons).'));
         for (let b = minBid; b <= maxBid; b++) {
             this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.bga.actions.performAction('actBid', { workers: b }));
         }
@@ -152,6 +160,7 @@ export class Game {
     }
 
     renderBoard(board) {
+        if (!board || !document.getElementById('rb-hw')) return;
         document.getElementById('rb-hw').innerHTML =
             [1, 2, 3].map(slot => {
                 const c = board.headwaters.find(x => x.slot === slot);

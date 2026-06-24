@@ -82,6 +82,7 @@
 .rb-clickable:hover { background: #fff6d8; }
 .rb-selected { box-shadow: 0 0 0 3px #c0392b; }
 .rb-hint { font-style: italic; color: #345; margin: 4px 0; }
-.rb-panel { font-size: 12px; }
+.rb-panel { font-size: 15px; line-height: 1.5; }
+.rb-mats { font-size: 15px; margin-top: 2px; }
 .rb-built { margin-top: 2px; }
-.rb-tag { display: inline-block; background: #dde6f0; border-radius: 3px; padding: 0 4px; font-size: 10px; }
+.rb-tag { display: inline-block; background: #dde6f0; border-radius: 3px; padding: 0 4px; font-size: 12px; }
