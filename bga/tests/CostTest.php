@@ -25,4 +25,11 @@ final class CostTest extends TestCase
         // Snag Pile auctions a River-1 card at a flat 1/item.
         self::assertSame(1, Cost::perItem('river', 1, 1));
     }
+
+    public function testHeadwatersMoveCost(): void
+    {
+        self::assertSame(2, Cost::headwatersMove(1));
+        self::assertSame(3, Cost::headwatersMove(2));
+        self::assertSame(4, Cost::headwatersMove(3));
+    }
 }

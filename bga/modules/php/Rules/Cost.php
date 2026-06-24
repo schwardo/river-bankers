@@ -28,4 +28,12 @@ final class Cost
         }
         return $slot + 1; // River 1->2, 2->3, 3->4, 4->5
     }
+
+    /**
+     * Fish to pay to Pull a Headwaters card from slot 1..3: 2 / 3 / 4 (slot + 1).
+     */
+    public static function headwatersMove(int $slot): int
+    {
+        return $slot + 1;
+    }
 }

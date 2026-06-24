@@ -9,6 +9,9 @@ use Bga\GameFramework\States\GameState;
 use Bga\GameFramework\States\PossibleAction;
 use Bga\GameFramework\UserException;
 use Bga\Games\RiverBankers\Game;
+use Bga\Games\RiverBankers\Material;
+use Bga\Games\RiverBankers\Rules\Build;
+use Bga\Games\RiverBankers\Rules\Cost;
 
 /**
  * SelectAction — the active player takes exactly one action.
@@ -30,9 +33,40 @@ class PlayerTurn extends GameState
 
     public function getArgs(): array
     {
+        $playerId = (int) $this->game->getActivePlayerId();
         return [
             "auctionableRiverCards" => $this->game->getAuctionableRiverCards(),
+            "headwatersCards" => $this->game->getHeadwatersCards(),
+            "handStructureIds" => $this->game->getPlayerHand($playerId),
+            "canFlush" => $this->game->getMaterialDeckCount() > 0,
         ];
+    }
+
+    /**
+     * Pull a Headwaters card: pay its slot move cost (2/3/4), then auction it in
+     * place at the Headwaters rate (1/item). The card floats to River 1 (or the
+     * shoreline) afterward and the Headwaters refills — handled in ResolveAuction.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actPull(int $cardId, int $activePlayerId, array $args)
+    {
+        if (!in_array($cardId, $args['headwatersCards'], true)) {
+            throw new UserException('That card is not in the Headwaters.');
+        }
+
+        $slot = (int) $this->game->getCardRow($cardId)['card_location_arg'];
+        $this->game->advanceFish($activePlayerId, Cost::headwatersMove($slot));
+        $this->game->startAuction($cardId, $activePlayerId); // rate derives from 'headwaters' (1/item)
+
+        $this->notify->all('auctionStarted', clienttranslate('${player_name} pulls a Headwaters card'), [
+            'player_id' => $activePlayerId,
+            'player_name' => $this->game->getPlayerNameById($activePlayerId),
+            'card_id' => $cardId,
+        ]);
+
+        return Auction::class;
     }
 
     /**
@@ -60,8 +94,88 @@ class PlayerTurn extends GameState
         return Auction::class;
     }
 
-    // TODO (Phase 4): actPull (auction a Headwaters card + refill),
-    // actFlush, actInvent (draw N / discard N), actBuild.
+    /**
+     * Flush the Headwaters: pay 5 fish, reshuffle/redraw, then choose one of the
+     * fresh cards to auction (free trigger) in FlushChoose.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actFlush(int $activePlayerId, array $args)
+    {
+        if (!$args['canFlush']) {
+            throw new UserException('You cannot flush once the material deck is empty.');
+        }
+        $this->game->advanceFish($activePlayerId, 5);
+        $this->game->flushHeadwaters();
+
+        $this->notify->all('flush', clienttranslate('${player_name} flushes the Headwaters'), [
+            'player_id' => $activePlayerId,
+            'player_name' => $this->game->getPlayerNameById($activePlayerId),
+        ]);
+
+        return FlushChoose::class;
+    }
+
+    /**
+     * Invent: pay N fish (2..5), draw N structures, then discard N in InventDiscard.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actInvent(int $n, int $activePlayerId)
+    {
+        if ($n < 2 || $n > 5) {
+            throw new UserException('Invent draws between 2 and 5 cards.');
+        }
+        $this->game->advanceFish($activePlayerId, $n);
+        $drawn = $this->game->drawStructures($activePlayerId, $n);
+        // You discard as many as you drew (fewer only if the deck+discard ran dry).
+        $this->globals->set('invent_discard_count', $drawn);
+
+        $this->notify->all('invent', clienttranslate('${player_name} invents (${n} cards)'), [
+            'player_id' => $activePlayerId,
+            'player_name' => $this->game->getPlayerNameById($activePlayerId),
+            'n' => $n,
+        ]);
+
+        return InventDiscard::class;
+    }
+
+    /**
+     * Build a structure from hand: pay its printed fish cost, pick up workers to
+     * pay its materials, place it, and refill the hand.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actBuild(int $cardId, int $activePlayerId, array $args)
+    {
+        if (!in_array($cardId, $args['handStructureIds'], true)) {
+            throw new UserException('That structure is not in your hand.');
+        }
+        $typeArg = (int) $this->game->getCardRow($cardId)['card_type_arg'];
+        $def = Material::$STRUCTURE[$typeArg];
+
+        $alloc = Build::allocate($def['cost'], $this->game->getPlayerHoldings($activePlayerId));
+        if ($alloc === null) {
+            throw new UserException('You do not have the materials to build that.');
+        }
+
+        $this->game->advanceFish($activePlayerId, (int) $def['time']);
+        $this->game->applyBuild($activePlayerId, $cardId, $alloc);
+        // TODO (Phase 4): fire the structure's "when built" effect.
+        $this->game->refillHand($activePlayerId);
+
+        $this->notify->all('build', clienttranslate('${player_name} builds ${card_name}'), [
+            'player_id' => $activePlayerId,
+            'player_name' => $this->game->getPlayerNameById($activePlayerId),
+            'card_id' => $cardId,
+            'card_name' => $def['name'],
+        ]);
+
+        return NextPlayer::class;
+    }
 
     function zombie(int $playerId)
     {

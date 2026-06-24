@@ -350,6 +350,236 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery("DELETE FROM `auction` WHERE `auction_id` = $auctionId");
     }
 
+    // --- Headwaters ---
+
+    /** Card ids currently in the Headwaters (any slot). */
+    public function getHeadwatersCards(): array
+    {
+        return array_map('intval', $this->getObjectListFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'headwaters'",
+            true
+        ));
+    }
+
+    public function getMaterialDeckCount(): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT COUNT(*) FROM `card` WHERE `card_location` = 'material_deck'"
+        );
+    }
+
+    /**
+     * Refill the Headwaters after a card vacated $vacatedSlot: cards in higher
+     * slots advance one toward the river, then the top of the material deck
+     * enters the now-empty Headwaters 3 (if any cards remain).
+     */
+    public function refillHeadwaters(int $vacatedSlot): void
+    {
+        for ($s = $vacatedSlot + 1; $s <= 3; $s++) {
+            $this->DbQuery(
+                "UPDATE `card` SET `card_location_arg` = " . ($s - 1) . "
+                 WHERE `card_location` = 'headwaters' AND `card_location_arg` = $s"
+            );
+        }
+        $top = $this->getUniqueValueFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck' ORDER BY `card_location_arg` LIMIT 1"
+        );
+        if ($top !== null) {
+            $this->DbQuery(
+                "UPDATE `card` SET `card_location` = 'headwaters', `card_location_arg` = 3 WHERE `card_id` = " . (int) $top
+            );
+        }
+    }
+
+    // --- structure hand / deck ---
+
+    /** Structure card ids in a player's hand. */
+    public function getPlayerHand(int $playerId): array
+    {
+        return array_map('intval', $this->getObjectListFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'hand' AND `card_location_arg` = $playerId",
+            true
+        ));
+    }
+
+    public function getHandLimit(int $playerId): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT `player_hand_limit` FROM `player` WHERE `player_id` = $playerId"
+        );
+    }
+
+    /** Draw up to $n structure cards from the deck into a player's hand (reshuffles the discard if needed). */
+    public function drawStructures(int $playerId, int $n): int
+    {
+        $drawn = 0;
+        for ($i = 0; $i < $n; $i++) {
+            $top = $this->topOfStructureDeck();
+            if ($top === null) {
+                $this->reshuffleStructureDiscard();
+                $top = $this->topOfStructureDeck();
+                if ($top === null) {
+                    break; // no structures anywhere
+                }
+            }
+            $this->DbQuery(
+                "UPDATE `card` SET `card_location` = 'hand', `card_location_arg` = $playerId WHERE `card_id` = $top"
+            );
+            $drawn++;
+        }
+        return $drawn;
+    }
+
+    private function topOfStructureDeck(): ?int
+    {
+        $top = $this->getUniqueValueFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'structure_deck' ORDER BY `card_location_arg` LIMIT 1"
+        );
+        return $top === null ? null : (int) $top;
+    }
+
+    private function reshuffleStructureDiscard(): void
+    {
+        $ids = array_map('intval', $this->getObjectListFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'discard' AND `card_type` = 'structure'",
+            true
+        ));
+        shuffle($ids);
+        $order = 0;
+        foreach ($ids as $id) {
+            $this->DbQuery(
+                "UPDATE `card` SET `card_location` = 'structure_deck', `card_location_arg` = " . ($order++) . " WHERE `card_id` = $id"
+            );
+        }
+    }
+
+    /** @param list<int> $ids */
+    public function discardStructures(array $ids): void
+    {
+        foreach ($ids as $id) {
+            $this->DbQuery(
+                "UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0 WHERE `card_id` = " . (int) $id
+            );
+        }
+    }
+
+    /** Top a player's hand back up to their hand size. */
+    public function refillHand(int $playerId): void
+    {
+        $deficit = $this->getHandLimit($playerId) - count($this->getPlayerHand($playerId));
+        if ($deficit > 0) {
+            $this->drawStructures($playerId, $deficit);
+        }
+    }
+
+    // --- build ---
+
+    /**
+     * A player's worker holdings shaped for Rules\Build::allocate().
+     *
+     * @return list<array{cardId:int, material:string, wildAlt:?string, workers:int}>
+     */
+    public function getPlayerHoldings(int $playerId): array
+    {
+        $rows = $this->getObjectListFromDB(
+            "SELECT w.`card_id`, w.`workers`, c.`card_type`, c.`card_type_arg`
+             FROM `worker` w JOIN `card` c ON c.`card_id` = w.`card_id`
+             WHERE w.`player_id` = $playerId AND w.`workers` > 0"
+        );
+        $out = [];
+        foreach ($rows as $r) {
+            if ($r['card_type'] !== 'material') {
+                continue;
+            }
+            $def = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
+            if ($def === null) {
+                continue;
+            }
+            $out[] = [
+                'cardId' => (int) $r['card_id'],
+                'material' => (string) $def['material'],
+                'wildAlt' => isset($def['wildAlt']) ? (string) $def['wildAlt'] : null,
+                'workers' => (int) $r['workers'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Apply a build: pick up the allocated workers (returning them to supply,
+     * dropping blanks on vacated river icons, discarding emptied shoreline
+     * cards), then place the structure in the player's tableau.
+     *
+     * @param array<int,int> $alloc cardId => workers to pick up
+     */
+    public function applyBuild(int $playerId, int $structureCardId, array $alloc): void
+    {
+        foreach ($alloc as $cardId => $count) {
+            $cardId = (int) $cardId;
+            $count = (int) $count;
+            $this->DbQuery(
+                "UPDATE `worker` SET `workers` = `workers` - $count WHERE `player_id` = $playerId AND `card_id` = $cardId"
+            );
+            $this->DbQuery(
+                "DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $cardId AND `workers` <= 0"
+            );
+            $this->DbQuery(
+                "UPDATE `player` SET `player_worker_supply` = `player_worker_supply` + $count WHERE `player_id` = $playerId"
+            );
+            $row = $this->getCardRow($cardId);
+            if ($row['card_location'] === 'river') {
+                $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + $count WHERE `card_id` = $cardId");
+            } elseif ($row['card_location'] === 'shoreline') {
+                $left = (int) $this->getUniqueValueFromDB(
+                    "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $cardId"
+                );
+                if ($left === 0) {
+                    $this->DbQuery("UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0 WHERE `card_id` = $cardId");
+                }
+            }
+        }
+        $this->DbQuery(
+            "UPDATE `card` SET `card_location` = 'built', `card_location_arg` = $playerId WHERE `card_id` = $structureCardId"
+        );
+    }
+
+    // --- flush ---
+
+    /**
+     * Flush the Headwaters: set the current cards aside, reveal up to 3 fresh
+     * from the deck top, then shuffle the set-aside cards back into the deck.
+     */
+    public function flushHeadwaters(): void
+    {
+        $aside = $this->getHeadwatersCards();
+        foreach ($aside as $id) {
+            $this->DbQuery("UPDATE `card` SET `card_location` = 'flush_aside' WHERE `card_id` = $id");
+        }
+        for ($slot = 1; $slot <= 3; $slot++) {
+            $top = $this->getUniqueValueFromDB(
+                "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck' ORDER BY `card_location_arg` LIMIT 1"
+            );
+            if ($top === null) {
+                break;
+            }
+            $this->DbQuery(
+                "UPDATE `card` SET `card_location` = 'headwaters', `card_location_arg` = $slot WHERE `card_id` = " . (int) $top
+            );
+        }
+        foreach ($aside as $id) {
+            $this->DbQuery("UPDATE `card` SET `card_location` = 'material_deck' WHERE `card_id` = $id");
+        }
+        $ids = array_map('intval', $this->getObjectListFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck'",
+            true
+        ));
+        shuffle($ids);
+        $order = 0;
+        foreach ($ids as $id) {
+            $this->DbQuery("UPDATE `card` SET `card_location_arg` = " . ($order++) . " WHERE `card_id` = $id");
+        }
+    }
+
     public function debug_goToState(int $state = 3)
     {
         $this->gamestate->jumpToState($state);

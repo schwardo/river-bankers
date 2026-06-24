@@ -53,7 +53,12 @@ class ResolveAuction extends GameState
             }
         }
 
+        $wasHeadwaters = $cardRow['card_location'] === 'headwaters';
+        $vacatedSlot = (int) $cardRow['card_location_arg'];
         $this->game->moveCardAfterAuction($cardId, $open - $placed);
+        if ($wasHeadwaters) {
+            $this->game->refillHeadwaters($vacatedSlot);
+        }
         $this->game->clearAuction($auctionId);
 
         $this->notify->all('auctionResolved', clienttranslate('Auction resolved'), [
