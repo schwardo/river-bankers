@@ -16,6 +16,7 @@ namespace Bga\Games\RiverBankers;
 
 use Bga\Games\RiverBankers\States\NextPlayer;
 use Bga\Games\RiverBankers\Rules\CardMovement;
+use Bga\Games\RiverBankers\Rules\Scoring;
 
 class Game extends \Bga\GameFramework\Table
 {
@@ -577,6 +578,92 @@ class Game extends \Bga\GameFramework\Table
         $order = 0;
         foreach ($ids as $id) {
             $this->DbQuery("UPDATE `card` SET `card_location_arg` = " . ($order++) . " WHERE `card_id` = $id");
+        }
+    }
+
+    // =====================================================================
+    // End-of-game scoring (Phase 4) — assembles each player's end-state and
+    // feeds Rules\Scoring. DB-read paths get first validation in Studio.
+    // =====================================================================
+
+    /**
+     * A player's built structures shaped for Rules\Scoring.
+     *
+     * @return list<array{name:string, vp:int, cost:array<string,int>}>
+     */
+    public function getBuiltStructures(int $playerId): array
+    {
+        $rows = $this->getObjectListFromDB(
+            "SELECT `card_type`, `card_type_arg` FROM `card`
+             WHERE `card_location` = 'built' AND `card_location_arg` = $playerId"
+        );
+        $out = [];
+        foreach ($rows as $r) {
+            $arg = (int) $r['card_type_arg'];
+            if ($r['card_type'] === 'structure' && isset(Material::$STRUCTURE[$arg])) {
+                $def = Material::$STRUCTURE[$arg];
+                $out[] = ['name' => (string) $def['name'], 'vp' => (int) $def['vp'], 'cost' => $def['cost']];
+            } elseif ($r['card_type'] === 'starter' && isset(Material::$STARTER[$arg])) {
+                $def = Material::$STARTER[$arg];
+                $out[] = ['name' => (string) $def['name'], 'vp' => (int) $def['vp'], 'cost' => []];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Leftover workers split into fixed-material counts and wild pools.
+     * TODO: Old Growth's x2 logs yield isn't applied here yet.
+     *
+     * @return array{fixed: array<string,int>, wild: list<array{materials:array{0:string,1:string}, count:int}>}
+     */
+    public function getLeftoverWorkers(int $playerId): array
+    {
+        $fixed = [];
+        $wild = [];
+        foreach ($this->getPlayerHoldings($playerId) as $h) {
+            if ($h['wildAlt'] === null) {
+                $fixed[$h['material']] = ($fixed[$h['material']] ?? 0) + $h['workers'];
+            } else {
+                $wild[] = ['materials' => [$h['material'], $h['wildAlt']], 'count' => $h['workers']];
+            }
+        }
+        return ['fixed' => $fixed, 'wild' => $wild];
+    }
+
+    public function getShorelineTotal(): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT COUNT(*) FROM `card` WHERE `card_location` = 'shoreline'"
+        );
+    }
+
+    public function getShorelineCountWithWorkers(int $playerId): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT COUNT(*) FROM `card` c WHERE c.`card_location` = 'shoreline'
+             AND EXISTS (SELECT 1 FROM `worker` w WHERE w.`card_id` = c.`card_id`
+                         AND w.`player_id` = $playerId AND w.`workers` > 0)"
+        );
+    }
+
+    /** Compute and store every player's final score + tie-breaker (aux = -fish). */
+    public function setFinalScores(): void
+    {
+        $shorelineTotal = $this->getShorelineTotal();
+        foreach ($this->getTurnOrderRows() as $row) {
+            $pid = $row['id'];
+            $leftover = $this->getLeftoverWorkers($pid);
+            $vp = Scoring::playerVP(
+                $this->getBuiltStructures($pid),
+                $leftover['fixed'],
+                $leftover['wild'],
+                $shorelineTotal,
+                $this->getShorelineCountWithWorkers($pid),
+            );
+            $this->DbQuery(
+                "UPDATE `player` SET `player_score` = $vp, `player_score_aux` = " . (-$row['fish']) . " WHERE `player_id` = $pid"
+            );
         }
     }
 

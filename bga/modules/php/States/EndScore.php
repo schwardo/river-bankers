@@ -22,12 +22,11 @@ class EndScore extends \Bga\GameFramework\States\GameState
     }
 
     /**
-     * Game state action, example content.
-     *
-     * The onEnteringState method of state `EndScore` is called just before the end of the game.
+     * Compute and store every player's final VP + tie-breaker via Rules\Scoring,
+     * then end the game.
      */
     public function onEnteringState() {
-        // Here, we would compute scores if they are not updated live, and compute average statistics
+        $this->game->setFinalScores();
 
         return ST_END_GAME;
     }
