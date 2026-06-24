@@ -17,6 +17,7 @@ namespace Bga\Games\RiverBankers;
 use Bga\Games\RiverBankers\States\NextPlayer;
 use Bga\Games\RiverBankers\Rules\Build;
 use Bga\Games\RiverBankers\Rules\CardMovement;
+use Bga\Games\RiverBankers\Rules\Effects;
 use Bga\Games\RiverBankers\Rules\Endgame;
 use Bga\Games\RiverBankers\Rules\Scoring;
 
@@ -796,9 +797,16 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery("UPDATE `player` SET `player_retired` = 1, `player_fish_pos` = $pos WHERE `player_id` = $pid");
     }
 
+    /** Names of a player's built cards (structures + starters). */
+    public function getBuiltNames(int $playerId): array
+    {
+        return array_map(fn(array $b) => $b['name'], $this->getBuiltStructures($playerId));
+    }
+
     /**
-     * Build a structure if affordable: pay its fish + materials, place it.
-     * Returns false (no change) if the player can't pay the materials.
+     * Build a structure if affordable: pay its fish (incl. the Lodge Foundation
+     * discount) + materials, place it, and apply its on-build effects. Returns
+     * false (no change) if the player can't pay the materials.
      */
     public function tryBuild(int $playerId, int $structureCardId): bool
     {
@@ -807,9 +815,27 @@ class Game extends \Bga\GameFramework\Table
         if ($alloc === null) {
             return false;
         }
-        $this->advanceFish($playerId, (int) $def['time']);
+        // Built-card names BEFORE this card joins them (a card never discounts
+        // the build that creates it).
+        $builtNames = $this->getBuiltNames($playerId);
+        $this->advanceFish($playerId, Effects::buildFishCost((int) $def['time'], $def['cost'], $builtNames));
         $this->applyBuild($playerId, $structureCardId, $alloc);
+        $this->applyOnBuildEffects($playerId, $structureCardId);
         return true;
+    }
+
+    /** Immediate "when built" effects of the just-placed card (Batch 1: hand size). */
+    private function applyOnBuildEffects(int $playerId, int $cardId): void
+    {
+        $row = $this->getCardRow($cardId);
+        $arg = (int) $row['card_type_arg'];
+        $name = $row['card_type'] === 'structure'
+            ? (Material::$STRUCTURE[$arg]['name'] ?? '')
+            : (Material::$STARTER[$arg]['name'] ?? '');
+        if (Effects::grantsHandSize((string) $name)) {
+            $this->DbQuery("UPDATE `player` SET `player_hand_limit` = `player_hand_limit` + 1 WHERE `player_id` = $playerId");
+        }
+        // TODO (later batches): other when-built effects dispatch here.
     }
 
     /** Compute and store every player's final score + tie-breaker (aux = -fish). */

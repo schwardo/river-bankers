@@ -10,7 +10,6 @@ use Bga\GameFramework\States\PossibleAction;
 use Bga\GameFramework\UserException;
 use Bga\Games\RiverBankers\Game;
 use Bga\Games\RiverBankers\Material;
-use Bga\Games\RiverBankers\Rules\Build;
 use Bga\Games\RiverBankers\Rules\Cost;
 
 /**
@@ -176,17 +175,11 @@ class PlayerTurn extends GameState
         if (!in_array($cardId, $args['handStructureIds'], true)) {
             throw new UserException('That structure is not in your hand.');
         }
-        $typeArg = (int) $this->game->getCardRow($cardId)['card_type_arg'];
-        $def = Material::$STRUCTURE[$typeArg];
+        $name = Material::$STRUCTURE[(int) $this->game->getCardRow($cardId)['card_type_arg']]['name'];
 
-        $alloc = Build::allocate($def['cost'], $this->game->getPlayerHoldings($activePlayerId));
-        if ($alloc === null) {
+        if (!$this->game->tryBuild($activePlayerId, $cardId)) {
             throw new UserException('You do not have the materials to build that.');
         }
-
-        $this->game->advanceFish($activePlayerId, (int) $def['time']);
-        $this->game->applyBuild($activePlayerId, $cardId, $alloc);
-        // TODO (Phase 4): fire the structure's "when built" effect.
         $this->game->refillHand($activePlayerId);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
 
@@ -194,7 +187,7 @@ class PlayerTurn extends GameState
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $cardId,
-            'card_name' => $def['name'],
+            'card_name' => $name,
         ]);
 
         return NextPlayer::class;

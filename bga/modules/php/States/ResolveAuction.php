@@ -10,6 +10,7 @@ use Bga\Games\RiverBankers\Game;
 use Bga\Games\RiverBankers\Material;
 use Bga\Games\RiverBankers\Rules\Auction as AuctionRules;
 use Bga\Games\RiverBankers\Rules\Cost;
+use Bga\Games\RiverBankers\Rules\Effects;
 
 /**
  * Resolve the sealed auction (GAME state, runs once all bids are in):
@@ -43,11 +44,16 @@ class ResolveAuction extends GameState
         $clinched = AuctionRules::clinched($open, $bids);
         // TODO (Phase 4): detect each player's built Pontoon for the jam refund.
         $billable = AuctionRules::billableWorkers($open, $bids, []);
-        $perItem = Cost::perItem((string) $cardRow['card_location'], (int) $cardRow['card_location_arg'], $forcedRate);
+        $base = Cost::perItem((string) $cardRow['card_location'], (int) $cardRow['card_location_arg'], $forcedRate);
+        $material = Material::$MATERIAL[(int) $cardRow['card_type_arg']]['material'] ?? '';
 
+        // Per-item cost is per-player (material discounts: Reed Bed, Clay Den…).
+        $paid = [];
         $placed = 0;
         foreach ($bids as $pid => $bid) {
-            $this->game->advanceFish($pid, $billable[$pid] * $perItem);
+            $rate = Effects::perItemForPlayer($base, (string) $material, $this->game->getBuiltNames($pid));
+            $paid[$pid] = $billable[$pid] * $rate;
+            $this->game->advanceFish($pid, $paid[$pid]);
             if ($clinched[$pid] > 0) {
                 $this->game->placeWorkers($pid, $cardId, $clinched[$pid]);
                 $placed += $clinched[$pid];
@@ -63,7 +69,6 @@ class ResolveAuction extends GameState
         $this->game->clearAuction($auctionId);
 
         // Report what each bidder won (and that empty-handed bidders still paid).
-        $material = Material::$MATERIAL[(int) $cardRow['card_type_arg']]['material'] ?? '';
         foreach ($bids as $pid => $bid) {
             $got = $clinched[$pid];
             $msg = $got > 0
@@ -74,7 +79,7 @@ class ResolveAuction extends GameState
                 'player_name' => $this->game->getPlayerNameById($pid),
                 'n' => $got,
                 'material' => $material,
-                'paid' => $billable[$pid] * $perItem,
+                'paid' => $paid[$pid],
                 'i18n' => ['material'],
             ]);
         }
