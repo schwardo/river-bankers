@@ -47,16 +47,20 @@ class Auction {
     // the bid buttons must be (re)built in onPlayerActivationChange.
     onEnteringState(args, isActive) {
         this.args = args;
-        this.bga.statusBar.setTitle(_('Auction — submit your sealed worker bid'));
         this.onPlayerActivationChange(args, isActive);
     }
 
     onPlayerActivationChange(args, isActive) {
         this.bga.statusBar.removeActionButtons();
-        if (!isActive) { this.game.setHint(_('Waiting for the other bidders…')); return; }
+        if (!isActive) {
+            this.bga.statusBar.setTitle(_('Waiting for the other bidders…'));
+            this.game.setHint('');
+            return;
+        }
         const a = args || this.args;
         const maxBid = Math.min(a.open, this.game.mySupply());
         const minBid = (this.game.myId() === Number(a.triggerPlayer)) ? 1 : 0;
+        this.bga.statusBar.setTitle(_('Auction — submit your sealed worker bid'));
         this.game.setHint(_('Bid up to ') + maxBid + _(' workers (this lot has ') + a.open + _(' open icons).'));
         for (let b = minBid; b <= maxBid; b++) {
             this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.bga.actions.performAction('actBid', { workers: b }));
