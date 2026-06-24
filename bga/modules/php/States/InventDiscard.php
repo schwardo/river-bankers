@@ -55,4 +55,14 @@ class InventDiscard extends GameState
 
         return NextPlayer::class;
     }
+
+    function zombie(int $playerId)
+    {
+        // Auto-discard the required number from the front of the hand.
+        $n = (int) $this->globals->get('invent_discard_count', 0);
+        $this->game->discardStructures(array_slice($this->game->getPlayerHand($playerId), 0, $n));
+        $this->globals->set('invent_discard_count', 0);
+
+        return NextPlayer::class;
+    }
 }

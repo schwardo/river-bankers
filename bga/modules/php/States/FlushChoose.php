@@ -49,4 +49,10 @@ class FlushChoose extends GameState
 
         return Auction::class;
     }
+
+    function zombie(int $playerId)
+    {
+        // A quit player forfeits the post-flush auction.
+        return NextPlayer::class;
+    }
 }
