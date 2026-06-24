@@ -2,181 +2,227 @@
  *------
  * BGA framework: Gregory Isabelli & Emmanuel Colin & BoardGameArena
  * RiverBankers implementation : © <Your name here> <Your email address here>
- *
- * This code has been produced on the BGA studio platform for use on http://boardgamearena.com.
- * See http://en.boardgamearena.com/#!doc/Studio for more information.
  * -----
- * 
- * In this file, you are describing the logic of your user interface, in Javascript language.
  *
+ * River Bankers — minimal (functional, unstyled) client. Renders the board,
+ * hand, and fish track from getAllDatas, wires the five actions + auction
+ * bidding, and re-renders on boardUpdate / handUpdate notifications.
  */
 
-/**
- * We create one State class per declared state on the PHP side, to handle all state specific code here.
- * onEnteringState, onLeavingState and onPlayerActivationChange are predefined names that will be called by the framework.
- * When executing code in this state, you can access the args using this.args
- */
+const MAT_GLYPH = {
+    logs: '🪵', stones: '🪨', reeds: '🌾', mud: '🟫', vines: '🍃', clay: '🧱', '': '❓',
+};
+
+function costStr(cost) {
+    return Object.entries(cost || {}).map(([m, n]) => `${n}${MAT_GLYPH[m] || m}`).join(' ') || '—';
+}
+
+// ---- State classes --------------------------------------------------------
+
 class PlayerTurn {
-    constructor(game, bga) {
-        this.game = game;
-        this.bga = bga;
-    }
+    constructor(game, bga) { this.game = game; this.bga = bga; }
 
-    /**
-     * This method is called each time we are entering the game state. You can use this method to perform some user interface changes at this moment.
-     */
-    onEnteringState(args, isCurrentPlayerActive) {
-        this.bga.statusBar.setTitle(isCurrentPlayerActive ? 
-            _('${you} must play a card or pass') :
-            _('${actplayer} must play a card or pass')
-        );
-      
-        if (isCurrentPlayerActive) {
-            const playableCardsIds = args.playableCardsIds; // returned by the PlayerTurn::getArgs
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Your turn — take one action') : _('Waiting for the active player'));
+        if (!isActive) return;
+        this.game.setHint(_('Click a Headwaters card to Pull, a river card to Auction, or a hand card to Build.'));
+        this.game.markClickable('hw', args.headwatersCards, id => this.bga.actions.performAction('actPull', { cardId: id }));
+        this.game.markClickable('river', args.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
+        this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actBuild', { cardId: id }));
 
-            // Add test action buttons in the action status bar, simulating a card click:
-            playableCardsIds.forEach(
-                cardId => this.bga.statusBar.addActionButton(_('Play card with id ${card_id}').replace('${card_id}', cardId), () => this.onCardClick(cardId))
-            ); 
-
-            this.bga.statusBar.addActionButton(_('Pass'), () => this.bga.actions.performAction("actPass"), { color: 'secondary' }); 
+        for (let n = 2; n <= 5; n++) {
+            this.bga.statusBar.addActionButton(_('Invent ') + n, () => this.bga.actions.performAction('actInvent', { n }), { color: 'secondary' });
+        }
+        if (args.canFlush) {
+            this.bga.statusBar.addActionButton(_('Flush (5🐟)'), () => this.bga.actions.performAction('actFlush'), { color: 'secondary' });
         }
     }
+    onLeavingState() { this.game.clearClickable(); }
+}
 
-    /**
-     * This method is called each time we are leaving the game state. You can use this method to perform some user interface changes at this moment.
-     */
-    onLeavingState(args, isCurrentPlayerActive) {
-    }
+class Auction {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
 
-    /**
-     * This method is called each time the current player becomes active or inactive in a MULTIPLE_ACTIVE_PLAYER state. You can use this method to perform some user interface changes at this moment.
-     * on MULTIPLE_ACTIVE_PLAYER states, you may want to call this function in onEnteringState using `this.onPlayerActivationChange(args, isCurrentPlayerActive)` at the end of onEnteringState.
-     * If your state is not a MULTIPLE_ACTIVE_PLAYER one, you can delete this function.
-     */
-    onPlayerActivationChange(args, isCurrentPlayerActive) {
-    }
-
-    
-    onCardClick(card_id) {
-        console.log( 'onCardClick', card_id );
-
-        this.bga.actions.performAction("actPlayCard", { 
-            card_id,
-        }).then(() =>  {                
-            // What to do after the server call if it succeeded
-            // (most of the time, nothing, as the game will react to notifs / change of state instead, so you can delete the `then`)
-        });        
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(_('Auction — submit your sealed worker bid'));
+        if (!isActive) return;
+        const supply = this.game.mySupply();
+        const maxBid = Math.min(args.open, supply);
+        const minBid = (this.bga.getCurrentPlayerId() === args.triggerPlayer) ? 1 : 0;
+        this.game.setHint(_('Up to ') + maxBid + _(' workers (this lot has ') + args.open + _(' open icons).'));
+        for (let b = minBid; b <= maxBid; b++) {
+            this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.bga.actions.performAction('actBid', { workers: b }));
+        }
     }
 }
 
+class InventDiscard {
+    constructor(game, bga) { this.game = game; this.bga = bga; this.selected = new Set(); }
+
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(_('Invent — discard ') + args.nbToDiscard + _(' card(s)'));
+        if (!isActive) return;
+        this.selected = new Set();
+        this.nb = args.nbToDiscard;
+        this.game.setHint(_('Click hand cards to select, then confirm.'));
+        this.game.markClickable('hand', args.handStructureIds, id => this.toggle(id));
+        this.refreshButton();
+    }
+    toggle(id) {
+        if (this.selected.has(id)) this.selected.delete(id); else this.selected.add(id);
+        document.getElementById(`card-${id}`)?.classList.toggle('rb-selected', this.selected.has(id));
+        this.refreshButton();
+    }
+    refreshButton() {
+        this.bga.statusBar.removeActionButtons();
+        const btn = this.bga.statusBar.addActionButton(
+            _('Discard selected (') + this.selected.size + '/' + this.nb + ')',
+            () => this.bga.actions.performAction('actDiscard', { cardIds: [...this.selected] }));
+        if (this.selected.size !== this.nb && btn) btn.classList.add('disabled');
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class FlushChoose {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(_('Flush — choose a Headwaters card to auction'));
+        if (!isActive) return;
+        this.game.setHint(_('Click one of the revealed Headwaters cards.'));
+        this.game.markClickable('hw', args.headwatersCards, id => this.bga.actions.performAction('actChoose', { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+// ---- Game -----------------------------------------------------------------
+
 export class Game {
     constructor(bga) {
-        console.log('riverbankers constructor');
         this.bga = bga;
-
-        // Declare the State classes
-        this.playerTurn = new PlayerTurn(this, bga);
-        this.bga.states.register('PlayerTurn', this.playerTurn);
-
-        // Uncomment the next line to show debug informations about state changes in the console. Remove before going to production!
-        // this.bga.states.logger = console.log;
-            
-        // Here, you can init the global variables of your user interface
-        // Example:
-        // this.myGlobalValue = 0;
+        this.clickHandlers = [];
+        this.bga.states.register('PlayerTurn', new PlayerTurn(this, bga));
+        this.bga.states.register('Auction', new Auction(this, bga));
+        this.bga.states.register('InventDiscard', new InventDiscard(this, bga));
+        this.bga.states.register('FlushChoose', new FlushChoose(this, bga));
     }
-    
-    /*
-        setup:
-        
-        This method must set up the game user interface according to current game situation specified
-        in parameters.
-        
-        The method is called each time the game interface is displayed to a player, ie:
-        _ when the game starts
-        _ when a player refreshes the game page (F5)
-        
-        "gamedatas" argument contains all datas retrieved by your "getAllDatas" PHP method.
-    */
-    
-    setup( gamedatas ) {
-        console.log( "Starting game setup" );
+
+    setup(gamedatas) {
         this.gamedatas = gamedatas;
+        this.players = gamedatas.players;
 
-        // Example to add a div on the game area
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
-            <div id="player-tables"></div>
+            <div id="rb-hint" class="rb-hint"></div>
+            <div id="rb-board">
+                <div class="rb-section"><h3>Headwaters</h3><div id="rb-hw" class="rb-row"></div></div>
+                <div class="rb-section"><h3>River</h3><div id="rb-river" class="rb-row"></div></div>
+                <div class="rb-section"><h3>Shoreline</h3><div id="rb-shoreline" class="rb-row"></div></div>
+                <div class="rb-section"><h3>Your hand</h3><div id="rb-hand" class="rb-row"></div></div>
+            </div>
         `);
-        
-        // Setting up player boards
-        Object.values(gamedatas.players).forEach(player => {
-            // example of setting up players boards
-            // Fish-track position (River Bankers' money + turn-order key) and
-            // unplaced worker supply. TODO: live updates via notifications.
-            this.bga.playerPanels.getElement(player.id).insertAdjacentHTML('beforeend', `
-                <span id="fish-player-counter-${player.id}">${player.fish}</span> 🐟
-                &nbsp; <span id="worker-player-counter-${player.id}">${player.supply}</span> 👷
-            `);
 
-            // example of adding a div for each player
-            document.getElementById('player-tables').insertAdjacentHTML('beforeend', `
-                <div id="player-table-${player.id}">
-                    <strong>${player.name}</strong>
-                    <div>Player zone content goes here</div>
+        Object.values(gamedatas.players).forEach(p => {
+            this.bga.playerPanels.getElement(p.id).insertAdjacentHTML('beforeend', `
+                <div class="rb-panel">
+                    <span id="fish-${p.id}">${p.fish}</span> 🐟 (line ${gamedatas.fishLine})
+                    &nbsp; <span id="supply-${p.id}">${p.supply}</span> 👷
+                    &nbsp; <span id="score-${p.id}">${p.score}</span> ★
+                    <div id="built-${p.id}" class="rb-built"></div>
                 </div>
             `);
         });
-        
-        // TODO: Set up your game interface here, according to "gamedatas"
-        
 
-        // Setup game notifications to handle (see "setupNotifications" method below)
+        this.renderBoard(gamedatas.board);
+        this.renderHand(gamedatas.hand);
+        this.renderBuilt(gamedatas.built);
         this.setupNotifications();
-
-        console.log( "Ending game setup" );
     }
 
-    ///////////////////////////////////////////////////
-    //// Utility methods
-    
-    /*
-    
-        Here, you can defines some utility methods that you can use everywhere in your javascript
-        script. Typically, functions that are used in multiple state classes or outside a state class.
-    
-    */
+    // ---- rendering ----
 
-    
-    ///////////////////////////////////////////////////
-    //// Reaction to cometD notifications
+    cardHtml(c, group) {
+        const w = Object.entries(c.workers || {}).map(([pid, n]) => `${n}@p${pid}`).join(' ');
+        return `<div id="card-${c.id}" class="rb-card rb-${group}" data-id="${c.id}">
+            <div class="rb-mat">${MAT_GLYPH[c.material] || ''}${c.wildAlt ? '/' + MAT_GLYPH[c.wildAlt] : ''}</div>
+            <div class="rb-icons">${c.uncovered}/${c.icons} open</div>
+            ${c.blanks ? `<div>▪${c.blanks} blank</div>` : ''}
+            ${w ? `<div class="rb-workers">${w}</div>` : ''}
+        </div>`;
+    }
 
-    /*
-        setupNotifications:
-        
-        In this method, you associate each of your game notifications with your local method to handle it.
-        
-        Note: game notification names correspond to "bga->notify->all" calls in your Game.php file.
-    
-    */
-    setupNotifications() {
-        console.log( 'notifications subscriptions setup' );
-        
-        // automatically listen to the notifications, based on the `notif_xxx` function on this class. 
-        // Uncomment the logger param to see debug information in the console about notifications.
-        this.bga.notifications.setupPromiseNotifications({
-            // logger: console.log
+    renderBoard(board) {
+        document.getElementById('rb-hw').innerHTML =
+            [1, 2, 3].map(slot => {
+                const c = board.headwaters.find(x => x.slot === slot);
+                return c ? this.cardHtml(c, 'hw') : `<div class="rb-card rb-empty">HW${slot}</div>`;
+            }).join('');
+        document.getElementById('rb-river').innerHTML =
+            [1, 2, 3, 4].map(slot => {
+                const cards = board.river.filter(x => x.slot === slot);
+                return `<div class="rb-space"><div class="rb-space-label">R${slot} (${slot + 1}🐟)</div>${cards.map(c => this.cardHtml(c, 'river')).join('') || '<span class="rb-empty">—</span>'}</div>`;
+            }).join('');
+        document.getElementById('rb-shoreline').innerHTML =
+            board.shoreline.map(c => this.cardHtml(c, 'shore')).join('') || '<span class="rb-empty">—</span>';
+    }
+
+    renderHand(hand) {
+        document.getElementById('rb-hand').innerHTML = (hand || []).map(c => `
+            <div id="card-${c.id}" class="rb-card rb-hand" data-id="${c.id}" title="${c.effect}">
+                <div class="rb-name">${c.name}</div>
+                <div>${c.time}🐟 + ${costStr(c.cost)}</div>
+                <div>${c.vp}★</div>
+            </div>`).join('') || '<span class="rb-empty">—</span>';
+    }
+
+    renderBuilt(built) {
+        Object.entries(built || {}).forEach(([pid, list]) => {
+            const el = document.getElementById(`built-${pid}`);
+            if (el) el.innerHTML = list.map(b => `<span class="rb-tag">${b.name}</span>`).join(' ');
         });
     }
-    
-    // TODO: from this point and below, you can write your game notifications handling methods
-    
-    /*
-    Example:
-    async notif_cardPlayed( args ) {
-        // Note: args contains the arguments specified during you "notifyAllPlayers" / "notifyPlayer" PHP call
-        
-        // TODO: play the card in the user interface.
+
+    // ---- helpers ----
+
+    myId() { return this.bga.getCurrentPlayerId(); }
+    mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
+    setHint(text) { const el = document.getElementById('rb-hint'); if (el) el.textContent = text; }
+
+    markClickable(group, ids, handler) {
+        (ids || []).forEach(id => {
+            const el = document.getElementById(`card-${id}`);
+            if (!el) return;
+            el.classList.add('rb-clickable');
+            const fn = () => handler(id);
+            el.addEventListener('click', fn);
+            this.clickHandlers.push({ el, fn });
+        });
     }
-    */
+    clearClickable() {
+        this.clickHandlers.forEach(({ el, fn }) => { el.classList.remove('rb-clickable', 'rb-selected'); el.removeEventListener('click', fn); });
+        this.clickHandlers = [];
+        this.setHint('');
+    }
+
+    // ---- notifications ----
+
+    setupNotifications() {
+        this.bga.notifications.setupPromiseNotifications();
+    }
+
+    async notif_boardUpdate(args) {
+        this.renderBoard(args.board);
+        this.renderBuilt(args.built);
+        Object.values(args.players).forEach(p => {
+            this.players[p.id] = { ...this.players[p.id], ...p };
+            const set = (pfx, v) => { const e = document.getElementById(`${pfx}-${p.id}`); if (e) e.textContent = v; };
+            set('fish', p.fish); set('supply', p.supply); set('score', p.score);
+        });
+    }
+    async notif_handUpdate(args) { this.renderHand(args.hand); }
+
+    // Log-only notifications (messages show in the game log; no UI work needed).
+    async notif_auctionStarted() {}
+    async notif_auctionResolved() {}
+    async notif_build() {}
+    async notif_flush() {}
+    async notif_invent() {}
 }

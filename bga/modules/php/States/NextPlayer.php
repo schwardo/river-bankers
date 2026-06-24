@@ -28,6 +28,9 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
 
     function onEnteringState()
     {
+        // Refresh every client's public board after the just-completed action.
+        $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
+
         $next = TurnOrder::nextActor(
             $this->game->getTurnOrderRows(),
             $this->game->getBonusTurnPlayer(),

@@ -52,6 +52,7 @@ class InventDiscard extends GameState
 
         $this->game->discardStructures($cardIds);
         $this->globals->set('invent_discard_count', 0);
+        $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
 
         return NextPlayer::class;
     }

@@ -132,6 +132,7 @@ class PlayerTurn extends GameState
         $drawn = $this->game->drawStructures($activePlayerId, $n);
         // You discard as many as you drew (fewer only if the deck+discard ran dry).
         $this->globals->set('invent_discard_count', $drawn);
+        $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
 
         $this->notify->all('invent', clienttranslate('${player_name} invents (${n} cards)'), [
             'player_id' => $activePlayerId,
@@ -166,6 +167,7 @@ class PlayerTurn extends GameState
         $this->game->applyBuild($activePlayerId, $cardId, $alloc);
         // TODO (Phase 4): fire the structure's "when built" effect.
         $this->game->refillHand($activePlayerId);
+        $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
 
         $this->notify->all('build', clienttranslate('${player_name} builds ${card_name}'), [
             'player_id' => $activePlayerId,

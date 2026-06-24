@@ -63,3 +63,25 @@
 
 
 
+
+/* ===== Minimal client (Phase 6) ===== */
+#rb-board { margin-top: 8px; }
+.rb-section { margin: 6px 0; }
+.rb-section h3 { margin: 2px 0; font-size: 13px; color: #2c4a6b; }
+.rb-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; }
+.rb-card { border: 1px solid #888; border-radius: 5px; padding: 4px 6px; background: #f7f1e1;
+           font-size: 11px; min-width: 64px; text-align: center; }
+.rb-card.rb-hand { background: #eaf2e0; min-width: 90px; }
+.rb-card.rb-empty, .rb-empty { color: #999; font-style: italic; background: none; border-style: dashed; }
+.rb-mat { font-size: 18px; }
+.rb-name { font-weight: bold; }
+.rb-space { border: 1px dashed #aab; border-radius: 5px; padding: 3px; display: flex; flex-direction: column; gap: 3px; }
+.rb-space-label { font-size: 9px; color: #678; }
+.rb-workers { color: #062; font-weight: bold; }
+.rb-clickable { cursor: pointer; box-shadow: 0 0 0 2px #d6a73a; }
+.rb-clickable:hover { background: #fff6d8; }
+.rb-selected { box-shadow: 0 0 0 3px #c0392b; }
+.rb-hint { font-style: italic; color: #345; margin: 4px 0; }
+.rb-panel { font-size: 12px; }
+.rb-built { margin-top: 2px; }
+.rb-tag { display: inline-block; background: #dde6f0; border-radius: 3px; padding: 0 4px; font-size: 10px; }

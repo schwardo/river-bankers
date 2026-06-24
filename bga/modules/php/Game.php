@@ -64,8 +64,10 @@ class Game extends \Bga\GameFramework\Table
                     `player_hand_limit` AS `handLimit`, `player_retired` AS `retired`
              FROM `player`"
         );
-
-        // TODO (Phase 4): board cards, workers, blanks, this player's hand, current auction.
+        $result["fishLine"] = (int) $this->globals->get("fish_line", self::FISH_LINE);
+        $result["board"] = $this->getBoardView();
+        $result["built"] = $this->getBuiltViewAll();
+        $result["hand"] = $this->getHandView($currentPlayerId); // private: only this player's hand
 
         return $result;
     }
@@ -645,6 +647,107 @@ class Game extends \Bga\GameFramework\Table
              AND EXISTS (SELECT 1 FROM `worker` w WHERE w.`card_id` = c.`card_id`
                          AND w.`player_id` = $playerId AND w.`workers` > 0)"
         );
+    }
+
+    // =====================================================================
+    // View helpers (Phase 6 client) — assemble display data for getAllDatas
+    // and the boardUpdate / handUpdate notifications.
+    // =====================================================================
+
+    /** @return array{headwaters:list<array>, river:list<array>, shoreline:list<array>} */
+    public function getBoardView(): array
+    {
+        $cards = $this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type_arg`, `card_location`, `card_location_arg`, `card_blanks`
+             FROM `card` WHERE `card_location` IN ('headwaters', 'river', 'shoreline')"
+        );
+        $out = ['headwaters' => [], 'river' => [], 'shoreline' => []];
+        foreach ($cards as $c) {
+            $out[(string) $c['card_location']][] = $this->cardView($c);
+        }
+        return $out;
+    }
+
+    /** @param array<string,?string> $c a card row */
+    private function cardView(array $c): array
+    {
+        $id = (int) $c['card_id'];
+        $def = Material::$MATERIAL[(int) $c['card_type_arg']] ?? null;
+        $icons = $def !== null ? (int) $def['icons'] : 0;
+        $workers = [];
+        foreach ($this->getObjectListFromDB("SELECT `player_id`, `workers` FROM `worker` WHERE `card_id` = $id") as $w) {
+            $workers[(int) $w['player_id']] = (int) $w['workers'];
+        }
+        $blanks = (int) $c['card_blanks'];
+        return [
+            'id' => $id,
+            'material' => $def !== null ? (string) $def['material'] : '',
+            'wildAlt' => $def['wildAlt'] ?? null,
+            'icons' => $icons,
+            'slot' => (int) $c['card_location_arg'],
+            'workers' => $workers,
+            'blanks' => $blanks,
+            'uncovered' => max(0, $icons - array_sum($workers) - $blanks),
+        ];
+    }
+
+    /** @return list<array{id:int, name:string, cost:array<string,int>, time:int, vp:int, effect:string}> */
+    public function getHandView(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_location` = 'hand' AND `card_location_arg` = $playerId"
+        ) as $r) {
+            $def = Material::$STRUCTURE[(int) $r['card_type_arg']] ?? null;
+            if ($def !== null) {
+                $out[] = [
+                    'id' => (int) $r['card_id'], 'name' => (string) $def['name'], 'cost' => $def['cost'],
+                    'time' => (int) $def['time'], 'vp' => (int) $def['vp'], 'effect' => (string) ($def['effect'] ?? ''),
+                ];
+            }
+        }
+        return $out;
+    }
+
+    /** @return array<int,list<array{id:int,name:string}>> player_id => built structures */
+    public function getBuiltViewAll(): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB("SELECT `player_id` FROM `player`") as $p) {
+            $pid = (int) $p['player_id'];
+            $out[$pid] = [];
+        }
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type`, `card_type_arg`, `card_location_arg` FROM `card` WHERE `card_location` = 'built'"
+        ) as $r) {
+            $arg = (int) $r['card_type_arg'];
+            $name = $r['card_type'] === 'structure'
+                ? (Material::$STRUCTURE[$arg]['name'] ?? null)
+                : (Material::$STARTER[$arg]['name'] ?? null);
+            if ($name !== null) {
+                $out[(int) $r['card_location_arg']][] = ['id' => (int) $r['card_id'], 'name' => (string) $name];
+            }
+        }
+        return $out;
+    }
+
+    /** Public per-player display data (fish, supply, score, retired). */
+    public function getPlayersPublic(): array
+    {
+        return $this->getCollectionFromDB(
+            "SELECT `player_id` AS `id`, `player_fish_pos` AS `fish`, `player_worker_supply` AS `supply`,
+                    `player_score` AS `score`, `player_retired` AS `retired` FROM `player`"
+        );
+    }
+
+    /** Payload for the `boardUpdate` notification (public board + player panels). */
+    public function boardUpdatePayload(): array
+    {
+        return [
+            'board' => $this->getBoardView(),
+            'players' => $this->getPlayersPublic(),
+            'built' => $this->getBuiltViewAll(),
+        ];
     }
 
     /** Compute and store every player's final score + tie-breaker (aux = -fish). */
