@@ -48,7 +48,7 @@ class Auction {
         if (!isActive) return;
         const supply = this.game.mySupply();
         const maxBid = Math.min(args.open, supply);
-        const minBid = (this.bga.getCurrentPlayerId() === args.triggerPlayer) ? 1 : 0;
+        const minBid = (this.game.myId() === Number(args.triggerPlayer)) ? 1 : 0;
         this.game.setHint(_('Up to ') + maxBid + _(' workers (this lot has ') + args.open + _(' open icons).'));
         for (let b = minBid; b <= maxBid; b++) {
             this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.bga.actions.performAction('actBid', { workers: b }));
@@ -182,7 +182,7 @@ export class Game {
 
     // ---- helpers ----
 
-    myId() { return this.bga.getCurrentPlayerId(); }
+    myId() { return Number(this.bga.player_id); }
     mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
     setHint(text) { const el = document.getElementById('rb-hint'); if (el) el.textContent = text; }
 
