@@ -182,7 +182,7 @@ export class Game {
 
     // ---- helpers ----
 
-    myId() { return Number(this.bga.player_id); }
+    myId() { return Number(this.bga.players.getCurrentPlayerId()); }
     mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
     setHint(text) { const el = document.getElementById('rb-hint'); if (el) el.textContent = text; }
 
