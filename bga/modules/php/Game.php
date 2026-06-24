@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace Bga\Games\RiverBankers;
 
 use Bga\Games\RiverBankers\States\NextPlayer;
+use Bga\Games\RiverBankers\Rules\CardMovement;
 
 class Game extends \Bga\GameFramework\Table
 {
@@ -211,6 +212,142 @@ class Game extends \Bga\GameFramework\Table
     public function clearBonusTurnPlayer(): void
     {
         $this->globals->set("bonus_turn_player", 0);
+    }
+
+    // =====================================================================
+    // Board-model helpers (Phase 4) used by the Auction / ResolveAuction states.
+    // These touch the DB; their first real validation is in Studio.
+    // =====================================================================
+
+    /** @return array<string,?string> the card row */
+    public function getCardRow(int $cardId): array
+    {
+        return $this->getNonEmptyObjectFromDB("SELECT * FROM `card` WHERE `card_id` = $cardId");
+    }
+
+    /** Printed icon count of a material card (0 for non-material cards). */
+    public function iconCount(int $cardId): int
+    {
+        $row = $this->getCardRow($cardId);
+        if ($row['card_type'] !== 'material') {
+            return 0;
+        }
+        return (int) (Material::$MATERIAL[(int) $row['card_type_arg']]['icons'] ?? 0);
+    }
+
+    /** Uncovered icons on a card = printed icons - workers on it - blanks. */
+    public function uncoveredIcons(int $cardId): int
+    {
+        $workers = (int) $this->getUniqueValueFromDB(
+            "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $cardId"
+        );
+        $blanks = (int) $this->getUniqueValueFromDB(
+            "SELECT `card_blanks` FROM `card` WHERE `card_id` = $cardId"
+        );
+        return max(0, $this->iconCount($cardId) - $workers - $blanks);
+    }
+
+    public function getPlayerSupply(int $playerId): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT `player_worker_supply` FROM `player` WHERE `player_id` = $playerId"
+        );
+    }
+
+    /**
+     * Advance a pawn on the fish track by $by (the game's "spend"). Moving onto a
+     * space also puts the pawn on top of the stack (highest stack order), so the
+     * turn-order tiebreak stays correct.
+     */
+    public function advanceFish(int $playerId, int $by): void
+    {
+        if ($by <= 0) {
+            return;
+        }
+        $top = (int) $this->getUniqueValueFromDB("SELECT MAX(`player_stack_order`) FROM `player`") + 1;
+        $this->DbQuery(
+            "UPDATE `player`
+             SET `player_fish_pos` = `player_fish_pos` + $by, `player_stack_order` = $top
+             WHERE `player_id` = $playerId"
+        );
+    }
+
+    /** Place $n of a player's workers from supply onto a card. */
+    public function placeWorkers(int $playerId, int $cardId, int $n): void
+    {
+        if ($n <= 0) {
+            return;
+        }
+        $this->DbQuery(
+            "INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($playerId, $cardId, $n)
+             ON DUPLICATE KEY UPDATE `workers` = `workers` + $n"
+        );
+        $this->DbQuery(
+            "UPDATE `player` SET `player_worker_supply` = `player_worker_supply` - $n WHERE `player_id` = $playerId"
+        );
+    }
+
+    /** Slide/graduate the auctioned card per the universal movement rule. */
+    public function moveCardAfterAuction(int $cardId, int $uncoveredAfter): void
+    {
+        $row = $this->getCardRow($cardId);
+        $dest = CardMovement::destination((string) $row['card_location'], (int) $row['card_location_arg'], $uncoveredAfter);
+        $this->DbQuery(
+            "UPDATE `card` SET `card_location` = '{$dest['location']}', `card_location_arg` = {$dest['slot']}
+             WHERE `card_id` = $cardId"
+        );
+    }
+
+    /** River cards with at least one uncovered icon (legal Auction-action targets). */
+    public function getAuctionableRiverCards(): array
+    {
+        $ids = $this->getObjectListFromDB("SELECT `card_id` FROM `card` WHERE `card_location` = 'river'", true);
+        $out = [];
+        foreach ($ids as $id) {
+            if ($this->uncoveredIcons((int) $id) > 0) {
+                $out[] = (int) $id;
+            }
+        }
+        return $out;
+    }
+
+    // --- auction lifecycle ---
+
+    public function startAuction(int $lotCardId, int $triggerPlayer, ?int $forcedRate = null): void
+    {
+        $rate = $forcedRate === null ? 'NULL' : (string) $forcedRate;
+        $this->DbQuery(
+            "INSERT INTO `auction` (`lot_card_id`, `trigger_player`, `forced_rate`)
+             VALUES ($lotCardId, $triggerPlayer, $rate)"
+        );
+    }
+
+    /** @return array<string,?string> the single open auction row */
+    public function getOpenAuction(): array
+    {
+        return $this->getNonEmptyObjectFromDB("SELECT * FROM `auction` ORDER BY `auction_id` DESC LIMIT 1");
+    }
+
+    public function recordBid(int $auctionId, int $playerId, int $workers): void
+    {
+        $this->DbQuery(
+            "INSERT INTO `auction_bid` (`auction_id`, `player_id`, `workers_bid`) VALUES ($auctionId, $playerId, $workers)"
+        );
+    }
+
+    /** @return array<int,int> player_id => workers bid */
+    public function getAuctionBids(int $auctionId): array
+    {
+        return array_map('intval', $this->getCollectionFromDB(
+            "SELECT `player_id`, `workers_bid` FROM `auction_bid` WHERE `auction_id` = $auctionId",
+            true
+        ));
+    }
+
+    public function clearAuction(int $auctionId): void
+    {
+        $this->DbQuery("DELETE FROM `auction_bid` WHERE `auction_id` = $auctionId");
+        $this->DbQuery("DELETE FROM `auction` WHERE `auction_id` = $auctionId");
     }
 
     public function debug_goToState(int $state = 3)
