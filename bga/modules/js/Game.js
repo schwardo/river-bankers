@@ -188,7 +188,7 @@ class FlushChoose {
 export class Game {
     constructor(bga) {
         this.bga = bga;
-        this.clickHandlers = [];
+        this.clickable = new Map(); // card id -> handler (survives board re-renders)
         this.bga.states.register('PlayerTurn', new PlayerTurn(this, bga));
         this.bga.states.register('Auction', new Auction(this, bga));
         this.bga.states.register('InventDiscard', new InventDiscard(this, bga));
@@ -222,6 +222,14 @@ export class Game {
                     <div id="built-${p.id}" class="rb-built"></div>
                 </div>
             `);
+        });
+
+        // Delegated click handling so clickability survives board re-renders.
+        this.bga.gameArea.getElement().addEventListener('click', e => {
+            const card = e.target.closest('.rb-card');
+            if (!card) return;
+            const id = Number(card.dataset.id);
+            if (this.clickable.has(id)) this.clickable.get(id)(id);
         });
 
         this.renderBoard(gamedatas.board);
@@ -258,6 +266,7 @@ export class Game {
             }).join('');
         document.getElementById('rb-shoreline').innerHTML =
             board.shoreline.map(c => this.cardHtml(c, 'shore')).join('') || '<span class="rb-empty">—</span>';
+        this.applyClickableClasses();
     }
 
     renderHand(hand) {
@@ -267,6 +276,7 @@ export class Game {
                 <div>${c.time}🐟 + ${costStr(c.cost)}</div>
                 <div>${c.vp}★</div>
             </div>`).join('') || '<span class="rb-empty">—</span>';
+        this.applyClickableClasses();
     }
 
     renderBuilt(built) {
@@ -301,18 +311,22 @@ export class Game {
     setHint(text) { const el = document.getElementById('rb-hint'); if (el) el.textContent = text; }
 
     markClickable(group, ids, handler) {
-        (ids || []).forEach(id => {
+        (ids || []).forEach(id => this.clickable.set(Number(id), handler));
+        this.applyClickableClasses();
+    }
+    // Re-apply the visual highlight (called after every board render, since
+    // re-rendering replaces the card DOM). Clicks work via delegation regardless.
+    applyClickableClasses() {
+        document.querySelectorAll('.rb-card.rb-clickable').forEach(el => el.classList.remove('rb-clickable'));
+        this.clickable.forEach((_h, id) => {
             const el = document.getElementById(`card-${id}`);
-            if (!el) return;
-            el.classList.add('rb-clickable');
-            const fn = () => handler(id);
-            el.addEventListener('click', fn);
-            this.clickHandlers.push({ el, fn });
+            if (el) el.classList.add('rb-clickable');
         });
     }
     clearClickable() {
-        this.clickHandlers.forEach(({ el, fn }) => { el.classList.remove('rb-clickable', 'rb-selected'); el.removeEventListener('click', fn); });
-        this.clickHandlers = [];
+        this.clickable.clear();
+        document.querySelectorAll('.rb-card.rb-clickable, .rb-card.rb-selected')
+            .forEach(el => el.classList.remove('rb-clickable', 'rb-selected'));
         this.setHint('');
     }
 
