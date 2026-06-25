@@ -294,8 +294,14 @@ class Game extends \Bga\GameFramework\Table
         );
     }
 
-    /** Slide/graduate the auctioned card per the universal movement rule. */
-    public function moveCardAfterAuction(int $cardId, int $uncoveredAfter): void
+    /**
+     * Slide/graduate the auctioned card per the universal movement rule. If it
+     * reaches the shoreline, apply any material shoreline-arrival penalty and
+     * return it (player_id => spaces moved back) for the caller to notify.
+     *
+     * @return array<int,int>
+     */
+    public function moveCardAfterAuction(int $cardId, int $uncoveredAfter): array
     {
         $row = $this->getCardRow($cardId);
         $dest = CardMovement::destination((string) $row['card_location'], (int) $row['card_location_arg'], $uncoveredAfter);
@@ -303,6 +309,7 @@ class Game extends \Bga\GameFramework\Table
             "UPDATE `card` SET `card_location` = '{$dest['location']}', `card_location_arg` = {$dest['slot']}
              WHERE `card_id` = $cardId"
         );
+        return $dest['location'] === 'shoreline' ? $this->applyShorelineArrival($cardId) : [];
     }
 
     /** River cards with at least one uncovered icon (legal Auction-action targets). */
@@ -835,7 +842,44 @@ class Game extends \Bga\GameFramework\Table
         if (Effects::grantsHandSize((string) $name)) {
             $this->DbQuery("UPDATE `player` SET `player_hand_limit` = `player_hand_limit` + 1 WHERE `player_id` = $playerId");
         }
+        if (Effects::grantsExtraTurn((string) $name)) {
+            $this->globals->set('bonus_turn_player', $playerId); // Royal Lodge: act again
+        }
         // TODO (later batches): other when-built effects dispatch here.
+    }
+
+    /** Move a pawn back on the fish track (never below 0); does not change stack order. */
+    public function moveBackFish(int $playerId, int $spaces): void
+    {
+        if ($spaces <= 0) {
+            return;
+        }
+        $this->DbQuery(
+            "UPDATE `player` SET `player_fish_pos` = GREATEST(0, CAST(`player_fish_pos` AS SIGNED) - $spaces)
+             WHERE `player_id` = $playerId"
+        );
+    }
+
+    /**
+     * Material shoreline-arrival penalties (Hidden Inlet / Mud Wallow / Cattail
+     * Cluster). Applies the fish-track move-back and returns what it did so the
+     * caller can notify.
+     *
+     * @return array<int,int> player_id => spaces moved back
+     */
+    private function applyShorelineArrival(int $cardId): array
+    {
+        $row = $this->getCardRow($cardId);
+        $name = (string) (Material::$MATERIAL[(int) $row['card_type_arg']]['name'] ?? '');
+        $workers = [];
+        foreach ($this->getObjectListFromDB("SELECT `player_id`, `workers` FROM `worker` WHERE `card_id` = $cardId") as $w) {
+            $workers[(int) $w['player_id']] = (int) $w['workers'];
+        }
+        $penalties = Effects::shorelinePenalty($name, $workers);
+        foreach ($penalties as $pid => $spaces) {
+            $this->moveBackFish((int) $pid, (int) $spaces);
+        }
+        return $penalties;
     }
 
     /** Compute and store every player's final score + tie-breaker (aux = -fish). */

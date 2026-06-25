@@ -269,4 +269,5 @@ export class Game {
     async notif_flush() {}
     async notif_invent() {}
     async notif_retire() {}
+    async notif_shorelinePenalty() {}
 }

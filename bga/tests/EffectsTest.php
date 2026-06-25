@@ -53,4 +53,35 @@ final class EffectsTest extends TestCase
         self::assertTrue(Effects::grantsHandSize('Beaver Cache'));
         self::assertFalse(Effects::grantsHandSize('Reed Bed'));
     }
+
+    public function testRoyalLodgeExtraTurn(): void
+    {
+        self::assertTrue(Effects::grantsExtraTurn('Royal Lodge'));
+        self::assertFalse(Effects::grantsExtraTurn('Spillway'));
+    }
+
+    public function testHiddenInletSoloPlayerBackPerWorker(): void
+    {
+        self::assertSame([5 => 3], Effects::shorelinePenalty('Hidden Inlet', [5 => 3]));
+        // More than one player with workers -> nobody.
+        self::assertSame([], Effects::shorelinePenalty('Hidden Inlet', [5 => 3, 6 => 1]));
+    }
+
+    public function testMudWallowMostWorkers(): void
+    {
+        self::assertSame([6 => 2], Effects::shorelinePenalty('Mud Wallow', [5 => 1, 6 => 3]));
+        // Tie -> nobody.
+        self::assertSame([], Effects::shorelinePenalty('Mud Wallow', [5 => 2, 6 => 2]));
+    }
+
+    public function testCattailClusterBackThree(): void
+    {
+        self::assertSame([5 => 3], Effects::shorelinePenalty('Cattail Cluster', [5 => 4, 6 => 1]));
+    }
+
+    public function testNoPenaltyForPlainOrEmpty(): void
+    {
+        self::assertSame([], Effects::shorelinePenalty('Logjam', [5 => 3]));
+        self::assertSame([], Effects::shorelinePenalty('Mud Wallow', []));
+    }
 }

@@ -70,4 +70,43 @@ final class Effects
     {
         return in_array($name, self::HAND_SIZE_CARDS, true);
     }
+
+    /** Royal Lodge: building it grants an immediate extra turn. */
+    public static function grantsExtraTurn(string $name): bool
+    {
+        return $name === 'Royal Lodge';
+    }
+
+    /**
+     * Fish-track penalty when a material card reaches the shoreline:
+     *   - Hidden Inlet: if exactly one player has workers, back 1 per worker;
+     *   - Mud Wallow / Cattail Cluster: the sole player with the most workers
+     *     moves back 2 / 3 (ties → nobody).
+     *
+     * @param array<int,int> $workersByPlayer player_id => workers on the card
+     * @return array<int,int> player_id => spaces to move back (empty = none)
+     */
+    public static function shorelinePenalty(string $cardName, array $workersByPlayer): array
+    {
+        $withWorkers = array_filter($workersByPlayer, fn(int $w): bool => $w > 0);
+        if ($withWorkers === []) {
+            return [];
+        }
+        if ($cardName === 'Hidden Inlet') {
+            if (count($withWorkers) === 1) {
+                $pid = array_key_first($withWorkers);
+                return [$pid => $withWorkers[$pid]];
+            }
+            return [];
+        }
+        if ($cardName === 'Mud Wallow' || $cardName === 'Cattail Cluster') {
+            $max = max($withWorkers);
+            $leaders = array_keys($withWorkers, $max, true);
+            if (count($leaders) !== 1) {
+                return []; // ties → nobody
+            }
+            return [$leaders[0] => ($cardName === 'Mud Wallow' ? 2 : 3)];
+        }
+        return [];
+    }
 }

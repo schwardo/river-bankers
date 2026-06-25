@@ -62,11 +62,23 @@ class ResolveAuction extends GameState
 
         $wasHeadwaters = $cardRow['card_location'] === 'headwaters';
         $vacatedSlot = (int) $cardRow['card_location_arg'];
-        $this->game->moveCardAfterAuction($cardId, $open - $placed);
+        $penalties = $this->game->moveCardAfterAuction($cardId, $open - $placed);
         if ($wasHeadwaters) {
             $this->game->refillHeadwaters($vacatedSlot);
         }
         $this->game->clearAuction($auctionId);
+
+        // Material shoreline-arrival penalties (Hidden Inlet / Mud Wallow / Cattail Cluster).
+        $cardName = Material::$MATERIAL[(int) $cardRow['card_type_arg']]['name'] ?? '';
+        foreach ($penalties as $pid => $spaces) {
+            $this->notify->all('shorelinePenalty', clienttranslate('${player_name} drifts back ${spaces}🐟 (${card})'), [
+                'player_id' => $pid,
+                'player_name' => $this->game->getPlayerNameById($pid),
+                'spaces' => $spaces,
+                'card' => $cardName,
+                'i18n' => ['card'],
+            ]);
+        }
 
         // Report what each bidder won (and that empty-handed bidders still paid).
         foreach ($bids as $pid => $bid) {
