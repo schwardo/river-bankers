@@ -17,6 +17,55 @@ function costStr(cost) {
     return Object.entries(cost || {}).map(([m, n]) => `${n}${MAT_GLYPH[m] || m}`).join(' ') || '—';
 }
 
+// Card name -> art-file slug. Mirrors the deck generators' safe_filename():
+// keep ASCII letters/digits, drop everything else ("Boulder Field" -> "BoulderField").
+function slugify(name) { return (name || '').replace(/[^A-Za-z0-9]/g, ''); }
+
+// A material-icon sprite chip (logs/stones/reeds/mud/vines/clay) — see img/icons.png.
+function matIcon(m) {
+    return m ? `<span class="rb-art rb-art-icon rb-p-icon-${m}" title="${m}"></span>` : '';
+}
+
+// Cost rendered with real material-icon sprites instead of emoji.
+function costIcons(cost) {
+    return Object.entries(cost || {}).map(([m, n]) => `${n}${matIcon(m)}`).join(' ') || '—';
+}
+
+// Material-card face geometry (the sprite renders the trimmed 252×180pt card).
+// WORKER_DISC_PX must match the generator's wchit render width (img/build_sprites.py).
+const MAT_CARD_W = 154, MAT_CARD_H = 110, WORKER_DISC_PX = 37;
+
+// Center of each printed icon circle, as {cx,cy} in % of the trimmed card.
+// Ported from the web prototype's pngIconPositions() (which mirrors generate.py's
+// layout: 4→[4], 5→[3,2], 7→[4,3], 8→[4,4]). `hasEffect` shortens the icon band.
+function pngIconPositions(totalIcons, hasEffect) {
+    let rows;
+    if (totalIcons === 4) rows = [4];
+    else if (totalIcons === 5) rows = [3, 2];
+    else if (totalIcons === 7) rows = [4, 3];
+    else if (totalIcons === 8) rows = [4, 4];
+    else return [];
+    const DIAM = 45.36, RADIUS = 22.68, GAP = 6;
+    const CROP_W = 252, CROP_H = 180, CROP_OFFSET = 9;
+    const cardCenterX = 135 - CROP_OFFSET;                       // 126
+    const areaTop = 44 - CROP_OFFSET;                            // 35
+    const areaBot = (hasEffect ? 154 : 178) - CROP_OFFSET;      // 145 / 169
+    const rowsH = rows.length === 1 ? DIAM : rows.length * DIAM + (rows.length - 1) * GAP;
+    const cyTop = areaTop + (areaBot - areaTop - rowsH) / 2 + RADIUS;
+    const positions = [];
+    for (let r = 0; r < rows.length; r++) {
+        const cy = cyTop + r * (DIAM + GAP);
+        const count = rows[r];
+        const rowW = count * DIAM + (count - 1) * GAP;
+        const xFirst = cardCenterX - rowW / 2 + RADIUS;
+        for (let i = 0; i < count; i++) {
+            const cx = xFirst + i * (DIAM + GAP);
+            positions.push({ cx: 100 * cx / CROP_W, cy: 100 * cy / CROP_H });
+        }
+    }
+    return positions;
+}
+
 // ---- State classes --------------------------------------------------------
 
 class PlayerTurn {
@@ -570,13 +619,31 @@ export class Game {
 
     // ---- rendering ----
 
+    // A worker/blank disc centered on a printed icon circle (pos = {cx,cy} in %).
+    disc(cls, pos, title) {
+        const left = (pos.cx * MAT_CARD_W / 100 - WORKER_DISC_PX / 2).toFixed(1);
+        const top = (pos.cy * MAT_CARD_H / 100 - WORKER_DISC_PX / 2).toFixed(1);
+        return `<span class="rb-art rb-art-wchit ${cls}" title="${title}"` +
+            ` style="position:absolute;left:${left}px;top:${top}px;"></span>`;
+    }
+
+    // Material/river/shoreline cards render as the printed material-deck face;
+    // each placed worker (player's species disc) and dropped blank sits on its
+    // matching printed icon circle, filling circles in order: workers, then
+    // blanks; remaining circles stay open (already drawn on the art).
     cardHtml(c, group) {
-        const w = Object.entries(c.workers || {}).map(([pid, n]) => `${n}@p${pid}`).join(' ');
-        return `<div id="card-${c.id}" class="rb-card rb-${group}" data-id="${c.id}">
-            <div class="rb-mat">${MAT_GLYPH[c.material] || ''}${c.wildAlt ? '/' + MAT_GLYPH[c.wildAlt] : ''}</div>
-            <div class="rb-icons">${c.uncovered}/${c.icons} open</div>
-            ${c.blanks ? `<div>▪${c.blanks} blank</div>` : ''}
-            ${w ? `<div class="rb-workers">${w}</div>` : ''}
+        const positions = pngIconPositions(c.icons, c.hasEffect);
+        const occ = [];
+        Object.entries(c.workers || {}).forEach(([pid, n]) => {
+            const sp = (this.players[pid] || {}).species || 'beaver';
+            for (let i = 0; i < n; i++) occ.push([`rb-p-wchit-${sp}`, this.playerName(pid) + "'s worker"]);
+        });
+        for (let i = 0; i < (c.blanks || 0); i++) occ.push(['rb-p-wchit-blank', _('sold')]);
+        const discs = occ.map(([cls, title], i) =>
+            positions[i] ? this.disc(cls, positions[i], title) : '').join('');
+        return `<div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-mat rb-p-mat-${slugify(c.name)} rb-${group}"
+                     data-id="${c.id}" title="${c.name}${c.wildAlt ? ' (wild)' : ''}">
+            <span class="rb-ov rb-ov-open">${c.uncovered}/${c.icons}</span>${discs}
         </div>`;
     }
 
@@ -600,10 +667,8 @@ export class Game {
 
     renderHand(hand) {
         document.getElementById('rb-hand').innerHTML = (hand || []).map(c => `
-            <div id="card-${c.id}" class="rb-card rb-hand" data-id="${c.id}" title="${c.effect}">
-                <div class="rb-name">${c.name}</div>
-                <div>${c.time}🐟 + ${costStr(c.cost)}</div>
-                <div>${c.vp}★</div>
+            <div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-str rb-p-str-${slugify(c.name)}"
+                 data-id="${c.id}" title="${c.name} — ${c.time}🐟 + ${costStr(c.cost)} — ${c.vp}★ — ${c.effect}">
             </div>`).join('') || '<span class="rb-empty">—</span>';
         this.applyClickableClasses();
     }
@@ -619,11 +684,8 @@ export class Game {
         const el = document.getElementById('rb-draft');
         if (!el) return;
         el.innerHTML = (offers || []).map(c => `
-            <div id="card-${c.id}" class="rb-card rb-hand" data-id="${c.id}" title="${c.effect}">
-                <div class="rb-name">${c.name}</div>
-                <div>${c.vp}★</div>
-                <div style="font-size:9px">${c.effect}</div>
-            </div>`).join('');
+            <div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-sta rb-p-sta-${slugify(c.name)}"
+                 data-id="${c.id}" title="${c.name} — ${c.vp}★ — ${c.effect}"></div>`).join('');
         this.applyClickableClasses();
     }
 
@@ -631,8 +693,8 @@ export class Game {
         Object.entries(materials || {}).forEach(([pid, held]) => {
             const el = document.getElementById(`materials-${pid}`);
             if (!el) return;
-            const fixed = Object.entries(held.fixed || {}).map(([m, n]) => `${n}${MAT_GLYPH[m] || m}`);
-            const wild = (held.wild || []).map(w => `${w.count}${MAT_GLYPH[w.materials[0]] || ''}/${MAT_GLYPH[w.materials[1]] || ''}`);
+            const fixed = Object.entries(held.fixed || {}).map(([m, n]) => `${n}${matIcon(m)}`);
+            const wild = (held.wild || []).map(w => `${w.count}${matIcon(w.materials[0])}/${matIcon(w.materials[1])}`);
             const all = [...fixed, ...wild];
             el.innerHTML = all.length ? all.join(' ') : '<span class="rb-empty">no workers placed</span>';
         });

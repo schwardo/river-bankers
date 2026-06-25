@@ -86,3 +86,144 @@
 .rb-mats { font-size: 15px; margin-top: 2px; }
 .rb-built { margin-top: 2px; }
 .rb-tag { display: inline-block; background: #dde6f0; border-radius: 3px; padding: 0 4px; font-size: 12px; }
+
+/* ===== Sprite-art cards (Phase 7 — real card faces from the sprite sheets) =====
+   A card flagged .rb-has-art uses the printed PNG as its face (size + background
+   come from the generated .rb-art-* / .rb-p-* classes); we strip the placeholder
+   chrome and stack dynamic state (open-icon count, worker chits, blanks) on top. */
+/* Clear only the placeholder color/border — NOT background-image, or it would
+   override the sprite face set by the lower-specificity .rb-art-* class. */
+.rb-card.rb-has-art { border: none; padding: 0; background-color: transparent;
+                      min-width: 0; position: relative; border-radius: 6px; }
+.rb-card.rb-has-art.rb-clickable { box-shadow: 0 0 0 2px #d6a73a; border-radius: 6px; }
+/* Worker/blank discs (.rb-art-wchit) are absolutely positioned inline by JS at
+   each printed icon circle — see pngIconPositions() / cardHtml() in Game.js. */
+.rb-ov { position: absolute; line-height: 1; pointer-events: none; font-weight: 700; }
+.rb-ov-open { top: 3px; right: 3px; font-size: 10px; color: #1c2e44;
+              background: rgba(255,255,255,0.85); border-radius: 3px; padding: 1px 3px; }
+
+/* === BEGIN GENERATED SPRITES (build_sprites.py) === */
+/* Do not edit by hand — regenerate with: python3 img/build_sprites.py */
+.rb-art{background-repeat:no-repeat;display:inline-block;background-color:transparent;vertical-align:middle;}
+.rb-art-mat{background-image:url('img/cards-material.png');background-size:770.0px 550.0px;width:154.0px;height:110.0px;}
+.rb-p-mat-_back{background-position:0.0px 0.0px;}
+.rb-p-mat-BoulderField{background-position:-154.0px 0.0px;}
+.rb-p-mat-Cairn{background-position:-308.0px 0.0px;}
+.rb-p-mat-CattailCluster{background-position:-462.0px 0.0px;}
+.rb-p-mat-ClayBank{background-position:-616.0px 0.0px;}
+.rb-p-mat-ClaySeep{background-position:0.0px -110.0px;}
+.rb-p-mat-DriftwoodTangle{background-position:-154.0px -110.0px;}
+.rb-p-mat-FallenLimb{background-position:-308.0px -110.0px;}
+.rb-p-mat-Floodplain{background-position:-462.0px -110.0px;}
+.rb-p-mat-HiddenInlet{background-position:-616.0px -110.0px;}
+.rb-p-mat-Logjam{background-position:0.0px -220.0px;}
+.rb-p-mat-MarshEdge{background-position:-154.0px -220.0px;}
+.rb-p-mat-MudFlat{background-position:-308.0px -220.0px;}
+.rb-p-mat-MudSlick{background-position:-462.0px -220.0px;}
+.rb-p-mat-MudWallow{background-position:-616.0px -220.0px;}
+.rb-p-mat-OldGrowth{background-position:0.0px -330.0px;}
+.rb-p-mat-QuarryBank{background-position:-154.0px -330.0px;}
+.rb-p-mat-ReedStand{background-position:-308.0px -330.0px;}
+.rb-p-mat-RockyShoal{background-position:-462.0px -330.0px;}
+.rb-p-mat-SiltBank{background-position:-616.0px -330.0px;}
+.rb-p-mat-SlippingSandbar{background-position:0.0px -440.0px;}
+.rb-p-mat-StranglerKnot{background-position:-154.0px -440.0px;}
+.rb-p-mat-TrailingVine{background-position:-308.0px -440.0px;}
+.rb-p-mat-VineCurtain{background-position:-462.0px -440.0px;}
+.rb-p-mat-VineThicket{background-position:-616.0px -440.0px;}
+.rb-art-str{background-image:url('img/cards-structure.png');background-size:880.0px 1078.0px;width:110.0px;height:154.0px;}
+.rb-p-str-_back{background-position:0.0px 0.0px;}
+.rb-p-str-BurrowNetwork{background-position:-110.0px 0.0px;}
+.rb-p-str-BurrowRun{background-position:-220.0px 0.0px;}
+.rb-p-str-CacheBurrow{background-position:-330.0px 0.0px;}
+.rb-p-str-CattailMarsh{background-position:-440.0px 0.0px;}
+.rb-p-str-CattailPatch{background-position:-550.0px 0.0px;}
+.rb-p-str-CharcoalPit{background-position:-660.0px 0.0px;}
+.rb-p-str-ClayVault{background-position:-770.0px 0.0px;}
+.rb-p-str-Confluence{background-position:0.0px -154.0px;}
+.rb-p-str-DriftwoodSnag{background-position:-110.0px -154.0px;}
+.rb-p-str-Floodgate{background-position:-220.0px -154.0px;}
+.rb-p-str-FlushChannel{background-position:-330.0px -154.0px;}
+.rb-p-str-Granary{background-position:-440.0px -154.0px;}
+.rb-p-str-GraniteSpire{background-position:-550.0px -154.0px;}
+.rb-p-str-HeronRoost{background-position:-660.0px -154.0px;}
+.rb-p-str-HeronWatch{background-position:-770.0px -154.0px;}
+.rb-p-str-HiddenCache{background-position:0.0px -308.0px;}
+.rb-p-str-HollowedoutLog{background-position:-110.0px -308.0px;}
+.rb-p-str-LogFlume{background-position:-220.0px -308.0px;}
+.rb-p-str-LookoutTree{background-position:-330.0px -308.0px;}
+.rb-p-str-MillWheel{background-position:-440.0px -308.0px;}
+.rb-p-str-MudLevee{background-position:-550.0px -308.0px;}
+.rb-p-str-PackRatBurrow{background-position:-660.0px -308.0px;}
+.rb-p-str-Pier{background-position:-770.0px -308.0px;}
+.rb-p-str-Pontoon{background-position:0.0px -462.0px;}
+.rb-p-str-Portage{background-position:-110.0px -462.0px;}
+.rb-p-str-ReedBed{background-position:-220.0px -462.0px;}
+.rb-p-str-ReedWalkway{background-position:-330.0px -462.0px;}
+.rb-p-str-RoyalLodge{background-position:-440.0px -462.0px;}
+.rb-p-str-SalmonRun{background-position:-550.0px -462.0px;}
+.rb-p-str-SaltLick{background-position:-660.0px -462.0px;}
+.rb-p-str-SapDrip{background-position:-770.0px -462.0px;}
+.rb-p-str-Slipstream{background-position:0.0px -616.0px;}
+.rb-p-str-SnagPile{background-position:-110.0px -616.0px;}
+.rb-p-str-Spillway{background-position:-220.0px -616.0px;}
+.rb-p-str-SpringCascade{background-position:-330.0px -616.0px;}
+.rb-p-str-SpringwaterPool{background-position:-440.0px -616.0px;}
+.rb-p-str-SpyMound{background-position:-550.0px -616.0px;}
+.rb-p-str-StoneCauseway{background-position:-660.0px -616.0px;}
+.rb-p-str-StonePool{background-position:-770.0px -616.0px;}
+.rb-p-str-StreambankHollow{background-position:0.0px -770.0px;}
+.rb-p-str-TowLine{background-position:-110.0px -770.0px;}
+.rb-p-str-TradingPost{background-position:-220.0px -770.0px;}
+.rb-p-str-TreatyStone{background-position:-330.0px -770.0px;}
+.rb-p-str-TributeStone{background-position:-440.0px -770.0px;}
+.rb-p-str-TrophyLodge{background-position:-550.0px -770.0px;}
+.rb-p-str-VineLadder{background-position:-660.0px -770.0px;}
+.rb-p-str-VineLattice{background-position:-770.0px -770.0px;}
+.rb-p-str-VineTrellis{background-position:0.0px -924.0px;}
+.rb-p-str-WoodPile{background-position:-110.0px -924.0px;}
+.rb-art-sta{background-image:url('img/cards-starter.png');background-size:550.0px 616.0px;width:110.0px;height:154.0px;}
+.rb-p-sta-_back_beaver{background-position:0.0px 0.0px;}
+.rb-p-sta-_back_mink{background-position:-110.0px 0.0px;}
+.rb-p-sta-_back_muskrat{background-position:-220.0px 0.0px;}
+.rb-p-sta-_back_otter{background-position:-330.0px 0.0px;}
+.rb-p-sta-BeaverCache{background-position:-440.0px 0.0px;}
+.rb-p-sta-ChannelClearer{background-position:0.0px -154.0px;}
+.rb-p-sta-ClayDen{background-position:-110.0px -154.0px;}
+.rb-p-sta-KelpBed{background-position:-220.0px -154.0px;}
+.rb-p-sta-LodgeFoundation{background-position:-330.0px -154.0px;}
+.rb-p-sta-MarshLookout{background-position:-440.0px -154.0px;}
+.rb-p-sta-MudBurrow{background-position:0.0px -308.0px;}
+.rb-p-sta-QuickStrike{background-position:-110.0px -308.0px;}
+.rb-p-sta-RollingFloat{background-position:-220.0px -308.0px;}
+.rb-p-sta-SnareSet{background-position:-330.0px -308.0px;}
+.rb-p-sta-StoneTool{background-position:-440.0px -308.0px;}
+.rb-p-sta-TailSlap{background-position:0.0px -462.0px;}
+.rb-art-chit{background-image:url('img/chits.png');background-size:160.0px 120.0px;width:40.0px;height:40.0px;}
+.rb-p-chit-beaver{background-position:0.0px 0.0px;}
+.rb-p-chit-mink{background-position:-40.0px 0.0px;}
+.rb-p-chit-muskrat{background-position:-80.0px 0.0px;}
+.rb-p-chit-otter{background-position:-120.0px 0.0px;}
+.rb-p-chit-beaver-back{background-position:0.0px -40.0px;}
+.rb-p-chit-mink-back{background-position:-40.0px -40.0px;}
+.rb-p-chit-muskrat-back{background-position:-80.0px -40.0px;}
+.rb-p-chit-otter-back{background-position:-120.0px -40.0px;}
+.rb-p-chit-blank{background-position:0.0px -80.0px;}
+.rb-art-wchit{background-image:url('img/chits.png');background-size:148.0px 111.0px;width:37.0px;height:37.0px;}
+.rb-p-wchit-beaver{background-position:0.0px 0.0px;}
+.rb-p-wchit-mink{background-position:-37.0px 0.0px;}
+.rb-p-wchit-muskrat{background-position:-74.0px 0.0px;}
+.rb-p-wchit-otter{background-position:-111.0px 0.0px;}
+.rb-p-wchit-beaver-back{background-position:0.0px -37.0px;}
+.rb-p-wchit-mink-back{background-position:-37.0px -37.0px;}
+.rb-p-wchit-muskrat-back{background-position:-74.0px -37.0px;}
+.rb-p-wchit-otter-back{background-position:-111.0px -37.0px;}
+.rb-p-wchit-blank{background-position:0.0px -74.0px;}
+.rb-art-icon{background-image:url('img/icons.png');background-size:144.0px 24.0px;width:24.0px;height:24.0px;}
+.rb-p-icon-logs{background-position:0.0px 0.0px;}
+.rb-p-icon-stones{background-position:-24.0px 0.0px;}
+.rb-p-icon-reeds{background-position:-48.0px 0.0px;}
+.rb-p-icon-mud{background-position:-72.0px 0.0px;}
+.rb-p-icon-vines{background-position:-96.0px 0.0px;}
+.rb-p-icon-clay{background-position:-120.0px 0.0px;}
+/* === END GENERATED SPRITES === */

@@ -1030,6 +1030,10 @@ class Game extends \Bga\GameFramework\Table
         $blanks = (int) $c['card_blanks'];
         return [
             'id' => $id,
+            'name' => $def !== null ? (string) $def['name'] : '',
+            // hasEffect drives the printed icon-grid layout (effect cards pack
+            // icons into a shorter band); mirrors pngIconPositions() on the client.
+            'hasEffect' => $def !== null && isset($def['effect']),
             'material' => $def !== null ? (string) $def['material'] : '',
             'wildAlt' => $def['wildAlt'] ?? null,
             'icons' => $icons,
