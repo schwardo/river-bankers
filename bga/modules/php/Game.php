@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace Bga\Games\RiverBankers;
 
 use Bga\Games\RiverBankers\States\NextPlayer;
+use Bga\Games\RiverBankers\States\StarterDraft;
 use Bga\Games\RiverBankers\Rules\Build;
 use Bga\Games\RiverBankers\Rules\CardMovement;
 use Bga\Games\RiverBankers\Rules\Effects;
@@ -72,6 +73,7 @@ class Game extends \Bga\GameFramework\Table
         $result["built"] = $this->getBuiltViewAll();
         $result["materials"] = $this->getMaterialsAll();
         $result["hand"] = $this->getHandView($currentPlayerId); // private: only this player's hand
+        $result["starterOffer"] = $this->getStarterOffer($currentPlayerId); // empty unless mid-draft
 
         return $result;
     }
@@ -90,11 +92,14 @@ class Game extends \Bga\GameFramework\Table
         // ---- Players ------------------------------------------------------
         // Stack order: pawns start stacked on space 0 in player order with the
         // first player on top. Higher stack_order = on top = acts first.
+        $draft = (int) ($options[100] ?? 1) === 1; // species-starter draft on?
+        $playerSpecies = [];
         $query_values = [];
         $stack = count($players);
         foreach ($players as $player_id => $player) {
             $color = array_shift($default_colors);
             $species = self::SPECIES_BY_COLOR[$color] ?? '';
+            $playerSpecies[(int) $player_id] = $species;
             $query_values[] = vsprintf("('%s', '%s', '%s', '%s', %d, %d)", [
                 $player_id,
                 $color,
@@ -147,16 +152,31 @@ class Game extends \Bga\GameFramework\Table
         // ---- Structure deck ----------------------------------------------
         $structArgs = array_keys(Material::$STRUCTURE);
         shuffle($structArgs);
-        // Deal 3 face-down to each player's hand.
-        foreach ($players as $player_id => $player) {
-            for ($i = 0; $i < 3 && $structArgs; $i++) {
-                $cardValues[] = $this->cardRow('structure', array_pop($structArgs), 'hand', (int) $player_id);
+        // Symmetric game: deal 3 to each hand now. Draft: defer dealing until
+        // after the starter draft (a drafted Beaver Cache raises the hand size).
+        if (!$draft) {
+            foreach ($players as $player_id => $player) {
+                for ($i = 0; $i < 3 && $structArgs; $i++) {
+                    $cardValues[] = $this->cardRow('structure', array_pop($structArgs), 'hand', (int) $player_id);
+                }
             }
         }
-        // Rest form the draw pile.
         $order = 0;
         foreach ($structArgs as $arg) {
             $cardValues[] = $this->cardRow('structure', $arg, 'structure_deck', $order++);
+        }
+
+        // ---- Species starter offers (draft only) -------------------------
+        if ($draft) {
+            $startersBySpecies = [];
+            foreach (Material::$STARTER as $arg => $def) {
+                $startersBySpecies[$def['species']][] = $arg;
+            }
+            foreach ($players as $player_id => $player) {
+                foreach ($startersBySpecies[$playerSpecies[(int) $player_id]] ?? [] as $arg) {
+                    $cardValues[] = $this->cardRow('starter', $arg, 'starter_offer', (int) $player_id);
+                }
+            }
         }
 
         static::DbQuery(
@@ -164,22 +184,18 @@ class Game extends \Bga\GameFramework\Table
              VALUES " . implode(",", $cardValues)
         );
 
-        // TODO (Phase 4): optional species-starter draft — a multiactive
-        // StarterDraft state before the first turn that offers each player their
-        // 3 Material::$STARTER cards for their species, builds the chosen one,
-        // and boxes the other two. Symmetric base game (no starter built) for now.
-
         // ---- Globals & stats ---------------------------------------------
         $this->globals->set("fish_line", self::FISH_LINE);
         $this->globals->set("deck_empty", 0);
 
         // TODO (Phase 5): init stats here once stats.json is defined.
 
-        // Provisional active player; NextPlayer immediately recomputes the real
+        // Provisional active player; the turn-order pivot recomputes the real
         // first actor (top of the space-0 stack) via Rules\TurnOrder.
         $this->activeNextPlayer();
 
-        return NextPlayer::class;
+        // Draft first (then deal hands), or straight into the turn loop.
+        return $draft ? StarterDraft::class : NextPlayer::class;
     }
 
     /** Build one VALUES tuple for the `card` insert. */
@@ -943,6 +959,50 @@ class Game extends \Bga\GameFramework\Table
     public function flipCardUsed(int $cardId): void
     {
         $this->DbQuery("UPDATE `card` SET `card_used` = 1 WHERE `card_id` = $cardId");
+    }
+
+    // --- species starter draft ---
+
+    /** @return list<array{id:int, name:string, vp:int, effect:string}> a player's 3 starter offers */
+    public function getStarterOffer(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_location` = 'starter_offer' AND `card_location_arg` = $playerId"
+        ) as $r) {
+            $def = Material::$STARTER[(int) $r['card_type_arg']] ?? null;
+            if ($def !== null) {
+                $out[] = [
+                    'id' => (int) $r['card_id'], 'name' => (string) $def['name'],
+                    'vp' => (int) $def['vp'], 'effect' => (string) ($def['effect'] ?? ''),
+                ];
+            }
+        }
+        return $out;
+    }
+
+    /** Pre-build the drafted starter, box the other two, apply its on-build effects. */
+    public function draftStarter(int $playerId, int $chosenCardId): void
+    {
+        $this->DbQuery("UPDATE `card` SET `card_location` = 'built', `card_location_arg` = $playerId WHERE `card_id` = $chosenCardId");
+        $this->applyOnBuildEffects($playerId, $chosenCardId);
+        $this->DbQuery(
+            "UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0
+             WHERE `card_location` = 'starter_offer' AND `card_location_arg` = $playerId"
+        );
+    }
+
+    /** Deal each player their opening hand up to their (post-draft) hand size. */
+    public function dealOpeningHands(): void
+    {
+        foreach ($this->getObjectListFromDB("SELECT `player_id` FROM `player`") as $p) {
+            $this->refillHand((int) $p['player_id']);
+        }
+    }
+
+    public function getAllPlayerIds(): array
+    {
+        return array_map('intval', $this->getObjectListFromDB("SELECT `player_id` FROM `player`", true));
     }
 
     /** Legal targets (card ids) for an ability, for the acting player. */

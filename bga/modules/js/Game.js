@@ -71,6 +71,30 @@ class AbilityTarget {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class StarterDraft {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const sec = document.getElementById('rb-draft-section');
+        if (sec) sec.style.display = '';
+        this.onPlayerActivationChange(args, isActive);
+    }
+    onPlayerActivationChange(args, isActive) {
+        const offers = (this.game.gamedatas && this.game.gamedatas.starterOffer) || [];
+        this.game.renderStarterOffer(offers);
+        this.game.clearClickable();
+        if (!isActive) { this.bga.statusBar.setTitle(_('Drafting starters…')); return; }
+        this.bga.statusBar.setTitle(_('Pick your species starter to pre-build'));
+        this.game.setHint(_('Click one of your species starters to build it (it starts already-built).'));
+        this.game.markClickable('starter', offers.map(c => c.id),
+            id => this.bga.actions.performAction('actPickStarter', { cardId: id }));
+    }
+    onLeavingState() {
+        this.game.clearClickable();
+        const sec = document.getElementById('rb-draft-section');
+        if (sec) sec.style.display = 'none';
+    }
+}
+
 class WhenBuilt {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -193,6 +217,7 @@ export class Game {
     constructor(bga) {
         this.bga = bga;
         this.clickable = new Map(); // card id -> handler (survives board re-renders)
+        this.bga.states.register('StarterDraft', new StarterDraft(this, bga));
         this.bga.states.register('PlayerTurn', new PlayerTurn(this, bga));
         this.bga.states.register('Auction', new Auction(this, bga));
         this.bga.states.register('InventDiscard', new InventDiscard(this, bga));
@@ -212,6 +237,7 @@ export class Game {
                 <div class="rb-section"><h3>Headwaters</h3><div id="rb-hw" class="rb-row"></div></div>
                 <div class="rb-section"><h3>River</h3><div id="rb-river" class="rb-row"></div></div>
                 <div class="rb-section"><h3>Shoreline</h3><div id="rb-shoreline" class="rb-row"></div></div>
+                <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — pick one</h3><div id="rb-draft" class="rb-row"></div></div>
                 <div class="rb-section"><h3>Your hand</h3><div id="rb-hand" class="rb-row"></div></div>
             </div>
         `);
@@ -288,6 +314,18 @@ export class Game {
             const el = document.getElementById(`built-${pid}`);
             if (el) el.innerHTML = list.map(b => `<span class="rb-tag">${b.name}</span>`).join(' ');
         });
+    }
+
+    renderStarterOffer(offers) {
+        const el = document.getElementById('rb-draft');
+        if (!el) return;
+        el.innerHTML = (offers || []).map(c => `
+            <div id="card-${c.id}" class="rb-card rb-hand" data-id="${c.id}" title="${c.effect}">
+                <div class="rb-name">${c.name}</div>
+                <div>${c.vp}★</div>
+                <div style="font-size:9px">${c.effect}</div>
+            </div>`).join('');
+        this.applyClickableClasses();
     }
 
     renderMaterials(materials) {
