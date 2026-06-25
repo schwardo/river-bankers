@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Bga\Games\RiverBankers\States;
 
+use Bga\GameFramework\Actions\Types\IntArrayParam;
 use Bga\GameFramework\StateType;
 use Bga\GameFramework\States\GameState;
 use Bga\GameFramework\States\PossibleAction;
@@ -39,7 +40,7 @@ class InventDiscard extends GameState
      * @throws UserException
      */
     #[PossibleAction]
-    public function actDiscard(array $cardIds, int $activePlayerId, array $args)
+    public function actDiscard(#[IntArrayParam] array $cardIds, int $activePlayerId, array $args)
     {
         if (count($cardIds) !== (int) $args['nbToDiscard']) {
             throw new UserException('You must discard exactly the number of cards you drew.');
