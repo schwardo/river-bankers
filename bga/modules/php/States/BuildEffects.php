@@ -56,8 +56,12 @@ class BuildEffects extends \Bga\GameFramework\States\GameState
                 ]);
                 return BuildEffects::class;
             }
+            // Stone Pool rearranges the top 5; Vine Curtain reuses it for the top 2.
+            if ($key === 'stonepool' || $key === 'vinecurtain') {
+                $this->globals->set('reorder_n', $key === 'vinecurtain' ? 2 : 5);
+                return StonePool::class;
+            }
             return match ($key) {
-                'stonepool'    => StonePool::class,
                 'vinelattice'  => VineLattice::class,
                 'snagpile'     => SnagPile::class,
                 'flushchannel' => FlushChannelBuild::class,

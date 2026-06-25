@@ -34,7 +34,8 @@ class StonePool extends GameState
 
     public function getArgs(): array
     {
-        return ["topCards" => $this->game->topMaterialCards(5)];
+        $n = (int) $this->globals->get('reorder_n', 5);
+        return ["topCards" => $this->game->topMaterialCards($n)];
     }
 
     /**

@@ -19,6 +19,7 @@ use Bga\Games\RiverBankers\States\StarterDraft;
 use Bga\Games\RiverBankers\Rules\Build;
 use Bga\Games\RiverBankers\Rules\BuildCost;
 use Bga\Games\RiverBankers\Rules\CardMovement;
+use Bga\Games\RiverBankers\Rules\Cost;
 use Bga\Games\RiverBankers\Rules\Effects;
 use Bga\Games\RiverBankers\Rules\Endgame;
 use Bga\Games\RiverBankers\Rules\Scoring;
@@ -77,6 +78,7 @@ class Game extends \Bga\GameFramework\Table
         $result["hand"] = $this->getHandView($currentPlayerId); // private: only this player's hand
         $result["starterOffer"] = $this->getStarterOffer($currentPlayerId); // empty unless mid-draft
         $result["auction"] = $this->getAuctionView(); // null unless an auction is open (board highlight on reconnect)
+        $result["peekTop"] = $this->getPeekTop($currentPlayerId); // Lookout Tree / Marsh Lookout
 
         return $result;
     }
@@ -245,6 +247,28 @@ class Game extends \Bga\GameFramework\Table
     // These touch the DB; their first real validation is in Studio.
     // =====================================================================
 
+    /**
+     * Top material card revealed to a player who controls Lookout Tree / Marsh
+     * Lookout ("peek at the top of the material deck at any time"), else null.
+     *
+     * @return array{material:string, icons:int}|null
+     */
+    public function getPeekTop(int $playerId): ?array
+    {
+        $names = $this->getBuiltNames($playerId);
+        if (!in_array('Lookout Tree', $names, true) && !in_array('Marsh Lookout', $names, true)) {
+            return null;
+        }
+        $top = $this->getUniqueValueFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck' ORDER BY `card_location_arg` LIMIT 1"
+        );
+        if ($top === null) {
+            return null;
+        }
+        $def = Material::$MATERIAL[(int) $this->getCardRow((int) $top)['card_type_arg']] ?? null;
+        return $def === null ? null : ['material' => (string) $def['material'], 'icons' => (int) $def['icons']];
+    }
+
     /** @return array<string,?string> the card row */
     public function getCardRow(int $cardId): array
     {
@@ -320,15 +344,45 @@ class Game extends \Bga\GameFramework\Table
      *
      * @return array<int,int>
      */
-    public function moveCardAfterAuction(int $cardId, int $uncoveredAfter): array
+    public function moveCardAfterAuction(int $cardId, int $uncoveredAfter, int $placed = 0): array
     {
         $row = $this->getCardRow($cardId);
-        $dest = CardMovement::destination((string) $row['card_location'], (int) $row['card_location_arg'], $uncoveredAfter);
+        $name = (string) (Material::$MATERIAL[(int) $row['card_type_arg']]['name'] ?? '');
+
+        if ($name === 'Slipping Sandbar') {
+            $dest = $this->slippingSandbarDestination((string) $row['card_location'], (int) $row['card_location_arg'], $uncoveredAfter, $placed);
+        } else {
+            $dest = CardMovement::destination((string) $row['card_location'], (int) $row['card_location_arg'], $uncoveredAfter);
+        }
         $this->DbQuery(
             "UPDATE `card` SET `card_location` = '{$dest['location']}', `card_location_arg` = {$dest['slot']}
              WHERE `card_id` = $cardId"
         );
         return $dest['location'] === 'shoreline' ? $this->applyShorelineArrival($cardId) : [];
+    }
+
+    /**
+     * Slipping Sandbar movement: enters the river at River 4 (from Headwaters);
+     * after an auction with workers placed it slides one space UPSTREAM, retiring
+     * to the shoreline from River 1; with no workers placed it drifts downstream
+     * like a normal card. Fully-claimed cards graduate to the shoreline.
+     *
+     * @return array{location:string, slot:int}
+     */
+    private function slippingSandbarDestination(string $location, int $slot, int $uncoveredAfter, int $placed): array
+    {
+        if ($uncoveredAfter <= 0) {
+            return ['location' => 'shoreline', 'slot' => 0];
+        }
+        if ($location === 'headwaters') {
+            return ['location' => 'river', 'slot' => 4]; // enters at River 4
+        }
+        if ($placed > 0) {
+            return $slot <= 1
+                ? ['location' => 'shoreline', 'slot' => 0]    // at River 1 with leftovers -> retire
+                : ['location' => 'river', 'slot' => $slot - 1]; // slide upstream
+        }
+        return CardMovement::destination($location, $slot, $uncoveredAfter); // no workers -> normal drift
     }
 
     /** Total workers a player has out on river cards (recallable during an auction). */
@@ -1123,6 +1177,9 @@ class Game extends \Bga\GameFramework\Table
         if ($bc['stoneToolUsed']) {
             $this->flipBuiltByName($playerId, 'Stone Tool');
         }
+        // Vine Curtain: building with one of its workers lets you peek+rearrange
+        // the top 2 material cards (queued as a build effect).
+        $this->globals->set('vine_curtain_hit', $this->allocationUsesCard($alloc, 'Vine Curtain') ? 1 : 0);
         $this->applyOnBuildEffects($playerId, $structureCardId);
         return true;
     }
@@ -1264,12 +1321,29 @@ class Game extends \Bga\GameFramework\Table
         if ($immediate !== null && $this->canRunImmediate($immediate, $playerId)) {
             $queue[] = 'self:' . $immediate;
         }
+        // Vine Curtain material passive (set by tryBuild when its worker was spent).
+        if ((int) $this->globals->get('vine_curtain_hit', 0) === 1 && $this->getMaterialDeckCount() >= 2) {
+            $queue[] = 'self:vinecurtain';
+        }
+        $this->globals->set('vine_curtain_hit', 0);
         foreach (Effects::reactiveBuildEffects($cost, $this->getBuiltNamesExcept($playerId, $cardId)) as $key) {
             if ($this->canReact($key, $playerId)) {
                 $queue[] = 'react:' . $key;
             }
         }
         return $queue;
+    }
+
+    /** Whether the build allocation pulled a worker off a card named $name. */
+    private function allocationUsesCard(array $alloc, string $name): bool
+    {
+        foreach (array_keys($alloc) as $cid) {
+            $def = Material::$MATERIAL[(int) $this->getCardRow((int) $cid)['card_type_arg']] ?? null;
+            if ($def !== null && $def['name'] === $name) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether an immediate self when-built effect has the resources to run. */
@@ -1551,7 +1625,7 @@ class Game extends \Bga\GameFramework\Table
      * Abilities the player controls (as-an-action turn abilities + unused
      * once-per-game abilities) that have a legal target.
      *
-     * @return list<array{key:string, name:string, cost:int, once:bool, cardId:int}>
+     * @return list<array{key:string, name:string, cost:int, once:bool, repeat:bool, cardId:int}>
      */
     public function getPlayerAbilities(int $playerId): array
     {
@@ -1567,12 +1641,16 @@ class Game extends \Bga\GameFramework\Table
                 : (Material::$STARTER[$arg]['name'] ?? ''));
 
             $aa = Effects::actionAbility($name);
-            if ($aa !== null && count($this->abilityTargets($aa['key'], $playerId)) > 0) {
-                $out[] = ['key' => $aa['key'], 'name' => $name, 'cost' => $aa['cost'], 'once' => false, 'cardId' => 0];
+            if ($aa !== null && $this->abilityUsable($aa['key'], $playerId)) {
+                $out[] = ['key' => $aa['key'], 'name' => $name, 'cost' => $aa['cost'], 'once' => false, 'repeat' => false, 'cardId' => 0];
+            }
+            $ta = Effects::turnAbility($name);
+            if ($ta !== null && $this->abilityUsable($ta['key'], $playerId)) {
+                $out[] = ['key' => $ta['key'], 'name' => $name, 'cost' => $ta['cost'], 'once' => false, 'repeat' => true, 'cardId' => 0];
             }
             $oa = Effects::onceAbility($name);
-            if ($oa !== null && (int) $r['card_used'] === 0 && $this->onceAbilityUsable($oa['key'], $playerId)) {
-                $out[] = ['key' => $oa['key'], 'name' => $name, 'cost' => $oa['cost'], 'once' => true, 'cardId' => (int) $r['card_id']];
+            if ($oa !== null && (int) $r['card_used'] === 0 && $this->abilityUsable($oa['key'], $playerId)) {
+                $out[] = ['key' => $oa['key'], 'name' => $name, 'cost' => $oa['cost'], 'once' => true, 'repeat' => false, 'cardId' => (int) $r['card_id']];
             }
         }
         return $out;
@@ -1588,8 +1666,8 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery("UPDATE `card` SET `card_used` = 0 WHERE `card_id` = $cardId");
     }
 
-    /** Whether a once-per-game ability with no single river target can run now. */
-    public function onceAbilityUsable(string $key, int $playerId): bool
+    /** Whether an ability with no single river target (or a custom gate) can run now. */
+    public function abilityUsable(string $key, int $playerId): bool
     {
         switch ($key) {
             case 'packrat':       // discard 1 hand card, take 1 from the discard pile
@@ -1600,6 +1678,14 @@ class Game extends \Bga\GameFramework\Table
                 return count($this->rollingFloatSources($playerId)) > 0;
             case 'slipstream':    // take an extra turn after this one
                 return $this->getBonusTurnPlayer() !== $playerId;
+            case 'salmonrun':     // place 1-5 workers on a river card (escalating cost)
+                return $this->getPlayerSupply($playerId) > 0 && count($this->salmonRunTargets()) > 0;
+            case 'portage':       // swap your worker with another worker on a different river card
+                return count($this->portageSources($playerId)) > 0;
+            case 'tailslap':      // drop a blank on a River-1 card (pay 1 on use)
+                return count($this->riverOneUncovered()) > 0;
+            case 'channelclearer': // discard an opponent's Reed worker
+                return count($this->channelClearerTargets($playerId)) > 0;
             default:
                 return count($this->abilityTargets($key, $playerId)) > 0;
         }
@@ -1700,6 +1786,58 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery("INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($playerId, $dstId, 1)
                         ON DUPLICATE KEY UPDATE `workers` = `workers` + 1");
         // their worker: dst -> src
+        $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $oid AND `card_id` = $dstId");
+        $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $oid AND `card_id` = $dstId AND `workers` <= 0");
+        $this->DbQuery("INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($oid, $srcId, 1)
+                        ON DUPLICATE KEY UPDATE `workers` = `workers` + 1");
+    }
+
+    // --- Salmon Run / Portage (as-an-action) ---
+
+    /**
+     * Salmon Run: place up to $want workers (capped by supply, uncovered icons,
+     * and 5) on a river card, paying the escalating cumulative fish cost. Returns
+     * the number actually placed.
+     */
+    public function salmonRunPlace(int $playerId, int $cardId, int $want): int
+    {
+        $n = min($want, $this->getPlayerSupply($playerId), $this->uncoveredIcons($cardId), count(Effects::SALMON_RUN_COSTS));
+        if ($n <= 0) {
+            return 0;
+        }
+        $this->advanceFish($playerId, Effects::salmonRunCost($n));
+        $this->placeWorkers($playerId, $cardId, $n);
+        return $n;
+    }
+
+    /** Maximum workers Salmon Run can place on $cardId for this player (0..5). */
+    public function salmonRunMax(int $playerId, int $cardId): int
+    {
+        return min($this->getPlayerSupply($playerId), $this->uncoveredIcons($cardId), count(Effects::SALMON_RUN_COSTS));
+    }
+
+    /**
+     * Portage: swap one of the player's workers on $srcId with one opponent worker
+     * on $dstId (different river card), paying the source card's per-item fish cost.
+     */
+    public function portageSwap(int $playerId, int $srcId, int $dstId): void
+    {
+        $opp = $this->getObjectListFromDB(
+            "SELECT `player_id` FROM `worker` WHERE `card_id` = $dstId AND `player_id` <> $playerId AND `workers` > 0
+             ORDER BY `workers` DESC LIMIT 1"
+        );
+        if (count($opp) === 0) {
+            return;
+        }
+        $oid = (int) $opp[0]['player_id'];
+        $srcSlot = (int) $this->getCardRow($srcId)['card_location_arg'];
+        $this->advanceFish($playerId, Cost::perItem('river', $srcSlot));
+        // your worker src -> dst
+        $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $playerId AND `card_id` = $srcId");
+        $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $srcId AND `workers` <= 0");
+        $this->DbQuery("INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($playerId, $dstId, 1)
+                        ON DUPLICATE KEY UPDATE `workers` = `workers` + 1");
+        // their worker dst -> src
         $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $oid AND `card_id` = $dstId");
         $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $oid AND `card_id` = $dstId AND `workers` <= 0");
         $this->DbQuery("INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($oid, $srcId, 1)
@@ -1814,7 +1952,57 @@ class Game extends \Bga\GameFramework\Table
                  WHERE c.`card_location` = 'river' AND w.`player_id` <> $playerId AND w.`workers` > 0", true
             ));
         }
+        if ($key === 'tailslap') {
+            return $this->riverOneUncovered(); // River-1 cards with an uncovered icon
+        }
+        if ($key === 'channelclearer') {
+            return $this->channelClearerTargets($playerId);
+        }
         return [];
+    }
+
+    /** Channel Clearer targets: river Reed cards holding an opponent's worker. @return list<int> */
+    public function channelClearerTargets(int $playerId): array
+    {
+        $ids = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT DISTINCT c.`card_id`, c.`card_type_arg` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
+             WHERE c.`card_location` = 'river' AND w.`player_id` <> $playerId AND w.`workers` > 0"
+        ) as $r) {
+            $def = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
+            if ($def !== null && $def['material'] === 'reeds') {
+                $ids[] = (int) $r['card_id'];
+            }
+        }
+        return $ids;
+    }
+
+    /** Salmon Run targets: river cards with at least one uncovered icon. @return list<int> */
+    public function salmonRunTargets(): array
+    {
+        return $this->getAuctionableRiverCards();
+    }
+
+    /** Portage sources: river cards where the player has a worker and a different river card holds an opponent's worker. @return list<int> */
+    public function portageSources(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->burrowSources($playerId) as $src) {
+            if (count($this->portageTargets($playerId, $src)) > 0) {
+                $out[] = $src;
+            }
+        }
+        return $out;
+    }
+
+    /** Portage destinations: any OTHER river card holding an opponent's worker. @return list<int> */
+    public function portageTargets(int $playerId, int $srcId): array
+    {
+        return array_map('intval', $this->getObjectListFromDB(
+            "SELECT DISTINCT c.`card_id` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
+             WHERE c.`card_location` = 'river' AND c.`card_id` <> $srcId AND w.`player_id` <> $playerId AND w.`workers` > 0",
+            true
+        ));
     }
 
     public function resolveAbility(string $key, int $cardId, int $playerId): void
@@ -1846,6 +2034,21 @@ class Game extends \Bga\GameFramework\Table
         if ($key === 'towline') {
             $slot = (int) $this->getCardRow($cardId)['card_location_arg'];
             $this->DbQuery("UPDATE `card` SET `card_location_arg` = " . max(1, $slot - 1) . " WHERE `card_id` = $cardId");
+            return;
+        }
+        if ($key === 'tailslap') {
+            $this->dropBlank($cardId); // the 1🐟 was paid on use
+            return;
+        }
+        if ($key === 'channelclearer') {
+            // Discard one opponent's Reed worker on this card back to their supply (no blank).
+            $opp = $this->getObjectListFromDB(
+                "SELECT `player_id` FROM `worker` WHERE `card_id` = $cardId AND `player_id` <> $playerId AND `workers` > 0
+                 ORDER BY `workers` DESC LIMIT 1"
+            );
+            if (count($opp) > 0) {
+                $this->recallWorker((int) $opp[0]['player_id'], $cardId, false); // no blank, no fish
+            }
             return;
         }
         if ($key === 'heronroost') {

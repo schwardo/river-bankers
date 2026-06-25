@@ -61,7 +61,9 @@ class AbilityTarget {
             heronroost: _('Heron Roost — replace a Headwaters card'),
             hollowedlog: _('Hollowed-out Log — recall a worker (no blank)'),
             woodpile: _('Wood Pile — claim a Log icon'),
-            tributestone: _('Tribute Stone — force an opponent to recall'),
+            tributestone: _('Tribute Stone / Snare Set — force an opponent to recall'),
+            tailslap: _('Tail Slap — drop a blank on a River-1 card'),
+            channelclearer: _('Channel Clearer — discard an opponent Reed worker'),
         };
         this.bga.statusBar.setTitle(isActive ? (labels[args.ability] || _('Choose a target')) : _('Resolving ability…'));
         if (!isActive) return;
@@ -277,6 +279,45 @@ class RollingFloat {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class SalmonRun {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const card = args.step === 'card';
+        this.bga.statusBar.setTitle(isActive
+            ? (card ? _('Salmon Run — pick a river card') : _('Salmon Run — how many workers?'))
+            : _('Salmon Run…'));
+        if (!isActive) return;
+        this.bga.statusBar.removeActionButtons();
+        if (card) {
+            this.game.setHint(_('Click a river card with uncovered icons.'));
+            this.game.markClickable('river', args.targets, id => this.bga.actions.performAction('actSalmonCard', { cardId: id }));
+        } else {
+            let cum = 0;
+            for (let n = 1; n <= args.max; n++) {
+                cum += args.costs[n - 1];
+                this.bga.statusBar.addActionButton(n + ' (' + cum + '🐟)',
+                    () => this.bga.actions.performAction('actSalmonCount', { n }), { color: 'secondary' });
+            }
+        }
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class Portage {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const src = args.step === 'source';
+        this.bga.statusBar.setTitle(isActive
+            ? (src ? _('Portage — pick your worker') : _('Portage — pick another worker to swap (pay source cost)'))
+            : _('Portage…'));
+        if (!isActive) return;
+        this.game.setHint(src ? _('Click a river card with your worker.') : _('Click another river card with a worker.'));
+        const action = src ? 'actPortageSource' : 'actPortageDest';
+        this.game.markClickable('river', args.targets, id => this.bga.actions.performAction(action, { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
 class FinalBuild {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -427,6 +468,8 @@ export class Game {
         this.bga.states.register('PackRat', new PackRat(this, bga));
         this.bga.states.register('SpringCascade', new SpringCascade(this, bga));
         this.bga.states.register('RollingFloat', new RollingFloat(this, bga));
+        this.bga.states.register('SalmonRun', new SalmonRun(this, bga));
+        this.bga.states.register('Portage', new Portage(this, bga));
         this.bga.states.register('AbilityTarget', new AbilityTarget(this, bga));
         this.bga.states.register('FinalBuild', new FinalBuild(this, bga));
     }
@@ -465,6 +508,11 @@ export class Game {
             const id = Number(card.dataset.id);
             if (this.clickable.has(id)) this.clickable.get(id)(id);
         });
+
+        if (gamedatas.peekTop) {
+            this.bga.gameArea.getElement().insertAdjacentHTML('beforeend',
+                `<div id="rb-peek" class="rb-hint">${_('Deck top (peek):')} ${MAT_GLYPH[gamedatas.peekTop.material] || ''} ${gamedatas.peekTop.icons}</div>`);
+        }
 
         this.renderBoard(gamedatas.board);
         this.renderHand(gamedatas.hand);

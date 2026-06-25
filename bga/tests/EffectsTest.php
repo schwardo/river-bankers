@@ -123,6 +123,18 @@ final class EffectsTest extends TestCase
         self::assertNull(Effects::onceAbility('Tow Line'));
     }
 
+    public function testSalmonRunCumulativeCost(): void
+    {
+        // Escalating 1/2/3/5/8 -> cumulative 1, 3, 6, 11, 19; capped at 5 workers.
+        self::assertSame(0, Effects::salmonRunCost(0));
+        self::assertSame(1, Effects::salmonRunCost(1));
+        self::assertSame(3, Effects::salmonRunCost(2));
+        self::assertSame(6, Effects::salmonRunCost(3));
+        self::assertSame(11, Effects::salmonRunCost(4));
+        self::assertSame(19, Effects::salmonRunCost(5));
+        self::assertSame(19, Effects::salmonRunCost(7)); // capped at 5
+    }
+
     public function testReactiveBuildEffectsGateOnMaterialAndOwnership(): void
     {
         // Stone Causeway fires only when the built cost uses Stones and it's built.

@@ -26,7 +26,7 @@ class RollingFloat extends GameState
     function onEnteringState()
     {
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
-        if (!$this->game->onceAbilityUsable('rollingfloat', (int) $this->game->getActivePlayerId())) {
+        if (!$this->game->abilityUsable('rollingfloat', (int) $this->game->getActivePlayerId())) {
             return $this->finish();
         }
         return null;

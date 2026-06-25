@@ -69,7 +69,7 @@ class ResolveAuction extends GameState
 
         $wasHeadwaters = $cardRow['card_location'] === 'headwaters';
         $vacatedSlot = (int) $cardRow['card_location_arg'];
-        $penalties = $this->game->moveCardAfterAuction($cardId, $open - $placed);
+        $penalties = $this->game->moveCardAfterAuction($cardId, $open - $placed, $placed);
         if ($wasHeadwaters) {
             $this->game->refillHeadwaters($vacatedSlot);
         }

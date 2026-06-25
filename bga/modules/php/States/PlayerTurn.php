@@ -78,17 +78,21 @@ class PlayerTurn extends GameState
         }
 
         $this->globals->set('pending_ability', $ability);
-        // Once-per-game abilities are free (don't consume the turn) and flip the
-        // source card; as-an-action abilities consume the turn.
-        $this->globals->set('pending_ability_free', $found['once'] ? 1 : 0);
+        // Once-per-game and free repeatable (turn-start) abilities don't consume
+        // the turn; only once-abilities flip their source card. As-an-action
+        // abilities consume the turn.
+        $repeat = (bool) ($found['repeat'] ?? false);
+        $this->globals->set('pending_ability_free', ($found['once'] || $repeat) ? 1 : 0);
         $this->globals->set('pending_ability_card', $found['once'] ? (int) $found['cardId'] : 0);
 
-        // The multi-step once-abilities have their own states; the rest pick a
-        // single river-card target in AbilityTarget.
+        // Multi-step abilities have their own states; the rest pick a single
+        // river-card target in AbilityTarget.
         return match ($ability) {
             'packrat'       => PackRat::class,
             'springcascade' => SpringCascade::class,
             'rollingfloat'  => RollingFloat::class,
+            'salmonrun'     => SalmonRun::class,
+            'portage'       => Portage::class,
             default         => AbilityTarget::class,
         };
     }

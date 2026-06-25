@@ -25,7 +25,7 @@ class SpringCascade extends GameState
 
     function onEnteringState()
     {
-        if (!$this->game->onceAbilityUsable('springcascade', (int) $this->game->getActivePlayerId())) {
+        if (!$this->game->abilityUsable('springcascade', (int) $this->game->getActivePlayerId())) {
             return $this->finish();
         }
         return null;

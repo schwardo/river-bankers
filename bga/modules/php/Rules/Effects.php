@@ -147,17 +147,51 @@ final class Effects
         return $out;
     }
 
-    /** "As an action" abilities a built structure grants: name => [key, fish cost]. */
+    /**
+     * "As an action" abilities a built structure grants: name => [key, fish cost].
+     * The cost is the fixed fish paid up front; abilities whose cost depends on the
+     * choice (Salmon Run, Portage) carry 0 here and bill in their state.
+     */
     public const ACTION_ABILITIES = [
         'Driftwood Snag' => ['key' => 'driftwoodsnag', 'cost' => 1],
         'Tow Line'       => ['key' => 'towline', 'cost' => 2],
         'Heron Roost'    => ['key' => 'heronroost', 'cost' => 1],
+        'Salmon Run'     => ['key' => 'salmonrun', 'cost' => 0],  // escalating cost billed in state
+        'Portage'        => ['key' => 'portage', 'cost' => 0],    // pays source per-item in state
     ];
 
     /** @return array{key:string, cost:int}|null */
     public static function actionAbility(string $name): ?array
     {
         return self::ACTION_ABILITIES[$name] ?? null;
+    }
+
+    /**
+     * Free, repeatable "at the start of your turn, you may…" abilities (species
+     * starters): name => [key, fish cost]. Don't consume the turn or flip a card.
+     */
+    public const TURN_ABILITIES = [
+        'Tail Slap'       => ['key' => 'tailslap', 'cost' => 1],       // drop a blank on a River-1 card
+        'Channel Clearer' => ['key' => 'channelclearer', 'cost' => 0], // discard an opponent's Reed worker
+    ];
+
+    /** @return array{key:string, cost:int}|null */
+    public static function turnAbility(string $name): ?array
+    {
+        return self::TURN_ABILITIES[$name] ?? null;
+    }
+
+    /** Salmon Run: per-worker fish costs (1st..5th worker placed). */
+    public const SALMON_RUN_COSTS = [1, 2, 3, 5, 8];
+
+    /** Cumulative fish cost of placing $workers via Salmon Run (capped at 5). */
+    public static function salmonRunCost(int $workers): int
+    {
+        $sum = 0;
+        for ($i = 0; $i < $workers && $i < count(self::SALMON_RUN_COSTS); $i++) {
+            $sum += self::SALMON_RUN_COSTS[$i];
+        }
+        return $sum;
     }
 
     /** Once-per-game abilities (flip the card when used): name => [key, fish cost]. */

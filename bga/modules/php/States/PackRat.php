@@ -26,7 +26,7 @@ class PackRat extends GameState
     function onEnteringState()
     {
         $playerId = (int) $this->game->getActivePlayerId();
-        if (!$this->game->onceAbilityUsable('packrat', $playerId)) {
+        if (!$this->game->abilityUsable('packrat', $playerId)) {
             return $this->finish();
         }
         return null;
