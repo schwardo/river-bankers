@@ -61,7 +61,8 @@ class Auction extends GameState
         }
         return [
             "lotCardId" => (int) $auction['lot_card_id'],
-            "open" => $this->game->uncoveredIcons((int) $auction['lot_card_id']),
+            "lotCardId2" => $auction['lot_card_id2'] === null ? null : (int) $auction['lot_card_id2'],
+            "open" => $this->game->auctionOpenIcons(), // sum of both cards when combined (Confluence)
             "triggerPlayer" => $trigger,
             "canDefer" => $canDefer,
             "canFloodgate" => $floodgate, // trigger may slide the lot toward Headwaters
@@ -74,7 +75,7 @@ class Auction extends GameState
     #[PossibleAction]
     public function actBid(int $workers, int $currentPlayerId, array $args)
     {
-        $maxBid = min((int) $args['open'], $this->game->getPlayerSupply($currentPlayerId));
+        $maxBid = min($this->game->auctionOpenIcons(), $this->game->getPlayerSupply($currentPlayerId));
         $minBid = $currentPlayerId === (int) $args['triggerPlayer'] ? 1 : 0;
         if ($workers < $minBid || $workers > $maxBid) {
             throw new UserException('Invalid bid.');

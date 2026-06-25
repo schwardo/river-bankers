@@ -40,11 +40,12 @@ class DeferBid extends GameState
         $auctionId = (int) $auction['auction_id'];
         $lot = (int) $auction['lot_card_id'];
         $playerId = (int) $this->game->getActivePlayerId();
+        $open = $this->game->auctionOpenIcons(); // combined-aware (Confluence)
         return [
             "lotCardId" => $lot,
-            "open" => $this->game->uncoveredIcons($lot),
+            "open" => $open,
             "triggerPlayer" => (int) $auction['trigger_player'],
-            "maxBid" => min($this->game->uncoveredIcons($lot), $this->game->getPlayerSupply($playerId)),
+            "maxBid" => min($open, $this->game->getPlayerSupply($playerId)),
             "revealedBids" => $this->game->getRevealedBids($auctionId), // player_id => workers (now public to the chooser)
         ];
     }
@@ -69,7 +70,7 @@ class DeferBid extends GameState
         // A quit deferred trigger still owes the minimum 1; others bid 0.
         $auction = $this->game->getOpenAuction();
         $min = $playerId === (int) $auction['trigger_player'] ? 1 : 0;
-        $cap = min($this->game->uncoveredIcons((int) $auction['lot_card_id']), $this->game->getPlayerSupply($playerId));
+        $cap = min($this->game->auctionOpenIcons(), $this->game->getPlayerSupply($playerId));
         $this->game->submitDeferredBid((int) $auction['auction_id'], $playerId, min($min, $cap));
         return BidReveal::class;
     }

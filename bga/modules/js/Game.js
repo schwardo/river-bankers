@@ -318,6 +318,50 @@ class Portage {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class TradingPost {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const src = args.step === 'source';
+        this.bga.statusBar.setTitle(isActive
+            ? (src ? _('Trading Post — recall a worker (source ') + (args.picked + 1) + '/3)' : _('Trading Post — place 2 workers on a river card'))
+            : _('Trading Post…'));
+        if (!isActive) return;
+        this.game.setHint(src ? _('Click a worker on a material you have not recalled yet.') : _('Click a river card with uncovered icons.'));
+        const action = src ? 'actTradeSource' : 'actTradeTarget';
+        this.game.markClickable('river', args.targets, id => this.bga.actions.performAction(action, { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class Confluence {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const a = args.step === 'cardA';
+        this.bga.statusBar.setTitle(isActive
+            ? (a ? _('Confluence — pick the first river card') : _('Confluence — pick a second card of the same material'))
+            : _('Confluence…'));
+        if (!isActive) return;
+        this.game.setHint(a ? _('Click a river card that has a same-material partner.') : _('Click another river card of the same material.'));
+        const action = a ? 'actConfA' : 'actConfB';
+        this.game.markClickable('river', args.targets, id => this.bga.actions.performAction(action, { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class MillWheel {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Mill Wheel — copy a neighbour\'s ability') : _('Mill Wheel…'));
+        if (!isActive) return;
+        this.bga.statusBar.removeActionButtons();
+        this.game.setHint(_('Pick a neighbour ability to use as your own.'));
+        (args.options || []).forEach(o => this.bga.statusBar.addActionButton(
+            _('Copy ') + o.name + (o.cost ? ' (' + o.cost + '🐟)' : ''),
+            () => this.bga.actions.performAction('actMillPick', { ability: o.key }), { color: 'secondary' }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
 class FinalBuild {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -470,6 +514,9 @@ export class Game {
         this.bga.states.register('RollingFloat', new RollingFloat(this, bga));
         this.bga.states.register('SalmonRun', new SalmonRun(this, bga));
         this.bga.states.register('Portage', new Portage(this, bga));
+        this.bga.states.register('TradingPost', new TradingPost(this, bga));
+        this.bga.states.register('Confluence', new Confluence(this, bga));
+        this.bga.states.register('MillWheel', new MillWheel(this, bga));
         this.bga.states.register('AbilityTarget', new AbilityTarget(this, bga));
         this.bga.states.register('FinalBuild', new FinalBuild(this, bga));
     }

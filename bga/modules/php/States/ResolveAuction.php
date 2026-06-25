@@ -34,6 +34,12 @@ class ResolveAuction extends GameState
     {
         $auction = $this->game->getOpenAuction();
         $auctionId = (int) $auction['auction_id'];
+
+        // Confluence: a combined two-card lot resolves on its own path.
+        if ($auction['lot_card_id2'] !== null) {
+            return $this->resolveCombined($auction);
+        }
+
         $cardId = (int) $auction['lot_card_id'];
         $forcedRate = $auction['forced_rate'] === null ? null : (int) $auction['forced_rate'];
 
@@ -105,6 +111,105 @@ class ResolveAuction extends GameState
 
         // Resume any queued build effects (e.g. Snag Pile auctions mid-queue);
         // an empty queue falls straight through to NextPlayer.
+        return BuildEffects::class;
+    }
+
+    /**
+     * Confluence resolution: distribute clinched workers across both lot cards
+     * (fill A then B), charge every bidder at the lesser per-item rate, then float
+     * both cards downriver. Bidders are processed trigger-first so jam overflow
+     * fills the first card before the second.
+     *
+     * @param array<string,?string> $auction
+     */
+    private function resolveCombined(array $auction)
+    {
+        $auctionId = (int) $auction['auction_id'];
+        $cardA = (int) $auction['lot_card_id'];
+        $cardB = (int) $auction['lot_card_id2'];
+        $trigger = (int) $auction['trigger_player'];
+        $rate = (int) $auction['forced_rate']; // lesser per-item, set by Confluence
+
+        $rowA = $this->game->getCardRow($cardA);
+        $openA = $this->game->uncoveredIcons($cardA);
+        $openB = $this->game->uncoveredIcons($cardB);
+        $open = $openA + $openB;
+        $bids = $this->game->getAuctionBids($auctionId);
+
+        $clinched = AuctionRules::clinched($open, $bids);
+        $pontoon = [];
+        foreach ($bids as $pid => $bid) {
+            $pontoon[$pid] = in_array('Pontoon', $this->game->getBuiltNames($pid), true);
+        }
+        $billable = AuctionRules::billableWorkers($open, $bids, $pontoon);
+
+        $matDef = Material::$MATERIAL[(int) $rowA['card_type_arg']] ?? [];
+        $material = (string) ($matDef['material'] ?? '');
+
+        // Trigger first, then the remaining bidders by id (jam-overflow fill order).
+        $order = array_keys($bids);
+        usort($order, fn(int $a, int $b): int => [$a !== $trigger, $a] <=> [$b !== $trigger, $b]);
+
+        $paid = [];
+        $placedA = 0;
+        $placedB = 0;
+        foreach ($order as $pid) {
+            $rateP = Effects::perItemForPlayer($rate, $material, $this->game->getBuiltNames($pid));
+            $paid[$pid] = $billable[$pid] * $rateP;
+            $this->game->advanceFish($pid, $paid[$pid]);
+            $toPlace = $clinched[$pid];
+            if ($toPlace > 0) {
+                $fa = min($toPlace, $openA - $placedA);
+                if ($fa > 0) {
+                    $this->game->placeWorkers($pid, $cardA, $fa);
+                    $placedA += $fa;
+                    $toPlace -= $fa;
+                }
+                $fb = min($toPlace, $openB - $placedB);
+                if ($fb > 0) {
+                    $this->game->placeWorkers($pid, $cardB, $fb);
+                    $placedB += $fb;
+                }
+            }
+        }
+
+        // Both moves apply their fish penalties immediately; merge (sum) only for
+        // the notifications below.
+        $penalties = [];
+        foreach ([
+            $this->game->moveCardAfterAuction($cardA, $openA - $placedA, $placedA),
+            $this->game->moveCardAfterAuction($cardB, $openB - $placedB, $placedB),
+        ] as $set) {
+            foreach ($set as $pid => $spaces) {
+                $penalties[$pid] = ($penalties[$pid] ?? 0) + $spaces;
+            }
+        }
+        $this->game->clearAuction($auctionId);
+
+        foreach ($penalties as $pid => $spaces) {
+            $this->notify->all('shorelinePenalty', clienttranslate('${player_name} drifts back ${spaces}🐟'), [
+                'player_id' => $pid,
+                'player_name' => $this->game->getPlayerNameById($pid),
+                'spaces' => $spaces,
+                'card' => '',
+                'i18n' => ['card'],
+            ]);
+        }
+        foreach ($order as $pid) {
+            $got = $clinched[$pid];
+            $msg = $got > 0
+                ? clienttranslate('${player_name} wins ${n} ${material} (paid ${paid}🐟)')
+                : clienttranslate('${player_name} wins nothing (paid ${paid}🐟)');
+            $this->notify->all('auctionResolved', $msg, [
+                'player_id' => $pid,
+                'player_name' => $this->game->getPlayerNameById($pid),
+                'n' => $got,
+                'material' => $material,
+                'paid' => $paid[$pid],
+                'i18n' => ['material'],
+            ]);
+        }
+
         return BuildEffects::class;
     }
 }

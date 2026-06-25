@@ -1652,6 +1652,11 @@ class Game extends \Bga\GameFramework\Table
             if ($oa !== null && (int) $r['card_used'] === 0 && $this->abilityUsable($oa['key'], $playerId)) {
                 $out[] = ['key' => $oa['key'], 'name' => $name, 'cost' => $oa['cost'], 'once' => true, 'repeat' => false, 'cardId' => (int) $r['card_id']];
             }
+            // Confluence is an as-an-action ability kept out of ACTION_ABILITIES so
+            // Mill Wheel can't copy its combined auction.
+            if ($name === 'Confluence' && $this->abilityUsable('confluence', $playerId)) {
+                $out[] = ['key' => 'confluence', 'name' => $name, 'cost' => 0, 'once' => false, 'repeat' => false, 'cardId' => 0];
+            }
         }
         return $out;
     }
@@ -1686,9 +1691,68 @@ class Game extends \Bga\GameFramework\Table
                 return count($this->riverOneUncovered()) > 0;
             case 'channelclearer': // discard an opponent's Reed worker
                 return count($this->channelClearerTargets($playerId)) > 0;
+            case 'tradingpost':   // recall 1 each from 3 different-material cards, place 2
+                return count($this->tradingPostSourceMaterials($playerId)) >= 3
+                    && count($this->getAuctionableRiverCards()) > 0;
+            case 'confluence':    // combined two-card auction (same material)
+                return $this->canTriggerAuction($playerId) && count($this->confluenceFirstCards()) > 0;
+            case 'millwheel':     // copy a neighbour's as-an-action ability
+                return count($this->millWheelOptions($playerId)) > 0;
             default:
                 return count($this->abilityTargets($key, $playerId)) > 0;
         }
+    }
+
+    // --- Trading Post (recall 1 each from 3 different-material cards, place 2) ---
+
+    /** Distinct materials the player has workers on (river + shoreline). @return list<string> */
+    public function tradingPostSourceMaterials(int $playerId): array
+    {
+        $mats = [];
+        foreach ($this->playerWorkerCards($playerId) as $c) {
+            $mats[$c['material']] = true;
+        }
+        return array_keys($mats);
+    }
+
+    /** Cards (river + shoreline) where the player has a worker. @return list<array{id:int, material:string}> */
+    public function playerWorkerCards(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT c.`card_id`, c.`card_type_arg` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
+             WHERE c.`card_location` IN ('river', 'shoreline') AND w.`player_id` = $playerId AND w.`workers` > 0"
+        ) as $r) {
+            $def = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
+            $out[] = ['id' => (int) $r['card_id'], 'material' => $def !== null ? (string) $def['material'] : ''];
+        }
+        return $out;
+    }
+
+    /**
+     * Trading Post source options: cards with the player's worker whose material
+     * isn't already chosen (the 3 sources must be different materials).
+     *
+     * @param list<string> $excludeMaterials
+     * @return list<int>
+     */
+    public function tradingPostSourceOptions(int $playerId, array $excludeMaterials): array
+    {
+        $out = [];
+        foreach ($this->playerWorkerCards($playerId) as $c) {
+            if (!in_array($c['material'], $excludeMaterials, true)) {
+                $out[] = $c['id'];
+            }
+        }
+        return $out;
+    }
+
+    /** Place up to 2 free workers from supply on a target card's uncovered icons. */
+    public function tradingPostPlace(int $playerId, int $cardId): int
+    {
+        $n = min(2, $this->getPlayerSupply($playerId), $this->uncoveredIcons($cardId));
+        $this->placeWorkers($playerId, $cardId, $n);
+        return $n;
     }
 
     // --- Pack Rat Burrow (discard 1 hand card, take 1 from the discard pile) ---
@@ -1842,6 +1906,117 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $oid AND `card_id` = $dstId AND `workers` <= 0");
         $this->DbQuery("INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($oid, $srcId, 1)
                         ON DUPLICATE KEY UPDATE `workers` = `workers` + 1");
+    }
+
+    // --- Confluence (combined two-card auction over same-material river cards) ---
+
+    /** River cards (uncovered icons) that have a same-material partner to pair with. @return list<int> */
+    public function confluenceFirstCards(): array
+    {
+        $byMat = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_location` = 'river'"
+        ) as $r) {
+            $id = (int) $r['card_id'];
+            if ($this->uncoveredIcons($id) <= 0) {
+                continue;
+            }
+            $def = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
+            $mat = $def !== null ? (string) $def['material'] : '';
+            $byMat[$mat][] = $id;
+        }
+        $out = [];
+        foreach ($byMat as $ids) {
+            if (count($ids) >= 2) {
+                foreach ($ids as $id) {
+                    $out[] = $id;
+                }
+            }
+        }
+        return $out;
+    }
+
+    /** River cards that can pair with $firstId (same material, uncovered, different card). @return list<int> */
+    public function confluenceSecondCards(int $firstId): array
+    {
+        $def = Material::$MATERIAL[(int) $this->getCardRow($firstId)['card_type_arg']] ?? null;
+        $mat = $def !== null ? (string) $def['material'] : '';
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_location` = 'river' AND `card_id` <> $firstId"
+        ) as $r) {
+            $d = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
+            if ($d !== null && (string) $d['material'] === $mat && $this->uncoveredIcons((int) $r['card_id']) > 0) {
+                $out[] = (int) $r['card_id'];
+            }
+        }
+        return $out;
+    }
+
+    /** Start a combined (two-card) auction at a forced per-item rate. */
+    public function startCombinedAuction(int $cardA, int $cardB, int $triggerPlayer, int $forcedRate): void
+    {
+        $this->DbQuery(
+            "INSERT INTO `auction` (`lot_card_id`, `lot_card_id2`, `trigger_player`, `forced_rate`)
+             VALUES ($cardA, $cardB, $triggerPlayer, $forcedRate)"
+        );
+    }
+
+    /** Open icons for the current auction — sum of both cards when combined. */
+    public function auctionOpenIcons(): int
+    {
+        $a = $this->getOpenAuction();
+        $open = $this->uncoveredIcons((int) $a['lot_card_id']);
+        if ($a['lot_card_id2'] !== null) {
+            $open += $this->uncoveredIcons((int) $a['lot_card_id2']);
+        }
+        return $open;
+    }
+
+    // --- Mill Wheel (copy a neighbour's as-an-action ability) ---
+
+    /** Left/right neighbours by seating order (player_no). @return list<int> */
+    public function neighborIds(int $playerId): array
+    {
+        $rows = $this->getObjectListFromDB("SELECT `player_id`, `player_no` FROM `player` ORDER BY `player_no`");
+        $ids = array_map(fn(array $r): int => (int) $r['player_id'], $rows);
+        $n = count($ids);
+        if ($n <= 1) {
+            return [];
+        }
+        $i = array_search($playerId, $ids, true);
+        if ($i === false) {
+            return [];
+        }
+        $left = $ids[($i - 1 + $n) % $n];
+        $right = $ids[($i + 1) % $n];
+        return $left === $right ? [$left] : [$left, $right];
+    }
+
+    /**
+     * Distinct as-an-action abilities a neighbour has built that the player could
+     * use right now (Mill Wheel copy options).
+     *
+     * @return list<array{key:string, name:string, cost:int}>
+     */
+    public function millWheelOptions(int $playerId): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ($this->neighborIds($playerId) as $nid) {
+            foreach ($this->getBuiltNames($nid) as $name) {
+                $aa = Effects::actionAbility($name);
+                if ($aa === null || !in_array($aa['key'], Effects::MILL_WHEEL_COPYABLE, true)) {
+                    continue;
+                }
+                if (isset($seen[$aa['key']]) || !$this->abilityUsable($aa['key'], $playerId)) {
+                    continue;
+                }
+                $seen[$aa['key']] = true;
+                $out[] = ['key' => $aa['key'], 'name' => $name, 'cost' => $aa['cost']];
+            }
+        }
+        return $out;
     }
 
     /** Floodgate: can the trigger slide the auctioned lot 1 space toward the Headwaters? */

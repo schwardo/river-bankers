@@ -93,6 +93,9 @@ class PlayerTurn extends GameState
             'rollingfloat'  => RollingFloat::class,
             'salmonrun'     => SalmonRun::class,
             'portage'       => Portage::class,
+            'tradingpost'   => TradingPost::class,
+            'confluence'    => Confluence::class,
+            'millwheel'     => MillWheel::class,
             default         => AbilityTarget::class,
         };
     }

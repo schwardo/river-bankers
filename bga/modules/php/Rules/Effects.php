@@ -158,7 +158,14 @@ final class Effects
         'Heron Roost'    => ['key' => 'heronroost', 'cost' => 1],
         'Salmon Run'     => ['key' => 'salmonrun', 'cost' => 0],  // escalating cost billed in state
         'Portage'        => ['key' => 'portage', 'cost' => 0],    // pays source per-item in state
+        'Trading Post'   => ['key' => 'tradingpost', 'cost' => 1], // recall 3, place 2
     ];
+
+    /**
+     * Abilities Mill Wheel can copy from a neighbour (every as-an-action ability
+     * except Confluence's combined auction). Keyed by effect key.
+     */
+    public const MILL_WHEEL_COPYABLE = ['driftwoodsnag', 'towline', 'heronroost', 'salmonrun', 'portage', 'tradingpost'];
 
     /** @return array{key:string, cost:int}|null */
     public static function actionAbility(string $name): ?array
