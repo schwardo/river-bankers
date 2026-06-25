@@ -39,6 +39,26 @@ class PlayerTurn {
         if (args.canRetire) {
             this.bga.statusBar.addActionButton(_('Retire'), () => this.bga.actions.performAction('actRetire'), { color: 'secondary' });
         }
+        (args.abilities || []).forEach(ab => {
+            this.bga.statusBar.addActionButton(ab.name + ' (' + ab.cost + '🐟)',
+                () => this.bga.actions.performAction('actUseAbility', { ability: ab.key }), { color: 'secondary' });
+        });
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class AbilityTarget {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const labels = {
+            driftwoodsnag: _('Driftwood Snag — drop a blank on a river card'),
+            towline: _('Tow Line — slide a river card upstream'),
+            heronroost: _('Heron Roost — replace a Headwaters card'),
+        };
+        this.bga.statusBar.setTitle(isActive ? (labels[args.ability] || _('Choose a target')) : _('Resolving ability…'));
+        if (!isActive) return;
+        this.game.setHint(_('Click a highlighted card.'));
+        this.game.markClickable('target', args.targets, id => this.bga.actions.performAction('actAbilityTarget', { cardId: id }));
     }
     onLeavingState() { this.game.clearClickable(); }
 }
@@ -150,6 +170,7 @@ export class Game {
         this.bga.states.register('InventDiscard', new InventDiscard(this, bga));
         this.bga.states.register('FlushChoose', new FlushChoose(this, bga));
         this.bga.states.register('WhenBuilt', new WhenBuilt(this, bga));
+        this.bga.states.register('AbilityTarget', new AbilityTarget(this, bga));
         this.bga.states.register('FinalBuild', new FinalBuild(this, bga));
     }
 

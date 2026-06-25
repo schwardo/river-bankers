@@ -583,15 +583,7 @@ class Game extends \Bga\GameFramework\Table
         foreach ($aside as $id) {
             $this->DbQuery("UPDATE `card` SET `card_location` = 'material_deck' WHERE `card_id` = $id");
         }
-        $ids = array_map('intval', $this->getObjectListFromDB(
-            "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck'",
-            true
-        ));
-        shuffle($ids);
-        $order = 0;
-        foreach ($ids as $id) {
-            $this->DbQuery("UPDATE `card` SET `card_location_arg` = " . ($order++) . " WHERE `card_id` = $id");
-        }
+        $this->reshuffleMaterialDeck();
     }
 
     // =====================================================================
@@ -883,6 +875,80 @@ class Game extends \Bga\GameFramework\Table
     {
         if ($this->uncoveredIcons($cardId) > 0) {
             $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + 1 WHERE `card_id` = $cardId");
+        }
+    }
+
+    // --- "as an action" abilities (Batch 4) ---
+
+    /**
+     * As-an-action abilities the player controls that have a legal target.
+     *
+     * @return list<array{key:string, name:string, cost:int}>
+     */
+    public function getPlayerAbilities(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->getBuiltNames($playerId) as $name) {
+            $ab = Effects::actionAbility($name);
+            if ($ab !== null && count($this->abilityTargets($ab['key'])) > 0) {
+                $out[] = ['key' => $ab['key'], 'name' => $name, 'cost' => $ab['cost']];
+            }
+        }
+        return $out;
+    }
+
+    /** Legal targets (card ids) for an as-an-action ability. */
+    public function abilityTargets(string $key): array
+    {
+        if ($key === 'driftwoodsnag') {
+            return $this->getAuctionableRiverCards(); // river cards with an uncovered icon
+        }
+        if ($key === 'towline') {
+            return array_map('intval', $this->getObjectListFromDB(
+                "SELECT `card_id` FROM `card` WHERE `card_location` = 'river' AND `card_location_arg` > 1", true
+            ));
+        }
+        if ($key === 'heronroost') {
+            return $this->getMaterialDeckCount() > 0 ? $this->getHeadwatersCards() : [];
+        }
+        return [];
+    }
+
+    public function resolveAbility(string $key, int $cardId): void
+    {
+        if ($key === 'driftwoodsnag') {
+            $this->dropBlank($cardId);
+            return;
+        }
+        if ($key === 'towline') {
+            $slot = (int) $this->getCardRow($cardId)['card_location_arg'];
+            $this->DbQuery("UPDATE `card` SET `card_location_arg` = " . max(1, $slot - 1) . " WHERE `card_id` = $cardId");
+            return;
+        }
+        if ($key === 'heronroost') {
+            // Replace the chosen Headwaters card with the deck top; shuffle it back in.
+            $slot = (int) $this->getCardRow($cardId)['card_location_arg'];
+            $this->DbQuery("UPDATE `card` SET `card_location` = 'heron_aside' WHERE `card_id` = $cardId");
+            $top = $this->getUniqueValueFromDB(
+                "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck' ORDER BY `card_location_arg` LIMIT 1"
+            );
+            if ($top !== null) {
+                $this->DbQuery("UPDATE `card` SET `card_location` = 'headwaters', `card_location_arg` = $slot WHERE `card_id` = " . (int) $top);
+            }
+            $this->DbQuery("UPDATE `card` SET `card_location` = 'material_deck' WHERE `card_id` = $cardId");
+            $this->reshuffleMaterialDeck();
+        }
+    }
+
+    private function reshuffleMaterialDeck(): void
+    {
+        $ids = array_map('intval', $this->getObjectListFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck'", true
+        ));
+        shuffle($ids);
+        $order = 0;
+        foreach ($ids as $id) {
+            $this->DbQuery("UPDATE `card` SET `card_location_arg` = " . ($order++) . " WHERE `card_id` = $id");
         }
     }
 

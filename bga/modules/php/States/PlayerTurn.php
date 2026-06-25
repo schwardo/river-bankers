@@ -39,7 +39,31 @@ class PlayerTurn extends GameState
             "handStructureIds" => $this->game->getPlayerHand($playerId),
             "canFlush" => $this->game->getMaterialDeckCount() > 0,
             "canRetire" => $this->game->endgameTriggered(),
+            "abilities" => $this->game->getPlayerAbilities($playerId),
         ];
+    }
+
+    /**
+     * Use an "as an action" ability of a built structure: pay its fish cost, then
+     * pick a target in AbilityTarget.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actUseAbility(string $ability, int $activePlayerId, array $args)
+    {
+        $found = null;
+        foreach ($args['abilities'] as $ab) {
+            if ($ab['key'] === $ability) {
+                $found = $ab;
+            }
+        }
+        if ($found === null) {
+            throw new UserException('You cannot use that ability.');
+        }
+        $this->game->advanceFish($activePlayerId, (int) $found['cost']);
+        $this->globals->set('pending_ability', $ability);
+        return AbilityTarget::class;
     }
 
     /**

@@ -92,4 +92,11 @@ final class EffectsTest extends TestCase
         self::assertSame('mudlevee', Effects::whenBuiltChoice('Mud Levee'));
         self::assertNull(Effects::whenBuiltChoice('Reed Bed'));
     }
+
+    public function testActionAbilityMapping(): void
+    {
+        self::assertSame(['key' => 'towline', 'cost' => 2], Effects::actionAbility('Tow Line'));
+        self::assertSame(['key' => 'heronroost', 'cost' => 1], Effects::actionAbility('Heron Roost'));
+        self::assertNull(Effects::actionAbility('Spillway'));
+    }
 }

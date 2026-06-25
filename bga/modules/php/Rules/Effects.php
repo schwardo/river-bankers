@@ -90,6 +90,19 @@ final class Effects
         return self::WHEN_BUILT_CHOICE[$name] ?? null;
     }
 
+    /** "As an action" abilities a built structure grants: name => [key, fish cost]. */
+    public const ACTION_ABILITIES = [
+        'Driftwood Snag' => ['key' => 'driftwoodsnag', 'cost' => 1],
+        'Tow Line'       => ['key' => 'towline', 'cost' => 2],
+        'Heron Roost'    => ['key' => 'heronroost', 'cost' => 1],
+    ];
+
+    /** @return array{key:string, cost:int}|null */
+    public static function actionAbility(string $name): ?array
+    {
+        return self::ACTION_ABILITIES[$name] ?? null;
+    }
+
     /**
      * Fish-track penalty when a material card reaches the shoreline:
      *   - Hidden Inlet: if exactly one player has workers, back 1 per worker;
