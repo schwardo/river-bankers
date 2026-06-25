@@ -229,12 +229,12 @@ class PlayerTurn extends GameState
             'card_name' => $name,
         ]);
 
-        // A when-built effect that needs a target choice hands off to WhenBuilt.
-        $effect = \Bga\Games\RiverBankers\Rules\Effects::whenBuiltChoice($name);
-        if ($effect !== null) {
-            $this->globals->set('pending_effect', $effect);
-            $this->globals->set('mudlevee_left', $effect === 'mudlevee' ? 2 : 0);
-            return WhenBuilt::class;
+        // Queue any interactive when-built / reactive-when-you-build effects and
+        // resolve them one at a time via the BuildEffects dispatcher.
+        $queue = $this->game->pendingBuildEffects($activePlayerId, $cardId);
+        if (count($queue) > 0) {
+            $this->globals->set('build_fx', $queue);
+            return BuildEffects::class;
         }
 
         return NextPlayer::class;

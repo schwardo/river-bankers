@@ -97,6 +97,37 @@ final class Effects
         return self::WHEN_BUILT_CHOICE[$name] ?? null;
     }
 
+    /**
+     * Reactive "when you build a structure that uses <material>" abilities granted
+     * by an already-built card: card name => [material gate, effect key]. Fire once
+     * each per qualifying build (the card itself is excluded from its own build).
+     */
+    public const REACT_BUILD = [
+        'Stone Causeway' => ['material' => 'stones', 'key' => 'stonecauseway'], // draw 1, discard 1
+        'Reed Walkway'   => ['material' => 'reeds',  'key' => 'reedwalkway'],   // free worker on a River 1 card
+        'Clay Vault'     => ['material' => 'clay',   'key' => 'clayvault'],     // peek struct deck top, may swap a hand card
+        'Burrow Network' => ['material' => 'mud',    'key' => 'burrownetwork'], // move a worker to another river card
+    ];
+
+    /**
+     * Reactive effect keys triggered when $cost uses the gated material, from the
+     * player's other built cards $builtNames. Returned in REACT_BUILD order.
+     *
+     * @param array<string,int> $cost       the just-built structure's printed cost
+     * @param list<string>       $builtNames the player's OTHER built-card names
+     * @return list<string> effect keys
+     */
+    public static function reactiveBuildEffects(array $cost, array $builtNames): array
+    {
+        $out = [];
+        foreach (self::REACT_BUILD as $name => $def) {
+            if (in_array($name, $builtNames, true) && ($cost[$def['material']] ?? 0) > 0) {
+                $out[] = $def['key'];
+            }
+        }
+        return $out;
+    }
+
     /** "As an action" abilities a built structure grants: name => [key, fish cost]. */
     public const ACTION_ABILITIES = [
         'Driftwood Snag' => ['key' => 'driftwoodsnag', 'cost' => 1],

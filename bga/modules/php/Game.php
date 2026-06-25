@@ -1171,6 +1171,193 @@ class Game extends \Bga\GameFramework\Table
         }
     }
 
+    // =====================================================================
+    // Post-build effect queue: the built card's own when-built choice, then
+    // reactive "when you build <material>" abilities from the player's OTHER
+    // built cards (Stone Causeway / Reed Walkway / Clay Vault / Burrow Network).
+    // Each entry is resolved in its own interactive sub-state via BuildEffects.
+    // =====================================================================
+
+    /** Built-card names for a player, excluding one card id. @return list<string> */
+    public function getBuiltNamesExcept(int $playerId, int $exceptCardId): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type`, `card_type_arg` FROM `card`
+             WHERE `card_location` = 'built' AND `card_location_arg` = $playerId AND `card_id` <> $exceptCardId"
+        ) as $r) {
+            $arg = (int) $r['card_type_arg'];
+            $out[] = (string) ($r['card_type'] === 'structure'
+                ? (Material::$STRUCTURE[$arg]['name'] ?? '')
+                : (Material::$STARTER[$arg]['name'] ?? ''));
+        }
+        return $out;
+    }
+
+    /** Structure cards available to draw (deck + discard). */
+    public function structuresAvailable(): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT COUNT(*) FROM `card` WHERE `card_type` = 'structure' AND `card_location` IN ('structure_deck', 'discard')"
+        );
+    }
+
+    /** River-1 cards with an uncovered icon (Reed Walkway free-worker targets). */
+    public function riverOneUncovered(): array
+    {
+        $out = [];
+        foreach (array_map('intval', $this->getObjectListFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'river' AND `card_location_arg` = 1", true
+        )) as $id) {
+            if ($this->uncoveredIcons($id) > 0) {
+                $out[] = $id;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Whether reactive effect $key can run for $playerId right now (has the
+     * resources/targets it needs). Mirrors the early-returns in sim.js.
+     */
+    public function canReact(string $key, int $playerId): bool
+    {
+        switch ($key) {
+            case 'stonecauseway': // draw 1 then discard 1 — needs a card to draw
+                return $this->structuresAvailable() > 0;
+            case 'reedwalkway':   // place 1 free worker on a River-1 card
+                return $this->getPlayerSupply($playerId) > 0 && count($this->riverOneUncovered()) > 0;
+            case 'clayvault':     // peek struct deck top (swap optional) — needs a top card
+                return $this->structuresAvailable() > 0;
+            case 'burrownetwork': // move a worker to another river card you occupy / a blank
+                return count($this->burrowSources($playerId)) > 0 && count($this->burrowDests($playerId, 0)) > 0;
+        }
+        return false;
+    }
+
+    /**
+     * Ordered list of interactive effects to resolve after $playerId builds
+     * $cardId. Entries: 'self:<choice>' (Spillway/Sap Drip/Mud Levee) then
+     * 'react:<key>'. Only includes effects with a current legal target.
+     *
+     * @return list<string>
+     */
+    public function pendingBuildEffects(int $playerId, int $cardId): array
+    {
+        $row = $this->getCardRow($cardId);
+        $arg = (int) $row['card_type_arg'];
+        $isStruct = $row['card_type'] === 'structure';
+        $def = $isStruct ? (Material::$STRUCTURE[$arg] ?? null) : (Material::$STARTER[$arg] ?? null);
+        if ($def === null) {
+            return [];
+        }
+        $name = (string) $def['name'];
+        /** @var array<string,int> $cost */
+        $cost = $isStruct ? ($def['cost'] ?? []) : [];
+
+        $queue = [];
+        $choice = Effects::whenBuiltChoice($name);
+        if ($choice !== null && count($this->whenBuiltTargets($choice)) > 0) {
+            $queue[] = 'self:' . $choice;
+        }
+        foreach (Effects::reactiveBuildEffects($cost, $this->getBuiltNamesExcept($playerId, $cardId)) as $key) {
+            if ($this->canReact($key, $playerId)) {
+                $queue[] = 'react:' . $key;
+            }
+        }
+        return $queue;
+    }
+
+    // --- Clay Vault (peek struct deck top, may swap with a hand card) ---
+
+    /** @return array{id:int, name:string}|null the top structure-deck card (peek) */
+    public function peekStructureTop(): ?array
+    {
+        $top = $this->getUniqueValueFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'structure_deck' ORDER BY `card_location_arg` LIMIT 1"
+        );
+        if ($top === null) {
+            // Deck empty but discard has cards: reshuffle so there is a top to peek.
+            $this->reshuffleStructureDiscardPublic();
+            $top = $this->getUniqueValueFromDB(
+                "SELECT `card_id` FROM `card` WHERE `card_location` = 'structure_deck' ORDER BY `card_location_arg` LIMIT 1"
+            );
+            if ($top === null) {
+                return null;
+            }
+        }
+        $def = Material::$STRUCTURE[(int) $this->getCardRow((int) $top)['card_type_arg']] ?? null;
+        return $def === null ? null : ['id' => (int) $top, 'name' => (string) $def['name']];
+    }
+
+    /** Clay Vault swap: discard $handCardId, draw the peeked deck top into hand. */
+    public function clayVaultSwap(int $playerId, int $handCardId): void
+    {
+        $this->discardStructures([$handCardId]);
+        $this->drawStructures($playerId, 1); // draws the (now) top card
+    }
+
+    public function reshuffleStructureDiscardPublic(): void
+    {
+        $this->reshuffleStructureDiscard();
+    }
+
+    // --- Burrow Network (move a worker to another river card) ---
+
+    /** River cards where the player has a worker (move sources). @return list<int> */
+    public function burrowSources(int $playerId): array
+    {
+        return array_map('intval', $this->getObjectListFromDB(
+            "SELECT c.`card_id` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
+             WHERE c.`card_location` = 'river' AND w.`player_id` = $playerId AND w.`workers` > 0",
+            true
+        ));
+    }
+
+    /**
+     * River cards a worker can move TO (excluding $sourceCardId): a card with an
+     * uncovered icon where you already have a worker, or a card with a blank you
+     * can replace.
+     *
+     * @return list<int>
+     */
+    public function burrowDests(int $playerId, int $sourceCardId): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_blanks` FROM `card` WHERE `card_location` = 'river'"
+        ) as $r) {
+            $id = (int) $r['card_id'];
+            if ($id === $sourceCardId) {
+                continue;
+            }
+            $mine = (int) $this->getUniqueValueFromDB(
+                "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $id AND `player_id` = $playerId"
+            );
+            $hasBlank = (int) $r['card_blanks'] > 0;
+            if (($mine > 0 && $this->uncoveredIcons($id) > 0) || $hasBlank) {
+                $out[] = $id;
+            }
+        }
+        return $out;
+    }
+
+    /** Move one of the player's workers from $src to $dst (replacing a blank if needed). */
+    public function burrowMove(int $playerId, int $src, int $dst): void
+    {
+        // Lift one worker off the source (no blank dropped — it's a move, not a recall).
+        $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $playerId AND `card_id` = $src");
+        $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $src AND `workers` <= 0");
+        // If the destination has no uncovered icon, replace one of its blanks.
+        if ($this->uncoveredIcons($dst) <= 0) {
+            $this->DbQuery("UPDATE `card` SET `card_blanks` = GREATEST(0, `card_blanks` - 1) WHERE `card_id` = $dst");
+        }
+        $this->DbQuery(
+            "INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($playerId, $dst, 1)
+             ON DUPLICATE KEY UPDATE `workers` = `workers` + 1"
+        );
+    }
+
     /** Springwater Pool: un-flip all of a player's spent once-per-game cards. */
     public function readySpentOnce(int $playerId): void
     {

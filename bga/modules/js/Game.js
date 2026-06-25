@@ -113,6 +113,57 @@ class WhenBuilt {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class ReactReedWalkway {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Reed Walkway — place a free worker on a River-1 card') : _('Resolving Reed Walkway…'));
+        if (!isActive) return;
+        this.game.setHint(_('Click a River-1 card with an uncovered icon.'));
+        this.game.markClickable('river', args.targets, id => this.bga.actions.performAction('actReedTarget', { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class ReactDrawDiscard {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Stone Causeway — discard 1 card from your hand') : _('Stone Causeway…'));
+        if (!isActive) return;
+        this.game.setHint(_('You drew a card. Click a hand card to discard.'));
+        this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actDiscardOne', { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class ReactClayVault {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive
+            ? _('Clay Vault — deck top is ') + args.topName + _('; swap a hand card or skip')
+            : _('Clay Vault…'));
+        if (!isActive) return;
+        this.game.setHint(_('Click a hand card to swap it for ') + args.topName + _(', or skip.'));
+        this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actClaySwap', { cardId: id }));
+        this.bga.statusBar.addActionButton(_('Skip'), () => this.bga.actions.performAction('actClaySkip'), { color: 'secondary' });
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class ReactBurrowNetwork {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const src = args.step === 'source';
+        this.bga.statusBar.setTitle(isActive
+            ? (src ? _('Burrow Network — pick a worker to move') : _('Burrow Network — pick a destination'))
+            : _('Burrow Network…'));
+        if (!isActive) return;
+        this.game.setHint(src ? _('Click a river card with your worker.') : _('Click the destination river card.'));
+        const action = src ? 'actBurrowSource' : 'actBurrowDest';
+        this.game.markClickable('river', args.targets, id => this.bga.actions.performAction(action, { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
 class FinalBuild {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -248,6 +299,10 @@ export class Game {
         this.bga.states.register('InventDiscard', new InventDiscard(this, bga));
         this.bga.states.register('FlushChoose', new FlushChoose(this, bga));
         this.bga.states.register('WhenBuilt', new WhenBuilt(this, bga));
+        this.bga.states.register('ReactReedWalkway', new ReactReedWalkway(this, bga));
+        this.bga.states.register('ReactDrawDiscard', new ReactDrawDiscard(this, bga));
+        this.bga.states.register('ReactClayVault', new ReactClayVault(this, bga));
+        this.bga.states.register('ReactBurrowNetwork', new ReactBurrowNetwork(this, bga));
         this.bga.states.register('AbilityTarget', new AbilityTarget(this, bga));
         this.bga.states.register('FinalBuild', new FinalBuild(this, bga));
     }

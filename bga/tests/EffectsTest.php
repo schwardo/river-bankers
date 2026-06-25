@@ -116,4 +116,27 @@ final class EffectsTest extends TestCase
         self::assertSame(['key' => 'tributestone', 'cost' => 0], Effects::onceAbility('Tribute Stone'));
         self::assertNull(Effects::onceAbility('Tow Line'));
     }
+
+    public function testReactiveBuildEffectsGateOnMaterialAndOwnership(): void
+    {
+        // Stone Causeway fires only when the built cost uses Stones and it's built.
+        self::assertSame(['stonecauseway'],
+            Effects::reactiveBuildEffects(['stones' => 3, 'logs' => 2], ['Stone Causeway']));
+        // No Stones in the cost -> no trigger.
+        self::assertSame([], Effects::reactiveBuildEffects(['logs' => 2], ['Stone Causeway']));
+        // Not built -> no trigger.
+        self::assertSame([], Effects::reactiveBuildEffects(['stones' => 3], ['Reed Bed']));
+    }
+
+    public function testReactiveBuildEffectsReturnedInCatalogOrder(): void
+    {
+        // A structure using Stones, Reeds, Clay, and Mud with all four reactors
+        // built -> all four, in REACT_BUILD order.
+        $cost = ['stones' => 1, 'reeds' => 1, 'clay' => 1, 'mud' => 1];
+        $built = ['Burrow Network', 'Clay Vault', 'Reed Walkway', 'Stone Causeway']; // unsorted
+        self::assertSame(
+            ['stonecauseway', 'reedwalkway', 'clayvault', 'burrownetwork'],
+            Effects::reactiveBuildEffects($cost, $built)
+        );
+    }
 }

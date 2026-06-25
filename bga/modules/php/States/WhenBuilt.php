@@ -95,6 +95,6 @@ class WhenBuilt extends GameState
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         $this->globals->set('pending_effect', '');
         $this->globals->set('mudlevee_left', 0);
-        return NextPlayer::class;
+        return BuildEffects::class; // resolve any remaining queued build effects
     }
 }
