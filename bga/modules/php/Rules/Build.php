@@ -7,6 +7,10 @@
  * Logs/Reeds, Mud Slick = Mud/Clay) pay either of their two materials, chosen
  * here to cover the remaining deficits. Mirrors the cover logic in sim.js
  * (playerWorkersByMaterial / canCoverWithWild).
+ *
+ * A holding may carry a `yield` > 1 (Old Growth at River 3/4 yields 2 Logs per
+ * worker); one worker then covers `yield` units, so we pull ceil(need/yield)
+ * workers. Lower-yield cards are spent first so a double isn't wasted.
  */
 declare(strict_types=1);
 
@@ -19,7 +23,7 @@ final class Build
      * Fixed-material workers are spent first; wild workers then fill what's left.
      *
      * @param array<string,int> $cost material => count required
-     * @param list<array{cardId:int, material:string, wildAlt:?string, workers:int}> $holdings
+     * @param list<array{cardId:int, material:string, wildAlt:?string, workers:int, yield?:int}> $holdings
      * @return array<int,int>|null cardId => workers to pick up, or null if unaffordable
      */
     public static function allocate(array $cost, array $holdings): ?array
@@ -27,20 +31,22 @@ final class Build
         $need = array_filter($cost, fn(int $n) => $n > 0);
         $pull = [];
 
-        // Pass 1 — spend fixed-material workers on their own material.
-        foreach ($holdings as $h) {
-            if ($h['wildAlt'] !== null) {
-                continue;
-            }
+        // Pass 1 — spend fixed-material workers on their own material, lower-yield
+        // cards first (PHP 8 usort is stable, so equal-yield order is preserved).
+        $fixed = array_values(array_filter($holdings, fn(array $h): bool => $h['wildAlt'] === null));
+        usort($fixed, fn(array $a, array $b): int => ($a['yield'] ?? 1) <=> ($b['yield'] ?? 1));
+        foreach ($fixed as $h) {
             $m = $h['material'];
             $remaining = $need[$m] ?? 0;
             if ($remaining <= 0) {
                 continue;
             }
-            $take = min($h['workers'], $remaining);
+            $mult = $h['yield'] ?? 1;
+            $wantWorkers = (int) ceil($remaining / $mult);
+            $take = min($h['workers'], $wantWorkers);
             if ($take > 0) {
                 $pull[$h['cardId']] = ($pull[$h['cardId']] ?? 0) + $take;
-                $need[$m] = $remaining - $take;
+                $need[$m] = max(0, $remaining - $take * $mult);
                 if ($need[$m] === 0) {
                     unset($need[$m]);
                 }

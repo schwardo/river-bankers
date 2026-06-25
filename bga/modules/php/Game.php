@@ -17,6 +17,7 @@ namespace Bga\Games\RiverBankers;
 use Bga\Games\RiverBankers\States\NextPlayer;
 use Bga\Games\RiverBankers\States\StarterDraft;
 use Bga\Games\RiverBankers\Rules\Build;
+use Bga\Games\RiverBankers\Rules\BuildCost;
 use Bga\Games\RiverBankers\Rules\CardMovement;
 use Bga\Games\RiverBankers\Rules\Effects;
 use Bga\Games\RiverBankers\Rules\Endgame;
@@ -695,14 +696,16 @@ class Game extends \Bga\GameFramework\Table
     // --- build ---
 
     /**
-     * A player's worker holdings shaped for Rules\Build::allocate().
+     * A player's worker holdings shaped for Rules\Build::allocate(). Old Growth
+     * yields 2 Logs per worker while it sits at River 3 or 4 (yield = 2).
      *
-     * @return list<array{cardId:int, material:string, wildAlt:?string, workers:int}>
+     * @return list<array{cardId:int, material:string, wildAlt:?string, workers:int, yield:int}>
      */
     public function getPlayerHoldings(int $playerId): array
     {
         $rows = $this->getObjectListFromDB(
-            "SELECT w.`card_id`, w.`workers`, c.`card_type`, c.`card_type_arg`
+            "SELECT w.`card_id`, w.`workers`, c.`card_type`, c.`card_type_arg`,
+                    c.`card_location`, c.`card_location_arg`
              FROM `worker` w JOIN `card` c ON c.`card_id` = w.`card_id`
              WHERE w.`player_id` = $playerId AND w.`workers` > 0"
         );
@@ -715,12 +718,94 @@ class Game extends \Bga\GameFramework\Table
             if ($def === null) {
                 continue;
             }
+            // Old Growth at River 3/4 (slot >= 3): each worker yields 2 Logs.
+            $yield = ($def['name'] === 'Old Growth'
+                && $r['card_location'] === 'river'
+                && (int) $r['card_location_arg'] >= 3) ? 2 : 1;
             $out[] = [
                 'cardId' => (int) $r['card_id'],
                 'material' => (string) $def['material'],
                 'wildAlt' => isset($def['wildAlt']) ? (string) $def['wildAlt'] : null,
                 'workers' => (int) $r['workers'],
+                'yield' => $yield,
             ];
+        }
+        return $out;
+    }
+
+    /**
+     * Fixed-material worker counts (Old-Growth yield folded in), for the build-cost
+     * modifier engine. Wild holdings are excluded — they're resolved at allocation.
+     *
+     * @param list<array{material:string, wildAlt:?string, workers:int, yield:int}> $holdings
+     * @return array<string,int>
+     */
+    private function fixedMaterialCounts(array $holdings): array
+    {
+        $counts = [];
+        foreach ($holdings as $h) {
+            if ($h['wildAlt'] === null) {
+                $counts[$h['material']] = ($counts[$h['material']] ?? 0) + $h['workers'] * $h['yield'];
+            }
+        }
+        return $counts;
+    }
+
+    /**
+     * Which build-cost modifiers a player controls + the used-state of the
+     * once-per-game ones (Stone Tool / Granary), for Rules\BuildCost::effective().
+     *
+     * @return array{cattailMarsh:bool, charcoalPit:bool, stoneTool:bool, stoneToolUsed:bool, treatyStone:bool, granary:bool, granaryUsed:bool}
+     */
+    private function buildFlags(int $playerId): array
+    {
+        $names = $this->getBuiltNames($playerId);
+        return [
+            'cattailMarsh' => in_array('Cattail Marsh', $names, true),
+            'charcoalPit' => in_array('Charcoal Pit', $names, true),
+            'stoneTool' => in_array('Stone Tool', $names, true),
+            'stoneToolUsed' => $this->onceCardUsed($playerId, 'Stone Tool'),
+            'treatyStone' => in_array('Treaty Stone', $names, true),
+            'granary' => in_array('Granary', $names, true),
+            'granaryUsed' => $this->onceCardUsed($playerId, 'Granary'),
+        ];
+    }
+
+    /** True if the player has a built card of $name already flipped (used). */
+    public function onceCardUsed(int $playerId, string $name): bool
+    {
+        foreach ($this->getBuiltWithUsed($playerId) as $b) {
+            if ($b['name'] === $name && $b['used']) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Flip (spend) the first unused built card of $name the player controls. */
+    public function flipBuiltByName(int $playerId, string $name): void
+    {
+        foreach ($this->getBuiltWithUsed($playerId) as $b) {
+            if ($b['name'] === $name && !$b['used']) {
+                $this->flipCardUsed($b['cardId']);
+                return;
+            }
+        }
+    }
+
+    /** @return list<array{cardId:int, name:string, used:bool}> the player's built cards + used-state */
+    private function getBuiltWithUsed(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type`, `card_type_arg`, `card_used` FROM `card`
+             WHERE `card_location` = 'built' AND `card_location_arg` = $playerId"
+        ) as $r) {
+            $arg = (int) $r['card_type_arg'];
+            $name = $r['card_type'] === 'structure'
+                ? (Material::$STRUCTURE[$arg]['name'] ?? '')
+                : (Material::$STARTER[$arg]['name'] ?? '');
+            $out[] = ['cardId' => (int) $r['card_id'], 'name' => (string) $name, 'used' => (int) $r['card_used'] === 1];
         }
         return $out;
     }
@@ -823,8 +908,8 @@ class Game extends \Bga\GameFramework\Table
     }
 
     /**
-     * Leftover workers split into fixed-material counts and wild pools.
-     * TODO: Old Growth's x2 logs yield isn't applied here yet.
+     * Leftover workers split into fixed-material counts and wild pools (Old
+     * Growth at River 3/4 counts each worker as 2 Logs, matching build yield).
      *
      * @return array{fixed: array<string,int>, wild: list<array{materials:array{0:string,1:string}, count:int}>}
      */
@@ -834,7 +919,8 @@ class Game extends \Bga\GameFramework\Table
         $wild = [];
         foreach ($this->getPlayerHoldings($playerId) as $h) {
             if ($h['wildAlt'] === null) {
-                $fixed[$h['material']] = ($fixed[$h['material']] ?? 0) + $h['workers'];
+                // Old Growth at River 3/4 counts each leftover worker as 2 Logs.
+                $fixed[$h['material']] = ($fixed[$h['material']] ?? 0) + $h['workers'] * $h['yield'];
             } else {
                 $wild[] = ['materials' => [$h['material'], $h['wildAlt']], 'count' => $h['workers']];
             }
@@ -1016,15 +1102,27 @@ class Game extends \Bga\GameFramework\Table
     public function tryBuild(int $playerId, int $structureCardId): bool
     {
         $def = Material::$STRUCTURE[(int) $this->getCardRow($structureCardId)['card_type_arg']];
-        $alloc = Build::allocate($def['cost'], $this->getPlayerHoldings($playerId));
+        $holdings = $this->getPlayerHoldings($playerId);
+        // Apply the player's build-cost modifiers (Cattail Marsh / Charcoal Pit /
+        // Stone Tool / Treaty Stone / Granary) to the printed material cost.
+        $bc = BuildCost::effective($def['cost'], $this->fixedMaterialCounts($holdings), $this->buildFlags($playerId));
+        $alloc = Build::allocate($bc['eff'], $holdings);
         if ($alloc === null) {
             return false;
         }
         // Built-card names BEFORE this card joins them (a card never discounts
-        // the build that creates it).
+        // the build that creates it). Fish cost uses the PRINTED cost (Lodge
+        // Foundation keys off Logs in the cost); material payment uses effective.
         $builtNames = $this->getBuiltNames($playerId);
         $this->advanceFish($playerId, Effects::buildFishCost((int) $def['time'], $def['cost'], $builtNames));
         $this->applyBuild($playerId, $structureCardId, $alloc);
+        // Spend the once-per-game cost cards the modifier engine consumed.
+        if ($bc['granaryUsed']) {
+            $this->flipBuiltByName($playerId, 'Granary');
+        }
+        if ($bc['stoneToolUsed']) {
+            $this->flipBuiltByName($playerId, 'Stone Tool');
+        }
         $this->applyOnBuildEffects($playerId, $structureCardId);
         return true;
     }
