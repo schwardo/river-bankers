@@ -45,7 +45,10 @@ class ResolveAuction extends GameState
         // TODO (Phase 4): detect each player's built Pontoon for the jam refund.
         $billable = AuctionRules::billableWorkers($open, $bids, []);
         $base = Cost::perItem((string) $cardRow['card_location'], (int) $cardRow['card_location_arg'], $forcedRate);
-        $material = Material::$MATERIAL[(int) $cardRow['card_type_arg']]['material'] ?? '';
+        $matDef = Material::$MATERIAL[(int) $cardRow['card_type_arg']] ?? [];
+        $material = (string) ($matDef['material'] ?? '');               // primary, for the discount lookup
+        $wildAlt = $matDef['wildAlt'] ?? null;
+        $matLabel = $wildAlt !== null ? "$material/$wildAlt" : $material; // display (wilds show both)
 
         // Per-item cost is per-player (material discounts: Reed Bed, Clay Den…).
         $paid = [];
@@ -90,7 +93,7 @@ class ResolveAuction extends GameState
                 'player_id' => $pid,
                 'player_name' => $this->game->getPlayerNameById($pid),
                 'n' => $got,
-                'material' => $material,
+                'material' => $matLabel,
                 'paid' => $paid[$pid],
                 'i18n' => ['material'],
             ]);
