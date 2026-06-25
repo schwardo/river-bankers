@@ -59,10 +59,17 @@ final class Effects
      */
     public static function buildFishCost(int $baseTime, array $cost, array $builtNames): int
     {
-        if ($baseTime >= 1 && ($cost['logs'] ?? 0) > 0 && in_array('Lodge Foundation', $builtNames, true)) {
-            return max(1, $baseTime - 1);
+        if ($baseTime < 1) {
+            return $baseTime; // a 0-fish build is never discounted up to 1
         }
-        return $baseTime;
+        $discount = 0;
+        if (($cost['logs'] ?? 0) > 0 && in_array('Lodge Foundation', $builtNames, true)) {
+            $discount += 1; // Lodge Foundation: Logs builds
+        }
+        if (in_array('Log Flume', $builtNames, true)) {
+            $discount += 3; // Log Flume: every build
+        }
+        return max(1, $baseTime - $discount);
     }
 
     /** Whether building $name grants a +1 hand-size bonus. */

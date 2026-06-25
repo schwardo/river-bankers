@@ -42,8 +42,12 @@ class ResolveAuction extends GameState
         $bids = $this->game->getAuctionBids($auctionId);
 
         $clinched = AuctionRules::clinched($open, $bids);
-        // TODO (Phase 4): detect each player's built Pontoon for the jam refund.
-        $billable = AuctionRules::billableWorkers($open, $bids, []);
+        // Pontoon: a jammed bidder who controls a built Pontoon pays for one fewer worker.
+        $pontoon = [];
+        foreach ($bids as $pid => $bid) {
+            $pontoon[$pid] = in_array('Pontoon', $this->game->getBuiltNames($pid), true);
+        }
+        $billable = AuctionRules::billableWorkers($open, $bids, $pontoon);
         $base = Cost::perItem((string) $cardRow['card_location'], (int) $cardRow['card_location_arg'], $forcedRate);
         $matDef = Material::$MATERIAL[(int) $cardRow['card_type_arg']] ?? [];
         $material = (string) ($matDef['material'] ?? '');               // primary, for the discount lookup

@@ -47,6 +47,15 @@ final class EffectsTest extends TestCase
         self::assertSame(3, Effects::buildFishCost(3, ['logs' => 4], []));
     }
 
+    public function testLogFlumeDiscountsEveryBuild(): void
+    {
+        self::assertSame(2, Effects::buildFishCost(5, ['reeds' => 4], ['Log Flume']));
+        // Stacks with Lodge Foundation on a Logs build, floored at 1.
+        self::assertSame(1, Effects::buildFishCost(5, ['logs' => 4], ['Log Flume', 'Lodge Foundation']));
+        // 0-fish build stays 0.
+        self::assertSame(0, Effects::buildFishCost(0, ['vines' => 2], ['Log Flume']));
+    }
+
     public function testHandSizeGrants(): void
     {
         self::assertTrue(Effects::grantsHandSize('Cache Burrow'));

@@ -868,21 +868,54 @@ class Game extends \Bga\GameFramework\Table
         return true;
     }
 
-    /** Immediate "when built" effects of the just-placed card (Batch 1: hand size). */
+    /** "When built" effects of the just-placed card + reactive "when you build". */
     private function applyOnBuildEffects(int $playerId, int $cardId): void
     {
         $row = $this->getCardRow($cardId);
         $arg = (int) $row['card_type_arg'];
-        $name = $row['card_type'] === 'structure'
-            ? (Material::$STRUCTURE[$arg]['name'] ?? '')
-            : (Material::$STARTER[$arg]['name'] ?? '');
-        if (Effects::grantsHandSize((string) $name)) {
+        $isStruct = $row['card_type'] === 'structure';
+        $def = $isStruct ? (Material::$STRUCTURE[$arg] ?? null) : (Material::$STARTER[$arg] ?? null);
+        if ($def === null) {
+            return;
+        }
+        $name = (string) $def['name'];
+        /** @var array<string,int> $cost */
+        $cost = $isStruct ? ($def['cost'] ?? []) : [];
+
+        // --- self "when built" ---
+        if (Effects::grantsHandSize($name)) {
             $this->DbQuery("UPDATE `player` SET `player_hand_limit` = `player_hand_limit` + 1 WHERE `player_id` = $playerId");
         }
-        if (Effects::grantsExtraTurn((string) $name)) {
+        if (Effects::grantsExtraTurn($name)) {
             $this->globals->set('bonus_turn_player', $playerId); // Royal Lodge: act again
         }
-        // TODO (later batches): other when-built effects dispatch here.
+        if ($name === 'Burrow Run') {
+            $this->moveBackFish($playerId, 5);
+        }
+        if ($name === 'Springwater Pool') {
+            $this->readySpentOnce($playerId);
+        }
+
+        // --- reactive "when you build [material]" from the player's OTHER built cards ---
+        $others = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_type`, `card_type_arg` FROM `card`
+             WHERE `card_location` = 'built' AND `card_location_arg` = $playerId AND `card_id` <> $cardId"
+        ) as $r) {
+            $a = (int) $r['card_type_arg'];
+            $others[] = (string) ($r['card_type'] === 'structure'
+                ? (Material::$STRUCTURE[$a]['name'] ?? '')
+                : (Material::$STARTER[$a]['name'] ?? ''));
+        }
+        if (in_array('Vine Trellis', $others, true) && ($cost['vines'] ?? 0) > 0) {
+            $this->moveBackFish($playerId, 1);
+        }
+    }
+
+    /** Springwater Pool: un-flip all of a player's spent once-per-game cards. */
+    public function readySpentOnce(int $playerId): void
+    {
+        $this->DbQuery("UPDATE `card` SET `card_used` = 0 WHERE `card_location` = 'built' AND `card_location_arg` = $playerId");
     }
 
     // --- when-built river-target effects (Batch 3) ---
