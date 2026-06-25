@@ -63,9 +63,10 @@ class Game extends \Bga\GameFramework\Table
         $result = [];
         // WARNING: only return info visible by $currentPlayerId (hide opponents' hands).
         $result["players"] = $this->getCollectionFromDb(
-            "SELECT `player_id` AS `id`, `player_score` AS `score`, `player_species` AS `species`,
-                    `player_fish_pos` AS `fish`, `player_worker_supply` AS `supply`,
-                    `player_hand_limit` AS `handLimit`, `player_retired` AS `retired`
+            "SELECT `player_id` AS `id`, `player_name` AS `name`, `player_score` AS `score`,
+                    `player_species` AS `species`, `player_fish_pos` AS `fish`,
+                    `player_worker_supply` AS `supply`, `player_hand_limit` AS `handLimit`,
+                    `player_retired` AS `retired`
              FROM `player`"
         );
         $result["fishLine"] = (int) $this->globals->get("fish_line", self::FISH_LINE);
@@ -74,6 +75,7 @@ class Game extends \Bga\GameFramework\Table
         $result["materials"] = $this->getMaterialsAll();
         $result["hand"] = $this->getHandView($currentPlayerId); // private: only this player's hand
         $result["starterOffer"] = $this->getStarterOffer($currentPlayerId); // empty unless mid-draft
+        $result["auction"] = $this->getAuctionView(); // null unless an auction is open (board highlight on reconnect)
 
         return $result;
     }
@@ -387,6 +389,47 @@ class Game extends \Bga\GameFramework\Table
         return $this->getNonEmptyObjectFromDB("SELECT * FROM `auction` ORDER BY `auction_id` DESC LIMIT 1");
     }
 
+    public function hasOpenAuction(): bool
+    {
+        return (int) $this->getUniqueValueFromDB("SELECT COUNT(*) FROM `auction`") > 0;
+    }
+
+    /**
+     * The open auction shaped for the client (board highlight + "who has acted"),
+     * or null if none is running. Bid amounts are sealed — only submission status
+     * is exposed, never workers_bid.
+     *
+     * @return array{lotCardId:int, lotCardId2:?int, triggerPlayer:int, open:int, acted:list<int>, deferred:list<int>}|null
+     */
+    public function getAuctionView(): ?array
+    {
+        if (!$this->hasOpenAuction()) {
+            return null;
+        }
+        $a = $this->getOpenAuction();
+        $auctionId = (int) $a['auction_id'];
+        $acted = [];
+        $deferred = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `player_id`, `status` FROM `auction_bid` WHERE `auction_id` = $auctionId"
+        ) as $r) {
+            $pid = (int) $r['player_id'];
+            if ($r['status'] === 'deferred') {
+                $deferred[] = $pid;
+            } else {
+                $acted[] = $pid;
+            }
+        }
+        return [
+            'lotCardId' => (int) $a['lot_card_id'],
+            'lotCardId2' => $a['lot_card_id2'] === null ? null : (int) $a['lot_card_id2'],
+            'triggerPlayer' => (int) $a['trigger_player'],
+            'open' => $this->uncoveredIcons((int) $a['lot_card_id']),
+            'acted' => $acted,       // submitted a sealed bid (amount hidden)
+            'deferred' => $deferred, // Spy Mound / Quick Strike: will bid after reveal
+        ];
+    }
+
     public function recordBid(int $auctionId, int $playerId, int $workers): void
     {
         $this->DbQuery(
@@ -407,6 +450,124 @@ class Game extends \Bga\GameFramework\Table
     {
         $this->DbQuery("DELETE FROM `auction_bid` WHERE `auction_id` = $auctionId");
         $this->DbQuery("DELETE FROM `auction` WHERE `auction_id` = $auctionId");
+    }
+
+    // --- deferred bids (Spy Mound / Quick Strike) ---
+
+    /** Quick Strike lets the auction TRIGGER declare their bid last (free, unlimited). */
+    public function quickStrikeApplies(int $playerId, int $triggerPlayer): bool
+    {
+        return $playerId === $triggerPlayer
+            && in_array('Quick Strike', $this->getBuiltNames($playerId), true);
+    }
+
+    /** An unused built Spy Mound's card id for the player, or null. */
+    public function spyMoundCard(int $playerId): ?int
+    {
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type`, `card_type_arg` FROM `card`
+             WHERE `card_location` = 'built' AND `card_location_arg` = $playerId AND `card_used` = 0"
+        ) as $r) {
+            $arg = (int) $r['card_type_arg'];
+            $name = $r['card_type'] === 'structure'
+                ? (Material::$STRUCTURE[$arg]['name'] ?? '')
+                : (Material::$STARTER[$arg]['name'] ?? '');
+            if ($name === 'Spy Mound') {
+                return (int) $r['card_id'];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Which built card lets this player defer their bid, or null if none. Quick
+     * Strike (free) takes priority over Spy Mound (once per game) when both apply,
+     * matching recordDefer's flip rule.
+     */
+    public function deferReason(int $playerId, int $triggerPlayer): ?string
+    {
+        if ($this->quickStrikeApplies($playerId, $triggerPlayer)) {
+            return 'Quick Strike';
+        }
+        if ($this->spyMoundCard($playerId) !== null) {
+            return 'Spy Mound';
+        }
+        return null;
+    }
+
+    /** A player may defer their bid via Quick Strike (as trigger) or an unused Spy Mound. */
+    public function canDeferBid(int $playerId, int $triggerPlayer): bool
+    {
+        return $this->deferReason($playerId, $triggerPlayer) !== null;
+    }
+
+    /**
+     * Record a deferral: a placeholder 'deferred' bid row. Quick Strike grants the
+     * defer for free; otherwise it consumes (flips) the Spy Mound card.
+     */
+    public function recordDefer(int $auctionId, int $playerId, int $triggerPlayer): void
+    {
+        $this->DbQuery(
+            "INSERT INTO `auction_bid` (`auction_id`, `player_id`, `workers_bid`, `status`)
+             VALUES ($auctionId, $playerId, 0, 'deferred')"
+        );
+        if (!$this->quickStrikeApplies($playerId, $triggerPlayer)) {
+            $spy = $this->spyMoundCard($playerId);
+            if ($spy !== null) {
+                $this->flipCardUsed($spy); // Spy Mound is once per game
+            }
+        }
+    }
+
+    public function hasDeferredBidders(int $auctionId): bool
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT COUNT(*) FROM `auction_bid` WHERE `auction_id` = $auctionId AND `status` = 'deferred'"
+        ) > 0;
+    }
+
+    /**
+     * Deferred bidders still owing a real bid, in turn order (lowest fish first,
+     * then top of stack) so each reveals before the next.
+     *
+     * @return list<int>
+     */
+    public function getDeferredBidders(int $auctionId): array
+    {
+        $ids = array_map('intval', $this->getObjectListFromDB(
+            "SELECT `player_id` FROM `auction_bid` WHERE `auction_id` = $auctionId AND `status` = 'deferred'",
+            true
+        ));
+        if (count($ids) <= 1) {
+            return $ids;
+        }
+        $rows = array_values(array_filter($this->getTurnOrderRows(), fn(array $r): bool => in_array($r['id'], $ids, true)));
+        usort($rows, function (array $a, array $b): int {
+            return ($a['fish'] <=> $b['fish']) ?: ($b['stack'] <=> $a['stack']);
+        });
+        return array_map(fn(array $r): int => $r['id'], $rows);
+    }
+
+    /**
+     * Bids already revealed (committed) to a deferring player.
+     *
+     * @return array<int,int> player_id => workers
+     */
+    public function getRevealedBids(int $auctionId): array
+    {
+        return array_map('intval', $this->getCollectionFromDB(
+            "SELECT `player_id`, `workers_bid` FROM `auction_bid`
+             WHERE `auction_id` = $auctionId AND `status` <> 'deferred'",
+            true
+        ));
+    }
+
+    public function submitDeferredBid(int $auctionId, int $playerId, int $workers): void
+    {
+        $this->DbQuery(
+            "UPDATE `auction_bid` SET `workers_bid` = $workers, `status` = 'in'
+             WHERE `auction_id` = $auctionId AND `player_id` = $playerId"
+        );
     }
 
     // --- Headwaters ---

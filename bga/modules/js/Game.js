@@ -158,6 +158,11 @@ class Auction {
         if (this.game.myRecallTargets(a.lotCardId).length) {
             this.bga.statusBar.addActionButton(_('Recall Workers'), () => this.enterRecall(), { color: 'secondary' });
         }
+        const deferCard = a.canDefer && a.canDefer[this.game.myId()];
+        if (deferCard) {
+            this.bga.statusBar.addActionButton(_('Bid last') + ' (' + _(deferCard) + ')',
+                () => this.bga.actions.performAction('actDefer'), { color: 'secondary' });
+        }
     }
 
     enterRecall() {
@@ -170,6 +175,25 @@ class Auction {
         this.bga.statusBar.addActionButton(_('Cancel'), () => this.showBid(true), { color: 'secondary' });
     }
 
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class DeferBid {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const revealed = Object.entries(args.revealedBids || {})
+            .map(([pid, n]) => `${this.game.playerName(pid)}: ${n}`).join(', ') || _('no bids');
+        this.bga.statusBar.setTitle(isActive
+            ? _('Declare your bid — revealed: ') + revealed
+            : _('Waiting for the deferred bid…'));
+        if (!isActive) return;
+        const minBid = (this.game.myId() === Number(args.triggerPlayer)) ? 1 : 0;
+        this.game.setHint(_('You bid last. Revealed bids — ') + revealed);
+        for (let b = minBid; b <= args.maxBid; b++) {
+            this.bga.statusBar.addActionButton(_('Bid ') + b,
+                () => this.bga.actions.performAction('actDeferredBid', { workers: b }));
+        }
+    }
     onLeavingState() { this.game.clearClickable(); }
 }
 
@@ -220,6 +244,7 @@ export class Game {
         this.bga.states.register('StarterDraft', new StarterDraft(this, bga));
         this.bga.states.register('PlayerTurn', new PlayerTurn(this, bga));
         this.bga.states.register('Auction', new Auction(this, bga));
+        this.bga.states.register('DeferBid', new DeferBid(this, bga));
         this.bga.states.register('InventDiscard', new InventDiscard(this, bga));
         this.bga.states.register('FlushChoose', new FlushChoose(this, bga));
         this.bga.states.register('WhenBuilt', new WhenBuilt(this, bga));
@@ -342,6 +367,7 @@ export class Game {
     // ---- helpers ----
 
     myId() { return Number(this.bga.players.getCurrentPlayerId()); }
+    playerName(pid) { const p = this.players[pid]; return p ? p.name : ('#' + pid); }
     mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
     // River cards (excluding the auction lot) where I have a worker to recall.
     myRecallTargets(lotCardId) {
@@ -393,6 +419,7 @@ export class Game {
     // Log-only notifications (messages show in the game log; no UI work needed).
     async notif_auctionStarted() {}
     async notif_auctionResolved() {}
+    async notif_defer() {}
     async notif_build() {}
     async notif_flush() {}
     async notif_invent() {}

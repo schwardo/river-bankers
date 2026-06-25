@@ -12,12 +12,12 @@ use Bga\Games\RiverBankers\Game;
 
 /**
  * Sealed simultaneous bidding. Every non-retired player is multiactive and
- * secretly commits a number of workers; once all have bid, control passes to
- * ResolveAuction (multi-winner plenty/jam). The triggering player must bid >= 1;
- * others may bid 0. A bid is capped at min(supply, uncovered icons).
+ * secretly commits a number of workers; once all have acted, control passes to
+ * BidReveal (which runs any deferred bids, then ResolveAuction). The triggering
+ * player must bid >= 1; others may bid 0. A bid is capped at min(supply, icons).
  *
- * TODO (Phase 4): pre-auction recall, and the Spy Mound / Quick Strike
- * "declare your bid last" defer gate.
+ * A player with Quick Strike (as trigger) or an unused Spy Mound may DEFER —
+ * declaring their bid after the others reveal theirs (handled in DeferBid).
  */
 class Auction extends GameState
 {
@@ -41,16 +41,25 @@ class Auction extends GameState
                 $bidders[] = $row['id'];
             }
         }
-        $this->gamestate->setPlayersMultiactive($bidders, ResolveAuction::class, true);
+        // Once everyone has bid (or deferred), BidReveal runs deferred bids then resolves.
+        $this->gamestate->setPlayersMultiactive($bidders, BidReveal::class, true);
     }
 
     public function getArgs(): array
     {
         $auction = $this->game->getOpenAuction();
+        $trigger = (int) $auction['trigger_player'];
+        // Public map of who may defer + via which card (built cards are public):
+        // player_id => 'Quick Strike' | 'Spy Mound' | null.
+        $canDefer = [];
+        foreach ($this->gamestate->getActivePlayerList() as $pid) {
+            $canDefer[(int) $pid] = $this->game->deferReason((int) $pid, $trigger);
+        }
         return [
             "lotCardId" => (int) $auction['lot_card_id'],
             "open" => $this->game->uncoveredIcons((int) $auction['lot_card_id']),
-            "triggerPlayer" => (int) $auction['trigger_player'],
+            "triggerPlayer" => $trigger,
+            "canDefer" => $canDefer,
         ];
     }
 
@@ -68,7 +77,29 @@ class Auction extends GameState
 
         $auction = $this->game->getOpenAuction();
         $this->game->recordBid((int) $auction['auction_id'], $currentPlayerId, $workers);
-        $this->gamestate->setPlayerNonMultiactive($currentPlayerId, ResolveAuction::class);
+        $this->gamestate->setPlayerNonMultiactive($currentPlayerId, BidReveal::class);
+    }
+
+    /**
+     * Defer your bid (Quick Strike as trigger, or an unused Spy Mound): drop out
+     * of the sealed round now and declare your real bid in DeferBid, after the
+     * others reveal theirs.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actDefer(int $currentPlayerId)
+    {
+        $auction = $this->game->getOpenAuction();
+        if (!$this->game->canDeferBid($currentPlayerId, (int) $auction['trigger_player'])) {
+            throw new UserException('You cannot defer your bid.');
+        }
+        $this->game->recordDefer((int) $auction['auction_id'], $currentPlayerId, (int) $auction['trigger_player']);
+        $this->notify->all('defer', clienttranslate('${player_name} will bid last'), [
+            'player_id' => $currentPlayerId,
+            'player_name' => $this->game->getPlayerNameById($currentPlayerId),
+        ]);
+        $this->gamestate->setPlayerNonMultiactive($currentPlayerId, BidReveal::class);
     }
 
     /**
@@ -101,6 +132,6 @@ class Auction extends GameState
         // A quit player bids 0 and drops out of the auction.
         $auction = $this->game->getOpenAuction();
         $this->game->recordBid((int) $auction['auction_id'], $playerId, 0);
-        $this->gamestate->setPlayerNonMultiactive($playerId, ResolveAuction::class);
+        $this->gamestate->setPlayerNonMultiactive($playerId, BidReveal::class);
     }
 }
