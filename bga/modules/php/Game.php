@@ -848,6 +848,44 @@ class Game extends \Bga\GameFramework\Table
         // TODO (later batches): other when-built effects dispatch here.
     }
 
+    // --- when-built river-target effects (Batch 3) ---
+
+    /** Legal targets for a when-built river effect ('spillway'|'sapdrip'|'mudlevee'). */
+    public function whenBuiltTargets(string $effect): array
+    {
+        if ($effect === 'spillway') {
+            // Any River-1 card.
+            return array_map('intval', $this->getObjectListFromDB(
+                "SELECT `card_id` FROM `card` WHERE `card_location` = 'river' AND `card_location_arg` = 1", true
+            ));
+        }
+        // sapdrip / mudlevee: any river card that still has uncovered icons.
+        return $this->getAuctionableRiverCards();
+    }
+
+    /** Spillway: send a card straight to the shoreline (workers carry along). */
+    public function washToShoreline(int $cardId): array
+    {
+        $this->DbQuery("UPDATE `card` SET `card_location` = 'shoreline', `card_location_arg` = 0 WHERE `card_id` = $cardId");
+        return $this->applyShorelineArrival($cardId);
+    }
+
+    /** Sap Drip: place up to 2 of a player's workers free onto a river card. */
+    public function sapDripPlace(int $playerId, int $cardId): int
+    {
+        $n = min(2, $this->getPlayerSupply($playerId), $this->uncoveredIcons($cardId));
+        $this->placeWorkers($playerId, $cardId, $n);
+        return $n;
+    }
+
+    /** Mud Levee: drop one blank on a river card with an uncovered icon. */
+    public function dropBlank(int $cardId): void
+    {
+        if ($this->uncoveredIcons($cardId) > 0) {
+            $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + 1 WHERE `card_id` = $cardId");
+        }
+    }
+
     /** Move a pawn back on the fish track (never below 0); does not change stack order. */
     public function moveBackFish(int $playerId, int $spaces): void
     {

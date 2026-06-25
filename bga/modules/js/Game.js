@@ -43,6 +43,24 @@ class PlayerTurn {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class WhenBuilt {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const labels = {
+            spillway: _('Spillway — wash a River-1 card to the shoreline'),
+            sapdrip: _('Sap Drip — place 2 free workers on a river card'),
+            mudlevee: _('Mud Levee — drop a blank on a river card'),
+        };
+        let title = labels[args.effect] || _('Resolve effect');
+        if (args.effect === 'mudlevee') title += ' (' + args.remaining + _(' left)');
+        this.bga.statusBar.setTitle(isActive ? title : _('Resolving effect…'));
+        if (!isActive) return;
+        this.game.setHint(_('Click a highlighted river card.'));
+        this.game.markClickable('river', args.targets, id => this.bga.actions.performAction('actEffectTarget', { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
 class FinalBuild {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -131,6 +149,7 @@ export class Game {
         this.bga.states.register('Auction', new Auction(this, bga));
         this.bga.states.register('InventDiscard', new InventDiscard(this, bga));
         this.bga.states.register('FlushChoose', new FlushChoose(this, bga));
+        this.bga.states.register('WhenBuilt', new WhenBuilt(this, bga));
         this.bga.states.register('FinalBuild', new FinalBuild(this, bga));
     }
 

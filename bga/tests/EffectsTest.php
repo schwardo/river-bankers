@@ -84,4 +84,12 @@ final class EffectsTest extends TestCase
         self::assertSame([], Effects::shorelinePenalty('Logjam', [5 => 3]));
         self::assertSame([], Effects::shorelinePenalty('Mud Wallow', []));
     }
+
+    public function testWhenBuiltChoiceMapping(): void
+    {
+        self::assertSame('spillway', Effects::whenBuiltChoice('Spillway'));
+        self::assertSame('sapdrip', Effects::whenBuiltChoice('Sap Drip'));
+        self::assertSame('mudlevee', Effects::whenBuiltChoice('Mud Levee'));
+        self::assertNull(Effects::whenBuiltChoice('Reed Bed'));
+    }
 }

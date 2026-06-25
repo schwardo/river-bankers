@@ -77,6 +77,19 @@ final class Effects
         return $name === 'Royal Lodge';
     }
 
+    /** When-built effects that need the builder to pick a river-card target. */
+    public const WHEN_BUILT_CHOICE = [
+        'Spillway'  => 'spillway',  // wash one River-1 card to the shoreline
+        'Sap Drip'  => 'sapdrip',   // place 2 free workers on one river card
+        'Mud Levee' => 'mudlevee',  // drop 2 blanks on uncovered river icons
+    ];
+
+    /** The river-target when-built effect key for $name, or null. */
+    public static function whenBuiltChoice(string $name): ?string
+    {
+        return self::WHEN_BUILT_CHOICE[$name] ?? null;
+    }
+
     /**
      * Fish-track penalty when a material card reaches the shoreline:
      *   - Hidden Inlet: if exactly one player has workers, back 1 per worker;
