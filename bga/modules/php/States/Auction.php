@@ -55,11 +55,16 @@ class Auction extends GameState
         foreach ($this->gamestate->getActivePlayerList() as $pid) {
             $canDefer[(int) $pid] = $this->game->deferReason((int) $pid, $trigger);
         }
+        $floodgate = [];
+        foreach ($this->gamestate->getActivePlayerList() as $pid) {
+            $floodgate[(int) $pid] = $this->game->canFloodgate((int) $pid, $trigger);
+        }
         return [
             "lotCardId" => (int) $auction['lot_card_id'],
             "open" => $this->game->uncoveredIcons((int) $auction['lot_card_id']),
             "triggerPlayer" => $trigger,
             "canDefer" => $canDefer,
+            "canFloodgate" => $floodgate, // trigger may slide the lot toward Headwaters
         ];
     }
 
@@ -123,8 +128,33 @@ class Auction extends GameState
             throw new UserException('You have no worker to recall there.');
         }
         $this->game->recallWorker($currentPlayerId, $cardId);
+        // Streambank Hollow: slide back 1🐟 per worker recalled before an auction.
+        if (in_array('Streambank Hollow', $this->game->getBuiltNames($currentPlayerId), true)) {
+            $this->game->moveBackFish($currentPlayerId, 1);
+        }
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         // Player stays active (multiactive) and re-chooses their bid.
+    }
+
+    /**
+     * Floodgate (once per game, trigger only): slide the auctioned lot one space
+     * toward the Headwaters before bidding (cheaper per item). Stay active to bid.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actFloodgate(int $currentPlayerId)
+    {
+        $auction = $this->game->getOpenAuction();
+        if (!$this->game->canFloodgate($currentPlayerId, (int) $auction['trigger_player'])) {
+            throw new UserException('You cannot use Floodgate now.');
+        }
+        $this->game->applyFloodgate($currentPlayerId);
+        $this->notify->all('boardUpdate', clienttranslate('${player_name} uses Floodgate (slides the lot upstream)'), array_merge(
+            $this->game->boardUpdatePayload(),
+            ['player_id' => $currentPlayerId, 'player_name' => $this->game->getPlayerNameById($currentPlayerId)]
+        ));
+        // Player stays multiactive and re-chooses their bid at the cheaper rate.
     }
 
     function zombie(int $playerId)

@@ -1571,7 +1571,7 @@ class Game extends \Bga\GameFramework\Table
                 $out[] = ['key' => $aa['key'], 'name' => $name, 'cost' => $aa['cost'], 'once' => false, 'cardId' => 0];
             }
             $oa = Effects::onceAbility($name);
-            if ($oa !== null && (int) $r['card_used'] === 0 && count($this->abilityTargets($oa['key'], $playerId)) > 0) {
+            if ($oa !== null && (int) $r['card_used'] === 0 && $this->onceAbilityUsable($oa['key'], $playerId)) {
                 $out[] = ['key' => $oa['key'], 'name' => $name, 'cost' => $oa['cost'], 'once' => true, 'cardId' => (int) $r['card_id']];
             }
         }
@@ -1581,6 +1581,154 @@ class Game extends \Bga\GameFramework\Table
     public function flipCardUsed(int $cardId): void
     {
         $this->DbQuery("UPDATE `card` SET `card_used` = 1 WHERE `card_id` = $cardId");
+    }
+
+    public function unflipCardUsed(int $cardId): void
+    {
+        $this->DbQuery("UPDATE `card` SET `card_used` = 0 WHERE `card_id` = $cardId");
+    }
+
+    /** Whether a once-per-game ability with no single river target can run now. */
+    public function onceAbilityUsable(string $key, int $playerId): bool
+    {
+        switch ($key) {
+            case 'packrat':       // discard 1 hand card, take 1 from the discard pile
+                return count($this->getPlayerHand($playerId)) > 0 && $this->structureDiscardCount() > 0;
+            case 'springcascade': // ready one of your other spent once-cards
+                return count($this->readyableSpentCards($playerId)) > 0;
+            case 'rollingfloat':  // swap a worker with an opponent's in the same river slot
+                return count($this->rollingFloatSources($playerId)) > 0;
+            case 'slipstream':    // take an extra turn after this one
+                return $this->getBonusTurnPlayer() !== $playerId;
+            default:
+                return count($this->abilityTargets($key, $playerId)) > 0;
+        }
+    }
+
+    // --- Pack Rat Burrow (discard 1 hand card, take 1 from the discard pile) ---
+
+    public function structureDiscardCount(): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT COUNT(*) FROM `card` WHERE `card_type` = 'structure' AND `card_location` = 'discard'"
+        );
+    }
+
+    /** @return list<array{id:int, name:string, effect:string}> structure cards in the discard pile */
+    public function getStructureDiscardView(): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_type` = 'structure' AND `card_location` = 'discard'"
+        ) as $r) {
+            $def = Material::$STRUCTURE[(int) $r['card_type_arg']] ?? null;
+            if ($def !== null) {
+                $out[] = ['id' => (int) $r['card_id'], 'name' => (string) $def['name'], 'effect' => (string) ($def['effect'] ?? '')];
+            }
+        }
+        return $out;
+    }
+
+    /** Pack Rat: discard $handId from hand, then take $takeId from the discard pile. */
+    public function packRatSwap(int $playerId, int $handId, int $takeId): void
+    {
+        $this->DbQuery("UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0 WHERE `card_id` = $handId");
+        $this->DbQuery("UPDATE `card` SET `card_location` = 'hand', `card_location_arg` = $playerId WHERE `card_id` = $takeId");
+    }
+
+    // --- Spring Cascade (ready one of your other spent once-cards) ---
+
+    /** @return list<array{id:int, name:string}> the player's flipped once-cards (excluding Spring Cascade) */
+    public function readyableSpentCards(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type`, `card_type_arg` FROM `card`
+             WHERE `card_location` = 'built' AND `card_location_arg` = $playerId AND `card_used` = 1"
+        ) as $r) {
+            $arg = (int) $r['card_type_arg'];
+            $name = (string) ($r['card_type'] === 'structure'
+                ? (Material::$STRUCTURE[$arg]['name'] ?? '')
+                : (Material::$STARTER[$arg]['name'] ?? ''));
+            if ($name !== 'Spring Cascade') {
+                $out[] = ['id' => (int) $r['card_id'], 'name' => $name];
+            }
+        }
+        return $out;
+    }
+
+    // --- Rolling Float (swap a worker with an opponent's in the same river slot) ---
+
+    /** River cards where the player has a worker and a same-slot card holds an opponent's worker. @return list<int> */
+    public function rollingFloatSources(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->burrowSources($playerId) as $src) {
+            if (count($this->rollingFloatTargets($playerId, $src)) > 0) {
+                $out[] = $src;
+            }
+        }
+        return $out;
+    }
+
+    /** Cards in the same river slot as $srcId (different card) holding an opponent's worker. @return list<int> */
+    public function rollingFloatTargets(int $playerId, int $srcId): array
+    {
+        $slot = (int) $this->getCardRow($srcId)['card_location_arg'];
+        return array_map('intval', $this->getObjectListFromDB(
+            "SELECT DISTINCT c.`card_id` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
+             WHERE c.`card_location` = 'river' AND c.`card_location_arg` = $slot AND c.`card_id` <> $srcId
+               AND w.`player_id` <> $playerId AND w.`workers` > 0",
+            true
+        ));
+    }
+
+    /** Swap one of the player's workers on $srcId with one opponent worker on $dstId (no fish, no blanks). */
+    public function rollingFloatSwap(int $playerId, int $srcId, int $dstId): void
+    {
+        $opp = $this->getObjectListFromDB(
+            "SELECT `player_id` FROM `worker` WHERE `card_id` = $dstId AND `player_id` <> $playerId AND `workers` > 0
+             ORDER BY `workers` DESC LIMIT 1"
+        );
+        if (count($opp) === 0) {
+            return;
+        }
+        $oid = (int) $opp[0]['player_id'];
+        // your worker: src -> dst
+        $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $playerId AND `card_id` = $srcId");
+        $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $srcId AND `workers` <= 0");
+        $this->DbQuery("INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($playerId, $dstId, 1)
+                        ON DUPLICATE KEY UPDATE `workers` = `workers` + 1");
+        // their worker: dst -> src
+        $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $oid AND `card_id` = $dstId");
+        $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $oid AND `card_id` = $dstId AND `workers` <= 0");
+        $this->DbQuery("INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($oid, $srcId, 1)
+                        ON DUPLICATE KEY UPDATE `workers` = `workers` + 1");
+    }
+
+    /** Floodgate: can the trigger slide the auctioned lot 1 space toward the Headwaters? */
+    public function canFloodgate(int $playerId, int $triggerPlayer): bool
+    {
+        if ($playerId !== $triggerPlayer || !in_array('Floodgate', $this->getBuiltNames($playerId), true)) {
+            return false;
+        }
+        if ($this->onceCardUsed($playerId, 'Floodgate')) {
+            return false;
+        }
+        if (!$this->hasOpenAuction()) {
+            return false;
+        }
+        $row = $this->getCardRow((int) $this->getOpenAuction()['lot_card_id']);
+        return $row['card_location'] === 'river' && (int) $row['card_location_arg'] >= 2; // River 2..4 can slide up
+    }
+
+    /** Slide the open auction's lot one space toward the Headwaters and spend Floodgate. */
+    public function applyFloodgate(int $playerId): void
+    {
+        $lot = (int) $this->getOpenAuction()['lot_card_id'];
+        $slot = (int) $this->getCardRow($lot)['card_location_arg'];
+        $this->DbQuery("UPDATE `card` SET `card_location_arg` = " . max(1, $slot - 1) . " WHERE `card_id` = $lot");
+        $this->flipBuiltByName($playerId, 'Floodgate');
     }
 
     // --- species starter draft ---

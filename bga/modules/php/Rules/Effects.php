@@ -165,6 +165,12 @@ final class Effects
         'Hollowed-out Log' => ['key' => 'hollowedlog', 'cost' => 0],
         'Wood Pile'        => ['key' => 'woodpile', 'cost' => 1],
         'Tribute Stone'    => ['key' => 'tributestone', 'cost' => 0],
+        // Snare Set (mink starter) is mechanically identical to Tribute Stone.
+        'Snare Set'        => ['key' => 'tributestone', 'cost' => 0],
+        'Pack Rat Burrow'  => ['key' => 'packrat', 'cost' => 0],   // discard 1 hand, take 1 from discard
+        'Spring Cascade'   => ['key' => 'springcascade', 'cost' => 0], // ready one other spent once-card
+        'Rolling Float'    => ['key' => 'rollingfloat', 'cost' => 0],  // swap workers in the same river slot
+        'Slipstream'       => ['key' => 'slipstream', 'cost' => 0],    // take an extra turn after this one
     ];
 
     /** @return array{key:string, cost:int}|null */

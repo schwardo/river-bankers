@@ -64,12 +64,33 @@ class PlayerTurn extends GameState
             throw new UserException('You cannot use that ability.');
         }
         $this->game->advanceFish($activePlayerId, (int) $found['cost']);
+
+        // Slipstream: no target — flip the card and grant an extra turn after this
+        // one (a once-per-game self bonus turn), staying on the current turn.
+        if ($ability === 'slipstream') {
+            $this->game->flipCardUsed((int) $found['cardId']);
+            $this->globals->set('bonus_turn_player', $activePlayerId);
+            $this->notify->all('build', clienttranslate('${player_name} uses Slipstream (extra turn)'), [
+                'player_id' => $activePlayerId,
+                'player_name' => $this->game->getPlayerNameById($activePlayerId),
+            ]);
+            return PlayerTurn::class;
+        }
+
         $this->globals->set('pending_ability', $ability);
         // Once-per-game abilities are free (don't consume the turn) and flip the
         // source card; as-an-action abilities consume the turn.
         $this->globals->set('pending_ability_free', $found['once'] ? 1 : 0);
         $this->globals->set('pending_ability_card', $found['once'] ? (int) $found['cardId'] : 0);
-        return AbilityTarget::class;
+
+        // The multi-step once-abilities have their own states; the rest pick a
+        // single river-card target in AbilityTarget.
+        return match ($ability) {
+            'packrat'       => PackRat::class,
+            'springcascade' => SpringCascade::class,
+            'rollingfloat'  => RollingFloat::class,
+            default         => AbilityTarget::class,
+        };
     }
 
     /**

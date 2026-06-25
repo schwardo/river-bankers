@@ -114,6 +114,12 @@ final class EffectsTest extends TestCase
         self::assertSame(['key' => 'woodpile', 'cost' => 1], Effects::onceAbility('Wood Pile'));
         self::assertSame(['key' => 'hollowedlog', 'cost' => 0], Effects::onceAbility('Hollowed-out Log'));
         self::assertSame(['key' => 'tributestone', 'cost' => 0], Effects::onceAbility('Tribute Stone'));
+        // Snare Set (mink starter) reuses the Tribute Stone resolver.
+        self::assertSame(['key' => 'tributestone', 'cost' => 0], Effects::onceAbility('Snare Set'));
+        self::assertSame(['key' => 'packrat', 'cost' => 0], Effects::onceAbility('Pack Rat Burrow'));
+        self::assertSame(['key' => 'springcascade', 'cost' => 0], Effects::onceAbility('Spring Cascade'));
+        self::assertSame(['key' => 'rollingfloat', 'cost' => 0], Effects::onceAbility('Rolling Float'));
+        self::assertSame(['key' => 'slipstream', 'cost' => 0], Effects::onceAbility('Slipstream'));
         self::assertNull(Effects::onceAbility('Tow Line'));
     }
 

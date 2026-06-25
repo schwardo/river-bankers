@@ -228,6 +228,55 @@ class FlushChannelBuild {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class PackRat {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const discard = args.step === 'discard';
+        this.bga.statusBar.setTitle(isActive
+            ? (discard ? _('Pack Rat — discard a card from your hand') : _('Pack Rat — take a card from the discard pile'))
+            : _('Pack Rat Burrow…'));
+        if (!isActive) return;
+        this.bga.statusBar.removeActionButtons();
+        if (discard) {
+            this.game.setHint(_('Click a hand card to discard.'));
+            this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actPackRatDiscard', { cardId: id }));
+        } else {
+            this.game.setHint(_('Choose a card to take from the discard pile.'));
+            (args.discardCards || []).forEach(c => this.bga.statusBar.addActionButton(
+                _('Take ') + c.name, () => this.bga.actions.performAction('actPackRatTake', { cardId: c.id }), { color: 'secondary' }));
+        }
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class SpringCascade {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Spring Cascade — ready one spent once-per-game card') : _('Spring Cascade…'));
+        if (!isActive) return;
+        this.bga.statusBar.removeActionButtons();
+        this.game.setHint(_('Pick a flipped card to ready.'));
+        (args.spentCards || []).forEach(c => this.bga.statusBar.addActionButton(
+            _('Ready ') + c.name, () => this.bga.actions.performAction('actReady', { cardId: c.id }), { color: 'secondary' }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class RollingFloat {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        const src = args.step === 'source';
+        this.bga.statusBar.setTitle(isActive
+            ? (src ? _('Rolling Float — pick your worker to swap') : _('Rolling Float — pick the opponent worker to swap with'))
+            : _('Rolling Float…'));
+        if (!isActive) return;
+        this.game.setHint(src ? _('Click a river card with your worker.') : _('Click an opponent worker in the same slot.'));
+        const action = src ? 'actRollSource' : 'actRollDest';
+        this.game.markClickable('river', args.targets, id => this.bga.actions.performAction(action, { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
 class FinalBuild {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -277,6 +326,10 @@ class Auction {
         if (deferCard) {
             this.bga.statusBar.addActionButton(_('Bid last') + ' (' + _(deferCard) + ')',
                 () => this.bga.actions.performAction('actDefer'), { color: 'secondary' });
+        }
+        if (a.canFloodgate && a.canFloodgate[this.game.myId()]) {
+            this.bga.statusBar.addActionButton(_('Floodgate — slide lot upstream'),
+                () => this.bga.actions.performAction('actFloodgate').then(() => this.showBid(true)), { color: 'secondary' });
         }
     }
 
@@ -371,6 +424,9 @@ export class Game {
         this.bga.states.register('VineLattice', new VineLattice(this, bga));
         this.bga.states.register('SnagPile', new SnagPile(this, bga));
         this.bga.states.register('FlushChannelBuild', new FlushChannelBuild(this, bga));
+        this.bga.states.register('PackRat', new PackRat(this, bga));
+        this.bga.states.register('SpringCascade', new SpringCascade(this, bga));
+        this.bga.states.register('RollingFloat', new RollingFloat(this, bga));
         this.bga.states.register('AbilityTarget', new AbilityTarget(this, bga));
         this.bga.states.register('FinalBuild', new FinalBuild(this, bga));
     }
