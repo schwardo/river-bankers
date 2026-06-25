@@ -44,7 +44,8 @@ class PlayerTurn {
             this.bga.statusBar.addActionButton(_('Retire'), () => this.bga.actions.performAction('actRetire'), { color: 'secondary' });
         }
         (args.abilities || []).forEach(ab => {
-            this.bga.statusBar.addActionButton(ab.name + ' (' + ab.cost + '🐟)',
+            const label = ab.name + (ab.cost ? ' (' + ab.cost + '🐟)' : '') + (ab.once ? ' ⚡' : '');
+            this.bga.statusBar.addActionButton(label,
                 () => this.bga.actions.performAction('actUseAbility', { ability: ab.key }), { color: 'secondary' });
         });
     }
@@ -58,6 +59,9 @@ class AbilityTarget {
             driftwoodsnag: _('Driftwood Snag — drop a blank on a river card'),
             towline: _('Tow Line — slide a river card upstream'),
             heronroost: _('Heron Roost — replace a Headwaters card'),
+            hollowedlog: _('Hollowed-out Log — recall a worker (no blank)'),
+            woodpile: _('Wood Pile — claim a Log icon'),
+            tributestone: _('Tribute Stone — force an opponent to recall'),
         };
         this.bga.statusBar.setTitle(isActive ? (labels[args.ability] || _('Choose a target')) : _('Resolving ability…'));
         if (!isActive) return;

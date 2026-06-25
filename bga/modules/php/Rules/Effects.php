@@ -103,6 +103,19 @@ final class Effects
         return self::ACTION_ABILITIES[$name] ?? null;
     }
 
+    /** Once-per-game abilities (flip the card when used): name => [key, fish cost]. */
+    public const ONCE_ABILITIES = [
+        'Hollowed-out Log' => ['key' => 'hollowedlog', 'cost' => 0],
+        'Wood Pile'        => ['key' => 'woodpile', 'cost' => 1],
+        'Tribute Stone'    => ['key' => 'tributestone', 'cost' => 0],
+    ];
+
+    /** @return array{key:string, cost:int}|null */
+    public static function onceAbility(string $name): ?array
+    {
+        return self::ONCE_ABILITIES[$name] ?? null;
+    }
+
     /**
      * Fish-track penalty when a material card reaches the shoreline:
      *   - Hidden Inlet: if exactly one player has workers, back 1 per worker;

@@ -99,4 +99,12 @@ final class EffectsTest extends TestCase
         self::assertSame(['key' => 'heronroost', 'cost' => 1], Effects::actionAbility('Heron Roost'));
         self::assertNull(Effects::actionAbility('Spillway'));
     }
+
+    public function testOnceAbilityMapping(): void
+    {
+        self::assertSame(['key' => 'woodpile', 'cost' => 1], Effects::onceAbility('Wood Pile'));
+        self::assertSame(['key' => 'hollowedlog', 'cost' => 0], Effects::onceAbility('Hollowed-out Log'));
+        self::assertSame(['key' => 'tributestone', 'cost' => 0], Effects::onceAbility('Tribute Stone'));
+        self::assertNull(Effects::onceAbility('Tow Line'));
+    }
 }

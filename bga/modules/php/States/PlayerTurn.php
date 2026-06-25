@@ -65,6 +65,10 @@ class PlayerTurn extends GameState
         }
         $this->game->advanceFish($activePlayerId, (int) $found['cost']);
         $this->globals->set('pending_ability', $ability);
+        // Once-per-game abilities are free (don't consume the turn) and flip the
+        // source card; as-an-action abilities consume the turn.
+        $this->globals->set('pending_ability_free', $found['once'] ? 1 : 0);
+        $this->globals->set('pending_ability_card', $found['once'] ? (int) $found['cardId'] : 0);
         return AbilityTarget::class;
     }
 

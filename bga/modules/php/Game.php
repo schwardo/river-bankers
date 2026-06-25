@@ -331,12 +331,12 @@ class Game extends \Bga\GameFramework\Table
      * Pre-auction recall: pull one of a player's workers off a river card back to
      * supply, dropping a blank on the vacated icon (so it stays covered).
      */
-    public function recallWorker(int $playerId, int $cardId): void
+    public function recallWorker(int $playerId, int $cardId, bool $dropBlank = true): void
     {
         $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $playerId AND `card_id` = $cardId");
         $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $cardId AND `workers` <= 0");
         $this->DbQuery("UPDATE `player` SET `player_worker_supply` = `player_worker_supply` + 1 WHERE `player_id` = $playerId");
-        if ($this->getCardRow($cardId)['card_location'] === 'river') {
+        if ($dropBlank && $this->getCardRow($cardId)['card_location'] === 'river') {
             $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + 1 WHERE `card_id` = $cardId");
         }
     }
@@ -910,24 +910,43 @@ class Game extends \Bga\GameFramework\Table
     // --- "as an action" abilities (Batch 4) ---
 
     /**
-     * As-an-action abilities the player controls that have a legal target.
+     * Abilities the player controls (as-an-action turn abilities + unused
+     * once-per-game abilities) that have a legal target.
      *
-     * @return list<array{key:string, name:string, cost:int}>
+     * @return list<array{key:string, name:string, cost:int, once:bool, cardId:int}>
      */
     public function getPlayerAbilities(int $playerId): array
     {
         $out = [];
-        foreach ($this->getBuiltNames($playerId) as $name) {
-            $ab = Effects::actionAbility($name);
-            if ($ab !== null && count($this->abilityTargets($ab['key'])) > 0) {
-                $out[] = ['key' => $ab['key'], 'name' => $name, 'cost' => $ab['cost']];
+        $rows = $this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type`, `card_type_arg`, `card_used` FROM `card`
+             WHERE `card_location` = 'built' AND `card_location_arg` = $playerId"
+        );
+        foreach ($rows as $r) {
+            $arg = (int) $r['card_type_arg'];
+            $name = (string) ($r['card_type'] === 'structure'
+                ? (Material::$STRUCTURE[$arg]['name'] ?? '')
+                : (Material::$STARTER[$arg]['name'] ?? ''));
+
+            $aa = Effects::actionAbility($name);
+            if ($aa !== null && count($this->abilityTargets($aa['key'], $playerId)) > 0) {
+                $out[] = ['key' => $aa['key'], 'name' => $name, 'cost' => $aa['cost'], 'once' => false, 'cardId' => 0];
+            }
+            $oa = Effects::onceAbility($name);
+            if ($oa !== null && (int) $r['card_used'] === 0 && count($this->abilityTargets($oa['key'], $playerId)) > 0) {
+                $out[] = ['key' => $oa['key'], 'name' => $name, 'cost' => $oa['cost'], 'once' => true, 'cardId' => (int) $r['card_id']];
             }
         }
         return $out;
     }
 
-    /** Legal targets (card ids) for an as-an-action ability. */
-    public function abilityTargets(string $key): array
+    public function flipCardUsed(int $cardId): void
+    {
+        $this->DbQuery("UPDATE `card` SET `card_used` = 1 WHERE `card_id` = $cardId");
+    }
+
+    /** Legal targets (card ids) for an ability, for the acting player. */
+    public function abilityTargets(string $key, int $playerId): array
     {
         if ($key === 'driftwoodsnag') {
             return $this->getAuctionableRiverCards(); // river cards with an uncovered icon
@@ -940,13 +959,58 @@ class Game extends \Bga\GameFramework\Table
         if ($key === 'heronroost') {
             return $this->getMaterialDeckCount() > 0 ? $this->getHeadwatersCards() : [];
         }
+        if ($key === 'hollowedlog') {
+            return array_map('intval', $this->getObjectListFromDB(
+                "SELECT c.`card_id` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
+                 WHERE c.`card_location` = 'river' AND w.`player_id` = $playerId AND w.`workers` > 0", true
+            ));
+        }
+        if ($key === 'woodpile') {
+            if ($this->getPlayerSupply($playerId) <= 0) {
+                return [];
+            }
+            $ids = [];
+            foreach ($this->getObjectListFromDB("SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_location` = 'river'") as $r) {
+                $def = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
+                if ($def !== null && $def['material'] === 'logs' && $this->uncoveredIcons((int) $r['card_id']) > 0) {
+                    $ids[] = (int) $r['card_id'];
+                }
+            }
+            return $ids;
+        }
+        if ($key === 'tributestone') {
+            return array_map('intval', $this->getObjectListFromDB(
+                "SELECT DISTINCT c.`card_id` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
+                 WHERE c.`card_location` = 'river' AND w.`player_id` <> $playerId AND w.`workers` > 0", true
+            ));
+        }
         return [];
     }
 
-    public function resolveAbility(string $key, int $cardId): void
+    public function resolveAbility(string $key, int $cardId, int $playerId): void
     {
         if ($key === 'driftwoodsnag') {
             $this->dropBlank($cardId);
+            return;
+        }
+        if ($key === 'hollowedlog') {
+            $this->recallWorker($playerId, $cardId, false); // no blank
+            return;
+        }
+        if ($key === 'woodpile') {
+            $this->placeWorkers($playerId, $cardId, 1); // claim a log icon (the 1 fish was paid upfront)
+            return;
+        }
+        if ($key === 'tributestone') {
+            $opp = $this->getObjectListFromDB(
+                "SELECT `player_id` FROM `worker` WHERE `card_id` = $cardId AND `player_id` <> $playerId AND `workers` > 0
+                 ORDER BY `workers` DESC LIMIT 1"
+            );
+            if (count($opp) > 0) {
+                $oid = (int) $opp[0]['player_id'];
+                $this->recallWorker($oid, $cardId, true);
+                $this->moveBackFish($oid, 3);
+            }
             return;
         }
         if ($key === 'towline') {

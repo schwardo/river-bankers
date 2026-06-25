@@ -11,8 +11,10 @@ use Bga\GameFramework\UserException;
 use Bga\Games\RiverBankers\Game;
 
 /**
- * Pick the target for an "as an action" ability the player triggered (the fish
- * cost was already paid in PlayerTurn). Driftwood Snag / Tow Line / Heron Roost.
+ * Pick the target for an ability the player triggered (cost already paid in
+ * PlayerTurn). As-an-action abilities (Driftwood Snag / Tow Line / Heron Roost)
+ * consume the turn; once-per-game abilities (Hollowed-out Log / Wood Pile /
+ * Tribute Stone) are free, flip the source card, and return to the turn.
  */
 class AbilityTarget extends GameState
 {
@@ -29,7 +31,7 @@ class AbilityTarget extends GameState
     {
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         $key = (string) $this->globals->get('pending_ability', '');
-        if ($key === '' || count($this->game->abilityTargets($key)) === 0) {
+        if ($key === '' || count($this->game->abilityTargets($key, (int) $this->game->getActivePlayerId())) === 0) {
             return $this->finish();
         }
         return null;
@@ -40,7 +42,7 @@ class AbilityTarget extends GameState
         $key = (string) $this->globals->get('pending_ability', '');
         return [
             "ability" => $key,
-            "targets" => $this->game->abilityTargets($key),
+            "targets" => $this->game->abilityTargets($key, (int) $this->game->getActivePlayerId()),
         ];
     }
 
@@ -53,7 +55,7 @@ class AbilityTarget extends GameState
         if (!in_array($cardId, $args['targets'], true)) {
             throw new UserException('Choose a valid target.');
         }
-        $this->game->resolveAbility((string) $this->globals->get('pending_ability', ''), $cardId);
+        $this->game->resolveAbility((string) $this->globals->get('pending_ability', ''), $cardId, $activePlayerId);
         return $this->finish();
     }
 
@@ -64,8 +66,17 @@ class AbilityTarget extends GameState
 
     private function finish()
     {
+        $free = (int) $this->globals->get('pending_ability_free', 0) === 1;
+        $card = (int) $this->globals->get('pending_ability_card', 0);
+        if ($free && $card > 0) {
+            $this->game->flipCardUsed($card); // once-per-game: spend the card
+        }
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         $this->globals->set('pending_ability', '');
-        return NextPlayer::class;
+        $this->globals->set('pending_ability_free', 0);
+        $this->globals->set('pending_ability_card', 0);
+
+        // Free abilities don't end the turn; the player resumes PlayerTurn.
+        return $free ? PlayerTurn::class : NextPlayer::class;
     }
 }
