@@ -26,6 +26,12 @@ class InventDiscard extends GameState
         );
     }
 
+    function onEnteringState()
+    {
+        $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
+        return null;
+    }
+
     public function getArgs(): array
     {
         $playerId = (int) $this->game->getActivePlayerId();

@@ -32,6 +32,9 @@ class Auction extends GameState
 
     function onEnteringState()
     {
+        // Reflect the trigger's flat-cost fish payment + the open lot.
+        $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
+
         $bidders = [];
         foreach ($this->game->getTurnOrderRows() as $row) {
             if (!$row['retired']) {

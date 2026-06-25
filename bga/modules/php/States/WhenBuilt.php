@@ -29,6 +29,7 @@ class WhenBuilt extends GameState
 
     function onEnteringState()
     {
+        $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         $effect = (string) $this->globals->get('pending_effect', '');
         if ($effect === '' || count($this->game->whenBuiltTargets($effect)) === 0) {
             return $this->finish();

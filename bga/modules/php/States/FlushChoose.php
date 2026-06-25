@@ -26,6 +26,13 @@ class FlushChoose extends GameState
         );
     }
 
+    function onEnteringState()
+    {
+        // Push the freshly-redrawn Headwaters to all clients.
+        $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
+        return null;
+    }
+
     public function getArgs(): array
     {
         return [

@@ -27,6 +27,7 @@ class AbilityTarget extends GameState
 
     function onEnteringState()
     {
+        $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         $key = (string) $this->globals->get('pending_ability', '');
         if ($key === '' || count($this->game->abilityTargets($key)) === 0) {
             return $this->finish();
