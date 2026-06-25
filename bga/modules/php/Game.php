@@ -312,6 +312,35 @@ class Game extends \Bga\GameFramework\Table
         return $dest['location'] === 'shoreline' ? $this->applyShorelineArrival($cardId) : [];
     }
 
+    /** Total workers a player has out on river cards (recallable during an auction). */
+    public function riverWorkerCount(int $playerId): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT COALESCE(SUM(w.`workers`), 0) FROM `worker` w JOIN `card` c ON c.`card_id` = w.`card_id`
+             WHERE w.`player_id` = $playerId AND c.`card_location` = 'river'"
+        );
+    }
+
+    /** A player can start an auction only with a worker available or recallable. */
+    public function canTriggerAuction(int $playerId): bool
+    {
+        return $this->getPlayerSupply($playerId) > 0 || $this->riverWorkerCount($playerId) > 0;
+    }
+
+    /**
+     * Pre-auction recall: pull one of a player's workers off a river card back to
+     * supply, dropping a blank on the vacated icon (so it stays covered).
+     */
+    public function recallWorker(int $playerId, int $cardId): void
+    {
+        $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $playerId AND `card_id` = $cardId");
+        $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $cardId AND `workers` <= 0");
+        $this->DbQuery("UPDATE `player` SET `player_worker_supply` = `player_worker_supply` + 1 WHERE `player_id` = $playerId");
+        if ($this->getCardRow($cardId)['card_location'] === 'river') {
+            $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + 1 WHERE `card_id` = $cardId");
+        }
+    }
+
     /** River cards with at least one uncovered icon (legal Auction-action targets). */
     public function getAuctionableRiverCards(): array
     {

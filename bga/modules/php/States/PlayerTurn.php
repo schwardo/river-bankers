@@ -40,6 +40,8 @@ class PlayerTurn extends GameState
             "canFlush" => $this->game->getMaterialDeckCount() > 0,
             "canRetire" => $this->game->endgameTriggered(),
             "abilities" => $this->game->getPlayerAbilities($playerId),
+            // You can only trigger an auction with a worker available or recallable.
+            "canTriggerAuction" => $this->game->canTriggerAuction($playerId),
         ];
     }
 
@@ -99,6 +101,9 @@ class PlayerTurn extends GameState
         if (!in_array($cardId, $args['headwatersCards'], true)) {
             throw new UserException('That card is not in the Headwaters.');
         }
+        if (!$args['canTriggerAuction']) {
+            throw new UserException('You have no worker available or recallable to bid.');
+        }
 
         $slot = (int) $this->game->getCardRow($cardId)['card_location_arg'];
         $this->game->advanceFish($activePlayerId, Cost::headwatersMove($slot));
@@ -125,6 +130,9 @@ class PlayerTurn extends GameState
         if (!in_array($cardId, $args['auctionableRiverCards'], true)) {
             throw new UserException('That card cannot be auctioned.');
         }
+        if (!$args['canTriggerAuction']) {
+            throw new UserException('You have no worker available or recallable to bid.');
+        }
 
         $this->game->advanceFish($activePlayerId, 1); // flat trigger cost
         $this->game->startAuction($cardId, $activePlayerId);
@@ -149,6 +157,9 @@ class PlayerTurn extends GameState
     {
         if (!$args['canFlush']) {
             throw new UserException('You cannot flush once the material deck is empty.');
+        }
+        if (!$args['canTriggerAuction']) {
+            throw new UserException('You have no worker available or recallable to bid.');
         }
         $this->game->advanceFish($activePlayerId, 5);
         $this->game->flushHeadwaters();

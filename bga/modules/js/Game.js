@@ -25,15 +25,19 @@ class PlayerTurn {
     onEnteringState(args, isActive) {
         this.bga.statusBar.setTitle(isActive ? _('Your turn — take one action') : _('Waiting for the active player'));
         if (!isActive) return;
-        this.game.setHint(_('Click a Headwaters card to Pull, a river card to Auction, or a hand card to Build.'));
-        this.game.markClickable('hw', args.headwatersCards, id => this.bga.actions.performAction('actPull', { cardId: id }));
-        this.game.markClickable('river', args.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
+        this.game.setHint(args.canTriggerAuction
+            ? _('Click a Headwaters card to Pull, a river card to Auction, or a hand card to Build.')
+            : _('No workers to bid — Build or Invent this turn (recall happens during an auction).'));
+        if (args.canTriggerAuction) {
+            this.game.markClickable('hw', args.headwatersCards, id => this.bga.actions.performAction('actPull', { cardId: id }));
+            this.game.markClickable('river', args.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
+        }
         this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actBuild', { cardId: id }));
 
         for (let n = 2; n <= 5; n++) {
             this.bga.statusBar.addActionButton(_('Invent ') + n, () => this.bga.actions.performAction('actInvent', { n }), { color: 'secondary' });
         }
-        if (args.canFlush) {
+        if (args.canFlush && args.canTriggerAuction) {
             this.bga.statusBar.addActionButton(_('Flush (5🐟)'), () => this.bga.actions.performAction('actFlush'), { color: 'secondary' });
         }
         if (args.canRetire) {
@@ -104,13 +108,18 @@ class Auction {
     }
 
     onPlayerActivationChange(args, isActive) {
+        this.args = args || this.args;
+        this.showBid(isActive);
+    }
+
+    showBid(isActive) {
+        this.game.clearClickable();
         this.bga.statusBar.removeActionButtons();
         if (!isActive) {
             this.bga.statusBar.setTitle(_('Waiting for the other bidders…'));
-            this.game.setHint('');
             return;
         }
-        const a = args || this.args;
+        const a = this.args;
         const maxBid = Math.min(a.open, this.game.mySupply());
         const minBid = (this.game.myId() === Number(a.triggerPlayer)) ? 1 : 0;
         this.bga.statusBar.setTitle(_('Auction — submit your sealed worker bid'));
@@ -118,7 +127,22 @@ class Auction {
         for (let b = minBid; b <= maxBid; b++) {
             this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.bga.actions.performAction('actBid', { workers: b }));
         }
+        if (this.game.myRecallTargets(a.lotCardId).length) {
+            this.bga.statusBar.addActionButton(_('Recall Workers'), () => this.enterRecall(), { color: 'secondary' });
+        }
     }
+
+    enterRecall() {
+        this.game.clearClickable();
+        this.bga.statusBar.removeActionButtons();
+        this.bga.statusBar.setTitle(_('Recall — pick a worker to pull back'));
+        this.game.setHint(_('Click a river card with your worker; it returns to supply (drops a blank).'));
+        this.game.markClickable('recall', this.game.myRecallTargets(this.args.lotCardId), id =>
+            this.bga.actions.performAction('actRecall', { cardId: id }).then(() => this.showBid(true)));
+        this.bga.statusBar.addActionButton(_('Cancel'), () => this.showBid(true), { color: 'secondary' });
+    }
+
+    onLeavingState() { this.game.clearClickable(); }
 }
 
 class InventDiscard {
@@ -221,6 +245,7 @@ export class Game {
 
     renderBoard(board) {
         if (!board || !document.getElementById('rb-hw')) return;
+        this.board = board;
         document.getElementById('rb-hw').innerHTML =
             [1, 2, 3].map(slot => {
                 const c = board.headwaters.find(x => x.slot === slot);
@@ -266,6 +291,13 @@ export class Game {
 
     myId() { return Number(this.bga.players.getCurrentPlayerId()); }
     mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
+    // River cards (excluding the auction lot) where I have a worker to recall.
+    myRecallTargets(lotCardId) {
+        const me = this.myId();
+        return ((this.board && this.board.river) || [])
+            .filter(c => Number((c.workers || {})[me] || 0) > 0 && c.id !== lotCardId)
+            .map(c => c.id);
+    }
     setHint(text) { const el = document.getElementById('rb-hint'); if (el) el.textContent = text; }
 
     markClickable(group, ids, handler) {

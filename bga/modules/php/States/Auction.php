@@ -71,6 +71,31 @@ class Auction extends GameState
         $this->gamestate->setPlayerNonMultiactive($currentPlayerId, ResolveAuction::class);
     }
 
+    /**
+     * Pre-auction recall: pull one worker off a river card back to supply (drops a
+     * blank). The player stays active and returns to choosing a bid with the
+     * freed worker.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actRecall(int $cardId, int $currentPlayerId)
+    {
+        $auction = $this->game->getOpenAuction();
+        if ($cardId === (int) $auction['lot_card_id']) {
+            throw new UserException('You cannot recall from the card being auctioned.');
+        }
+        $here = (int) $this->game->getUniqueValueFromDB(
+            "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `player_id` = $currentPlayerId AND `card_id` = $cardId"
+        );
+        if ($here <= 0) {
+            throw new UserException('You have no worker to recall there.');
+        }
+        $this->game->recallWorker($currentPlayerId, $cardId);
+        $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
+        // Player stays active (multiactive) and re-chooses their bid.
+    }
+
     function zombie(int $playerId)
     {
         // A quit player bids 0 and drops out of the auction.
