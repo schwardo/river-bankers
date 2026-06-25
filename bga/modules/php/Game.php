@@ -1260,12 +1260,155 @@ class Game extends \Bga\GameFramework\Table
         if ($choice !== null && count($this->whenBuiltTargets($choice)) > 0) {
             $queue[] = 'self:' . $choice;
         }
+        $immediate = Effects::whenBuiltImmediate($name);
+        if ($immediate !== null && $this->canRunImmediate($immediate, $playerId)) {
+            $queue[] = 'self:' . $immediate;
+        }
         foreach (Effects::reactiveBuildEffects($cost, $this->getBuiltNamesExcept($playerId, $cardId)) as $key) {
             if ($this->canReact($key, $playerId)) {
                 $queue[] = 'react:' . $key;
             }
         }
         return $queue;
+    }
+
+    /** Whether an immediate self when-built effect has the resources to run. */
+    public function canRunImmediate(string $key, int $playerId): bool
+    {
+        switch ($key) {
+            case 'stonepool':    return $this->getMaterialDeckCount() >= 2;       // worth rearranging
+            case 'vinelattice':  return $this->structuresAvailable() >= 1;        // at least 1 to draw
+            case 'snagpile':     return count($this->getHeadwatersCards()) > 0
+                                     && $this->canTriggerAuction($playerId);      // builder triggers the auction
+            case 'flushchannel': return count($this->getHeadwatersCards()) > 0;
+            case 'saltlick':     return true;                                     // info-only, always "runs"
+        }
+        return false;
+    }
+
+    // --- Stone Pool (rearrange the top N material cards) ---
+
+    /** The top $n material-deck cards (nearest the top first). @return list<array{id:int, material:string, icons:int}> */
+    public function topMaterialCards(int $n): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_location` = 'material_deck'
+             ORDER BY `card_location_arg` LIMIT $n"
+        ) as $r) {
+            $def = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
+            $out[] = [
+                'id' => (int) $r['card_id'],
+                'material' => $def !== null ? (string) $def['material'] : '',
+                'icons' => $def !== null ? (int) $def['icons'] : 0,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Rewrite the order of the top material cards to $orderedIds (top first),
+     * keeping the same set of draw-order slots. No-op unless $orderedIds is a
+     * permutation of the current top cards.
+     *
+     * @param list<int> $orderedIds
+     */
+    public function reorderMaterialTop(array $orderedIds): bool
+    {
+        $current = array_map(fn(array $c): int => $c['id'], $this->topMaterialCards(count($orderedIds)));
+        sort($current);
+        $check = $orderedIds;
+        sort($check);
+        if ($current !== $check || count($orderedIds) === 0) {
+            return false;
+        }
+        // The draw-order args these cards occupy (smallest = top), reassigned in
+        // the requested order.
+        $args = array_map('intval', $this->getObjectListFromDB(
+            "SELECT `card_location_arg` FROM `card` WHERE `card_id` IN (" . implode(',', $orderedIds) . ")
+             ORDER BY `card_location_arg`",
+            true
+        ));
+        foreach ($orderedIds as $i => $id) {
+            $this->DbQuery("UPDATE `card` SET `card_location_arg` = {$args[$i]} WHERE `card_id` = " . (int) $id);
+        }
+        return true;
+    }
+
+    // --- Vine Lattice (draw 3 structures, keep 1) ---
+
+    /** Draw up to 3 structures into a private offer zone for a keep-1 choice. */
+    public function drawLatticeOffer(int $playerId, int $n = 3): int
+    {
+        $drawn = 0;
+        for ($i = 0; $i < $n; $i++) {
+            $top = $this->getUniqueValueFromDB(
+                "SELECT `card_id` FROM `card` WHERE `card_location` = 'structure_deck' ORDER BY `card_location_arg` LIMIT 1"
+            );
+            if ($top === null) {
+                $this->reshuffleStructureDiscard();
+                $top = $this->getUniqueValueFromDB(
+                    "SELECT `card_id` FROM `card` WHERE `card_location` = 'structure_deck' ORDER BY `card_location_arg` LIMIT 1"
+                );
+                if ($top === null) {
+                    break;
+                }
+            }
+            $this->DbQuery("UPDATE `card` SET `card_location` = 'lattice_offer', `card_location_arg` = $playerId WHERE `card_id` = " . (int) $top);
+            $drawn++;
+        }
+        return $drawn;
+    }
+
+    /** @return list<array{id:int, name:string, effect:string}> the player's Vine Lattice offer */
+    public function getLatticeOffer(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_location` = 'lattice_offer' AND `card_location_arg` = $playerId"
+        ) as $r) {
+            $def = Material::$STRUCTURE[(int) $r['card_type_arg']] ?? null;
+            if ($def !== null) {
+                $out[] = ['id' => (int) $r['card_id'], 'name' => (string) $def['name'], 'effect' => (string) ($def['effect'] ?? '')];
+            }
+        }
+        return $out;
+    }
+
+    /** Keep $keepId from the lattice offer (to hand); discard the rest. */
+    public function latticeKeep(int $playerId, int $keepId): void
+    {
+        $this->DbQuery("UPDATE `card` SET `card_location` = 'hand', `card_location_arg` = $playerId WHERE `card_id` = $keepId");
+        foreach ($this->getLatticeOffer($playerId) as $c) {
+            $this->DbQuery("UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0 WHERE `card_id` = " . (int) $c['id']);
+        }
+    }
+
+    // --- Flush Channel (remove a Headwaters card out of game, refill same slot) ---
+
+    /** Remove a Headwaters card from the game and refill its slot from the deck (no auction). */
+    public function flushChannelRemove(int $cardId): void
+    {
+        $slot = (int) $this->getCardRow($cardId)['card_location_arg'];
+        $this->DbQuery("UPDATE `card` SET `card_location` = 'removed', `card_location_arg` = 0 WHERE `card_id` = $cardId");
+        $top = $this->getUniqueValueFromDB(
+            "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck' ORDER BY `card_location_arg` LIMIT 1"
+        );
+        if ($top !== null) {
+            $this->DbQuery("UPDATE `card` SET `card_location` = 'headwaters', `card_location_arg` = $slot WHERE `card_id` = " . (int) $top);
+        }
+    }
+
+    /** Opponents' hands for Salt Lick: player_id => hand view (the builder peeks). */
+    public function getOpponentHands(int $playerId): array
+    {
+        $out = [];
+        foreach ($this->getAllPlayerIds() as $pid) {
+            if ($pid !== $playerId) {
+                $out[$pid] = $this->getHandView($pid);
+            }
+        }
+        return $out;
     }
 
     // --- Clay Vault (peek struct deck top, may swap with a hand card) ---

@@ -98,6 +98,25 @@ final class Effects
     }
 
     /**
+     * Immediate self "when built" effects that aren't a simple river-target pick:
+     * card name => effect key. Resolved in dedicated sub-states (or inline for the
+     * info-only Salt Lick) by the BuildEffects dispatcher.
+     */
+    public const WHEN_BUILT_IMMEDIATE = [
+        'Stone Pool'    => 'stonepool',    // rearrange the top 5 material cards
+        'Vine Lattice'  => 'vinelattice',  // draw 3 structures, keep 1
+        'Snag Pile'     => 'snagpile',     // pull a Headwaters card to River 1, auction at 1/item
+        'Flush Channel' => 'flushchannel', // remove a Headwaters card (out of game), refill, no auction
+        'Salt Lick'     => 'saltlick',     // peek every opponent's hand (info only)
+    ];
+
+    /** The immediate self when-built effect key for $name, or null. */
+    public static function whenBuiltImmediate(string $name): ?string
+    {
+        return self::WHEN_BUILT_IMMEDIATE[$name] ?? null;
+    }
+
+    /**
      * Reactive "when you build a structure that uses <material>" abilities granted
      * by an already-built card: card name => [material gate, effect key]. Fire once
      * each per qualifying build (the card itself is excluded from its own build).

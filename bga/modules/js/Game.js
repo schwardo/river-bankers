@@ -164,6 +164,70 @@ class ReactBurrowNetwork {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class StonePool {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Stone Pool — set the new order of the top material cards') : _('Stone Pool…'));
+        if (!isActive) return;
+        this.cards = args.topCards.slice();
+        this.order = [];
+        this.render();
+    }
+    render() {
+        this.bga.statusBar.removeActionButtons();
+        const remaining = this.cards.filter(c => !this.order.includes(c.id));
+        this.game.setHint(_('Click cards top-first. Picked: ') +
+            (this.order.map(id => MAT_GLYPH[(this.cards.find(c => c.id === id) || {}).material] || '?').join(' ') || '—'));
+        remaining.forEach(c => this.bga.statusBar.addActionButton(
+            (MAT_GLYPH[c.material] || '?') + ' ' + c.icons, () => { this.order.push(c.id); this.maybeSubmit(); }, { color: 'secondary' }));
+        this.bga.statusBar.addActionButton(_('Keep current order'),
+            () => this.bga.actions.performAction('actReorder', { cardIds: this.cards.map(c => c.id) }));
+    }
+    maybeSubmit() {
+        if (this.order.length === this.cards.length) {
+            this.bga.actions.performAction('actReorder', { cardIds: this.order });
+        } else {
+            this.render();
+        }
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class VineLattice {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Vine Lattice — keep 1 of the drawn cards') : _('Vine Lattice…'));
+        if (!isActive) return;
+        this.bga.statusBar.removeActionButtons();
+        this.game.setHint(_('Pick one card to keep; the others are discarded.'));
+        (args.offer || []).forEach(c => this.bga.statusBar.addActionButton(
+            _('Keep ') + c.name, () => this.bga.actions.performAction('actLatticeKeep', { cardId: c.id }), { color: 'secondary' }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class SnagPile {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Snag Pile — pull a Headwaters card to auction (1🐟/item)') : _('Snag Pile…'));
+        if (!isActive) return;
+        this.game.setHint(_('Click a Headwaters card to snag and auction.'));
+        this.game.markClickable('hw', args.headwatersCards, id => this.bga.actions.performAction('actSnagChoose', { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class FlushChannelBuild {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Flush Channel — remove a Headwaters card (no auction)') : _('Flush Channel…'));
+        if (!isActive) return;
+        this.game.setHint(_('Click a Headwaters card to discard out of game; the slot refills.'));
+        this.game.markClickable('hw', args.headwatersCards, id => this.bga.actions.performAction('actFlushChannelRemove', { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
 class FinalBuild {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -303,6 +367,10 @@ export class Game {
         this.bga.states.register('ReactDrawDiscard', new ReactDrawDiscard(this, bga));
         this.bga.states.register('ReactClayVault', new ReactClayVault(this, bga));
         this.bga.states.register('ReactBurrowNetwork', new ReactBurrowNetwork(this, bga));
+        this.bga.states.register('StonePool', new StonePool(this, bga));
+        this.bga.states.register('VineLattice', new VineLattice(this, bga));
+        this.bga.states.register('SnagPile', new SnagPile(this, bga));
+        this.bga.states.register('FlushChannelBuild', new FlushChannelBuild(this, bga));
         this.bga.states.register('AbilityTarget', new AbilityTarget(this, bga));
         this.bga.states.register('FinalBuild', new FinalBuild(this, bga));
     }
@@ -475,6 +543,7 @@ export class Game {
     async notif_auctionStarted() {}
     async notif_auctionResolved() {}
     async notif_defer() {}
+    async notif_peekHands(args) { /* Salt Lick: opponents' hands available in args.hands */ }
     async notif_build() {}
     async notif_flush() {}
     async notif_invent() {}

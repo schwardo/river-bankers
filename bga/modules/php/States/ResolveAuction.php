@@ -103,6 +103,8 @@ class ResolveAuction extends GameState
             ]);
         }
 
-        return NextPlayer::class;
+        // Resume any queued build effects (e.g. Snag Pile auctions mid-queue);
+        // an empty queue falls straight through to NextPlayer.
+        return BuildEffects::class;
     }
 }

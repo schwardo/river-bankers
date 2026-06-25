@@ -42,9 +42,27 @@ class BuildEffects extends \Bga\GameFramework\States\GameState
         [$kind, $key] = explode(':', $next, 2);
 
         if ($kind === 'self') {
-            $this->globals->set('pending_effect', $key);
-            $this->globals->set('mudlevee_left', $key === 'mudlevee' ? 2 : 0);
-            return WhenBuilt::class;
+            // River-target when-built choices go through WhenBuilt.
+            if (in_array($key, ['spillway', 'sapdrip', 'mudlevee'], true)) {
+                $this->globals->set('pending_effect', $key);
+                $this->globals->set('mudlevee_left', $key === 'mudlevee' ? 2 : 0);
+                return WhenBuilt::class;
+            }
+            // Salt Lick is info-only: privately reveal opponents' hands, then continue.
+            if ($key === 'saltlick') {
+                $playerId = (int) $this->game->getActivePlayerId();
+                $this->notify->player($playerId, 'peekHands', clienttranslate('Salt Lick: you peek at every opponent\'s hand'), [
+                    'hands' => $this->game->getOpponentHands($playerId),
+                ]);
+                return BuildEffects::class;
+            }
+            return match ($key) {
+                'stonepool'    => StonePool::class,
+                'vinelattice'  => VineLattice::class,
+                'snagpile'     => SnagPile::class,
+                'flushchannel' => FlushChannelBuild::class,
+                default        => BuildEffects::class,
+            };
         }
 
         // react:<key> — re-check legality (an earlier effect may have changed the
