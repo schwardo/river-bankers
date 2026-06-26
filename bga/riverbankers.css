@@ -108,12 +108,13 @@
    sideways. We rotate it back to landscape so the labels read correctly and the
    (landscape) card sprites drop straight into the slots. Slot %s come from the
    river-board.svg slot rects normalized over the 1625x1025 viewBox. */
-#rb-board-wrap { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; }
+#rb-board-wrap { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
 #rb-board { position: relative; width: 800px; flex: 0 0 800px; aspect-ratio: 1625 / 1025; }
-/* Shoreline: a vertical column to the right of the board, cards stacked top-down. */
-#rb-shoreline-col { flex: 0 0 auto; }
+/* Side columns to the right of the board (shoreline, your hand, each player's
+   built cards): cards stack top-down with no overlap. */
+.rb-side-col { flex: 0 0 auto; }
 .rb-sl-label { font-size: 13px; font-weight: bold; color: #2c4a6b; margin: 2px 0; }
-#rb-shoreline { display: flex; flex-direction: column; gap: 4px; }
+.rb-stack { display: flex; flex-direction: column; gap: 4px; }
 #rb-board-img {
   position: absolute; top: 50%; left: 50%; z-index: 0;
   width: 63.077%;    /* 1025/1625 of the container width  */

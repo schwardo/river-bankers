@@ -1034,6 +1034,7 @@ class Game extends \Bga\GameFramework\Table
             // hasEffect drives the printed icon-grid layout (effect cards pack
             // icons into a shorter band); mirrors pngIconPositions() on the client.
             'hasEffect' => $def !== null && isset($def['effect']),
+            'effect' => $def !== null ? (string) ($def['effect'] ?? '') : '', // tooltip text
             'material' => $def !== null ? (string) $def['material'] : '',
             'wildAlt' => $def['wildAlt'] ?? null,
             'icons' => $icons,
@@ -1062,7 +1063,12 @@ class Game extends \Bga\GameFramework\Table
         return $out;
     }
 
-    /** @return array<int,list<array{id:int,name:string}>> player_id => built structures */
+    /**
+     * Built cards per player, with the art kind ('str' structure / 'sta' starter),
+     * VP, and effect text so the client can render the face + an effect tooltip.
+     *
+     * @return array<int,list<array{id:int, name:string, kind:string, vp:int, effect:string}>>
+     */
     public function getBuiltViewAll(): array
     {
         $out = [];
@@ -1074,11 +1080,16 @@ class Game extends \Bga\GameFramework\Table
             "SELECT `card_id`, `card_type`, `card_type_arg`, `card_location_arg` FROM `card` WHERE `card_location` = 'built'"
         ) as $r) {
             $arg = (int) $r['card_type_arg'];
-            $name = $r['card_type'] === 'structure'
-                ? (Material::$STRUCTURE[$arg]['name'] ?? null)
-                : (Material::$STARTER[$arg]['name'] ?? null);
-            if ($name !== null) {
-                $out[(int) $r['card_location_arg']][] = ['id' => (int) $r['card_id'], 'name' => (string) $name];
+            $isStruct = $r['card_type'] === 'structure';
+            $def = $isStruct ? (Material::$STRUCTURE[$arg] ?? null) : (Material::$STARTER[$arg] ?? null);
+            if ($def !== null) {
+                $out[(int) $r['card_location_arg']][] = [
+                    'id' => (int) $r['card_id'],
+                    'name' => (string) $def['name'],
+                    'kind' => $isStruct ? 'str' : 'sta',
+                    'vp' => (int) ($def['vp'] ?? 0),
+                    'effect' => (string) ($def['effect'] ?? ''),
+                ];
             }
         }
         return $out;

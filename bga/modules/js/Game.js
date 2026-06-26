@@ -583,6 +583,9 @@ export class Game {
         this.gamedatas = gamedatas;
         this.players = gamedatas.players;
 
+        const builtCols = Object.values(gamedatas.players).map(p =>
+            `<div class="rb-side-col"><div class="rb-sl-label">${p.name} — built</div><div id="built-${p.id}" class="rb-stack"></div></div>`).join('');
+
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
             <div id="rb-hint" class="rb-hint"></div>
             <div id="rb-board-wrap">
@@ -590,13 +593,11 @@ export class Game {
                     <div id="rb-board-img"></div>
                     <div id="rb-slots"></div>
                 </div>
-                <div id="rb-shoreline-col">
-                    <div class="rb-sl-label">Shoreline</div>
-                    <div id="rb-shoreline"></div>
-                </div>
+                <div class="rb-side-col"><div class="rb-sl-label">Shoreline</div><div id="rb-shoreline" class="rb-stack"></div></div>
+                <div class="rb-side-col"><div class="rb-sl-label">Your hand</div><div id="rb-hand" class="rb-stack"></div></div>
+                ${builtCols}
             </div>
             <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — pick one</h3><div id="rb-draft" class="rb-row"></div></div>
-            <div class="rb-section"><h3>Your hand</h3><div id="rb-hand" class="rb-row"></div></div>
         `);
 
         Object.values(gamedatas.players).forEach(p => {
@@ -606,7 +607,6 @@ export class Game {
                     &nbsp; <span id="supply-${p.id}">${p.supply}</span> 👷
                     &nbsp; <span id="score-${p.id}">${p.score}</span> ★
                     <div id="materials-${p.id}" class="rb-mats"></div>
-                    <div id="built-${p.id}" class="rb-built"></div>
                 </div>
             `);
         });
@@ -655,8 +655,9 @@ export class Game {
         for (let i = 0; i < (c.blanks || 0); i++) occ.push(['rb-p-wchit-blank', _('sold')]);
         const discs = occ.map(([cls, title], i) =>
             positions[i] ? this.disc(cls, positions[i], title) : '').join('');
+        const tip = `${c.name}${c.wildAlt ? ' (wild)' : ''}${c.effect ? ' — ' + c.effect : ''}`;
         return `<div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-mat rb-p-mat-${slugify(c.name)} rb-${group}"
-                     data-id="${c.id}" title="${c.name}${c.wildAlt ? ' (wild)' : ''}">
+                     data-id="${c.id}" title="${tip}">
             <span class="rb-ov rb-ov-open">${c.uncovered}/${c.icons}</span>${discs}
         </div>`;
     }
@@ -706,11 +707,19 @@ export class Game {
         this.applyClickableClasses();
     }
 
+    // A built card's face (structure or species-starter art) with an effect tooltip.
+    builtCardHtml(b) {
+        const cls = b.kind === 'sta' ? `rb-art-sta rb-p-sta-${slugify(b.name)}` : `rb-art-str rb-p-str-${slugify(b.name)}`;
+        const tip = `${b.name}${b.vp ? ' — ' + b.vp + '★' : ''}${b.effect ? ' — ' + b.effect : ''}`;
+        return `<div id="card-${b.id}" class="rb-card rb-has-art rb-art ${cls}" data-id="${b.id}" title="${tip}"></div>`;
+    }
+
     renderBuilt(built) {
         Object.entries(built || {}).forEach(([pid, list]) => {
             const el = document.getElementById(`built-${pid}`);
-            if (el) el.innerHTML = list.map(b => `<span class="rb-tag">${b.name}</span>`).join(' ');
+            if (el) el.innerHTML = list.map(b => this.builtCardHtml(b)).join('') || '<span class="rb-empty">—</span>';
         });
+        this.applyClickableClasses();
     }
 
     renderStarterOffer(offers) {
