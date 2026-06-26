@@ -102,6 +102,25 @@
 .rb-ov-open { top: 3px; right: 3px; font-size: 10px; color: #1c2e44;
               background: rgba(255,255,255,0.85); border-radius: 3px; padding: 1px 3px; }
 
+/* ===== Board overlay (Phase 6 — cards positioned over the river-board art) =====
+   river-board.png is the print template: authored landscape (1625x1025) then
+   rotated to portrait (1200x1902) for the TGC template, so all its labels read
+   sideways. We rotate it back to landscape so the labels read correctly and the
+   (landscape) card sprites drop straight into the slots. Slot %s come from the
+   river-board.svg slot rects normalized over the 1625x1025 viewBox. */
+#rb-board { position: relative; width: 800px; aspect-ratio: 1625 / 1025; margin: 8px 0; }
+#rb-board-img {
+  position: absolute; top: 50%; left: 50%; z-index: 0;
+  width: 63.077%;    /* 1025/1625 of the container width  */
+  height: 158.537%;  /* 1625/1025 of the container height */
+  transform: translate(-50%, -50%) rotate(-90deg); /* undo the portrait print rotation */
+  background: url('img/river-board.png') center / 100% 100% no-repeat;
+}
+#rb-slots { position: absolute; inset: 0; z-index: 1; }
+.rb-slot { position: absolute; width: 20.31%; height: 23.61%;
+           display: flex; align-items: center; justify-content: center; }
+.rb-slot-empty { font-size: 10px; color: rgba(20, 45, 65, 0.55); font-style: italic; text-align: center; }
+
 /* === BEGIN GENERATED SPRITES (build_sprites.py) === */
 /* Do not edit by hand — regenerate with: python3 img/build_sprites.py */
 .rb-art{background-repeat:no-repeat;display:inline-block;background-color:transparent;vertical-align:middle;}

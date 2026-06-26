@@ -66,6 +66,14 @@ function pngIconPositions(totalIcons, hasEffect) {
     return positions;
 }
 
+// Board-slot geometry: each slot's top-left as a % of the river-board container.
+// Derived from the river-board.svg slot rects (330x242 each) normalized over the
+// 1625x1025 viewBox; the board is shown rotated back to landscape (#rb-board-img).
+const HW_SLOT_LEFT = { 1: 73.29, 2: 50.22, 3: 27.14 }; // Headwaters 1 rightmost
+const HW_SLOT_TOP = 7.12;
+const RIVER_SLOT_LEFT = { 1: 4.06, 2: 27.14, 3: 50.22, 4: 73.29 };
+const RIVER_SLOT_TOPS = [46.24, 70.63];                // two card positions per river slot
+
 // ---- State classes --------------------------------------------------------
 
 class PlayerTurn {
@@ -577,12 +585,12 @@ export class Game {
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
             <div id="rb-hint" class="rb-hint"></div>
             <div id="rb-board">
-                <div class="rb-section"><h3>Headwaters</h3><div id="rb-hw" class="rb-row"></div></div>
-                <div class="rb-section"><h3>River</h3><div id="rb-river" class="rb-row"></div></div>
-                <div class="rb-section"><h3>Shoreline</h3><div id="rb-shoreline" class="rb-row"></div></div>
-                <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — pick one</h3><div id="rb-draft" class="rb-row"></div></div>
-                <div class="rb-section"><h3>Your hand</h3><div id="rb-hand" class="rb-row"></div></div>
+                <div id="rb-board-img"></div>
+                <div id="rb-slots"></div>
             </div>
+            <div class="rb-section"><h3>Shoreline</h3><div id="rb-shoreline" class="rb-row"></div></div>
+            <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — pick one</h3><div id="rb-draft" class="rb-row"></div></div>
+            <div class="rb-section"><h3>Your hand</h3><div id="rb-hand" class="rb-row"></div></div>
         `);
 
         Object.values(gamedatas.players).forEach(p => {
@@ -647,22 +655,43 @@ export class Game {
         </div>`;
     }
 
+    // Lay the cards out over the river-board art: Headwaters across the top,
+    // each River slot holding up to two cards (extra cards fan off the second
+    // position), and the shoreline in a row beneath the board.
     renderBoard(board) {
-        if (!board || !document.getElementById('rb-hw')) return;
+        const slots = document.getElementById('rb-slots');
+        if (!board || !slots) return;
         this.board = board;
-        document.getElementById('rb-hw').innerHTML =
-            [1, 2, 3].map(slot => {
-                const c = board.headwaters.find(x => x.slot === slot);
-                return c ? this.cardHtml(c, 'hw') : `<div class="rb-card rb-empty">HW${slot}</div>`;
-            }).join('');
-        document.getElementById('rb-river').innerHTML =
-            [1, 2, 3, 4].map(slot => {
-                const cards = board.river.filter(x => x.slot === slot);
-                return `<div class="rb-space"><div class="rb-space-label">R${slot} (${slot + 1}🐟)</div>${cards.map(c => this.cardHtml(c, 'river')).join('') || '<span class="rb-empty">—</span>'}</div>`;
-            }).join('');
-        document.getElementById('rb-shoreline').innerHTML =
-            board.shoreline.map(c => this.cardHtml(c, 'shore')).join('') || '<span class="rb-empty">—</span>';
+        let html = '';
+
+        [1, 2, 3].forEach(slot => {
+            const c = board.headwaters.find(x => x.slot === slot);
+            html += this.slotHtml(HW_SLOT_LEFT[slot], HW_SLOT_TOP,
+                c ? this.cardHtml(c, 'hw') : `<span class="rb-slot-empty">HW${slot}</span>`);
+        });
+
+        [1, 2, 3, 4].forEach(slot => {
+            const cards = board.river.filter(x => x.slot === slot);
+            const left = RIVER_SLOT_LEFT[slot];
+            RIVER_SLOT_TOPS.forEach((top, i) => {
+                const c = cards[i];
+                html += this.slotHtml(left, top,
+                    c ? this.cardHtml(c, 'river')
+                      : (i === 0 ? `<span class="rb-slot-empty">R${slot} · ${slot + 1}🐟</span>` : ''));
+            });
+            // 3rd+ card in a slot (rare): fan off the lower position.
+            cards.slice(2).forEach((c, j) =>
+                html += this.slotHtml(left + (j + 1) * 1.5, RIVER_SLOT_TOPS[1] + (j + 1) * 4, this.cardHtml(c, 'river')));
+        });
+
+        slots.innerHTML = html;
+        const sh = document.getElementById('rb-shoreline');
+        if (sh) sh.innerHTML = board.shoreline.map(c => this.cardHtml(c, 'shore')).join('') || '<span class="rb-empty">—</span>';
         this.applyClickableClasses();
+    }
+
+    slotHtml(left, top, inner) {
+        return `<div class="rb-slot" style="left:${left}%;top:${top}%;">${inner}</div>`;
     }
 
     renderHand(hand) {
