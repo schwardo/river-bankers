@@ -72,7 +72,8 @@ function pngIconPositions(totalIcons, hasEffect) {
 const HW_SLOT_LEFT = { 1: 73.29, 2: 50.22, 3: 27.14 }; // Headwaters 1 rightmost
 const HW_SLOT_TOP = 7.12;
 const RIVER_SLOT_LEFT = { 1: 4.06, 2: 27.14, 3: 50.22, 4: 73.29 };
-const RIVER_SLOT_TOPS = [46.24, 70.63];                // two card positions per river slot
+const RIVER_SLOT_TOP = 46.24;                          // first card position in a river slot
+const RIVER_SLOT_PITCH = 24.39;                        // cards stack downward by this (no overlap)
 
 // ---- State classes --------------------------------------------------------
 
@@ -584,11 +585,16 @@ export class Game {
 
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
             <div id="rb-hint" class="rb-hint"></div>
-            <div id="rb-board">
-                <div id="rb-board-img"></div>
-                <div id="rb-slots"></div>
+            <div id="rb-board-wrap">
+                <div id="rb-board">
+                    <div id="rb-board-img"></div>
+                    <div id="rb-slots"></div>
+                </div>
+                <div id="rb-shoreline-col">
+                    <div class="rb-sl-label">Shoreline</div>
+                    <div id="rb-shoreline"></div>
+                </div>
             </div>
-            <div class="rb-section"><h3>Shoreline</h3><div id="rb-shoreline" class="rb-row"></div></div>
             <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — pick one</h3><div id="rb-draft" class="rb-row"></div></div>
             <div class="rb-section"><h3>Your hand</h3><div id="rb-hand" class="rb-row"></div></div>
         `);
@@ -673,15 +679,13 @@ export class Game {
         [1, 2, 3, 4].forEach(slot => {
             const cards = board.river.filter(x => x.slot === slot);
             const left = RIVER_SLOT_LEFT[slot];
-            RIVER_SLOT_TOPS.forEach((top, i) => {
-                const c = cards[i];
-                html += this.slotHtml(left, top,
-                    c ? this.cardHtml(c, 'river')
-                      : (i === 0 ? `<span class="rb-slot-empty">R${slot} · ${slot + 1}🐟</span>` : ''));
-            });
-            // 3rd+ card in a slot (rare): fan off the lower position.
-            cards.slice(2).forEach((c, j) =>
-                html += this.slotHtml(left + (j + 1) * 1.5, RIVER_SLOT_TOPS[1] + (j + 1) * 4, this.cardHtml(c, 'river')));
+            if (cards.length === 0) {
+                html += this.slotHtml(left, RIVER_SLOT_TOP, `<span class="rb-slot-empty">R${slot} · ${slot + 1}🐟</span>`);
+            } else {
+                // Stack the slot's cards downward from the starting space (no overlap).
+                cards.forEach((c, i) =>
+                    html += this.slotHtml(left, RIVER_SLOT_TOP + i * RIVER_SLOT_PITCH, this.cardHtml(c, 'river')));
+            }
         });
 
         slots.innerHTML = html;
