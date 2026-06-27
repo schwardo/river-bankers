@@ -137,14 +137,22 @@ class PlayerTurn extends GameState
             throw new UserException('You have no worker available or recallable to bid.');
         }
 
-        $slot = (int) $this->game->getCardRow($cardId)['card_location_arg'];
+        $row = $this->game->getCardRow($cardId);
+        $slot = (int) $row['card_location_arg'];
         $this->game->advanceFish($activePlayerId, Cost::headwatersMove($slot));
         $this->game->startAuction($cardId, $activePlayerId); // rate derives from 'headwaters' (1/item)
 
-        $this->notify->all('auctionStarted', clienttranslate('${player_name} pulls a Headwaters card'), [
+        $matDef = Material::$MATERIAL[(int) $row['card_type_arg']] ?? [];
+        $material = (string) ($matDef['material'] ?? '');
+        $wildAlt = $matDef['wildAlt'] ?? null;
+        $matLabel = ucfirst($material) . ($wildAlt !== null ? '/' . ucfirst((string) $wildAlt) : '');
+        $this->notify->all('auctionStarted', clienttranslate('${player_name} pulls ${card_name} (${material}, ${open} open)'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $cardId,
+            'card_name' => (string) ($matDef['name'] ?? ''),
+            'material' => $matLabel,
+            'open' => $this->game->uncoveredIcons($cardId),
         ]);
 
         return Auction::class;
