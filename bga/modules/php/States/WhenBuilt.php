@@ -62,9 +62,9 @@ class WhenBuilt extends GameState
             $penalties = $this->game->washToShoreline($cardId);
             $cardName = ''; // shoreline-penalty card name is resolved server-side; keep the log simple
             foreach ($penalties as $pid => $spaces) {
-                $this->notify->all('shorelinePenalty', clienttranslate('${player_name} drifts back ${spaces}🐟'), [
+                $this->notify->all('shorelinePenalty', clienttranslate('${player_name} drifts back ${spaces} 🐟.'), [
                     'player_id' => $pid, 'player_name' => $this->game->getPlayerNameById($pid),
-                    'spaces' => $spaces, 'card' => $cardName, 'i18n' => ['card'],
+                    'spaces' => $spaces,
                 ]);
             }
             return $this->finish();

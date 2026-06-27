@@ -69,30 +69,21 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         $this->gamestate->changeActivePlayer($next);
         $this->game->giveExtraTime($next);
 
-        // Announce the turn + how far back on the fish track the active player is
-        // (the furthest-back active player acts next, so this is their gap to the
-        // leader). Lower fish = further back = closer to the front of the queue.
+        // Announce whose turn it is and where they sit on the fish track. The
+        // furthest-back active player acts next; lower fish = further back =
+        // closer to the front of the queue.
         $activeFish = 0;
-        $leaderFish = 0;
         foreach ($this->game->getTurnOrderRows() as $r) {
-            if ($r['retired']) {
-                continue;
-            }
-            if ($r['id'] === $next) {
+            if (!$r['retired'] && $r['id'] === $next) {
                 $activeFish = $r['fish'];
             }
-            $leaderFish = max($leaderFish, $r['fish']);
         }
-        $behind = $leaderFish - $activeFish;
         $this->notify->all('turnInfo',
-            $behind > 0
-                ? clienttranslate('${player_name} is next with ${fish}🐟 (${behind} behind the leader)')
-                : clienttranslate('${player_name} is next with ${fish}🐟, it\'s their turn'),
+            clienttranslate('${player_name} is next to act with ${fish} 🐟.'),
             [
                 'player_id' => $next,
                 'player_name' => $this->game->getPlayerNameById($next),
                 'fish' => $activeFish,
-                'behind' => $behind,
             ]);
 
         return PlayerTurn::class;

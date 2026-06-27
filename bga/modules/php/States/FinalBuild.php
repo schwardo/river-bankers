@@ -48,7 +48,7 @@ class FinalBuild extends GameState
                 ? 'You do not have the materials to build that.'
                 : 'You are short ' . $missing . ' to build that.');
         }
-        $this->notify->all('build', clienttranslate('${player_name} makes a final build'), [
+        $this->notify->all('build', clienttranslate('${player_name} makes a final build.'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $cardId,

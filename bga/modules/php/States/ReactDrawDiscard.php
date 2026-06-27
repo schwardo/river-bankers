@@ -28,7 +28,7 @@ class ReactDrawDiscard extends GameState
         $playerId = (int) $this->game->getActivePlayerId();
         $this->game->drawStructures($playerId, 1);
         $this->notify->player($playerId, 'handUpdate', '', ['hand' => $this->game->getHandView($playerId)]);
-        $this->notify->all('build', clienttranslate('${player_name} draws a card (Stone Causeway)'), [
+        $this->notify->all('build', clienttranslate('${player_name} draws a card (Stone Causeway).'), [
             'player_id' => $playerId,
             'player_name' => $this->game->getPlayerNameById($playerId),
         ]);

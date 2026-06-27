@@ -85,7 +85,7 @@ class ResolveAuction extends GameState
         // Material shoreline-arrival penalties (Hidden Inlet / Mud Wallow / Cattail Cluster).
         $cardName = Material::$MATERIAL[(int) $cardRow['card_type_arg']]['name'] ?? '';
         foreach ($penalties as $pid => $spaces) {
-            $this->notify->all('shorelinePenalty', clienttranslate('${player_name} drifts back ${spaces}🐟 (${card})'), [
+            $this->notify->all('shorelinePenalty', clienttranslate('${player_name} drifts back ${spaces} 🐟 (${card}).'), [
                 'player_id' => $pid,
                 'player_name' => $this->game->getPlayerNameById($pid),
                 'spaces' => $spaces,
@@ -98,8 +98,8 @@ class ResolveAuction extends GameState
         foreach ($bids as $pid => $bid) {
             $got = $clinched[$pid];
             $msg = $got > 0
-                ? clienttranslate('${player_name} wins ${n} ${material} (paid ${paid}🐟)')
-                : clienttranslate('${player_name} wins nothing (paid ${paid}🐟)');
+                ? clienttranslate('${player_name} wins ${n}x ${material} (paid ${paid} 🐟).')
+                : clienttranslate('${player_name} wins nothing (paid ${paid} 🐟).');
             $this->notify->all('auctionResolved', $msg, [
                 'player_id' => $pid,
                 'player_name' => $this->game->getPlayerNameById($pid),
@@ -189,7 +189,7 @@ class ResolveAuction extends GameState
         $this->game->clearAuction($auctionId);
 
         foreach ($penalties as $pid => $spaces) {
-            $this->notify->all('shorelinePenalty', clienttranslate('${player_name} drifts back ${spaces}🐟'), [
+            $this->notify->all('shorelinePenalty', clienttranslate('${player_name} drifts back ${spaces} 🐟.'), [
                 'player_id' => $pid,
                 'player_name' => $this->game->getPlayerNameById($pid),
                 'spaces' => $spaces,
@@ -200,8 +200,8 @@ class ResolveAuction extends GameState
         foreach ($order as $pid) {
             $got = $clinched[$pid];
             $msg = $got > 0
-                ? clienttranslate('${player_name} wins ${n} ${material} (paid ${paid}🐟)')
-                : clienttranslate('${player_name} wins nothing (paid ${paid}🐟)');
+                ? clienttranslate('${player_name} wins ${n}x ${material} (paid ${paid} 🐟).')
+                : clienttranslate('${player_name} wins nothing (paid ${paid} 🐟).');
             $this->notify->all('auctionResolved', $msg, [
                 'player_id' => $pid,
                 'player_name' => $this->game->getPlayerNameById($pid),
@@ -225,18 +225,20 @@ class ResolveAuction extends GameState
     {
         $parts = [];
         foreach ($bids as $pid => $bid) {
-            $parts[] = $this->game->getPlayerNameById((int) $pid) . ': ' . (int) $bid;
+            $bid = (int) $bid;
+            $parts[] = $this->game->getPlayerNameById((int) $pid)
+                . ' sends ' . $bid . ' worker' . ($bid === 1 ? '' : 's');
         }
         $list = implode(', ', $parts);
         $overbid = max(0, array_sum($bids) - $open);
         if ($overbid > 0) {
-            $this->notify->all('auctionBids', clienttranslate('Bids — ${bids} · ${open} item(s), jam: overbid by ${overbid}'), [
+            $this->notify->all('auctionBids', clienttranslate('${open} item(s) available: ${bids}. River jams, overbid by ${overbid}.'), [
                 'bids' => $list,
                 'open' => $open,
                 'overbid' => $overbid,
             ]);
         } else {
-            $this->notify->all('auctionBids', clienttranslate('Bids — ${bids} · ${open} item(s), plenty to go around'), [
+            $this->notify->all('auctionBids', clienttranslate('${open} item(s) available: ${bids}. Plenty to go around.'), [
                 'bids' => $list,
                 'open' => $open,
             ]);

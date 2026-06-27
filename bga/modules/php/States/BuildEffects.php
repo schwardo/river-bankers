@@ -51,7 +51,7 @@ class BuildEffects extends \Bga\GameFramework\States\GameState
             // Salt Lick is info-only: privately reveal opponents' hands, then continue.
             if ($key === 'saltlick') {
                 $playerId = (int) $this->game->getActivePlayerId();
-                $this->notify->player($playerId, 'peekHands', clienttranslate('Salt Lick: you peek at every opponent\'s hand'), [
+                $this->notify->player($playerId, 'peekHands', clienttranslate('Salt Lick: you peek at every opponent\'s hand.'), [
                     'hands' => $this->game->getOpponentHands($playerId),
                 ]);
                 return BuildEffects::class;

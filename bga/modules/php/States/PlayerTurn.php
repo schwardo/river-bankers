@@ -70,7 +70,7 @@ class PlayerTurn extends GameState
         if ($ability === 'slipstream') {
             $this->game->flipCardUsed((int) $found['cardId']);
             $this->globals->set('bonus_turn_player', $activePlayerId);
-            $this->notify->all('build', clienttranslate('${player_name} uses Slipstream (extra turn)'), [
+            $this->notify->all('build', clienttranslate('${player_name} uses Slipstream (extra turn).'), [
                 'player_id' => $activePlayerId,
                 'player_name' => $this->game->getPlayerNameById($activePlayerId),
             ]);
@@ -113,7 +113,7 @@ class PlayerTurn extends GameState
             throw new UserException('You can only retire once another player has crossed the line.');
         }
         $this->game->retirePlayer($activePlayerId, $this->game->getFishLine());
-        $this->notify->all('retire', clienttranslate('${player_name} retires'), [
+        $this->notify->all('retire', clienttranslate('${player_name} retires.'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
         ]);
@@ -146,7 +146,7 @@ class PlayerTurn extends GameState
         $material = (string) ($matDef['material'] ?? '');
         $wildAlt = $matDef['wildAlt'] ?? null;
         $matLabel = ucfirst($material) . ($wildAlt !== null ? '/' . ucfirst((string) $wildAlt) : '');
-        $this->notify->all('auctionStarted', clienttranslate('${player_name} pulls ${card_name} (${material}, ${open} open)'), [
+        $this->notify->all('auctionStarted', clienttranslate('${player_name} pulls ${card_name} (${open}x ${material}) from the headwaters.'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $cardId,
@@ -181,7 +181,7 @@ class PlayerTurn extends GameState
         $material = (string) ($matDef['material'] ?? '');
         $wildAlt = $matDef['wildAlt'] ?? null;
         $matLabel = ucfirst($material) . ($wildAlt !== null ? '/' . ucfirst((string) $wildAlt) : '');
-        $this->notify->all('auctionStarted', clienttranslate('${player_name} opens an auction on ${card_name} (${material}, ${open} open)'), [
+        $this->notify->all('auctionStarted', clienttranslate('${player_name} swims towards ${card_name} (${open}x ${material}).'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $cardId,
@@ -211,7 +211,7 @@ class PlayerTurn extends GameState
         $this->game->advanceFish($activePlayerId, 5);
         $this->game->flushHeadwaters();
 
-        $this->notify->all('flush', clienttranslate('${player_name} flushes the Headwaters'), [
+        $this->notify->all('flush', clienttranslate('${player_name} flushes the Headwaters.'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
         ]);
@@ -236,7 +236,7 @@ class PlayerTurn extends GameState
         $this->globals->set('invent_discard_count', $drawn);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
 
-        $this->notify->all('invent', clienttranslate('${player_name} invents (${n} cards)'), [
+        $this->notify->all('invent', clienttranslate('${player_name} invents (${n} cards).'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'n' => $n,
@@ -268,7 +268,7 @@ class PlayerTurn extends GameState
         $this->game->refillHand($activePlayerId);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
 
-        $this->notify->all('build', clienttranslate('${player_name} builds ${card_name}'), [
+        $this->notify->all('build', clienttranslate('${player_name} builds ${card_name}.'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $cardId,

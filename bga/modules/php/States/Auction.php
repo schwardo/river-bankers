@@ -107,7 +107,7 @@ class Auction extends GameState
             throw new UserException('You cannot defer your bid.');
         }
         $this->game->recordDefer((int) $auction['auction_id'], $currentPlayerId, (int) $auction['trigger_player']);
-        $this->notify->all('defer', clienttranslate('${player_name} will bid last'), [
+        $this->notify->all('defer', clienttranslate('${player_name} defers and bids last.'), [
             'player_id' => $currentPlayerId,
             'player_name' => $this->game->getPlayerNameById($currentPlayerId),
         ]);
@@ -157,7 +157,7 @@ class Auction extends GameState
             throw new UserException('You cannot use Floodgate now.');
         }
         $this->game->applyFloodgate($currentPlayerId);
-        $this->notify->all('boardUpdate', clienttranslate('${player_name} uses Floodgate (slides the lot upstream)'), array_merge(
+        $this->notify->all('boardUpdate', clienttranslate('${player_name} uses Floodgate (slides the lot upstream).'), array_merge(
             $this->game->boardUpdatePayload(),
             ['player_id' => $currentPlayerId, 'player_name' => $this->game->getPlayerNameById($currentPlayerId)]
         ));

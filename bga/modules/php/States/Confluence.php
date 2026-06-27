@@ -77,7 +77,7 @@ class Confluence extends GameState
         $this->game->startCombinedAuction($a, $cardId, $activePlayerId, $rate);
         $this->globals->set('conf_a', 0);
 
-        $this->notify->all('auctionStarted', clienttranslate('${player_name} opens a Confluence (two-card auction)'), [
+        $this->notify->all('auctionStarted', clienttranslate('${player_name} opens a Confluence (two-card auction).'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $a,

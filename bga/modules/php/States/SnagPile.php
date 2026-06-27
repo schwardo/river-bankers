@@ -56,7 +56,7 @@ class SnagPile extends GameState
         $material = (string) ($matDef['material'] ?? '');
         $wildAlt = $matDef['wildAlt'] ?? null;
         $matLabel = ucfirst($material) . ($wildAlt !== null ? '/' . ucfirst((string) $wildAlt) : '');
-        $this->notify->all('auctionStarted', clienttranslate('${player_name} snags ${card_name} (${material}, ${open} open) — Snag Pile'), [
+        $this->notify->all('auctionStarted', clienttranslate('${player_name} snags ${card_name} (${open}x ${material}) with the Snag Pile.'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $cardId,
