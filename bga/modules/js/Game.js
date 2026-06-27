@@ -595,6 +595,8 @@ export class Game {
             `<div id="built-${p.id}" class="rb-hrow"></div></div>`).join('');
 
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
+            <div id="rb-zoomctl">${_('Board zoom')}: <input id="rb-zoom" type="range" min="0.5" max="1.5" step="0.05"><span id="rb-zoomval"></span></div>
+            <div id="rb-root">
             <div id="rb-hint" class="rb-hint"></div>
             <div id="rb-board-wrap">
                 <div id="rb-board">
@@ -608,6 +610,7 @@ export class Game {
                 </div>
             </div>
             <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — pick one</h3><div id="rb-draft" class="rb-row"></div></div>
+            </div>
         `);
 
         Object.values(gamedatas.players).forEach(p => {
@@ -630,7 +633,7 @@ export class Game {
         });
 
         if (gamedatas.peekTop) {
-            this.bga.gameArea.getElement().insertAdjacentHTML('beforeend',
+            (document.getElementById('rb-root') || this.bga.gameArea.getElement()).insertAdjacentHTML('beforeend',
                 `<div id="rb-peek" class="rb-hint">${_('Deck top (peek):')} ${MAT_GLYPH[gamedatas.peekTop.material] || ''} ${gamedatas.peekTop.icons}</div>`);
         }
 
@@ -638,7 +641,27 @@ export class Game {
         this.renderHand(gamedatas.hand);
         this.renderBuilt(gamedatas.built);
         this.renderMaterials(gamedatas.materials);
+        this.setupZoom();
         this.setupNotifications();
+    }
+
+    // Zoom slider for the whole board area (#rb-root), persisted per browser.
+    setupZoom() {
+        const root = document.getElementById('rb-root');
+        const slider = document.getElementById('rb-zoom');
+        const val = document.getElementById('rb-zoomval');
+        if (!root || !slider) return;
+        const apply = z => { root.style.zoom = z; if (val) val.textContent = Math.round(z * 100) + '%'; };
+        let z;
+        try { z = parseFloat(localStorage.getItem('rb-zoom')); } catch (e) { z = NaN; }
+        if (!(z >= 0.5 && z <= 1.5)) z = 1.0;
+        slider.value = z;
+        apply(z);
+        slider.addEventListener('input', () => {
+            const v = parseFloat(slider.value);
+            apply(v);
+            try { localStorage.setItem('rb-zoom', v); } catch (e) { /* private mode */ }
+        });
     }
 
     // ---- rendering ----
