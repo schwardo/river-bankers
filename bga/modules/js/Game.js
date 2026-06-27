@@ -616,8 +616,8 @@ export class Game {
         Object.values(gamedatas.players).forEach(p => {
             this.bga.playerPanels.getElement(p.id).insertAdjacentHTML('beforeend', `
                 <div class="rb-panel">
-                    <span id="fish-${p.id}">${p.fish}</span> 🐟 (line ${gamedatas.fishLine})
-                    &nbsp; <span id="supply-${p.id}">${p.supply}</span> 👷
+                    <span id="fish-${p.id}">${p.fish}</span>/${gamedatas.fishLine} 🐟
+                    &nbsp; <span id="supply-${p.id}">${p.supply}</span> <span class="rb-pchit"><span class="rb-art rb-art-wchit rb-p-wchit-${p.species}"></span></span>
                     &nbsp; <span id="score-${p.id}">${p.score}</span> ★
                     <div id="materials-${p.id}" class="rb-mats"></div>
                 </div>
