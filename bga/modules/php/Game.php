@@ -78,6 +78,7 @@ class Game extends \Bga\GameFramework\Table
         $result["hand"] = $this->getHandView($currentPlayerId); // private: only this player's hand
         $result["starterOffer"] = $this->getStarterOffer($currentPlayerId); // empty unless mid-draft
         $result["auction"] = $this->getAuctionView(); // null unless an auction is open (board highlight on reconnect)
+        $result["materialDeck"] = $this->getMaterialDeckView(); // remaining / original deck size
         $result["peekTop"] = $this->getPeekTop($currentPlayerId); // Lookout Tree / Marsh Lookout
 
         return $result;
@@ -648,6 +649,21 @@ class Game extends \Bga\GameFramework\Table
     }
 
     /**
+     * Material-deck counts for the board overlay: cards still face-down in the
+     * draw pile, and the original deck size (every material card in the game —
+     * constant, since material cards only move between locations).
+     *
+     * @return array{remaining:int, total:int}
+     */
+    public function getMaterialDeckView(): array
+    {
+        return [
+            'remaining' => $this->getMaterialDeckCount(),
+            'total' => (int) $this->getUniqueValueFromDB("SELECT COUNT(*) FROM `card` WHERE `card_type` = 'material'"),
+        ];
+    }
+
+    /**
      * Refill the Headwaters after a card vacated $vacatedSlot: cards in higher
      * slots advance one toward the river, then the top of the material deck
      * enters the now-empty Headwaters 3 (if any cards remain).
@@ -1130,6 +1146,7 @@ class Game extends \Bga\GameFramework\Table
             'players' => $this->getPlayersPublic(),
             'built' => $this->getBuiltViewAll(),
             'materials' => $this->getMaterialsAll(),
+            'materialDeck' => $this->getMaterialDeckView(),
         ];
     }
 
@@ -1165,6 +1182,30 @@ class Game extends \Bga\GameFramework\Table
     public function getBuiltNames(int $playerId): array
     {
         return array_map(fn(array $b) => $b['name'], $this->getBuiltStructures($playerId));
+    }
+
+    /**
+     * Why a build is unaffordable: the materials the player is still short by
+     * (material => count, after their cost modifiers). Empty if they can afford it.
+     *
+     * @return array<string,int>
+     */
+    public function buildShortfall(int $playerId, int $structureCardId): array
+    {
+        $def = Material::$STRUCTURE[(int) $this->getCardRow($structureCardId)['card_type_arg']];
+        $holdings = $this->getPlayerHoldings($playerId);
+        $bc = BuildCost::effective($def['cost'], $this->fixedMaterialCounts($holdings), $this->buildFlags($playerId));
+        return Build::shortfall($bc['eff'], $holdings);
+    }
+
+    /** Human-readable list of missing materials, e.g. "2 stones, 1 clay" (or '' if affordable). */
+    public function buildShortfallText(int $playerId, int $structureCardId): string
+    {
+        $parts = [];
+        foreach ($this->buildShortfall($playerId, $structureCardId) as $material => $n) {
+            $parts[] = $n . ' ' . $material;
+        }
+        return implode(', ', $parts);
     }
 
     /**

@@ -43,7 +43,10 @@ class FinalBuild extends GameState
             throw new UserException('That structure is not in your hand.');
         }
         if (!$this->game->tryBuild($activePlayerId, $cardId)) {
-            throw new UserException('You do not have the materials to build that.');
+            $missing = $this->game->buildShortfallText($activePlayerId, $cardId);
+            throw new UserException($missing === ''
+                ? 'You do not have the materials to build that.'
+                : 'You are short ' . $missing . ' to build that.');
         }
         $this->notify->all('build', clienttranslate('${player_name} makes a final build'), [
             'player_id' => $activePlayerId,

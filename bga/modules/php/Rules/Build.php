@@ -28,6 +28,30 @@ final class Build
      */
     public static function allocate(array $cost, array $holdings): ?array
     {
+        $plan = self::plan($cost, $holdings);
+        return $plan['need'] === [] ? $plan['pull'] : null;
+    }
+
+    /**
+     * Materials a player is still short by for $cost (material => count); empty if
+     * affordable. Same allocation as allocate(), but returns the leftover need.
+     *
+     * @param array<string,int> $cost
+     * @param list<array{cardId:int, material:string, wildAlt:?string, workers:int, yield?:int}> $holdings
+     * @return array<string,int>
+     */
+    public static function shortfall(array $cost, array $holdings): array
+    {
+        return self::plan($cost, $holdings)['need'];
+    }
+
+    /**
+     * @param array<string,int> $cost
+     * @param list<array{cardId:int, material:string, wildAlt:?string, workers:int, yield?:int}> $holdings
+     * @return array{pull: array<int,int>, need: array<string,int>}
+     */
+    private static function plan(array $cost, array $holdings): array
+    {
         $need = array_filter($cost, fn(int $n) => $n > 0);
         $pull = [];
 
@@ -81,7 +105,7 @@ final class Build
             }
         }
 
-        return $need === [] ? $pull : null;
+        return ['pull' => $pull, 'need' => $need];
     }
 
     /**

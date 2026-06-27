@@ -154,6 +154,9 @@
 .rb-slot { position: absolute; width: 20.31%; height: 23.61%;
            display: flex; align-items: center; justify-content: center; }
 .rb-slot-empty { font-size: 10px; color: rgba(20, 45, 65, 0.55); font-style: italic; text-align: center; }
+/* "X/Y left" over the Material Deck slot. */
+.rb-deck-count { font-size: 13px; font-weight: 700; color: #fff;
+                 background: rgba(20, 45, 65, 0.8); border-radius: 4px; padding: 2px 6px; }
 /* River slots: a bounded scrollable column (each slot can hold many cards). ~2
    cards show; the rest scroll. Kept inside the board so a tall pile never
    overlaps the content below. */

@@ -64,4 +64,16 @@ final class BuildTest extends TestCase
         // A logs/reeds wild cannot pay a stones cost.
         self::assertNull(Build::allocate(['stones' => 1], [self::card(1, 'logs', 5, 'reeds')]));
     }
+
+    public function testShortfallReportsMissingMaterials(): void
+    {
+        // Need logs:4 stones:2; have logs:2 and a logs/reeds wild:1 -> short 1 logs, 2 stones.
+        $short = Build::shortfall(['logs' => 4, 'stones' => 2], [
+            self::card(1, 'logs', 2),
+            self::card(2, 'logs', 1, 'reeds'),
+        ]);
+        self::assertSame(['logs' => 1, 'stones' => 2], $short);
+        // Affordable -> empty shortfall.
+        self::assertSame([], Build::shortfall(['logs' => 2], [self::card(1, 'logs', 2)]));
+    }
 }

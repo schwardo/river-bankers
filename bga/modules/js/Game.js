@@ -71,6 +71,7 @@ function pngIconPositions(totalIcons, hasEffect) {
 // 1625x1025 viewBox; the board is shown rotated back to landscape (#rb-board-img).
 const HW_SLOT_LEFT = { 1: 73.29, 2: 50.22, 3: 27.14 }; // Headwaters 1 rightmost
 const HW_SLOT_TOP = 7.12;
+const DECK_SLOT = { left: 4.06, top: 7.12 };           // Material Deck (top-left)
 const RIVER_SLOT_LEFT = { 1: 4.06, 2: 27.14, 3: 50.22, 4: 73.29 };
 // Each river slot is a bounded, scrollable column (top/height in the CSS); cards
 // stack inside it at natural size (~2 visible) and scroll rather than overflowing
@@ -583,6 +584,7 @@ export class Game {
     setup(gamedatas) {
         this.gamedatas = gamedatas;
         this.players = gamedatas.players;
+        this.materialDeck = gamedatas.materialDeck;
 
         // Right side: my hand, then my built structures, then each opponent's
         // built structures — one row each (me first).
@@ -678,19 +680,23 @@ export class Game {
     // matching printed icon circle, filling circles in order: workers, then
     // blanks; remaining circles stay open (already drawn on the art).
     cardHtml(c, group) {
+        // Shoreline cards have graduated — no remaining items to auction, so don't
+        // show blanks or the open-icon count there (only the placed workers).
+        const shore = group === 'shore';
         const positions = pngIconPositions(c.icons, c.hasEffect);
         const occ = [];
         Object.entries(c.workers || {}).forEach(([pid, n]) => {
             const sp = (this.players[pid] || {}).species || 'beaver';
             for (let i = 0; i < n; i++) occ.push([`rb-p-wchit-${sp}`, this.playerName(pid) + "'s worker"]);
         });
-        for (let i = 0; i < (c.blanks || 0); i++) occ.push(['rb-p-wchit-blank', _('sold')]);
+        if (!shore) for (let i = 0; i < (c.blanks || 0); i++) occ.push(['rb-p-wchit-blank', _('sold')]);
         const discs = occ.map(([cls, title], i) =>
             positions[i] ? this.disc(cls, positions[i], title) : '').join('');
         const tip = `${c.name}${c.wildAlt ? ' (wild)' : ''}${c.effect ? ' — ' + c.effect : ''}`;
+        const openOv = shore ? '' : `<span class="rb-ov rb-ov-open">${c.uncovered}/${c.icons}</span>`;
         return `<div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-mat rb-p-mat-${slugify(c.name)} rb-${group}"
                      data-id="${c.id}" title="${tip}">
-            <span class="rb-ov rb-ov-open">${c.uncovered}/${c.icons}</span>${discs}
+            ${openOv}${discs}
         </div>`;
     }
 
@@ -702,6 +708,12 @@ export class Game {
         if (!board || !slots) return;
         this.board = board;
         let html = '';
+
+        const md = this.materialDeck;
+        if (md) {
+            html += this.slotHtml(DECK_SLOT.left, DECK_SLOT.top,
+                `<span class="rb-deck-count">${md.remaining}/${md.total} left</span>`);
+        }
 
         [1, 2, 3].forEach(slot => {
             const c = board.headwaters.find(x => x.slot === slot);
@@ -813,6 +825,7 @@ export class Game {
     }
 
     async notif_boardUpdate(args) {
+        this.materialDeck = args.materialDeck;
         this.renderBoard(args.board);
         this.renderBuilt(args.built);
         this.renderMaterials(args.materials);

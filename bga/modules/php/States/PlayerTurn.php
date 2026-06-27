@@ -260,7 +260,10 @@ class PlayerTurn extends GameState
         $name = Material::$STRUCTURE[(int) $this->game->getCardRow($cardId)['card_type_arg']]['name'];
 
         if (!$this->game->tryBuild($activePlayerId, $cardId)) {
-            throw new UserException('You do not have the materials to build that.');
+            $missing = $this->game->buildShortfallText($activePlayerId, $cardId);
+            throw new UserException($missing === ''
+                ? 'You do not have the materials to build that.'
+                : 'You are short ' . $missing . ' to build that.');
         }
         $this->game->refillHand($activePlayerId);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
