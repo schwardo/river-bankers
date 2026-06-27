@@ -72,8 +72,9 @@ function pngIconPositions(totalIcons, hasEffect) {
 const HW_SLOT_LEFT = { 1: 73.29, 2: 50.22, 3: 27.14 }; // Headwaters 1 rightmost
 const HW_SLOT_TOP = 7.12;
 const RIVER_SLOT_LEFT = { 1: 4.06, 2: 27.14, 3: 50.22, 4: 73.29 };
-const RIVER_SLOT_TOP = 46.24;                          // first card position in a river slot
-const RIVER_SLOT_PITCH = 24.39;                        // cards stack downward by this (no overlap)
+// Each river slot is a bounded, scrollable column (top/height in the CSS); cards
+// stack inside it at natural size (~2 visible) and scroll rather than overflowing
+// the board onto the content below.
 
 // ---- State classes --------------------------------------------------------
 
@@ -583,8 +584,15 @@ export class Game {
         this.gamedatas = gamedatas;
         this.players = gamedatas.players;
 
-        const builtCols = Object.values(gamedatas.players).map(p =>
-            `<div class="rb-side-col"><div class="rb-sl-label">${p.name} — built</div><div id="built-${p.id}" class="rb-stack"></div></div>`).join('');
+        // Right side: my hand, then my built structures, then each opponent's
+        // built structures — one row each (me first).
+        const myId = Number(this.bga.players.getCurrentPlayerId());
+        const players = Object.values(gamedatas.players);
+        const me = players.find(p => Number(p.id) === myId);
+        const ordered = me ? [me, ...players.filter(p => p !== me)] : players;
+        const builtRows = ordered.map(p =>
+            `<div class="rb-built-row"><div class="rb-sl-label">${p === me ? _('Your built') : p.name + ' — built'}</div>` +
+            `<div id="built-${p.id}" class="rb-row"></div></div>`).join('');
 
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
             <div id="rb-hint" class="rb-hint"></div>
@@ -593,9 +601,11 @@ export class Game {
                     <div id="rb-board-img"></div>
                     <div id="rb-slots"></div>
                 </div>
-                <div class="rb-side-col"><div class="rb-sl-label">Shoreline</div><div id="rb-shoreline" class="rb-stack"></div></div>
-                <div class="rb-side-col"><div class="rb-sl-label">Your hand</div><div id="rb-hand" class="rb-stack"></div></div>
-                ${builtCols}
+                <div class="rb-side-col" id="rb-shoreline-col"><div class="rb-sl-label">Shoreline</div><div id="rb-shoreline" class="rb-stack"></div></div>
+                <div id="rb-right">
+                    <div class="rb-built-row"><div class="rb-sl-label">Your hand</div><div id="rb-hand" class="rb-row"></div></div>
+                    ${builtRows}
+                </div>
             </div>
             <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — pick one</h3><div id="rb-draft" class="rb-row"></div></div>
         `);
@@ -679,19 +689,15 @@ export class Game {
 
         [1, 2, 3, 4].forEach(slot => {
             const cards = board.river.filter(x => x.slot === slot);
-            const left = RIVER_SLOT_LEFT[slot];
-            if (cards.length === 0) {
-                html += this.slotHtml(left, RIVER_SLOT_TOP, `<span class="rb-slot-empty">R${slot} · ${slot + 1}🐟</span>`);
-            } else {
-                // Stack the slot's cards downward from the starting space (no overlap).
-                cards.forEach((c, i) =>
-                    html += this.slotHtml(left, RIVER_SLOT_TOP + i * RIVER_SLOT_PITCH, this.cardHtml(c, 'river')));
-            }
+            const inner = cards.length
+                ? cards.map(c => `<div class="rb-mcard">${this.cardHtml(c, 'river')}</div>`).join('')
+                : `<span class="rb-slot-empty">R${slot} · ${slot + 1}🐟</span>`;
+            html += `<div class="rb-river-col" style="left:${RIVER_SLOT_LEFT[slot]}%">${inner}</div>`;
         });
 
         slots.innerHTML = html;
         const sh = document.getElementById('rb-shoreline');
-        if (sh) sh.innerHTML = board.shoreline.map(c => this.cardHtml(c, 'shore')).join('') || '<span class="rb-empty">—</span>';
+        if (sh) sh.innerHTML = board.shoreline.map(c => `<div class="rb-mcard">${this.cardHtml(c, 'shore')}</div>`).join('') || '<span class="rb-empty">—</span>';
         this.applyClickableClasses();
     }
 

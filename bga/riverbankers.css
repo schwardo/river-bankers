@@ -126,6 +126,27 @@
 .rb-slot { position: absolute; width: 20.31%; height: 23.61%;
            display: flex; align-items: center; justify-content: center; }
 .rb-slot-empty { font-size: 10px; color: rgba(20, 45, 65, 0.55); font-style: italic; text-align: center; }
+/* River slots: a bounded scrollable column (each slot can hold many cards). ~2
+   cards show; the rest scroll. Kept inside the board so a tall pile never
+   overlaps the content below. */
+.rb-river-col { position: absolute; top: 46.24%; bottom: 0; width: 20.31%;
+                overflow-y: auto; overflow-x: hidden;
+                display: flex; flex-direction: column; align-items: center; gap: 3px; }
+/* Material card in a scrollable stack (river / shoreline): a sized wrapper holding
+   the card scaled down just enough that the scrollbar doesn't clip its right edge.
+   flex:0 0 auto stops the column squashing cards into each other. */
+.rb-mcard { flex: 0 0 auto; width: 142px; height: 101px; }   /* 154x110 * 0.92 */
+.rb-mcard .rb-card { transform: scale(0.92); transform-origin: top left; }
+/* Shoreline: the panel fills the board height (the column is sized to the board
+   image), so the vertical scrollbar only appears once cards run past the board's
+   bottom. overflow-x: hidden clips the cards' (transform-scaled) layout box so no
+   horizontal scrollbar appears — same trick as the river columns. */
+#rb-shoreline-col { height: 505px; display: flex; flex-direction: column; } /* = board image height (800 * 1025/1625) */
+#rb-shoreline { width: 160px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+/* Right side: my hand row, my built row, then one row per opponent's built
+   cards. ~3 structure cards (110px) fit across each row; the rest wrap. */
+#rb-right { display: flex; flex-direction: column; gap: 8px; width: 350px; }
+.rb-built-row .rb-row { min-height: 18px; }
 
 /* === BEGIN GENERATED SPRITES (build_sprites.py) === */
 /* Do not edit by hand — regenerate with: python3 img/build_sprites.py */
