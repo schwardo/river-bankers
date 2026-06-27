@@ -49,15 +49,17 @@ class Auction extends GameState
     {
         $auction = $this->game->getOpenAuction();
         $trigger = (int) $auction['trigger_player'];
-        // Public map of who may defer + via which card (built cards are public):
-        // player_id => 'Quick Strike' | 'Spy Mound' | null.
+        // Public maps of who may defer (player_id => 'Quick Strike'|'Spy Mound'|null)
+        // and who may Floodgate (built cards are public). One loop over the active
+        // players. NB: this is intentionally NOT pulled into actBid — keeping the
+        // bid action free of getArgs shortens that hot transaction and reduces
+        // multiactive deadlocks with concurrent page wakeups.
         $canDefer = [];
-        foreach ($this->gamestate->getActivePlayerList() as $pid) {
-            $canDefer[(int) $pid] = $this->game->deferReason((int) $pid, $trigger);
-        }
         $floodgate = [];
         foreach ($this->gamestate->getActivePlayerList() as $pid) {
-            $floodgate[(int) $pid] = $this->game->canFloodgate((int) $pid, $trigger);
+            $pid = (int) $pid;
+            $canDefer[$pid] = $this->game->deferReason($pid, $trigger);
+            $floodgate[$pid] = $this->game->canFloodgate($pid, $trigger);
         }
         return [
             "lotCardId" => (int) $auction['lot_card_id'],
@@ -73,15 +75,19 @@ class Auction extends GameState
      * @throws UserException
      */
     #[PossibleAction]
-    public function actBid(int $workers, int $currentPlayerId, array $args)
+    public function actBid(int $workers, int $currentPlayerId)
     {
+        // Deliberately does NOT take $args: that would make the framework compute
+        // the (relatively heavy) getArgs() on every bid, lengthening this hot
+        // transaction and inviting multiactive deadlocks. Recompute the little we
+        // need straight from the open auction instead.
+        $auction = $this->game->getOpenAuction();
         $maxBid = min($this->game->auctionOpenIcons(), $this->game->getPlayerSupply($currentPlayerId));
-        $minBid = $currentPlayerId === (int) $args['triggerPlayer'] ? 1 : 0;
+        $minBid = $currentPlayerId === (int) $auction['trigger_player'] ? 1 : 0;
         if ($workers < $minBid || $workers > $maxBid) {
             throw new UserException('Invalid bid.');
         }
 
-        $auction = $this->game->getOpenAuction();
         $this->game->recordBid((int) $auction['auction_id'], $currentPlayerId, $workers);
         $this->gamestate->setPlayerNonMultiactive($currentPlayerId, BidReveal::class);
     }
