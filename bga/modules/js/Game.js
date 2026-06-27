@@ -429,7 +429,10 @@ class FinalBuild {
         this.bga.statusBar.setTitle(isActive ? _('Final build — build one structure or skip') : _('Final builds…'));
         if (!isActive) return;
         this.game.setHint(_('One last build: click a hand card, or skip.'));
-        this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actFinalBuild', { cardId: id }));
+        // Simultaneous round: each player builds from their own hand, so derive
+        // the clickable ids from the rendered hand rather than a shared arg.
+        const myHandIds = [...document.querySelectorAll('#rb-hand [data-id]')].map(el => Number(el.dataset.id));
+        this.game.markClickable('hand', myHandIds, id => this.bga.actions.performAction('actFinalBuild', { cardId: id }));
         this.bga.statusBar.addActionButton(_('Skip'), () => this.bga.actions.performAction('actSkipFinal'), { color: 'secondary' });
     }
     onLeavingState() { this.game.clearClickable(); }

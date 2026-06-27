@@ -56,12 +56,10 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         );
 
         if ($next === null) {
-            // Everyone has retired — go round once more for a final build (lowest
-            // fish first), then score.
+            // Everyone has retired — one simultaneous final-build round, then score.
             $rows = $this->game->getTurnOrderRows();
-            usort($rows, fn($a, $b) => $a['fish'] <=> $b['fish']);
             $this->globals->set('final_order', array_map(fn($r) => $r['id'], $rows));
-            return FinalBuildNext::class;
+            return FinalBuild::class;
         }
 
         $this->game->clearBonusTurnPlayer();

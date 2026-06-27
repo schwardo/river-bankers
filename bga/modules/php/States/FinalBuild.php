@@ -9,11 +9,13 @@ use Bga\GameFramework\States\GameState;
 use Bga\GameFramework\States\PossibleAction;
 use Bga\GameFramework\UserException;
 use Bga\Games\RiverBankers\Game;
+use Bga\Games\RiverBankers\Material;
 
 /**
- * One last build for a retired player (using workers they already hold). They
- * may build one affordable structure or skip; either way control returns to
- * FinalBuildNext for the next player.
+ * Final-build round. Every (now-retired) player simultaneously gets one last
+ * build from the workers they still hold: build one affordable structure or
+ * skip. Players act independently (MULTIPLE_ACTIVE_PLAYER) — there is no shared
+ * state left to contest — and once all have resolved, the game scores (EndScore).
  */
 class FinalBuild extends GameState
 {
@@ -22,58 +24,58 @@ class FinalBuild extends GameState
     ) {
         parent::__construct($game,
             id: 40,
-            type: StateType::ACTIVE_PLAYER,
+            type: StateType::MULTIPLE_ACTIVE_PLAYER,
         );
     }
 
-    public function getArgs(): array
+    function onEnteringState()
     {
-        return [
-            "handStructureIds" => $this->game->getPlayerHand((int) $this->game->getActivePlayerId()),
-        ];
+        // Everyone left in final_order builds at once; an empty set scores directly.
+        $this->gamestate->setPlayersMultiactive(
+            $this->globals->get('final_order', []),
+            EndScore::class,
+            true,
+        );
     }
 
     /**
      * @throws UserException
      */
     #[PossibleAction]
-    public function actFinalBuild(int $cardId, int $activePlayerId, array $args)
+    public function actFinalBuild(int $cardId, int $currentPlayerId)
     {
-        if (!in_array($cardId, $args['handStructureIds'], true)) {
+        if (!in_array($cardId, $this->game->getPlayerHand($currentPlayerId), true)) {
             throw new UserException('That structure is not in your hand.');
         }
-        if (!$this->game->tryBuild($activePlayerId, $cardId)) {
-            $missing = $this->game->buildShortfallText($activePlayerId, $cardId);
+        $name = Material::$STRUCTURE[(int) $this->game->getCardRow($cardId)['card_type_arg']]['name'] ?? '';
+
+        if (!$this->game->tryBuild($currentPlayerId, $cardId)) {
+            $missing = $this->game->buildShortfallText($currentPlayerId, $cardId);
             throw new UserException($missing === ''
                 ? 'You do not have the materials to build that.'
                 : 'You are short ' . $missing . ' to build that.');
         }
-        $this->notify->all('build', clienttranslate('${player_name} makes a final build.'), [
-            'player_id' => $activePlayerId,
-            'player_name' => $this->game->getPlayerNameById($activePlayerId),
+
+        $this->notify->player($currentPlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($currentPlayerId)]);
+        $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
+        $this->notify->all('build', clienttranslate('${player_name} makes a final build: ${card_name}.'), [
+            'player_id' => $currentPlayerId,
+            'player_name' => $this->game->getPlayerNameById($currentPlayerId),
             'card_id' => $cardId,
+            'card_name' => $name,
         ]);
-        return $this->advance();
+
+        $this->gamestate->setPlayerNonMultiactive($currentPlayerId, EndScore::class);
     }
 
     #[PossibleAction]
-    public function actSkipFinal(int $activePlayerId)
+    public function actSkipFinal(int $currentPlayerId)
     {
-        return $this->advance();
+        $this->gamestate->setPlayerNonMultiactive($currentPlayerId, EndScore::class);
     }
 
     function zombie(int $playerId)
     {
-        return $this->advance();
-    }
-
-    /** Pop the current player off final_order and hand back to the dispatcher. */
-    private function advance()
-    {
-        /** @var list<int> $order */
-        $order = $this->globals->get('final_order', []);
-        array_shift($order);
-        $this->globals->set('final_order', $order);
-        return FinalBuildNext::class;
+        $this->gamestate->setPlayerNonMultiactive($playerId, EndScore::class);
     }
 }
