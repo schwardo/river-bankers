@@ -64,6 +64,21 @@
 
 
 
+/* ===== Fish track (single line across the top) ===== */
+/* Height is set inline by renderFishTrack: one row normally, growing only when
+   tokens stack on a space. */
+#rb-fishtrack { margin: 2px 0 6px; }
+.rb-ft-inner { position: relative; height: 100%; margin: 0 18px; }
+.rb-ft-line { position: absolute; left: 0; right: 0; bottom: 16px; height: 4px;
+              border-radius: 2px; background: linear-gradient(to right, #aacfe0, #1d3f4d); }
+.rb-ft-finish { position: absolute; right: -12px; bottom: 9px; font-size: 16px; }
+/* A pawn = the player's species chit, centered (left + on the line) at its track
+   position; stacked pawns rise (bottom set inline) with higher stack order in
+   front (z-index). */
+.rb-ft-pawn { position: absolute; transform: translateX(-50%); width: 32px; height: 32px; overflow: hidden; }
+.rb-ft-pawn .rb-art-wchit { transform: scale(0.86); transform-origin: top left; } /* 37 * 0.86 ≈ 32 */
+.rb-ft-retired { opacity: 0.5; filter: grayscale(0.4); }
+
 /* ===== Minimal client (Phase 6) ===== */
 /* #rb-root is scaled via the zoom slider (set inline by JS, persisted in
    localStorage). zoom re-rasterizes everything inside — board, sprite cards,

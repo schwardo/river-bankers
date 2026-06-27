@@ -72,6 +72,7 @@ function pngIconPositions(totalIcons, hasEffect) {
 const HW_SLOT_LEFT = { 1: 73.29, 2: 50.22, 3: 27.14 }; // Headwaters 1 rightmost
 const HW_SLOT_TOP = 7.12;
 const DECK_SLOT = { left: 4.06, top: 7.12 };           // Material Deck (top-left)
+const FT_STACK_OFFSET = 16;                            // px each stacked pawn rises on the fish track
 const RIVER_SLOT_LEFT = { 1: 4.06, 2: 27.14, 3: 50.22, 4: 73.29 };
 // Each river slot is a bounded, scrollable column (top/height in the CSS); cards
 // stack inside it at natural size (~2 visible) and scroll rather than overflowing
@@ -585,6 +586,7 @@ export class Game {
         this.gamedatas = gamedatas;
         this.players = gamedatas.players;
         this.materialDeck = gamedatas.materialDeck;
+        this.fishLine = gamedatas.fishLine;
 
         // Right side: my hand, then my built structures, then each opponent's
         // built structures — one row each (me first).
@@ -597,6 +599,7 @@ export class Game {
             `<div id="built-${p.id}" class="rb-hrow"></div></div>`).join('');
 
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
+            <div id="rb-fishtrack"><div id="rb-ft-inner" class="rb-ft-inner"></div></div>
             <div id="rb-zoomctl">${_('Board zoom')}: <input id="rb-zoom" type="range" min="0.5" max="1.5" step="0.05"><span id="rb-zoomval"></span></div>
             <div id="rb-root">
             <div id="rb-hint" class="rb-hint"></div>
@@ -642,6 +645,7 @@ export class Game {
         this.renderHand(gamedatas.hand);
         this.renderBuilt(gamedatas.built);
         this.renderMaterials(gamedatas.materials);
+        this.renderFishTrack();
         this.setupZoom();
         this.setupNotifications();
     }
@@ -834,6 +838,38 @@ export class Game {
             const set = (pfx, v) => { const e = document.getElementById(`${pfx}-${p.id}`); if (e) e.textContent = v; };
             set('fish', p.fish); set('supply', p.supply); // VP shows on the official BGA panel (refreshScores)
         });
+        this.renderFishTrack();
+    }
+
+    // A single line across the top: each player's species chit at their position
+    // on the fish track (0 → fish line). Players on the same space stack vertically
+    // by stack order (top of the stack = acts first); ties read at a glance.
+    renderFishTrack() {
+        const inner = document.getElementById('rb-ft-inner');
+        if (!inner) return;
+        const line = Number(this.fishLine) || 90;
+        const byPos = {};
+        Object.values(this.players).forEach(p => {
+            const f = Number(p.fish) || 0;
+            (byPos[f] = byPos[f] || []).push(p);
+        });
+        // Keep the bar to a single row; grow only when tokens stack on a space.
+        const maxStack = Math.max(1, ...Object.values(byPos).map(g => g.length));
+        inner.parentElement.style.height = (34 + (maxStack - 1) * FT_STACK_OFFSET) + 'px';
+
+        let html = '<div class="rb-ft-line"></div><span class="rb-ft-finish" title="' + _('Finish line') + ' (' + line + ')">🏁</span>';
+        Object.keys(byPos).forEach(fish => {
+            const group = byPos[fish].slice().sort((a, b) => (Number(a.stack) || 0) - (Number(b.stack) || 0));
+            const x = Math.max(0, Math.min(100, (Number(fish) / line) * 100));
+            group.forEach((p, i) => {
+                const sp = p.species || 'beaver';
+                const retired = Number(p.retired) ? ' rb-ft-retired' : '';
+                html += `<span class="rb-ft-pawn${retired}" style="left:${x}%;bottom:${2 + i * FT_STACK_OFFSET}px;z-index:${Number(p.stack) || 0}"` +
+                    ` title="${this.playerName(p.id)} — ${p.fish}🐟${Number(p.retired) ? ' (' + _('retired') + ')' : ''}">` +
+                    `<span class="rb-art rb-art-wchit rb-p-wchit-${sp}"></span></span>`;
+            });
+        });
+        inner.innerHTML = html;
     }
     async notif_handUpdate(args) { this.renderHand(args.hand); }
 

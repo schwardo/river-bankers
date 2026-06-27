@@ -68,7 +68,7 @@ class Game extends \Bga\GameFramework\Table
             "SELECT `player_id` AS `id`, `player_name` AS `name`, `player_score` AS `score`,
                     `player_species` AS `species`, `player_fish_pos` AS `fish`,
                     `player_worker_supply` AS `supply`, `player_hand_limit` AS `handLimit`,
-                    `player_retired` AS `retired`
+                    `player_retired` AS `retired`, `player_stack_order` AS `stack`
              FROM `player`"
         );
         $result["fishLine"] = (int) $this->globals->get("fish_line", self::FISH_LINE);
@@ -1115,12 +1115,13 @@ class Game extends \Bga\GameFramework\Table
         return $out;
     }
 
-    /** Public per-player display data (fish, supply, score, retired). */
+    /** Public per-player display data (fish, supply, score, retired + fish-track pawn info). */
     public function getPlayersPublic(): array
     {
         return $this->getCollectionFromDB(
             "SELECT `player_id` AS `id`, `player_fish_pos` AS `fish`, `player_worker_supply` AS `supply`,
-                    `player_score` AS `score`, `player_retired` AS `retired` FROM `player`"
+                    `player_score` AS `score`, `player_retired` AS `retired`,
+                    `player_stack_order` AS `stack`, `player_species` AS `species` FROM `player`"
         );
     }
 
