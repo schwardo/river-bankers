@@ -294,7 +294,19 @@ class PlayerTurn extends GameState
 
     function zombie(int $playerId)
     {
-        // A quit player simply ends their turn without acting.
+        // A quit player can't keep taking turns — and a bare "pass" doesn't move
+        // them on the fish track, so NextPlayer would re-select the same
+        // furthest-back zombie forever (infinite zombie recursion: observed on
+        // Studio when players abandon mid-game). Retire them out of the rotation
+        // (as NextPlayer does for anyone who crosses the fish line) so turn order
+        // advances and the game can reach its end / FinalBuild.
+        $fish = 0;
+        foreach ($this->game->getTurnOrderRows() as $r) {
+            if ($r['id'] === $playerId) {
+                $fish = (int) $r['fish'];
+            }
+        }
+        $this->game->retirePlayer($playerId, $fish);
         return NextPlayer::class;
     }
 }
