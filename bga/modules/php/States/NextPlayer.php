@@ -86,8 +86,8 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         $behind = $leaderFish - $activeFish;
         $this->notify->all('turnInfo',
             $behind > 0
-                ? clienttranslate('${player_name} to act — ${fish}🐟 (${behind} behind the leader)')
-                : clienttranslate('${player_name} to act — ${fish}🐟 (out front)'),
+                ? clienttranslate('${player_name} is next with ${fish}🐟 (${behind} behind the leader)')
+                : clienttranslate('${player_name} is next with ${fish}🐟, it\'s their turn'),
             [
                 'player_id' => $next,
                 'player_name' => $this->game->getPlayerNameById($next),

@@ -599,7 +599,7 @@ export class Game {
             `<div id="built-${p.id}" class="rb-hrow"></div></div>`).join('');
 
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
-            <div id="rb-fishtrack"><div id="rb-ft-inner" class="rb-ft-inner"></div></div>
+            <div id="rb-fishtrack"><span class="rb-ft-fish" title="${_('Fish track')}">🐟</span><div id="rb-ft-inner" class="rb-ft-inner"></div></div>
             <div id="rb-zoomctl">${_('Board zoom')}: <input id="rb-zoom" type="range" min="0.5" max="1.5" step="0.05"><span id="rb-zoomval"></span></div>
             <div id="rb-root">
             <div id="rb-hint" class="rb-hint"></div>
@@ -621,8 +621,7 @@ export class Game {
         Object.values(gamedatas.players).forEach(p => {
             this.bga.playerPanels.getElement(p.id).insertAdjacentHTML('beforeend', `
                 <div class="rb-panel">
-                    <span id="fish-${p.id}">${p.fish}</span>/${gamedatas.fishLine} 🐟
-                    &nbsp; <span id="supply-${p.id}">${p.supply}</span> <span class="rb-pchit"><span class="rb-art rb-art-wchit rb-p-wchit-${p.species}"></span></span>
+                    <div id="supply-${p.id}" class="rb-supply" title="${_('Workers in supply')}"></div>
                     <div id="materials-${p.id}" class="rb-mats"></div>
                 </div>
             `);
@@ -645,6 +644,7 @@ export class Game {
         this.renderHand(gamedatas.hand);
         this.renderBuilt(gamedatas.built);
         this.renderMaterials(gamedatas.materials);
+        this.renderSupplies();
         this.renderFishTrack();
         this.setupZoom();
         this.setupNotifications();
@@ -786,6 +786,21 @@ export class Game {
         });
     }
 
+    // Draw one worker chit per worker in a player's supply (instead of "N 👷").
+    renderSupply(pid) {
+        const el = document.getElementById(`supply-${pid}`);
+        if (!el) return;
+        const p = this.players[pid] || {};
+        const n = Number(p.supply) || 0;
+        const sp = p.species || 'beaver';
+        let html = '';
+        for (let i = 0; i < n; i++) {
+            html += `<span class="rb-pchit"><span class="rb-art rb-art-wchit rb-p-wchit-${sp}"></span></span>`;
+        }
+        el.innerHTML = html || '<span class="rb-empty">—</span>';
+    }
+    renderSupplies() { Object.keys(this.players).forEach(pid => this.renderSupply(pid)); }
+
     // ---- helpers ----
 
     myId() { return Number(this.bga.players.getCurrentPlayerId()); }
@@ -835,9 +850,8 @@ export class Game {
         this.renderMaterials(args.materials);
         Object.values(args.players).forEach(p => {
             this.players[p.id] = { ...this.players[p.id], ...p };
-            const set = (pfx, v) => { const e = document.getElementById(`${pfx}-${p.id}`); if (e) e.textContent = v; };
-            set('fish', p.fish); set('supply', p.supply); // VP shows on the official BGA panel (refreshScores)
         });
+        this.renderSupplies(); // supply chits; fish position shows on the track, VP on the BGA panel
         this.renderFishTrack();
     }
 

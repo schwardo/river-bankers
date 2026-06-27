@@ -67,8 +67,9 @@
 /* ===== Fish track (single line across the top) ===== */
 /* Height is set inline by renderFishTrack: one row normally, growing only when
    tokens stack on a space. */
-#rb-fishtrack { margin: 2px 0 6px; }
-.rb-ft-inner { position: relative; height: 100%; margin: 0 18px; }
+#rb-fishtrack { position: relative; margin: 2px 0 6px; }
+.rb-ft-fish { position: absolute; left: 2px; bottom: 7px; font-size: 18px; }
+.rb-ft-inner { position: relative; height: 100%; margin: 0 18px 0 28px; }
 .rb-ft-line { position: absolute; left: 0; right: 0; bottom: 16px; height: 4px;
               border-radius: 2px; background: linear-gradient(to right, #aacfe0, #1d3f4d); }
 .rb-ft-finish { position: absolute; right: -12px; bottom: 9px; font-size: 16px; }
@@ -126,6 +127,8 @@
    A 22px box with the 37px chit sprite scaled to fit. */
 .rb-pchit { display: inline-block; width: 22px; height: 22px; vertical-align: middle; overflow: hidden; }
 .rb-pchit .rb-art-wchit { transform: scale(0.6); transform-origin: top left; }
+/* Supply: one worker chit per worker in the player's supply. */
+.rb-supply { display: flex; flex-wrap: wrap; gap: 1px; align-items: center; min-height: 22px; }
 .rb-mats { font-size: 15px; margin-top: 2px; }
 .rb-built { margin-top: 2px; }
 .rb-tag { display: inline-block; background: #dde6f0; border-radius: 3px; padding: 0 4px; font-size: 12px; }
