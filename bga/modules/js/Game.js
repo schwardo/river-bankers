@@ -481,7 +481,7 @@ class Auction {
         this.game.clearClickable();
         this.bga.statusBar.removeActionButtons();
         this.bga.statusBar.setTitle(_('Recall — pick a worker to pull back'));
-        this.game.setHint(_('Click a river card with your worker; it returns to supply (drops a blank).'));
+        this.game.setHint(_('Click a river or shoreline card with your worker; it returns to supply (river recalls drop a blank).'));
         this.game.markClickable('recall', this.game.myRecallTargets(this.args.lotCardId), id =>
             this.bga.actions.performAction('actRecall', { cardId: id }).then(() => this.showBid(true)));
         this.bga.statusBar.addActionButton(_('Cancel'), () => this.showBid(true), { color: 'secondary' });
@@ -776,10 +776,12 @@ export class Game {
     myId() { return Number(this.bga.players.getCurrentPlayerId()); }
     playerName(pid) { const p = this.players[pid]; return p ? p.name : ('#' + pid); }
     mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
-    // River cards (excluding the auction lot) where I have a worker to recall.
+    // River OR shoreline cards (excluding the auction lot) where I have a worker
+    // to recall. Shoreline recalls drop no blank (handled server-side).
     myRecallTargets(lotCardId) {
         const me = this.myId();
-        return ((this.board && this.board.river) || [])
+        const b = this.board || {};
+        return [...(b.river || []), ...(b.shoreline || [])]
             .filter(c => Number((c.workers || {})[me] || 0) > 0 && c.id !== lotCardId)
             .map(c => c.id);
     }

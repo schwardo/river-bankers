@@ -385,19 +385,23 @@ class Game extends \Bga\GameFramework\Table
         return CardMovement::destination($location, $slot, $uncoveredAfter); // no workers -> normal drift
     }
 
-    /** Total workers a player has out on river cards (recallable during an auction). */
-    public function riverWorkerCount(int $playerId): int
+    /**
+     * Workers a player has out on river OR shoreline cards — all recallable before
+     * an auction (rulebook "Pre-auction recall": river recalls drop a blank,
+     * shoreline recalls don't).
+     */
+    public function recallableWorkerCount(int $playerId): int
     {
         return (int) $this->getUniqueValueFromDB(
             "SELECT COALESCE(SUM(w.`workers`), 0) FROM `worker` w JOIN `card` c ON c.`card_id` = w.`card_id`
-             WHERE w.`player_id` = $playerId AND c.`card_location` = 'river'"
+             WHERE w.`player_id` = $playerId AND c.`card_location` IN ('river', 'shoreline')"
         );
     }
 
     /** A player can start an auction only with a worker available or recallable. */
     public function canTriggerAuction(int $playerId): bool
     {
-        return $this->getPlayerSupply($playerId) > 0 || $this->riverWorkerCount($playerId) > 0;
+        return $this->getPlayerSupply($playerId) > 0 || $this->recallableWorkerCount($playerId) > 0;
     }
 
     /**
