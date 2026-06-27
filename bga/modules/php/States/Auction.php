@@ -54,10 +54,19 @@ class Auction extends GameState
         // players. NB: this is intentionally NOT pulled into actBid — keeping the
         // bid action free of getArgs shortens that hot transaction and reduces
         // multiactive deadlocks with concurrent page wakeups.
+        // Key these by the bidder set (every non-retired player — matches
+        // onEnteringState's setPlayersMultiactive) rather than
+        // getActivePlayerList(): the latter can be empty/partial depending on
+        // when the framework evaluates getArgs() relative to the multiactive
+        // set, which would silently drop the trigger's Quick Strike / Floodgate
+        // buttons even though they qualify.
         $canDefer = [];
         $floodgate = [];
-        foreach ($this->gamestate->getActivePlayerList() as $pid) {
-            $pid = (int) $pid;
+        foreach ($this->game->getTurnOrderRows() as $row) {
+            if ($row['retired']) {
+                continue;
+            }
+            $pid = (int) $row['id'];
             $canDefer[$pid] = $this->game->deferReason($pid, $trigger);
             $floodgate[$pid] = $this->game->canFloodgate($pid, $trigger);
         }

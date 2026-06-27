@@ -463,7 +463,10 @@ class Auction {
         const a = this.args;
         const maxBid = Math.min(a.open, this.game.mySupply());
         const minBid = (this.game.myId() === Number(a.triggerPlayer)) ? 1 : 0;
-        this.bga.statusBar.setTitle(_('Auction — submit your sealed worker bid'));
+        const lotDesc = id => { const c = this.game.cardById(id); return c ? `${c.name} (${c.icons}x ${c.material})` : _('this lot'); };
+        let lot = lotDesc(a.lotCardId);
+        if (a.lotCardId2) lot += ' + ' + lotDesc(a.lotCardId2);
+        this.bga.statusBar.setTitle(_('How many workers would you like to send for ') + lot + ' ?');
         this.game.setHint(_('Bid up to ') + maxBid + _(' workers (this lot has ') + a.open + _(' open icons).'));
         for (let b = minBid; b <= maxBid; b++) {
             this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.bga.actions.performAction('actBid', { workers: b }));
@@ -603,7 +606,8 @@ export class Game {
 
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
             <div id="rb-fishtrack"><span class="rb-ft-fish" title="${_('Fish track')}">🐟</span><div id="rb-ft-inner" class="rb-ft-inner"></div></div>
-            <div id="rb-zoomctl">${_('Board zoom')}: <input id="rb-zoom" type="range" min="0.5" max="1.5" step="0.05"><span id="rb-zoomval"></span></div>
+            <div id="rb-zoomctl">${_('Board zoom')}: <input id="rb-zoom" type="range" min="0.5" max="1.5" step="0.05"><span id="rb-zoomval"></span>
+                <label id="rb-prevlabel"><input type="checkbox" id="rb-cardprev-cb"> ${_('Card previews')}</label></div>
             <div id="rb-root">
             <div id="rb-hint" class="rb-hint"></div>
             <div id="rb-board-wrap">
@@ -638,10 +642,7 @@ export class Game {
             if (this.clickable.has(id)) this.clickable.get(id)(id);
         });
 
-        if (gamedatas.peekTop) {
-            (document.getElementById('rb-root') || this.bga.gameArea.getElement()).insertAdjacentHTML('beforeend',
-                `<div id="rb-peek" class="rb-hint">${_('Deck top (peek):')} ${MAT_GLYPH[gamedatas.peekTop.material] || ''} ${gamedatas.peekTop.icons}</div>`);
-        }
+        this.renderPeek(gamedatas.peekTop);
 
         this.renderBoard(gamedatas.board);
         this.renderHand(gamedatas.hand);
@@ -650,6 +651,7 @@ export class Game {
         this.renderSupplies();
         this.renderFishTrack();
         this.setupZoom();
+        this.setupCardPreview();
         this.setupNotifications();
     }
 
@@ -670,6 +672,84 @@ export class Game {
             apply(v);
             try { localStorage.setItem('rb-zoom', v); } catch (e) { /* private mode */ }
         });
+    }
+
+    // "Card previews" toggle (persisted): when on, hovering any card pops a
+    // large copy of its printed face. The overlay is pointer-events:none and
+    // lives on <body> (outside the zoomed board), so clicks pass through to the
+    // card underneath and clickable cards stay clickable. When off, cards fall
+    // back to a native tooltip showing only the effect text (set at render).
+    setupCardPreview() {
+        const prev = document.createElement('div');
+        prev.id = 'rb-cardprev';
+        document.body.appendChild(prev);
+        this._cardPrev = prev;
+        this._prevCard = null;
+
+        const cb = document.getElementById('rb-cardprev-cb');
+        if (cb) {
+            let on = false;
+            try { on = localStorage.getItem('rb-cardprev') === '1'; } catch (e) { /* private mode */ }
+            cb.checked = on;
+            cb.addEventListener('change', () => {
+                try { localStorage.setItem('rb-cardprev', cb.checked ? '1' : '0'); } catch (e) { /* private mode */ }
+                if (!cb.checked) this.hideCardPreview();
+            });
+        }
+
+        const area = this.bga.gameArea.getElement();
+        area.addEventListener('mouseover', e => {
+            if (!cb || !cb.checked) return;
+            const card = e.target.closest('.rb-card.rb-has-art');
+            if (!card || card === this._prevCard) return;
+            this.showCardPreview(card, e);
+        });
+        area.addEventListener('mousemove', e => { if (this._prevCard) this.positionCardPreview(e); });
+        area.addEventListener('mouseout', e => {
+            if (!this._prevCard) return;
+            // Ignore moves between children of the same card (discs/overlays).
+            if (e.relatedTarget && this._prevCard.contains(e.relatedTarget)) return;
+            this.hideCardPreview();
+        });
+    }
+
+    showCardPreview(card, e) {
+        // Copy just the card's printed-face classes (rb-art* / rb-p-*); the inner
+        // worker/blank discs carry their own wchit classes and aren't on the card.
+        const artCls = [...card.classList].filter(c => c.startsWith('rb-art') || c.startsWith('rb-p-'));
+        if (!artCls.length) return;
+        const isMat = artCls.includes('rb-art-mat');
+        const baseW = isMat ? 154 : 110, baseH = isMat ? 110 : 154, scale = 2.5;
+        this._cardPrev.style.width = (baseW * scale) + 'px';
+        this._cardPrev.style.height = (baseH * scale) + 'px';
+        this._cardPrev.innerHTML =
+            `<div class="${artCls.join(' ')}" style="transform:scale(${scale});transform-origin:top left;"></div>`;
+        this._cardPrev.style.display = 'block';
+        // Suppress the native (effect) tooltip while the image preview is showing.
+        this._prevCard = card;
+        this._savedTitle = card.getAttribute('title');
+        card.setAttribute('title', '');
+        this.positionCardPreview(e);
+    }
+
+    positionCardPreview(e) {
+        const el = this._cardPrev;
+        const pad = 16;
+        const w = parseFloat(el.style.width) || 0, h = parseFloat(el.style.height) || 0;
+        let x = e.clientX + pad, y = e.clientY + pad;
+        if (x + w > window.innerWidth) x = e.clientX - pad - w;
+        if (y + h > window.innerHeight) y = window.innerHeight - h - pad;
+        el.style.left = Math.max(pad, x) + 'px';
+        el.style.top = Math.max(pad, y) + 'px';
+    }
+
+    hideCardPreview() {
+        if (this._cardPrev) { this._cardPrev.style.display = 'none'; this._cardPrev.innerHTML = ''; }
+        if (this._prevCard) {
+            if (this._savedTitle != null) this._prevCard.setAttribute('title', this._savedTitle);
+            this._prevCard = null;
+            this._savedTitle = null;
+        }
     }
 
     // ---- rendering ----
@@ -699,7 +779,7 @@ export class Game {
         if (!shore) for (let i = 0; i < (c.blanks || 0); i++) occ.push(['rb-p-wchit-blank', _('sold')]);
         const discs = occ.map(([cls, title], i) =>
             positions[i] ? this.disc(cls, positions[i], title) : '').join('');
-        const tip = `${c.name}${c.wildAlt ? ' (wild)' : ''}${c.effect ? ' — ' + c.effect : ''}`;
+        const tip = c.effect || ''; // tooltip: effect text only (no card metadata)
         const openOv = shore ? '' : `<span class="rb-ov rb-ov-open">${c.uncovered}/${c.icons}</span>`;
         return `<div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-mat rb-p-mat-${slugify(c.name)} rb-${group}"
                      data-id="${c.id}" title="${tip}">
@@ -749,7 +829,7 @@ export class Game {
     renderHand(hand) {
         document.getElementById('rb-hand').innerHTML = (hand || []).map(c => `
             <div class="rb-scard"><div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-str rb-p-str-${slugify(c.name)}"
-                 data-id="${c.id}" title="${c.name} — ${c.time}🐟 + ${costStr(c.cost)} — ${c.vp}★ — ${c.effect}">
+                 data-id="${c.id}" title="${c.effect || ''}">
             </div></div>`).join('') || '<span class="rb-empty">—</span>';
         this.applyClickableClasses();
     }
@@ -757,8 +837,12 @@ export class Game {
     // A built card's face (structure or species-starter art) with an effect tooltip.
     builtCardHtml(b) {
         const cls = b.kind === 'sta' ? `rb-art-sta rb-p-sta-${slugify(b.name)}` : `rb-art-str rb-p-str-${slugify(b.name)}`;
-        const tip = `${b.name}${b.vp ? ' — ' + b.vp + '★' : ''}${b.effect ? ' — ' + b.effect : ''}`;
-        return `<div id="card-${b.id}" class="rb-card rb-has-art rb-art ${cls}" data-id="${b.id}" title="${tip}"></div>`;
+        // A spent once-per-game card is dimmed and stamped "USED" (the physical
+        // card would be flipped); the tooltip notes it as well.
+        const spent = b.used ? ' rb-spent' : '';
+        const tip = (b.effect || '') + (b.used ? ' (' + _('once-per-game ability used') + ')' : '');
+        const stamp = b.used ? `<span class="rb-used-stamp">${_('USED')}</span>` : '';
+        return `<div id="card-${b.id}" class="rb-card rb-has-art rb-art ${cls}${spent}" data-id="${b.id}" title="${tip}">${stamp}</div>`;
     }
 
     renderBuilt(built) {
@@ -769,12 +853,25 @@ export class Game {
         this.applyClickableClasses();
     }
 
+    // The "peek at the top of the material deck" hint (Lookout Tree / Marsh
+    // Lookout). Private per-player info, so it arrives via getAllDatas on load
+    // and the `peekUpdate` notification thereafter; passing a null peekTop (no
+    // lookout, or empty deck) removes the hint.
+    renderPeek(peekTop) {
+        const existing = document.getElementById('rb-peek');
+        if (!peekTop) { if (existing) existing.remove(); return; }
+        const html = `${_('Deck top (peek):')} ${MAT_GLYPH[peekTop.material] || ''} ${peekTop.icons}`;
+        if (existing) { existing.innerHTML = html; return; }
+        (document.getElementById('rb-root') || this.bga.gameArea.getElement())
+            .insertAdjacentHTML('beforeend', `<div id="rb-peek" class="rb-hint">${html}</div>`);
+    }
+
     renderStarterOffer(offers) {
         const el = document.getElementById('rb-draft');
         if (!el) return;
         el.innerHTML = (offers || []).map(c => `
             <div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-sta rb-p-sta-${slugify(c.name)}"
-                 data-id="${c.id}" title="${c.name} — ${c.vp}★ — ${c.effect}"></div>`).join('');
+                 data-id="${c.id}" title="${c.effect || ''}"></div>`).join('');
         this.applyClickableClasses();
     }
 
@@ -808,6 +905,12 @@ export class Game {
 
     myId() { return Number(this.bga.players.getCurrentPlayerId()); }
     playerName(pid) { const p = this.players[pid]; return p ? p.name : ('#' + pid); }
+    // Look up a material card anywhere on the board (headwaters, river, shoreline).
+    cardById(id) {
+        const b = this.board || {};
+        return [...(b.headwaters || []), ...(b.river || []), ...(b.shoreline || [])]
+            .find(c => c.id === Number(id)) || null;
+    }
     mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
     // River OR shoreline cards (excluding the auction lot) where I have a worker
     // to recall. Shoreline recalls drop no blank (handled server-side).
@@ -889,6 +992,7 @@ export class Game {
         inner.innerHTML = html;
     }
     async notif_handUpdate(args) { this.renderHand(args.hand); }
+    async notif_peekUpdate(args) { this.renderPeek(args.peekTop); }
 
     // Log-only notifications (messages show in the game log; no UI work needed).
     async notif_turnInfo() {}

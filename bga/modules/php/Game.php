@@ -1097,7 +1097,7 @@ class Game extends \Bga\GameFramework\Table
             $out[$pid] = [];
         }
         foreach ($this->getObjectListFromDB(
-            "SELECT `card_id`, `card_type`, `card_type_arg`, `card_location_arg` FROM `card` WHERE `card_location` = 'built'"
+            "SELECT `card_id`, `card_type`, `card_type_arg`, `card_location_arg`, `card_used` FROM `card` WHERE `card_location` = 'built'"
         ) as $r) {
             $arg = (int) $r['card_type_arg'];
             $isStruct = $r['card_type'] === 'structure';
@@ -1109,6 +1109,8 @@ class Game extends \Bga\GameFramework\Table
                     'kind' => $isStruct ? 'str' : 'sta',
                     'vp' => (int) ($def['vp'] ?? 0),
                     'effect' => (string) ($def['effect'] ?? ''),
+                    // 1 once a once-per-game ability has been spent (card flipped).
+                    'used' => (int) $r['card_used'] === 1,
                 ];
             }
         }
@@ -1139,9 +1141,18 @@ class Game extends \Bga\GameFramework\Table
         return $out;
     }
 
-    /** Payload for the `boardUpdate` notification (public board + player panels). */
+    /**
+     * Payload for the `boardUpdate` notification (public board + player panels).
+     *
+     * Also refreshes each player's private deck-top peek (Lookout Tree / Marsh
+     * Lookout). The peek is hidden info, so it cannot ride the public
+     * boardUpdate; instead every board refresh re-pushes it privately, which is
+     * what makes "peek at any time" track the deck and appear the moment a
+     * player builds a lookout (not only on page reload).
+     */
     public function boardUpdatePayload(): array
     {
+        $this->notifyPeek();
         return [
             'board' => $this->getBoardView(),
             'players' => $this->getPlayersPublic(),
@@ -1149,6 +1160,18 @@ class Game extends \Bga\GameFramework\Table
             'materials' => $this->getMaterialsAll(),
             'materialDeck' => $this->getMaterialDeckView(),
         ];
+    }
+
+    /**
+     * Privately send each player their current deck-top peek (null when they
+     * hold no lookout or the deck is empty, which clears the client hint).
+     * Mirrors how getAllDatas delivers `peekTop` on load.
+     */
+    public function notifyPeek(): void
+    {
+        foreach ($this->getAllPlayerIds() as $pid) {
+            $this->notify->player($pid, 'peekUpdate', '', ['peekTop' => $this->getPeekTop($pid)]);
+        }
     }
 
     // =====================================================================

@@ -74,6 +74,8 @@ class PlayerTurn extends GameState
                 'player_id' => $activePlayerId,
                 'player_name' => $this->game->getPlayerNameById($activePlayerId),
             ]);
+            // Refresh so the flipped card shows its spent ("USED") stamp at once.
+            $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
             return PlayerTurn::class;
         }
 
