@@ -69,6 +69,13 @@ class Portage extends GameState
         return NextPlayer::class;
     }
 
+    /** Undo this in-progress ability before it commits — see Game::undoAbility(). */
+    #[PossibleAction]
+    public function actUndo(int $activePlayerId)
+    {
+        return $this->game->undoAbility();
+    }
+
     function zombie(int $playerId)
     {
         $this->globals->set('portage_src', 0);

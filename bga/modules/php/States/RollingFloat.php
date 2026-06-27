@@ -12,7 +12,7 @@ use Bga\Games\RiverBankers\Game;
 
 /**
  * Rolling Float (once per game): swap one of your workers on a river card with an
- * opponent's worker on another card in the SAME river slot — no fish, no blanks.
+ * opponent's worker on another card in the SAME river slot â no fish, no blanks.
  * Two steps (source, then destination); free ability (turn resumes).
  */
 class RollingFloat extends GameState
@@ -66,6 +66,13 @@ class RollingFloat extends GameState
         $this->game->rollingFloatSwap($activePlayerId, (int) $args['source'], $cardId);
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         return $this->finish();
+    }
+
+    /** Undo this in-progress ability before it commits — see Game::undoAbility(). */
+    #[PossibleAction]
+    public function actUndo(int $activePlayerId)
+    {
+        return $this->game->undoAbility();
     }
 
     function zombie(int $playerId)

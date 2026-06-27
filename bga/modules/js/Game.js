@@ -130,6 +130,7 @@ class AbilityTarget {
         if (!isActive) return;
         this.game.setHint(_('Click a highlighted card.'));
         this.game.markClickable('target', args.targets, id => this.bga.actions.performAction('actAbilityTarget', { cardId: id }));
+        this.bga.statusBar.addActionButton(_('Undo'), () => this.bga.actions.performAction('actUndo'), { color: 'secondary' });
     }
     onLeavingState() { this.game.clearClickable(); }
 }
@@ -308,6 +309,7 @@ class PackRat {
             (args.discardCards || []).forEach(c => this.bga.statusBar.addActionButton(
                 _('Take ') + c.name, () => this.bga.actions.performAction('actPackRatTake', { cardId: c.id }), { color: 'secondary' }));
         }
+        this.bga.statusBar.addActionButton(_('Undo'), () => this.bga.actions.performAction('actUndo'), { color: 'secondary' });
     }
     onLeavingState() { this.game.clearClickable(); }
 }
@@ -336,6 +338,7 @@ class RollingFloat {
         this.game.setHint(src ? _('Click a river card with your worker.') : _('Click an opponent worker in the same slot.'));
         const action = src ? 'actRollSource' : 'actRollDest';
         this.game.markClickable('river', args.targets, id => this.bga.actions.performAction(action, { cardId: id }));
+        this.bga.statusBar.addActionButton(_('Undo'), () => this.bga.actions.performAction('actUndo'), { color: 'secondary' });
     }
     onLeavingState() { this.game.clearClickable(); }
 }
@@ -360,6 +363,7 @@ class SalmonRun {
                     () => this.bga.actions.performAction('actSalmonCount', { n }), { color: 'secondary' });
             }
         }
+        this.bga.statusBar.addActionButton(_('Undo'), () => this.bga.actions.performAction('actUndo'), { color: 'secondary' });
     }
     onLeavingState() { this.game.clearClickable(); }
 }
@@ -375,6 +379,7 @@ class Portage {
         this.game.setHint(src ? _('Click a river card with your worker.') : _('Click another river card with a worker.'));
         const action = src ? 'actPortageSource' : 'actPortageDest';
         this.game.markClickable('river', args.targets, id => this.bga.actions.performAction(action, { cardId: id }));
+        this.bga.statusBar.addActionButton(_('Undo'), () => this.bga.actions.performAction('actUndo'), { color: 'secondary' });
     }
     onLeavingState() { this.game.clearClickable(); }
 }
@@ -390,6 +395,7 @@ class TradingPost {
         this.game.setHint(src ? _('Click a worker on a material you have not recalled yet.') : _('Click a river card with uncovered icons.'));
         const action = src ? 'actTradeSource' : 'actTradeTarget';
         this.game.markClickable('river', args.targets, id => this.bga.actions.performAction(action, { cardId: id }));
+        this.bga.statusBar.addActionButton(_('Undo'), () => this.bga.actions.performAction('actUndo'), { color: 'secondary' });
     }
     onLeavingState() { this.game.clearClickable(); }
 }

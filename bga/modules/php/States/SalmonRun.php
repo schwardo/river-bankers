@@ -13,7 +13,7 @@ use Bga\Games\RiverBankers\Game;
 /**
  * Salmon Run (as an action): place 1-5 workers from supply onto uncovered icons
  * of one river card; the fish cost escalates 1/2/3/5/8 per successive worker.
- * Two steps — pick the card, then the count — and consumes the turn.
+ * Two steps â pick the card, then the count â and consumes the turn.
  */
 class SalmonRun extends GameState
 {
@@ -28,7 +28,7 @@ class SalmonRun extends GameState
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         $playerId = (int) $this->game->getActivePlayerId();
         if (!$this->game->abilityUsable('salmonrun', $playerId)) {
-            return NextPlayer::class; // nothing to do — the turn is still spent
+            return NextPlayer::class; // nothing to do â the turn is still spent
         }
         return null;
     }
@@ -74,6 +74,13 @@ class SalmonRun extends GameState
         $this->globals->set('salmonrun_card', 0);
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         return NextPlayer::class;
+    }
+
+    /** Undo this in-progress ability before it commits — see Game::undoAbility(). */
+    #[PossibleAction]
+    public function actUndo(int $activePlayerId)
+    {
+        return $this->game->undoAbility();
     }
 
     function zombie(int $playerId)

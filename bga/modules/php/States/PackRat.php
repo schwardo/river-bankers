@@ -13,7 +13,7 @@ use Bga\Games\RiverBankers\Game;
 /**
  * Pack Rat Burrow (once per game): discard one structure from hand, then take one
  * of your choice from the discard pile. Two steps tracked in packrat_drop; the
- * source card is flipped on completion (free ability — turn continues).
+ * source card is flipped on completion (free ability â turn continues).
  */
 class PackRat extends GameState
 {
@@ -61,7 +61,7 @@ class PackRat extends GameState
     public function actPackRatTake(int $cardId, int $activePlayerId, array $args)
     {
         $ids = array_map(fn(array $c): int => $c['id'], $args['discardCards']);
-        // The just-dropped card is now in the discard pile too — exclude it.
+        // The just-dropped card is now in the discard pile too â exclude it.
         $drop = (int) $args['drop'];
         if ($cardId === $drop || !in_array($cardId, $ids, true)) {
             throw new UserException('Choose a card from the discard pile to take.');
@@ -69,6 +69,13 @@ class PackRat extends GameState
         $this->game->packRatSwap($activePlayerId, $drop, $cardId);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
         return $this->finish();
+    }
+
+    /** Undo this in-progress ability before it commits — see Game::undoAbility(). */
+    #[PossibleAction]
+    public function actUndo(int $activePlayerId)
+    {
+        return $this->game->undoAbility();
     }
 
     function zombie(int $playerId)
@@ -86,6 +93,6 @@ class PackRat extends GameState
         $this->globals->set('pending_ability', '');
         $this->globals->set('pending_ability_card', 0);
         $this->globals->set('pending_ability_free', 0);
-        return PlayerTurn::class; // free ability — resume the turn
+        return PlayerTurn::class; // free ability â resume the turn
     }
 }

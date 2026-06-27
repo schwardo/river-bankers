@@ -63,6 +63,10 @@ class PlayerTurn extends GameState
         if ($found === null) {
             throw new UserException('You cannot use that ability.');
         }
+        // Restore point so the player can Undo the ability before it commits — it
+        // refunds the fish cost and the stack order advanceFish() is about to
+        // overwrite. Consumed by Game::undoAbility() from the selection states.
+        $this->game->undoSavepoint();
         $this->game->advanceFish($activePlayerId, (int) $found['cost']);
 
         // Slipstream: no target — flip the card and grant an extra turn after this

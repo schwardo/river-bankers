@@ -11,10 +11,10 @@ use Bga\GameFramework\UserException;
 use Bga\Games\RiverBankers\Game;
 
 /**
- * Trading Post (as an action): the 1🐟 was paid on use. Recall one worker each
+ * Trading Post (as an action): the 1ð was paid on use. Recall one worker each
  * from three DIFFERENT-material cards (each drops a blank on river cards), then
  * place 2 free workers from supply on one river card's uncovered icons. Four
- * steps — three sources then a target — tracked in trade_sources / trade_mats.
+ * steps â three sources then a target â tracked in trade_sources / trade_mats.
  * Consumes the turn.
  */
 class TradingPost extends GameState
@@ -30,7 +30,7 @@ class TradingPost extends GameState
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         /** @var list<string> $mats */
         $mats = $this->globals->get('trade_mats', []);
-        // After three recalls, the blanks dropped may leave no place target — the
+        // After three recalls, the blanks dropped may leave no place target â the
         // recalls still happened; just end the action.
         if (count($mats) >= 3 && count($this->game->getAuctionableRiverCards()) === 0) {
             $this->globals->set('trade_mats', []);
@@ -86,6 +86,13 @@ class TradingPost extends GameState
         $this->globals->set('trade_mats', []);
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         return NextPlayer::class;
+    }
+
+    /** Undo this in-progress ability before it commits — see Game::undoAbility(). */
+    #[PossibleAction]
+    public function actUndo(int $activePlayerId)
+    {
+        return $this->game->undoAbility();
     }
 
     function zombie(int $playerId)

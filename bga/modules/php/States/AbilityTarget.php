@@ -59,6 +59,13 @@ class AbilityTarget extends GameState
         return $this->finish();
     }
 
+    /** Undo this in-progress ability before it commits — see Game::undoAbility(). */
+    #[PossibleAction]
+    public function actUndo(int $activePlayerId)
+    {
+        return $this->game->undoAbility();
+    }
+
     function zombie(int $playerId)
     {
         return $this->finish();

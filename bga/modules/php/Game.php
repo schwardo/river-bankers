@@ -1174,6 +1174,35 @@ class Game extends \Bga\GameFramework\Table
         }
     }
 
+    /**
+     * Back out an in-progress, not-yet-committed ability (Cancel / Undo): restore
+     * the situation saved by undoSavepoint() at ability invocation (PlayerTurn::
+     * actUseAbility). This refunds the fish cost *and* the player's prior stack
+     * order — a manual refund can't, because advanceFish() overwrites stack order
+     * and the old value is lost. Returns the player to PlayerTurn.
+     *
+     * Only wired into single-player ability-selection states that haven't
+     * committed yet and don't draw/reveal from the deck or open an auction
+     * (AbilityTarget / Portage / RollingFloat / TradingPost / PackRat / SalmonRun).
+     */
+    public function undoAbility(): string
+    {
+        $this->undoRestorePoint();
+        // The globals "cache" can be stale right after undoRestorePoint() (see the
+        // framework docs), so force the pending-ability bookkeeping back to the
+        // pre-ability values the savepoint already restored at the DB level.
+        $this->globals->set('pending_ability', '');
+        $this->globals->set('pending_ability_free', 0);
+        $this->globals->set('pending_ability_card', 0);
+        $this->globals->set('portage_src', 0);
+        $this->globals->set('rollingfloat_src', 0);
+        $this->globals->set('packrat_drop', 0);
+        $this->globals->set('salmonrun_card', 0);
+        $this->globals->set('trade_mats', []);
+        $this->notify->all('boardUpdate', '', $this->boardUpdatePayload());
+        return \Bga\Games\RiverBankers\States\PlayerTurn::class;
+    }
+
     // =====================================================================
     // Endgame (Phase 4)
     // =====================================================================
