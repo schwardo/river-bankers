@@ -825,7 +825,9 @@ export class Game {
     async notif_handUpdate(args) { this.renderHand(args.hand); }
 
     // Log-only notifications (messages show in the game log; no UI work needed).
+    async notif_turnInfo() {}
     async notif_auctionStarted() {}
+    async notif_auctionBids() {}
     async notif_auctionResolved() {}
     async notif_defer() {}
     async notif_peekHands(args) { /* Salt Lick: opponents' hands available in args.hands */ }

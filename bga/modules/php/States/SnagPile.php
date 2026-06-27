@@ -9,6 +9,7 @@ use Bga\GameFramework\States\GameState;
 use Bga\GameFramework\States\PossibleAction;
 use Bga\GameFramework\UserException;
 use Bga\Games\RiverBankers\Game;
+use Bga\Games\RiverBankers\Material;
 
 /**
  * Snag Pile (when built): pull a Headwaters card to River 1 and run an auction on
@@ -50,10 +51,18 @@ class SnagPile extends GameState
         }
         // Free trigger, forced 1🐟/item rate; the card floats to River 1 afterward.
         $this->game->startAuction($cardId, $activePlayerId, 1);
-        $this->notify->all('auctionStarted', clienttranslate('${player_name} snags a Headwaters card (Snag Pile)'), [
+
+        $matDef = Material::$MATERIAL[(int) $this->game->getCardRow($cardId)['card_type_arg']] ?? [];
+        $material = (string) ($matDef['material'] ?? '');
+        $wildAlt = $matDef['wildAlt'] ?? null;
+        $matLabel = ucfirst($material) . ($wildAlt !== null ? '/' . ucfirst((string) $wildAlt) : '');
+        $this->notify->all('auctionStarted', clienttranslate('${player_name} snags ${card_name} (${material}, ${open} open) — Snag Pile'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $cardId,
+            'card_name' => (string) ($matDef['name'] ?? ''),
+            'material' => $matLabel,
+            'open' => $this->game->uncoveredIcons($cardId),
         ]);
         return Auction::class;
     }

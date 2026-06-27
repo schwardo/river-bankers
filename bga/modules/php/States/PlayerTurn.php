@@ -177,10 +177,17 @@ class PlayerTurn extends GameState
         $this->game->advanceFish($activePlayerId, 1); // flat trigger cost
         $this->game->startAuction($cardId, $activePlayerId);
 
-        $this->notify->all('auctionStarted', clienttranslate('${player_name} opens an auction'), [
+        $matDef = Material::$MATERIAL[(int) $this->game->getCardRow($cardId)['card_type_arg']] ?? [];
+        $material = (string) ($matDef['material'] ?? '');
+        $wildAlt = $matDef['wildAlt'] ?? null;
+        $matLabel = ucfirst($material) . ($wildAlt !== null ? '/' . ucfirst((string) $wildAlt) : '');
+        $this->notify->all('auctionStarted', clienttranslate('${player_name} opens an auction on ${card_name} (${material}, ${open} open)'), [
             'player_id' => $activePlayerId,
             'player_name' => $this->game->getPlayerNameById($activePlayerId),
             'card_id' => $cardId,
+            'card_name' => (string) ($matDef['name'] ?? ''),
+            'material' => $matLabel,
+            'open' => $this->game->uncoveredIcons($cardId),
         ]);
 
         return Auction::class;

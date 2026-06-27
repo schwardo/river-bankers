@@ -46,6 +46,7 @@ class ResolveAuction extends GameState
         $cardRow = $this->game->getCardRow($cardId);
         $open = $this->game->uncoveredIcons($cardId);
         $bids = $this->game->getAuctionBids($auctionId);
+        $this->notifyBids($open, $bids);
 
         $clinched = AuctionRules::clinched($open, $bids);
         // Pontoon: a jammed bidder who controls a built Pontoon pays for one fewer worker.
@@ -135,6 +136,7 @@ class ResolveAuction extends GameState
         $openB = $this->game->uncoveredIcons($cardB);
         $open = $openA + $openB;
         $bids = $this->game->getAuctionBids($auctionId);
+        $this->notifyBids($open, $bids);
 
         $clinched = AuctionRules::clinched($open, $bids);
         $pontoon = [];
@@ -211,5 +213,33 @@ class ResolveAuction extends GameState
         }
 
         return BuildEffects::class;
+    }
+
+    /**
+     * Reveal every player's sealed bid and whether there was plenty to go around
+     * (sum of bids <= open icons) or a jam (and by how much it was overbid).
+     *
+     * @param array<int,int> $bids player_id => workers bid
+     */
+    private function notifyBids(int $open, array $bids): void
+    {
+        $parts = [];
+        foreach ($bids as $pid => $bid) {
+            $parts[] = $this->game->getPlayerNameById((int) $pid) . ': ' . (int) $bid;
+        }
+        $list = implode(', ', $parts);
+        $overbid = max(0, array_sum($bids) - $open);
+        if ($overbid > 0) {
+            $this->notify->all('auctionBids', clienttranslate('Bids — ${bids} · ${open} item(s), jam: overbid by ${overbid}'), [
+                'bids' => $list,
+                'open' => $open,
+                'overbid' => $overbid,
+            ]);
+        } else {
+            $this->notify->all('auctionBids', clienttranslate('Bids — ${bids} · ${open} item(s), plenty to go around'), [
+                'bids' => $list,
+                'open' => $open,
+            ]);
+        }
     }
 }
