@@ -2306,8 +2306,13 @@ class Game extends \Bga\GameFramework\Table
         return $penalties;
     }
 
-    /** Compute and store every player's final score + tie-breaker (aux = -fish). */
-    public function setFinalScores(): void
+    /**
+     * Recompute every player's VP ("if the game ended now": built VP + variable-VP
+     * clauses + leftover pairs) and tie-breaker (aux = -fish), and push them to the
+     * official BGA score counters. Safe to call live each turn — the PlayerCounter
+     * only notifies when the value actually changes. Also used for the final score.
+     */
+    public function refreshScores(): void
     {
         $shorelineTotal = $this->getShorelineTotal();
         foreach ($this->getTurnOrderRows() as $row) {
@@ -2320,8 +2325,12 @@ class Game extends \Bga\GameFramework\Table
                 $shorelineTotal,
                 $this->getShorelineCountWithWorkers($pid),
             );
-            $this->playerScore->set($pid, $vp);
-            $this->playerScoreAux->set($pid, -$row['fish']);
+            if ($this->playerScore->get($pid) !== $vp) {
+                $this->playerScore->set($pid, $vp);
+            }
+            if ($this->playerScoreAux->get($pid) !== -$row['fish']) {
+                $this->playerScoreAux->set($pid, -$row['fish']);
+            }
         }
     }
 

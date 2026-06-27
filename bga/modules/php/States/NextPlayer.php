@@ -43,6 +43,10 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
             }
         }
 
+        // Keep the official BGA score (VP) current from built structures + leftover
+        // material — pushed automatically by the score counter when it changes.
+        $this->game->refreshScores();
+
         // Refresh every client's public board after the just-completed action.
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
 

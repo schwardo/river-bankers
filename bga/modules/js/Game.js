@@ -618,7 +618,6 @@ export class Game {
                 <div class="rb-panel">
                     <span id="fish-${p.id}">${p.fish}</span>/${gamedatas.fishLine} 🐟
                     &nbsp; <span id="supply-${p.id}">${p.supply}</span> <span class="rb-pchit"><span class="rb-art rb-art-wchit rb-p-wchit-${p.species}"></span></span>
-                    &nbsp; <span id="score-${p.id}">${p.score}</span> ★
                     <div id="materials-${p.id}" class="rb-mats"></div>
                 </div>
             `);
@@ -820,7 +819,7 @@ export class Game {
         Object.values(args.players).forEach(p => {
             this.players[p.id] = { ...this.players[p.id], ...p };
             const set = (pfx, v) => { const e = document.getElementById(`${pfx}-${p.id}`); if (e) e.textContent = v; };
-            set('fish', p.fish); set('supply', p.supply); set('score', p.score);
+            set('fish', p.fish); set('supply', p.supply); // VP shows on the official BGA panel (refreshScores)
         });
     }
     async notif_handUpdate(args) { this.renderHand(args.hand); }

@@ -26,7 +26,7 @@ class EndScore extends \Bga\GameFramework\States\GameState
      * then end the game.
      */
     public function onEnteringState() {
-        $this->game->setFinalScores();
+        $this->game->refreshScores();
 
         return ST_END_GAME;
     }
