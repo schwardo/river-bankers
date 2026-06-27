@@ -175,9 +175,13 @@ class Auction extends GameState
 
     function zombie(int $playerId)
     {
-        // A quit player bids 0 and drops out of the auction.
+        // A quit player drops out with the minimum legal bid: 0 for a regular
+        // bidder, but the trigger still owes >= 1 (capped by available workers),
+        // matching actBid's invariant and DeferBid::zombie.
         $auction = $this->game->getOpenAuction();
-        $this->game->recordBid((int) $auction['auction_id'], $playerId, 0);
+        $min = $playerId === (int) $auction['trigger_player'] ? 1 : 0;
+        $cap = min($this->game->auctionOpenIcons(), $this->game->getPlayerSupply($playerId));
+        $this->game->recordBid((int) $auction['auction_id'], $playerId, min($min, $cap));
         $this->gamestate->setPlayerNonMultiactive($playerId, BidReveal::class);
     }
 }
