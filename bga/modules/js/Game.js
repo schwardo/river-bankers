@@ -592,7 +592,7 @@ export class Game {
         const ordered = me ? [me, ...players.filter(p => p !== me)] : players;
         const builtRows = ordered.map(p =>
             `<div class="rb-built-row"><div class="rb-sl-label">${p === me ? _('Your built') : p.name + ' — built'}</div>` +
-            `<div id="built-${p.id}" class="rb-row"></div></div>`).join('');
+            `<div id="built-${p.id}" class="rb-hrow"></div></div>`).join('');
 
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
             <div id="rb-hint" class="rb-hint"></div>
@@ -603,7 +603,7 @@ export class Game {
                 </div>
                 <div class="rb-side-col" id="rb-shoreline-col"><div class="rb-sl-label">Shoreline</div><div id="rb-shoreline" class="rb-stack"></div></div>
                 <div id="rb-right">
-                    <div class="rb-built-row"><div class="rb-sl-label">Your hand</div><div id="rb-hand" class="rb-row"></div></div>
+                    <div class="rb-built-row"><div class="rb-sl-label">Your hand</div><div id="rb-hand" class="rb-hrow"></div></div>
                     ${builtRows}
                 </div>
             </div>
@@ -707,9 +707,9 @@ export class Game {
 
     renderHand(hand) {
         document.getElementById('rb-hand').innerHTML = (hand || []).map(c => `
-            <div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-str rb-p-str-${slugify(c.name)}"
+            <div class="rb-scard"><div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-str rb-p-str-${slugify(c.name)}"
                  data-id="${c.id}" title="${c.name} — ${c.time}🐟 + ${costStr(c.cost)} — ${c.vp}★ — ${c.effect}">
-            </div>`).join('') || '<span class="rb-empty">—</span>';
+            </div></div>`).join('') || '<span class="rb-empty">—</span>';
         this.applyClickableClasses();
     }
 
@@ -723,7 +723,7 @@ export class Game {
     renderBuilt(built) {
         Object.entries(built || {}).forEach(([pid, list]) => {
             const el = document.getElementById(`built-${pid}`);
-            if (el) el.innerHTML = list.map(b => this.builtCardHtml(b)).join('') || '<span class="rb-empty">—</span>';
+            if (el) el.innerHTML = list.map(b => `<div class="rb-scard">${this.builtCardHtml(b)}</div>`).join('') || '<span class="rb-empty">—</span>';
         });
         this.applyClickableClasses();
     }

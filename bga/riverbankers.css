@@ -144,9 +144,15 @@
 #rb-shoreline-col { height: 505px; display: flex; flex-direction: column; } /* = board image height (800 * 1025/1625) */
 #rb-shoreline { width: 160px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 /* Right side: my hand row, my built row, then one row per opponent's built
-   cards. ~3 structure cards (110px) fit across each row; the rest wrap. */
+   cards. Each row scrolls HORIZONTALLY — ~3 cards show before a scrollbar. */
 #rb-right { display: flex; flex-direction: column; gap: 8px; width: 350px; }
-.rb-built-row .rb-row { min-height: 18px; }
+/* A horizontal scroll panel. overflow-y hidden + a height that clears the
+   horizontal scrollbar means no vertical scrollbar ever appears. Structure cards
+   are shrunk (.rb-scard) so the row stays compact and 3+ fit. */
+.rb-hrow { display: flex; flex-wrap: nowrap; gap: 6px; height: 142px;
+           overflow-x: auto; overflow-y: hidden; align-items: flex-start; }
+.rb-scard { flex: 0 0 auto; width: 90px; height: 126px; }   /* 110x154 * 0.82 */
+.rb-scard .rb-card { transform: scale(0.82); transform-origin: top left; }
 
 /* === BEGIN GENERATED SPRITES (build_sprites.py) === */
 /* Do not edit by hand — regenerate with: python3 img/build_sprites.py */
