@@ -366,6 +366,9 @@
 @keyframes rb-score-row { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .rb-score-total td { font-weight: 800; border-top: 2px solid #1c2e44; border-bottom: none; }
 .rb-score-close { display: block; margin: 12px auto 0; padding: 5px 16px; cursor: pointer; }
+/* Salt Lick "opponents' hands" dialog (reuses the scoring modal chrome). */
+.rb-spy-note { text-align: center; font-style: italic; color: #5a5042; margin-bottom: 8px; }
+.rb-spy-player { padding: 4px 0; border-bottom: 1px solid #d8cdb0; max-width: 70ch; }
 @media (prefers-reduced-motion: reduce) { .rb-score-table tbody tr { opacity: 1; animation: none; } }
 
 .rb-art-wchit{background-image:url('img/chits.png');background-size:148.0px 111.0px;width:37.0px;height:37.0px;}

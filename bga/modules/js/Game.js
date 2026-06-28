@@ -1236,7 +1236,33 @@ export class Game {
     async notif_auctionBids() {}
     async notif_auctionResolved() {}
     async notif_defer() {}
-    async notif_peekHands(args) { /* Salt Lick: opponents' hands available in args.hands */ }
+    // Salt Lick (when built): a one-time look at every opponent's hand. Rather
+    // than auto-popping, stash the snapshot and offer a button to view it.
+    async notif_peekHands(args) {
+        this.peekHands = args.hands || {};
+        if (!Object.keys(this.peekHands).length || document.getElementById('rb-spy-btn')) return;
+        (document.getElementById('rb-root') || this.bga.gameArea.getElement()).insertAdjacentHTML('beforeend',
+            `<button id="rb-spy-btn" class="rb-peek-btn"` +
+            ` title="${_('Salt Lick: the opponent hands you saw when it was built')}">👁 ${_("Opponents' hands")}</button>`);
+        document.getElementById('rb-spy-btn').addEventListener('click', () => this.showHandsDialog());
+    }
+    showHandsDialog() {
+        if (!this.peekHands || document.querySelector('.rb-score-backdrop')) return;
+        let html = `<div class="rb-score-panel"><h2>${_("Opponents' hands")}</h2>` +
+            `<div class="rb-spy-note">${_('Snapshot from when Salt Lick was built.')}</div>`;
+        Object.entries(this.peekHands).forEach(([pid, cards]) => {
+            const list = (cards && cards.length)
+                ? cards.map(c => `${c.name} (${costStr(c.cost)}${c.vp ? ', ' + c.vp + ' VP' : ''})`).join('; ')
+                : _('no cards');
+            html += `<div class="rb-spy-player"><b>${this.playerName(pid)}</b>: ${list}</div>`;
+        });
+        html += `<button class="rb-score-close">${_('Close')}</button></div>`;
+        const back = document.createElement('div');
+        back.className = 'rb-score-backdrop';
+        back.innerHTML = html;
+        back.addEventListener('click', e => { if (e.target === back || e.target.closest('.rb-score-close')) back.remove(); });
+        document.body.appendChild(back);
+    }
     async notif_build() {}
     async notif_flush() {}
     async notif_invent() {}
