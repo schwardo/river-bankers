@@ -76,7 +76,11 @@
 /* A pawn = the player's species chit, centered (left + on the line) at its track
    position; stacked pawns rise (bottom set inline) with higher stack order in
    front (z-index). */
-.rb-ft-pawn { position: absolute; transform: translateX(-50%); width: 32px; height: 32px; overflow: hidden; }
+/* Pawns persist across renders (see renderFishTrack), so a change to left/bottom
+   animates as a slide along the track rather than a redraw jump. */
+.rb-ft-pawn { position: absolute; transform: translateX(-50%); width: 32px; height: 32px; overflow: hidden;
+              transition: left 0.5s ease, bottom 0.25s ease; }
+@media (prefers-reduced-motion: reduce) { .rb-ft-pawn { transition: none; } }
 .rb-ft-pawn .rb-art-wchit { transform: scale(0.86); transform-origin: top left; } /* 37 * 0.86 ≈ 32 */
 .rb-ft-retired { opacity: 0.5; filter: grayscale(0.4); }
 
@@ -146,10 +150,11 @@
 .rb-panel { font-size: 15px; line-height: 1.5; zoom: 1.3; }
 /* Per-species worker chit shown next to the supply count (replaces the 👷 emoji).
    A 22px box with the 37px chit sprite scaled to fit. */
-.rb-pchit { display: inline-block; width: 22px; height: 22px; vertical-align: middle; overflow: hidden; }
+.rb-pchit { display: inline-block; width: 22px; height: 22px; vertical-align: middle; overflow: hidden;
+            margin-right: -4px; } /* overlap the sprite's transparent border so all 8 fit without wrapping */
 .rb-pchit .rb-art-wchit { transform: scale(0.6); transform-origin: top left; }
 /* Supply: one worker chit per worker in the player's supply. */
-.rb-supply { display: flex; flex-wrap: wrap; gap: 1px; align-items: center; min-height: 22px; }
+.rb-supply { display: flex; flex-wrap: wrap; gap: 0; align-items: center; min-height: 22px; }
 .rb-mats { font-size: 15px; margin-top: 2px; }
 .rb-built { margin-top: 2px; }
 .rb-tag { display: inline-block; background: #dde6f0; border-radius: 3px; padding: 0 4px; font-size: 12px; }
@@ -335,6 +340,15 @@
 .rb-p-chit-muskrat-back{background-position:-80.0px -40.0px;}
 .rb-p-chit-otter-back{background-position:-120.0px -40.0px;}
 .rb-p-chit-blank{background-position:0.0px -80.0px;}
+/* Overlay for worker-chit fly animations (place / spend) — sits above the board,
+   never intercepts clicks; chits are positioned in viewport (fixed) coords. */
+#rb-anim-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; }
+.rb-fly { position: fixed; pointer-events: none; transition: left 0.45s ease, top 0.45s ease; }
+/* Freshly revealed cards (no prior on-screen spot to slide from) fade/scale in. */
+.rb-card-enter { animation: rb-card-in 0.4s ease; }
+@keyframes rb-card-in { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rb-fly { transition: none; } .rb-card-enter { animation: none; } }
+
 .rb-art-wchit{background-image:url('img/chits.png');background-size:148.0px 111.0px;width:37.0px;height:37.0px;}
 .rb-p-wchit-beaver{background-position:0.0px 0.0px;}
 .rb-p-wchit-mink{background-position:-37.0px 0.0px;}

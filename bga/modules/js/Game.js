@@ -34,6 +34,7 @@ function costIcons(cost) {
 // Material-card face geometry (the sprite renders the trimmed 252×180pt card).
 // WORKER_DISC_PX must match the generator's wchit render width (img/build_sprites.py).
 const MAT_CARD_W = 154, MAT_CARD_H = 110, WORKER_DISC_PX = 37;
+const CARD_MOVE_MS = 400; // card slide duration; also the phase-1 delay before an incoming card drops into a stacked river column
 
 // Center of each printed icon circle, as {cx,cy} in % of the trimmed card.
 // Ported from the web prototype's pngIconPositions() (which mirrors generate.py's
@@ -799,6 +800,16 @@ export class Game {
     renderBoard(board) {
         const slots = document.getElementById('rb-slots');
         if (!board || !slots) return;
+        // Snapshot the previous board + where each card currently sits on screen,
+        // so after the re-render we can fly worker chits between cards and supply
+        // (animateWorkerMoves). Captured before innerHTML is replaced.
+        const prev = this.board;
+        const animate = prev && !this.reducedMotion();
+        const oldRects = {};
+        if (animate) {
+            [...(prev.headwaters || []), ...(prev.river || []), ...(prev.shoreline || [])]
+                .forEach(c => { const el = document.getElementById(`card-${c.id}`); if (el) oldRects[c.id] = this.animCenter(el); });
+        }
         this.board = board;
         let html = '';
 
@@ -815,7 +826,7 @@ export class Game {
         });
 
         [1, 2, 3, 4].forEach(slot => {
-            const cards = board.river.filter(x => x.slot === slot);
+            const cards = this.orderRiverSlot(slot, board.river.filter(x => x.slot === slot));
             const inner = cards.length
                 ? cards.map(c => `<div class="rb-mcard">${this.cardHtml(c, 'river')}</div>`).join('')
                 : `<span class="rb-slot-empty">R${slot} · ${slot + 1}🐟</span>`;
@@ -826,6 +837,142 @@ export class Game {
         const sh = document.getElementById('rb-shoreline');
         if (sh) sh.innerHTML = board.shoreline.map(c => `<div class="rb-mcard">${this.cardHtml(c, 'shore')}</div>`).join('') || '<span class="rb-empty">—</span>';
         this.applyClickableClasses();
+        if (animate) {
+            // Worker flies first (they read final card centers, before card FLIP
+            // transforms shift the wrappers), then card slides.
+            this.animateWorkerMoves(prev, board, oldRects);
+            this.animateCardMoves(prev, board, oldRects);
+        }
+    }
+
+    // Stable top-to-bottom order for a river column. Cards keep their remembered
+    // order across renders (so unrelated boardUpdates don't reshuffle the stack),
+    // and a newly-arrived card is placed on top — which opens room beneath it for
+    // the shift-down-then-drop-in card animation (animateCardMoves).
+    orderRiverSlot(slot, cards) {
+        this.riverOrder = this.riverOrder || {};
+        const byId = {};
+        cards.forEach(c => { byId[c.id] = c; });
+        const remembered = (this.riverOrder[slot] || []).filter(id => byId[id]);
+        const arrivals = cards.map(c => c.id).filter(id => !remembered.includes(id));
+        const order = [...arrivals, ...remembered];
+        this.riverOrder[slot] = order;
+        return order.map(id => byId[id]);
+    }
+
+    // ---- card move (FLIP) animations ----
+    // Slide cards from their previous on-screen spot to the new one. A card moving
+    // into a river column that already holds cards is DELAYED by one slide: the
+    // cards already there shift down first (to open the top), then the newcomer
+    // drops in. New cards (no prior position) just fade in.
+    animateCardMoves(prev, next, oldRects) {
+        const key = (zone, slot) => `${zone}:${slot}`;
+        const prevSlotOf = {};
+        const prevRiverCount = {};
+        ['headwaters', 'river', 'shoreline'].forEach(z => (prev[z] || []).forEach(c => {
+            prevSlotOf[c.id] = key(z, c.slot);
+            if (z === 'river') prevRiverCount[c.slot] = (prevRiverCount[c.slot] || 0) + 1;
+        }));
+        const cols = new Set();
+        ['headwaters', 'river', 'shoreline'].forEach(z => (next[z] || []).forEach(c => {
+            const el = document.getElementById(`card-${c.id}`);
+            const wrap = el && el.closest('.rb-mcard, .rb-slot');
+            if (!wrap) return;
+            if (!(c.id in oldRects)) { wrap.classList.add('rb-card-enter'); return; } // freshly revealed
+            const nc = this.animCenter(el);
+            const oc = oldRects[c.id];
+            const dx = oc.x - nc.x, dy = oc.y - nc.y;
+            if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return; // didn't move
+            // Hold the newcomer at its source while a previously-occupied river
+            // column makes room, then let it drop in.
+            const wasHere = prevSlotOf[c.id] === key('river', c.slot);
+            const delay = (z === 'river' && !wasHere && (prevRiverCount[c.slot] || 0) > 0) ? CARD_MOVE_MS : 0;
+            this.flipCard(wrap, dx, dy, delay);
+            const col = wrap.closest('.rb-river-col');
+            if (col) cols.add(col);
+        }));
+        // River columns clip (overflow) — let a card slide in from outside the
+        // column for the duration of the move, then restore.
+        cols.forEach(col => {
+            col.style.overflow = 'visible';
+            setTimeout(() => { col.style.overflow = ''; }, CARD_MOVE_MS * 2 + 150);
+        });
+    }
+    // FLIP: jump the wrapper back to the old spot (no transition), then transition
+    // its transform back to 0 — so it appears to slide from old to new. Applied to
+    // the wrapper, never the .rb-card (which owns the scale() transform).
+    flipCard(wrap, dx, dy, delay) {
+        wrap.style.transition = 'none';
+        wrap.style.transform = `translate(${dx}px, ${dy}px)`;
+        wrap.getBoundingClientRect(); // flush so the reset below transitions
+        requestAnimationFrame(() => {
+            wrap.style.transition = `transform ${CARD_MOVE_MS}ms ease ${delay}ms`;
+            wrap.style.transform = 'translate(0, 0)';
+        });
+        const clear = () => { wrap.style.transition = ''; wrap.style.transform = ''; };
+        wrap.addEventListener('transitionend', clear, { once: true });
+        setTimeout(clear, CARD_MOVE_MS + delay + 100);
+    }
+
+    // ---- worker-chit fly animations (place / spend) ----
+    reducedMotion() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    animCenter(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+    animLayer() {
+        let l = document.getElementById('rb-anim-layer');
+        // Append to <body>, NOT #rb-root: the board uses CSS `zoom`, which would
+        // distort a fixed-position overlay's coordinates inside it. getBoundingClientRect
+        // already returns post-zoom viewport coords, so body-level positioning matches.
+        if (!l) { l = document.createElement('div'); l.id = 'rb-anim-layer'; document.body.appendChild(l); }
+        return l;
+    }
+    // A single species chit that slides from `from` to `to` (viewport coords) then
+    // removes itself — used to show a worker arriving on / leaving a card.
+    flyChit(sp, from, to, delay = 0) {
+        const el = document.createElement('span');
+        el.className = `rb-art rb-art-wchit rb-p-wchit-${sp} rb-fly`;
+        el.style.left = (from.x - WORKER_DISC_PX / 2) + 'px';
+        el.style.top = (from.y - WORKER_DISC_PX / 2) + 'px';
+        el.style.transitionDelay = delay + 'ms';
+        this.animLayer().appendChild(el);
+        el.getBoundingClientRect(); // force initial layout so the move transitions
+        requestAnimationFrame(() => {
+            el.style.left = (to.x - WORKER_DISC_PX / 2) + 'px';
+            el.style.top = (to.y - WORKER_DISC_PX / 2) + 'px';
+        });
+        const done = () => el.remove();
+        el.addEventListener('transitionend', done, { once: true });
+        setTimeout(done, 900 + delay); // safety net if transitionend doesn't fire
+    }
+    // Diff the previous vs new board; for each card+player whose worker count rose,
+    // fly chits in from that player's supply; where it fell, fly chits out to it.
+    animateWorkerMoves(prev, next, oldRects) {
+        const zone = b => [...(b.headwaters || []), ...(b.river || []), ...(b.shoreline || [])];
+        const oldC = {}, newC = {};
+        zone(prev).forEach(c => oldC[c.id] = c);
+        zone(next).forEach(c => newC[c.id] = c);
+        const ids = new Set([...Object.keys(oldC), ...Object.keys(newC)].map(Number));
+        ids.forEach(id => {
+            const o = oldC[id], n = newC[id];
+            const pids = new Set([...Object.keys((o && o.workers) || {}), ...Object.keys((n && n.workers) || {})]);
+            pids.forEach(pid => {
+                const delta = Number((n && n.workers && n.workers[pid]) || 0) - Number((o && o.workers && o.workers[pid]) || 0);
+                if (!delta) return;
+                const sp = (this.players[pid] || {}).species || 'beaver';
+                const supEl = document.getElementById(`supply-${pid}`);
+                if (!supEl) return;
+                const supply = this.animCenter(supEl);
+                if (delta > 0) { // placed: supply -> card (new position)
+                    const cardEl = document.getElementById(`card-${id}`);
+                    if (!cardEl) return;
+                    const dest = this.animCenter(cardEl);
+                    for (let k = 0; k < delta; k++) this.flyChit(sp, supply, dest, k * 80);
+                } else { // spent / recalled: card (old position) -> supply
+                    const src = oldRects[id];
+                    if (!src) return;
+                    for (let k = 0; k < -delta; k++) this.flyChit(sp, src, supply, k * 80);
+                }
+            });
+        });
     }
 
     slotHtml(left, top, inner) {
@@ -888,7 +1035,7 @@ export class Game {
             const fixed = Object.entries(held.fixed || {}).map(([m, n]) => `${n}${matIcon(m)}`);
             const wild = (held.wild || []).map(w => `${w.count}${matIcon(w.materials[0])}/${matIcon(w.materials[1])}`);
             const all = [...fixed, ...wild];
-            el.innerHTML = all.length ? all.join(' ') : '<span class="rb-empty">no workers placed</span>';
+            el.innerHTML = all.length ? all.join(' ') : `<span class="rb-empty">${_('no materials yet')}</span>`;
         });
     }
 
@@ -903,7 +1050,7 @@ export class Game {
         for (let i = 0; i < n; i++) {
             html += `<span class="rb-pchit"><span class="rb-art rb-art-wchit rb-p-wchit-${sp}"></span></span>`;
         }
-        el.innerHTML = html || '<span class="rb-empty">—</span>';
+        el.innerHTML = html || `<span class="rb-empty">${_('no workers remaining')}</span>`;
     }
     renderSupplies() { Object.keys(this.players).forEach(pid => this.renderSupply(pid)); }
 
@@ -974,6 +1121,17 @@ export class Game {
         const inner = document.getElementById('rb-ft-inner');
         if (!inner) return;
         const line = Number(this.fishLine) || 90;
+
+        // Static scenery (the track line + finish flag) is drawn once. Pawns are
+        // NOT rebuilt each render — one element per player persists, so updating
+        // its left/bottom animates as a slide (see .rb-ft-pawn transition in CSS)
+        // instead of teleporting on every boardUpdate.
+        if (!inner.querySelector('.rb-ft-line')) {
+            inner.insertAdjacentHTML('afterbegin',
+                '<div class="rb-ft-line"></div><span class="rb-ft-finish" title="' +
+                _('Finish line') + ' (' + line + ')">🏁</span>');
+        }
+
         const byPos = {};
         Object.values(this.players).forEach(p => {
             const f = Number(p.fish) || 0;
@@ -983,19 +1141,27 @@ export class Game {
         const maxStack = Math.max(1, ...Object.values(byPos).map(g => g.length));
         inner.parentElement.style.height = (34 + (maxStack - 1) * FT_STACK_OFFSET) + 'px';
 
-        let html = '<div class="rb-ft-line"></div><span class="rb-ft-finish" title="' + _('Finish line') + ' (' + line + ')">🏁</span>';
         Object.keys(byPos).forEach(fish => {
             const group = byPos[fish].slice().sort((a, b) => (Number(a.stack) || 0) - (Number(b.stack) || 0));
             const x = Math.max(0, Math.min(100, (Number(fish) / line) * 100));
             group.forEach((p, i) => {
                 const sp = p.species || 'beaver';
-                const retired = Number(p.retired) ? ' rb-ft-retired' : '';
-                html += `<span class="rb-ft-pawn${retired}" style="left:${x}%;bottom:${2 + i * FT_STACK_OFFSET}px;z-index:${Number(p.stack) || 0}"` +
-                    ` title="${this.playerName(p.id)} — ${p.fish}🐟${Number(p.retired) ? ' (' + _('retired') + ')' : ''}">` +
-                    `<span class="rb-art rb-art-wchit rb-p-wchit-${sp}"></span></span>`;
+                let pawn = document.getElementById(`rb-ft-pawn-${p.id}`);
+                if (!pawn) {
+                    pawn = document.createElement('span');
+                    pawn.id = `rb-ft-pawn-${p.id}`;
+                    pawn.className = 'rb-ft-pawn';
+                    pawn.innerHTML = `<span class="rb-art rb-art-wchit rb-p-wchit-${sp}"></span>`;
+                    pawn.style.left = x + '%'; // set before insert: first paint doesn't animate
+                    inner.appendChild(pawn);
+                }
+                pawn.style.left = x + '%';
+                pawn.style.bottom = (2 + i * FT_STACK_OFFSET) + 'px';
+                pawn.style.zIndex = Number(p.stack) || 0;
+                pawn.classList.toggle('rb-ft-retired', !!Number(p.retired));
+                pawn.title = `${this.playerName(p.id)} — ${p.fish}🐟${Number(p.retired) ? ' (' + _('retired') + ')' : ''}`;
             });
         });
-        inner.innerHTML = html;
     }
     async notif_handUpdate(args) { this.renderHand(args.hand); }
     async notif_peekUpdate(args) { this.renderPeek(args.peekTop); }
