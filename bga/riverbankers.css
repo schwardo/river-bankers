@@ -145,6 +145,10 @@
     pointer-events: none; white-space: nowrap;
 }
 .rb-hint { font-style: italic; color: #345; margin: 4px 0; }
+/* Lookout deck-top peek: a button the player triggers on demand (the reveal
+   shows beside it) instead of a permanently-displayed card. */
+.rb-peek-btn { cursor: pointer; margin: 4px 0; padding: 2px 8px; font-size: 13px; border-radius: 4px; }
+.rb-peek-reveal { margin-left: 6px; font-weight: 700; }
 /* zoom scales the panel text AND its sprite icons (worker chit, material icons)
    together, so bumping it enlarges everything to match. */
 .rb-panel { font-size: 15px; line-height: 1.5; zoom: 1.3; }

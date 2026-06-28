@@ -1025,17 +1025,36 @@ export class Game {
         this.applyClickableClasses();
     }
 
-    // The "peek at the top of the material deck" hint (Lookout Tree / Marsh
-    // Lookout). Private per-player info, so it arrives via getAllDatas on load
-    // and the `peekUpdate` notification thereafter; passing a null peekTop (no
-    // lookout, or empty deck) removes the hint.
+    // "Peek at the top of the material deck at any time" (Lookout Tree / Marsh
+    // Lookout). The top card is private info delivered via getAllDatas / the
+    // `peekUpdate` notification, but rather than displaying it permanently we show
+    // a button the player triggers on demand. A null peekTop (no lookout, or
+    // empty deck) removes the button.
     renderPeek(peekTop) {
-        const existing = document.getElementById('rb-peek');
-        if (!peekTop) { if (existing) existing.remove(); return; }
-        const html = `${_('Deck top (peek):')} ${MAT_GLYPH[peekTop.material] || ''} ${peekTop.icons}`;
-        if (existing) { existing.innerHTML = html; return; }
-        (document.getElementById('rb-root') || this.bga.gameArea.getElement())
-            .insertAdjacentHTML('beforeend', `<div id="rb-peek" class="rb-hint">${html}</div>`);
+        this.peekTop = peekTop || null;
+        let btn = document.getElementById('rb-peek-btn');
+        if (!this.peekTop) {
+            const wrap = document.getElementById('rb-peek-wrap');
+            if (wrap) wrap.remove();
+            return;
+        }
+        if (!btn) {
+            (document.getElementById('rb-root') || this.bga.gameArea.getElement()).insertAdjacentHTML('beforeend',
+                `<span id="rb-peek-wrap"><button id="rb-peek-btn" class="rb-peek-btn"` +
+                ` title="${_('Lookout: reveal the top card of the material deck')}">🔭 ${_('Peek deck top')}</button>` +
+                `<span id="rb-peek-reveal" class="rb-peek-reveal" hidden></span></span>`);
+            document.getElementById('rb-peek-btn').addEventListener('click', () => {
+                const r = document.getElementById('rb-peek-reveal');
+                r.hidden = !r.hidden;
+                this.paintPeekReveal();
+            });
+        }
+        this.paintPeekReveal(); // keep an already-open reveal current as the deck top changes
+    }
+    paintPeekReveal() {
+        const r = document.getElementById('rb-peek-reveal');
+        if (!r || r.hidden) return;
+        r.innerHTML = this.peekTop ? ` ${MAT_GLYPH[this.peekTop.material] || ''} ${this.peekTop.icons}` : ` ${_('(deck empty)')}`;
     }
 
     renderStarterOffer(offers) {
