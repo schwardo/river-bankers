@@ -878,7 +878,20 @@ export class Game {
             const el = document.getElementById(`card-${c.id}`);
             const wrap = el && el.closest('.rb-mcard, .rb-slot');
             if (!wrap) return;
-            if (!(c.id in oldRects)) { wrap.classList.add('rb-card-enter'); return; } // freshly revealed
+            if (!(c.id in oldRects)) {
+                // A new card reaches the board only by the material deck refilling
+                // the Headwaters. Slide it from the deck space into its slot AFTER
+                // the existing Headwaters cards have shifted right to fill the gap
+                // (delay by one slide); fall back to a fade if the deck isn't found.
+                const deck = z === 'headwaters' ? this.deckCenter() : null;
+                if (deck) {
+                    const nc0 = this.animCenter(el);
+                    this.flipCard(wrap, deck.x - nc0.x, deck.y - nc0.y, CARD_MOVE_MS);
+                } else {
+                    wrap.classList.add('rb-card-enter');
+                }
+                return;
+            }
             const nc = this.animCenter(el);
             const oc = oldRects[c.id];
             const dx = oc.x - nc.x, dy = oc.y - nc.y;
@@ -917,6 +930,12 @@ export class Game {
     // ---- worker-chit fly animations (place / spend) ----
     reducedMotion() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
     animCenter(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+    // Screen center of the material-deck slot (source for cards refilling the Headwaters).
+    deckCenter() {
+        const dc = document.querySelector('#rb-slots .rb-deck-count');
+        const slot = dc && dc.closest('.rb-slot');
+        return slot ? this.animCenter(slot) : (dc ? this.animCenter(dc) : null);
+    }
     animLayer() {
         let l = document.getElementById('rb-anim-layer');
         // Append to <body>, NOT #rb-root: the board uses CSS `zoom`, which would
