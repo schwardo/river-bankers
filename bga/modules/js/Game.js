@@ -85,31 +85,90 @@ class PlayerTurn {
     constructor(game, bga) { this.game = game; this.bga = bga; }
 
     onEnteringState(args, isActive) {
-        this.bga.statusBar.setTitle(isActive ? _('Your turn — take one action') : _('Waiting for the active player'));
-        if (!isActive) return;
-        this.game.setHint(args.canTriggerAuction
-            ? _('Click a Headwaters card to Pull, a river card to Auction, or a hand card to Build.')
-            : _('No workers to bid — Build or Invent this turn (recall happens during an auction).'));
-        if (args.canTriggerAuction) {
-            this.game.markClickable('hw', args.headwatersCards, id => this.bga.actions.performAction('actPull', { cardId: id }));
-            this.game.markClickable('river', args.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
+        this.args = args;
+        if (!isActive) {
+            this.bga.statusBar.setTitle(_('Waiting for the active player'));
+            return;
         }
-        this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actBuild', { cardId: id }));
+        this.showMain();
+    }
 
-        for (let n = 2; n <= 5; n++) {
-            this.bga.statusBar.addActionButton(_('Invent ') + n, () => this.bga.actions.performAction('actInvent', { n }), { color: 'secondary' });
+    // Top-level action menu. Each choice that needs a target opens a client-side
+    // sub-mode (select a card / a count) with a Cancel that just returns here —
+    // no server call happens until the final selection, so Cancel is free.
+    showMain() {
+        this.game.clearClickable();
+        this.bga.statusBar.removeActionButtons();
+        this.bga.statusBar.setTitle(_('Your turn — choose an action'));
+        const a = this.args;
+        // Direct-click shortcuts stay live: click a Headwaters/river/hand card to
+        // Pull/Auction/Build it. The buttons below do the same via a guided select.
+        if (a.canTriggerAuction) {
+            this.game.markClickable('hw', a.headwatersCards, id => this.bga.actions.performAction('actPull', { cardId: id }));
+            this.game.markClickable('river', a.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
         }
-        if (args.canFlush && args.canTriggerAuction) {
-            this.bga.statusBar.addActionButton(_('Flush (5🐟)'), () => this.bga.actions.performAction('actFlush'), { color: 'secondary' });
+        this.game.markClickable('hand', a.handStructureIds, id => this.bga.actions.performAction('actBuild', { cardId: id }));
+        this.game.setHint(_('Click a Headwaters, river, or hand card directly — or use a button below.'));
+        if (a.canTriggerAuction && (a.headwatersCards || []).length) {
+            this.bga.statusBar.addActionButton(_('Pull Headwaters card (pay 2-4 🐟)'), () => this.enterPull());
         }
-        if (args.canRetire) {
+        if (a.canTriggerAuction && (a.auctionableRiverCards || []).length) {
+            this.bga.statusBar.addActionButton(_('Auction river card (pay 1 🐟)'), () => this.enterAuction());
+        }
+        if ((a.handStructureIds || []).length) {
+            this.bga.statusBar.addActionButton(_('Build structure card'), () => this.enterBuild());
+        }
+        this.bga.statusBar.addActionButton(_('Invent structure cards (pay 2-5 🐟)'), () => this.enterInvent());
+        if (a.canFlush && a.canTriggerAuction) {
+            this.bga.statusBar.addActionButton(_('Flush Headwaters (5🐟)'), () => this.bga.actions.performAction('actFlush'), { color: 'secondary' });
+        }
+        if (a.canRetire) {
             this.bga.statusBar.addActionButton(_('Retire'), () => this.bga.actions.performAction('actRetire'), { color: 'secondary' });
         }
-        (args.abilities || []).forEach(ab => {
+        (a.abilities || []).forEach(ab => {
             const label = ab.name + (ab.cost ? ' (' + ab.cost + '🐟)' : '') + (ab.once ? ' ⚡' : '');
             this.bga.statusBar.addActionButton(label,
                 () => this.bga.actions.performAction('actUseAbility', { ability: ab.key }), { color: 'secondary' });
         });
+    }
+
+    // Reset to a clean sub-mode (no clickables, no buttons) with a Cancel back to
+    // the main menu, then let the caller add the selection UI.
+    enterSubMode(title, hint) {
+        this.game.clearClickable();
+        this.bga.statusBar.removeActionButtons();
+        this.bga.statusBar.setTitle(title);
+        this.game.setHint(hint);
+    }
+    cancelButton() {
+        this.bga.statusBar.addActionButton(_('Cancel'), () => this.showMain(), { color: 'secondary' });
+    }
+
+    enterPull() {
+        this.enterSubMode(_('Pull — select a Headwaters card'),
+            _('Click a Headwaters card to pull into the river (pay its 2-4 🐟 move cost), then auction it.'));
+        this.game.markClickable('hw', this.args.headwatersCards, id => this.bga.actions.performAction('actPull', { cardId: id }));
+        this.cancelButton();
+    }
+    enterAuction() {
+        this.enterSubMode(_('Auction — select a river card'),
+            _('Click a river card to auction (pay 1 🐟 to trigger).'));
+        this.game.markClickable('river', this.args.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
+        this.cancelButton();
+    }
+    enterBuild() {
+        this.enterSubMode(_('Build — select a structure from your hand'),
+            _('Click a hand card to build it (pays its printed 🐟 cost in materials).'));
+        this.game.markClickable('hand', this.args.handStructureIds, id => this.bga.actions.performAction('actBuild', { cardId: id }));
+        this.cancelButton();
+    }
+    enterInvent() {
+        this.enterSubMode(_('Invent — how many cards?'),
+            _('Draw N structure cards then discard N; pay N 🐟.'));
+        for (let n = 2; n <= 5; n++) {
+            this.bga.statusBar.addActionButton(n + ' (' + n + '🐟)', () => this.bga.actions.performAction('actInvent', { n }), { color: 'secondary' });
+        }
+        this.cancelButton();
     }
     onLeavingState() { this.game.clearClickable(); }
 }

@@ -271,8 +271,8 @@ class PlayerTurn extends GameState
         if (!$this->game->tryBuild($activePlayerId, $cardId)) {
             $missing = $this->game->buildShortfallText($activePlayerId, $cardId);
             throw new UserException($missing === ''
-                ? 'You do not have the materials to build that.'
-                : 'You are short ' . $missing . ' to build that.');
+                ? 'You do not have the materials to build ' . $name . '.'
+                : 'You are short ' . $missing . ' to build ' . $name . '.');
         }
         $this->game->refillHand($activePlayerId);
         $this->playerStats->inc('structures_built', 1, $activePlayerId, true);

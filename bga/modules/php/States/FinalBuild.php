@@ -60,8 +60,8 @@ class FinalBuild extends GameState
         if (!$this->game->tryBuild($currentPlayerId, $cardId)) {
             $missing = $this->game->buildShortfallText($currentPlayerId, $cardId);
             throw new UserException($missing === ''
-                ? 'You do not have the materials to build that.'
-                : 'You are short ' . $missing . ' to build that.');
+                ? 'You do not have the materials to build ' . $name . '.'
+                : 'You are short ' . $missing . ' to build ' . $name . '.');
         }
 
         $this->playerStats->inc('structures_built', 1, $currentPlayerId, true);
