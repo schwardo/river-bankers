@@ -2216,6 +2216,14 @@ class Game extends \Bga\GameFramework\Table
         return array_map('intval', $this->getObjectListFromDB("SELECT `player_id` FROM `player`", true));
     }
 
+    /** Player ids currently flagged as zombies (quit / kicked). */
+    public function getZombiePlayerIds(): array
+    {
+        return array_map('intval', $this->getObjectListFromDB(
+            "SELECT `player_id` FROM `player` WHERE `player_zombie` = 1", true
+        ));
+    }
+
     /** Legal targets (card ids) for an ability, for the acting player. */
     public function abilityTargets(string $key, int $playerId): array
     {

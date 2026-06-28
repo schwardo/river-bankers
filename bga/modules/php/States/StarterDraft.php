@@ -28,7 +28,16 @@ class StarterDraft extends GameState
 
     function onEnteringState()
     {
-        $this->gamestate->setPlayersMultiactive($this->game->getAllPlayerIds(), DealHands::class, true);
+        $ids = $this->game->getAllPlayerIds();
+        $this->gamestate->setPlayersMultiactive($ids, DealHands::class, true);
+        // Auto-draft for any zombies up front (each via zombie()): the framework
+        // resolves only one zombie per request, so two+ would stall the draft.
+        $zombies = $this->game->getZombiePlayerIds();
+        foreach ($ids as $pid) {
+            if (in_array($pid, $zombies, true)) {
+                $this->zombie($pid);
+            }
+        }
     }
 
     /**

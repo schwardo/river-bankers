@@ -38,11 +38,20 @@ class Auction extends GameState
         $bidders = [];
         foreach ($this->game->getTurnOrderRows() as $row) {
             if (!$row['retired']) {
-                $bidders[] = $row['id'];
+                $bidders[] = (int) $row['id'];
             }
         }
         // Once everyone has bid (or deferred), BidReveal runs deferred bids then resolves.
         $this->gamestate->setPlayersMultiactive($bidders, BidReveal::class, true);
+        // Resolve any zombie bidders now (each bids the minimum via zombie()): the
+        // framework only auto-resolves one zombie per request, so two+ zombies
+        // would stall the sealed round with no live action left to nudge them.
+        $zombies = $this->game->getZombiePlayerIds();
+        foreach ($bidders as $pid) {
+            if (in_array($pid, $zombies, true)) {
+                $this->zombie($pid);
+            }
+        }
     }
 
     public function getArgs(): array

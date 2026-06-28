@@ -31,11 +31,19 @@ class FinalBuild extends GameState
     function onEnteringState()
     {
         // Everyone left in final_order builds at once; an empty set scores directly.
-        $this->gamestate->setPlayersMultiactive(
-            $this->globals->get('final_order', []),
-            EndScore::class,
-            true,
-        );
+        $order = array_map('intval', $this->globals->get('final_order', []));
+        $this->gamestate->setPlayersMultiactive($order, EndScore::class, true);
+        // A zombie can't take a final build, and the framework resolves at most
+        // one zombie per request — so two+ zombies would leave this simultaneous
+        // round hanging forever (no later live action to re-trigger them). Skip
+        // every zombie up front, leaving only live players (or straight to
+        // EndScore if everyone is a zombie).
+        $zombies = $this->game->getZombiePlayerIds();
+        foreach ($order as $pid) {
+            if (in_array($pid, $zombies, true)) {
+                $this->zombie($pid);
+            }
+        }
     }
 
     /**
