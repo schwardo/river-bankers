@@ -53,7 +53,7 @@ class Material
         8 => ['name' => 'Vine Lattice', 'cost' => ['vines' => 3, 'reeds' => 2], 'time' => 3, 'vp' => '5', 'effect' => 'When built: draw 3 structure cards, keep 1, discard 2.'],
         9 => ['name' => 'Charcoal Pit', 'cost' => ['clay' => 4, 'logs' => 2], 'time' => 3, 'vp' => '6', 'effect' => 'When you build: 1 of your Clay workers may substitute for any other material.'],
         10 => ['name' => 'Lookout Tree', 'cost' => ['logs' => 5, 'stones' => 2], 'time' => 4, 'vp' => '8', 'effect' => 'Peek at the top of the material deck at any time.'],
-        11 => ['name' => 'Pier', 'cost' => ['logs' => 3, 'stones' => 2], 'time' => 3, 'vp' => '0', 'effect' => 'End of game: +2 VP per shoreline card with at least one of your workers.'],
+        11 => ['name' => 'Pier', 'cost' => ['logs' => 3, 'stones' => 2], 'time' => 3, 'vp' => '0', 'effect' => 'End of game: +2 VP per shoreline card with at least one of your workers (max +6).'],
         12 => ['name' => 'Cattail Marsh', 'cost' => ['reeds' => 4, 'mud' => 2], 'time' => 3, 'vp' => '5', 'effect' => 'When you build: each Reed worker counts as 2 reeds.'],
         13 => ['name' => 'Wood Pile', 'cost' => ['logs' => 4], 'time' => 2, 'vp' => '4', 'effect' => 'Once per game (flip card): claim 1 uncovered Log icon from any river card for 1🐟.'],
         14 => ['name' => 'Heron Roost', 'cost' => ['reeds' => 3, 'vines' => 2], 'time' => 3, 'vp' => '6', 'effect' => 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck; shuffle the replaced card back into the deck.'],
