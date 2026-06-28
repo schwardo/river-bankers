@@ -31,8 +31,11 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         // Deck-empty drift: the player whose turn just ended drifts +1 fish once
         // the material deck is exhausted, so the endgame can't grind on forever.
         $turnPlayer = (int) $this->globals->get('turn_player', 0);
-        if ($turnPlayer > 0 && $this->game->getMaterialDeckCount() === 0) {
-            $this->game->advanceFish($turnPlayer, 1);
+        if ($turnPlayer > 0) {
+            $this->playerStats->inc('turns', 1, $turnPlayer, true); // count the turn that just ended
+            if ($this->game->getMaterialDeckCount() === 0) {
+                $this->game->advanceFish($turnPlayer, 1);
+            }
         }
 
         // Retire anyone whose pawn reached or crossed the fish line.

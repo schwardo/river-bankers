@@ -128,6 +128,18 @@ class Game extends \Bga\GameFramework\Table
         $this->reattributeColorsBasedOnPreferences($players, $gameinfos["player_colors"]);
         $this->reloadPlayersBasicInfos();
 
+        // Gameplay statistics (see stats.jsonc). Init to 0 before any play so the
+        // chokepoints (advanceFish, startAuction, ResolveAuction, turn states) can
+        // increment freely. Table aggregates are kept in sync via updateTableStat.
+        $this->playerStats->init([
+            'turns', 'fish_spent', 'structures_built', 'auctions_triggered',
+            'auctions_won', 'icons_won', 'inventions', 'flushes', 'abilities_used',
+        ], 0);
+        $this->tableStats->init([
+            'turns', 'fish_spent', 'structures_built', 'auctions_triggered', 'icons_won',
+            'plenty_auction', 'jammed_auctions', 'fully_jammed_auctions',
+        ], 0);
+
         $numPlayers = count($players);
 
         // ---- Material deck (sized by player count) ------------------------
@@ -321,6 +333,7 @@ class Game extends \Bga\GameFramework\Table
              SET `player_fish_pos` = `player_fish_pos` + $by, `player_stack_order` = $top
              WHERE `player_id` = $playerId"
         );
+        $this->playerStats->inc('fish_spent', $by, $playerId, true);
     }
 
     /** Place $n of a player's workers from supply onto a card. */
@@ -441,6 +454,7 @@ class Game extends \Bga\GameFramework\Table
             "INSERT INTO `auction` (`lot_card_id`, `trigger_player`, `forced_rate`)
              VALUES ($lotCardId, $triggerPlayer, $rate)"
         );
+        $this->playerStats->inc('auctions_triggered', 1, $triggerPlayer, true);
     }
 
     /** @return array<string,?string> the single open auction row */
@@ -2073,6 +2087,7 @@ class Game extends \Bga\GameFramework\Table
             "INSERT INTO `auction` (`lot_card_id`, `lot_card_id2`, `trigger_player`, `forced_rate`)
              VALUES ($cardA, $cardB, $triggerPlayer, $forcedRate)"
         );
+        $this->playerStats->inc('auctions_triggered', 1, $triggerPlayer, true);
     }
 
     /** Open icons for the current auction — sum of both cards when combined. */
@@ -2426,6 +2441,33 @@ class Game extends \Bga\GameFramework\Table
                 $this->playerScoreAux->set($pid, -$row['fish']);
             }
         }
+    }
+
+    /**
+     * Send each player's final-VP breakdown (component rows + total) for the
+     * end-of-game scoring dialog. Public info (built cards + leftover materials).
+     */
+    public function notifyFinalScores(): void
+    {
+        $shorelineTotal = $this->getShorelineTotal();
+        $scores = [];
+        foreach ($this->getTurnOrderRows() as $row) {
+            $pid = $row['id'];
+            $leftover = $this->getLeftoverWorkers($pid);
+            $rows = Scoring::playerVPBreakdown(
+                $this->getBuiltStructures($pid),
+                $leftover['fixed'],
+                $leftover['wild'],
+                $shorelineTotal,
+                $this->getShorelineCountWithWorkers($pid),
+            );
+            $total = 0;
+            foreach ($rows as $r) {
+                $total += $r['vp'];
+            }
+            $scores[] = ['playerId' => $pid, 'name' => $this->getPlayerNameById($pid), 'rows' => $rows, 'total' => $total];
+        }
+        $this->notify->all('finalScores', '', ['scores' => $scores]);
     }
 
     public function debug_goToState(int $state = 3)

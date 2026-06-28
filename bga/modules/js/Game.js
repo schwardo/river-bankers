@@ -1184,6 +1184,32 @@ export class Game {
     }
     async notif_handUpdate(args) { this.renderHand(args.hand); }
     async notif_peekUpdate(args) { this.renderPeek(args.peekTop); }
+    async notif_finalScores(args) { this.showFinalScores(args.scores || []); }
+
+    // End-of-game scoring dialog: a grid of VP components (rows) per player
+    // (columns) revealed row-by-row, with a Total. Dismissible.
+    showFinalScores(scores) {
+        if (!scores.length || document.querySelector('.rb-score-backdrop')) return;
+        const labels = [];
+        scores.forEach(s => (s.rows || []).forEach(r => { if (!labels.includes(r.label)) labels.push(r.label); }));
+        const valOf = (s, label) => { const r = (s.rows || []).find(x => x.label === label); return r ? r.vp : null; };
+        let html = `<div class="rb-score-panel"><h2>${_('Final scores')}</h2><table class="rb-score-table"><thead><tr><th></th>`;
+        scores.forEach(s => { html += `<th>${s.name}</th>`; });
+        html += '</tr></thead><tbody>';
+        labels.forEach((label, i) => {
+            html += `<tr style="animation-delay:${(i * 0.12).toFixed(2)}s"><td class="rb-score-cat">${_(label)}</td>`;
+            scores.forEach(s => { const v = valOf(s, label); html += `<td>${v === null ? '·' : v}</td>`; });
+            html += '</tr>';
+        });
+        html += `<tr class="rb-score-total" style="animation-delay:${(labels.length * 0.12).toFixed(2)}s"><td>${_('Total')}</td>`;
+        scores.forEach(s => { html += `<td>${s.total}</td>`; });
+        html += `</tr></tbody></table><button class="rb-score-close">${_('Close')}</button></div>`;
+        const back = document.createElement('div');
+        back.className = 'rb-score-backdrop';
+        back.innerHTML = html;
+        back.addEventListener('click', e => { if (e.target === back || e.target.closest('.rb-score-close')) back.remove(); });
+        document.body.appendChild(back);
+    }
 
     // Log-only notifications (messages show in the game log; no UI work needed).
     async notif_turnInfo() {}

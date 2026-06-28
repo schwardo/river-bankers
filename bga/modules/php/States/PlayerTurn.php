@@ -68,6 +68,7 @@ class PlayerTurn extends GameState
         // overwrite. Consumed by Game::undoAbility() from the selection states.
         $this->game->undoSavepoint();
         $this->game->advanceFish($activePlayerId, (int) $found['cost']);
+        $this->playerStats->inc('abilities_used', 1, $activePlayerId);
 
         // Slipstream: no target — flip the card and grant an extra turn after this
         // one (a once-per-game self bonus turn), staying on the current turn.
@@ -216,6 +217,7 @@ class PlayerTurn extends GameState
         }
         $this->game->advanceFish($activePlayerId, 5);
         $this->game->flushHeadwaters();
+        $this->playerStats->inc('flushes', 1, $activePlayerId);
 
         $this->notify->all('flush', clienttranslate('${player_name} flushes the Headwaters.'), [
             'player_id' => $activePlayerId,
@@ -237,6 +239,7 @@ class PlayerTurn extends GameState
             throw new UserException('Invent draws between 2 and 5 cards.');
         }
         $this->game->advanceFish($activePlayerId, $n);
+        $this->playerStats->inc('inventions', 1, $activePlayerId);
         $drawn = $this->game->drawStructures($activePlayerId, $n);
         // You discard as many as you drew (fewer only if the deck+discard ran dry).
         $this->globals->set('invent_discard_count', $drawn);
@@ -272,6 +275,7 @@ class PlayerTurn extends GameState
                 : 'You are short ' . $missing . ' to build that.');
         }
         $this->game->refillHand($activePlayerId);
+        $this->playerStats->inc('structures_built', 1, $activePlayerId, true);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
 
         $this->notify->all('build', clienttranslate('${player_name} builds ${card_name}.'), [

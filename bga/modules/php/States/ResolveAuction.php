@@ -71,7 +71,20 @@ class ResolveAuction extends GameState
             if ($clinched[$pid] > 0) {
                 $this->game->placeWorkers($pid, $cardId, $clinched[$pid]);
                 $placed += $clinched[$pid];
+                $this->playerStats->inc('auctions_won', 1, $pid);
+                $this->playerStats->inc('icons_won', $clinched[$pid], $pid, true);
             }
+        }
+
+        // Auction-type table stats: plenty (no overbid) vs jammed (overbid), and
+        // separately how many ended with nobody winning an icon.
+        if (array_sum($bids) > $open) {
+            $this->tableStats->inc('jammed_auctions', 1);
+        } else {
+            $this->tableStats->inc('plenty_auction', 1);
+        }
+        if ($placed === 0) {
+            $this->tableStats->inc('fully_jammed_auctions', 1);
         }
 
         $wasHeadwaters = $cardRow['card_location'] === 'headwaters';

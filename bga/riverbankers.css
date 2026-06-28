@@ -349,6 +349,21 @@
 @keyframes rb-card-in { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .rb-fly { transition: none; } .rb-card-enter { animation: none; } }
 
+/* End-of-game scoring dialog (notif_finalScores). */
+.rb-score-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 10000;
+                     display: flex; align-items: center; justify-content: center; }
+.rb-score-panel { background: #f7f1e1; color: #1c2e44; border-radius: 10px; padding: 16px 22px;
+                  max-width: 92vw; max-height: 86vh; overflow: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+.rb-score-panel h2 { margin: 0 0 10px; text-align: center; }
+.rb-score-table { border-collapse: collapse; margin: 0 auto; }
+.rb-score-table th, .rb-score-table td { padding: 4px 14px; text-align: center; border-bottom: 1px solid #d8cdb0; }
+.rb-score-table th:first-child, .rb-score-cat { text-align: left; }
+.rb-score-table tbody tr { opacity: 0; animation: rb-score-row 0.3s ease forwards; }
+@keyframes rb-score-row { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.rb-score-total td { font-weight: 800; border-top: 2px solid #1c2e44; border-bottom: none; }
+.rb-score-close { display: block; margin: 12px auto 0; padding: 5px 16px; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .rb-score-table tbody tr { opacity: 1; animation: none; } }
+
 .rb-art-wchit{background-image:url('img/chits.png');background-size:148.0px 111.0px;width:37.0px;height:37.0px;}
 .rb-p-wchit-beaver{background-position:0.0px 0.0px;}
 .rb-p-wchit-mink{background-position:-37.0px 0.0px;}

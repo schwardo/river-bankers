@@ -49,13 +49,36 @@ final class Scoring
         int $shorelineTotal,
         int $shorelineWithMyWorkers
     ): int {
+        $total = 0;
+        foreach (self::playerVPBreakdown($built, $fixedWorkers, $wildPools, $shorelineTotal, $shorelineWithMyWorkers) as $row) {
+            $total += $row['vp'];
+        }
+        return $total;
+    }
+
+    /**
+     * The component rows behind playerVP() — for the end-of-game scoring dialog.
+     * Returns nonzero contributions in display order: base structure VP, each
+     * end-game ?-VP clause that fired, then leftover-material pairs.
+     *
+     * @return list<array{label:string, vp:int}>
+     */
+    public static function playerVPBreakdown(
+        array $built,
+        array $fixedWorkers,
+        array $wildPools,
+        int $shorelineTotal,
+        int $shorelineWithMyWorkers
+    ): array {
         $names = array_map(fn(array $b) => $b['name'], $built);
         $has = fn(string $n): bool => in_array($n, $names, true);
+        $rows = [];
 
-        $v = 0;
+        $structures = 0;
         foreach ($built as $b) {
-            $v += $b['vp'];
+            $structures += $b['vp'];
         }
+        $rows[] = ['label' => 'Structures', 'vp' => $structures];
 
         $distinct = [];
         foreach ($built as $b) {
@@ -68,10 +91,10 @@ final class Scoring
         $distinctCount = count($distinct);
 
         if ($has('Pier')) {
-            $v += min(6, 2 * $shorelineWithMyWorkers);
+            $rows[] = ['label' => 'Pier', 'vp' => min(6, 2 * $shorelineWithMyWorkers)];
         }
         if ($has('Cattail Patch')) {
-            $v += self::CATTAIL_PATCH_VP[min($distinctCount, count(self::CATTAIL_PATCH_VP) - 1)];
+            $rows[] = ['label' => 'Cattail Patch', 'vp' => self::CATTAIL_PATCH_VP[min($distinctCount, count(self::CATTAIL_PATCH_VP) - 1)]];
         }
         foreach (self::MAT_ENDGAME as $name => [$mult, $cap, $mat]) {
             if ($has($name)) {
@@ -81,14 +104,14 @@ final class Scoring
                         $count++;
                     }
                 }
-                $v += min($cap, $mult * $count);
+                $rows[] = ['label' => $name, 'vp' => min($cap, $mult * $count)];
             }
         }
         if ($has('Hidden Cache')) {
-            $v += min(9, intdiv($distinctCount, 2) * 3);
+            $rows[] = ['label' => 'Hidden Cache', 'vp' => min(9, intdiv($distinctCount, 2) * 3)];
         }
         if ($has('Heron Watch')) {
-            $v += min(6, $shorelineTotal);
+            $rows[] = ['label' => 'Heron Watch', 'vp' => min(6, $shorelineTotal)];
         }
         if ($has('Trophy Lodge')) {
             $count = 0;
@@ -97,10 +120,15 @@ final class Scoring
                     $count++;
                 }
             }
-            $v += min(12, 3 * $count);
+            $rows[] = ['label' => 'Trophy Lodge', 'vp' => min(12, 3 * $count)];
         }
 
-        return $v + self::pairVP($fixedWorkers, $wildPools);
+        $pair = self::pairVP($fixedWorkers, $wildPools);
+        if ($pair !== 0) {
+            $rows[] = ['label' => 'Leftover materials', 'vp' => $pair];
+        }
+
+        return array_values(array_filter($rows, fn(array $r): bool => $r['vp'] !== 0 || $r['label'] === 'Structures'));
     }
 
     /**

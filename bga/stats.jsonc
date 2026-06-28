@@ -1,28 +1,29 @@
-{    
-    // Statistics for the table
-    "table": {},
-    
-    // Statistics for each player
+{
+    // Statistics for the table (aggregates across all players). Names match the
+    // per-player stats so PlayerStats::inc(..., updateTableStat: true) can keep
+    // both in sync from one call. See Game::setupNewGame (init) and the
+    // chokepoints (advanceFish, startAuction, ResolveAuction, the turn states).
+    "table": {
+        "turns":              { "id": 10, "name": "Turns played",       "type": "int" },
+        "fish_spent":         { "id": 11, "name": "Fish spent",         "type": "int" },
+        "structures_built":   { "id": 12, "name": "Structures built",   "type": "int" },
+        "auctions_triggered":    { "id": 13, "name": "Auctions held",      "type": "int" },
+        "icons_won":             { "id": 14, "name": "Material icons won", "type": "int" },
+        "plenty_auction":        { "id": 15, "name": "Auctions with plenty (no overbid)", "type": "int" },
+        "jammed_auctions":       { "id": 16, "name": "Jammed auctions (overbid)",         "type": "int" },
+        "fully_jammed_auctions": { "id": 17, "name": "Auctions won by nobody",            "type": "int" }
+    },
+
+    // Statistics for each player.
     "player": {
-      /* 
-      EXAMPLE:
-
-      "turns_number": {
-        "id": 10,
-        "name": "Number of turns",
-        "type": "int"
-      },
-      "player_teststat1": {
-        "id": 11,
-        "name": "player test stat 1",
-        "type": "int"
-      },
-      "player_teststat2": {
-        "id": 12,
-        "name": "player test stat 2",
-        "type": "float"
-      }
-      */
-
+        "turns":              { "id": 10, "name": "Turns played",            "type": "int" },
+        "fish_spent":         { "id": 11, "name": "Fish spent",              "type": "int" },
+        "structures_built":   { "id": 12, "name": "Structures built",        "type": "int" },
+        "auctions_triggered": { "id": 13, "name": "Auctions triggered",      "type": "int" },
+        "auctions_won":       { "id": 14, "name": "Auctions won (>=1 icon)", "type": "int" },
+        "icons_won":          { "id": 15, "name": "Material icons won",      "type": "int" },
+        "inventions":         { "id": 16, "name": "Invent actions",          "type": "int" },
+        "flushes":            { "id": 17, "name": "Headwaters flushes",      "type": "int" },
+        "abilities_used":     { "id": 18, "name": "Abilities used",          "type": "int" }
     }
 }

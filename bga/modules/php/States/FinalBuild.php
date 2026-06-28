@@ -56,6 +56,7 @@ class FinalBuild extends GameState
                 : 'You are short ' . $missing . ' to build that.');
         }
 
+        $this->playerStats->inc('structures_built', 1, $currentPlayerId, true);
         $this->notify->player($currentPlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($currentPlayerId)]);
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         $this->notify->all('build', clienttranslate('${player_name} makes a final build: ${card_name}.'), [
