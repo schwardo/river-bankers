@@ -39,29 +39,9 @@
 /* Note: you must not use any @import directive */
 
 
-/********* You can start writing your CSS below this line: **********/
-
-
-/*
-    Example of CSS sprites (a black token and a white token, 20x20px each, embedded in the same "tokens.png" 40x20px image):
-
-    .white_token {
-        background-image: url('img/tokens.png');
-        background-position: 0px 0px;
-    }
-    .black_token {
-        background-image: url('img/tokens.png');
-        background-position: -20px 0px;
-    }
-    .token {
-        width: 20px;
-        height: 20px;
-        background-repeat: none;
-    }
-*/
-
-
-
+/* All River Bankers classes/ids use the `rb-` prefix to avoid clashing with the
+   BGA framework's global CSS (the only unprefixed class we touch is `disabled`,
+   which is the framework's own action-button state). */
 
 
 /* ===== Fish track (single line across the top) ===== */
