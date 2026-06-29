@@ -272,14 +272,38 @@ class Game extends \Bga\GameFramework\Table
         if (!in_array('Lookout Tree', $names, true) && !in_array('Marsh Lookout', $names, true)) {
             return null;
         }
+        return $this->deckTopInfo();
+    }
+
+    /** Top material card of the deck as {material, icons}, or null if the deck is empty. */
+    private function deckTopInfo(): ?array
+    {
         $top = $this->getUniqueValueFromDB(
-            "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck' ORDER BY `card_location_arg` LIMIT 1"
+            "SELECT `card_type_arg` FROM `card` WHERE `card_location` = 'material_deck' ORDER BY `card_location_arg` LIMIT 1"
         );
         if ($top === null) {
             return null;
         }
-        $def = Material::$MATERIAL[(int) $this->getCardRow((int) $top)['card_type_arg']] ?? null;
+        $def = Material::$MATERIAL[(int) $top] ?? null;
         return $def === null ? null : ['material' => (string) $def['material'], 'icons' => (int) $def['icons']];
+    }
+
+    /** Player ids who control a deck-peek card (Lookout Tree / Marsh Lookout). */
+    private function lookoutOwners(): array
+    {
+        $out = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT `card_type`, `card_type_arg`, `card_location_arg` FROM `card` WHERE `card_location` = 'built'"
+        ) as $r) {
+            $arg = (int) $r['card_type_arg'];
+            $name = $r['card_type'] === 'structure'
+                ? (Material::$STRUCTURE[$arg]['name'] ?? '')
+                : (Material::$STARTER[$arg]['name'] ?? '');
+            if ($name === 'Lookout Tree' || $name === 'Marsh Lookout') {
+                $out[(int) $r['card_location_arg']] = true;
+            }
+        }
+        return $out;
     }
 
     /** @return array<string,?string> the card row */
@@ -1003,9 +1027,20 @@ class Game extends \Bga\GameFramework\Table
      */
     public function getLeftoverWorkers(int $playerId): array
     {
+        return $this->leftoverFromHoldings($this->getPlayerHoldings($playerId));
+    }
+
+    /**
+     * Split a holdings list (from getPlayerHoldings / allPlayerHoldings) into
+     * fixed-material counts and wild pools.
+     *
+     * @param list<array{material:string, wildAlt:?string, workers:int, yield:int}> $holdings
+     */
+    private function leftoverFromHoldings(array $holdings): array
+    {
         $fixed = [];
         $wild = [];
-        foreach ($this->getPlayerHoldings($playerId) as $h) {
+        foreach ($holdings as $h) {
             if ($h['wildAlt'] === null) {
                 // Old Growth at River 3/4 counts each leftover worker as 2 Logs.
                 $fixed[$h['material']] = ($fixed[$h['material']] ?? 0) + $h['workers'] * $h['yield'];
@@ -1044,23 +1079,31 @@ class Game extends \Bga\GameFramework\Table
             "SELECT `card_id`, `card_type_arg`, `card_location`, `card_location_arg`, `card_blanks`
              FROM `card` WHERE `card_location` IN ('headwaters', 'river', 'shoreline')"
         );
+        // One query for every board card's workers (was a SELECT per card).
+        $workersByCard = [];
+        foreach ($this->getObjectListFromDB(
+            "SELECT w.`card_id`, w.`player_id`, w.`workers`
+             FROM `worker` w JOIN `card` c ON c.`card_id` = w.`card_id`
+             WHERE c.`card_location` IN ('headwaters', 'river', 'shoreline')"
+        ) as $w) {
+            $workersByCard[(int) $w['card_id']][(int) $w['player_id']] = (int) $w['workers'];
+        }
         $out = ['headwaters' => [], 'river' => [], 'shoreline' => []];
         foreach ($cards as $c) {
-            $out[(string) $c['card_location']][] = $this->cardView($c);
+            $out[(string) $c['card_location']][] = $this->cardView($c, $workersByCard[(int) $c['card_id']] ?? []);
         }
         return $out;
     }
 
-    /** @param array<string,?string> $c a card row */
-    private function cardView(array $c): array
+    /**
+     * @param array<string,?string> $c a card row
+     * @param array<int,int> $workers player_id => count, pre-fetched by getBoardView
+     */
+    private function cardView(array $c, array $workers = []): array
     {
         $id = (int) $c['card_id'];
         $def = Material::$MATERIAL[(int) $c['card_type_arg']] ?? null;
         $icons = $def !== null ? (int) $def['icons'] : 0;
-        $workers = [];
-        foreach ($this->getObjectListFromDB("SELECT `player_id`, `workers` FROM `worker` WHERE `card_id` = $id") as $w) {
-            $workers[(int) $w['player_id']] = (int) $w['workers'];
-        }
         $blanks = (int) $c['card_blanks'];
         return [
             'id' => $id,
@@ -1148,9 +1191,49 @@ class Game extends \Bga\GameFramework\Table
      */
     public function getMaterialsAll(): array
     {
+        // One query for every player's material holdings (was one per player).
+        $byPlayer = $this->allPlayerHoldings();
         $out = [];
-        foreach ($this->getObjectListFromDB("SELECT `player_id` FROM `player`") as $p) {
-            $out[(int) $p['player_id']] = $this->getLeftoverWorkers((int) $p['player_id']);
+        foreach ($this->getAllPlayerIds() as $pid) {
+            $out[$pid] = $this->leftoverFromHoldings($byPlayer[$pid] ?? []);
+        }
+        return $out;
+    }
+
+    /**
+     * Every player's leftover material-worker holdings in a single query, keyed by
+     * player id. Same per-holding shape as getPlayerHoldings(); used by the batched
+     * getMaterialsAll() to avoid an N+1 over players.
+     *
+     * @return array<int, list<array{cardId:int, material:string, wildAlt:?string, workers:int, yield:int}>>
+     */
+    private function allPlayerHoldings(): array
+    {
+        $rows = $this->getObjectListFromDB(
+            "SELECT w.`player_id`, w.`card_id`, w.`workers`, c.`card_type`, c.`card_type_arg`,
+                    c.`card_location`, c.`card_location_arg`
+             FROM `worker` w JOIN `card` c ON c.`card_id` = w.`card_id`
+             WHERE w.`workers` > 0"
+        );
+        $out = [];
+        foreach ($rows as $r) {
+            if ($r['card_type'] !== 'material') {
+                continue;
+            }
+            $def = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
+            if ($def === null) {
+                continue;
+            }
+            $yield = ($def['name'] === 'Old Growth'
+                && $r['card_location'] === 'river'
+                && (int) $r['card_location_arg'] >= 3) ? 2 : 1;
+            $out[(int) $r['player_id']][] = [
+                'cardId' => (int) $r['card_id'],
+                'material' => (string) $def['material'],
+                'wildAlt' => isset($def['wildAlt']) ? (string) $def['wildAlt'] : null,
+                'workers' => (int) $r['workers'],
+                'yield' => $yield,
+            ];
         }
         return $out;
     }
@@ -1183,8 +1266,13 @@ class Game extends \Bga\GameFramework\Table
      */
     public function notifyPeek(): void
     {
+        // Compute the deck top + lookout ownership ONCE rather than per player
+        // (getPeekTop would otherwise run a built-names + deck query for each).
+        $top = $this->deckTopInfo();
+        $owners = $top === null ? [] : $this->lookoutOwners();
         foreach ($this->getAllPlayerIds() as $pid) {
-            $this->notify->player($pid, 'peekUpdate', '', ['peekTop' => $this->getPeekTop($pid)]);
+            $peek = isset($owners[$pid]) ? $top : null;
+            $this->notify->player($pid, 'peekUpdate', '', ['peekTop' => $peek]);
         }
     }
 
