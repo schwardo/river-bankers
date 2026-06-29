@@ -206,8 +206,8 @@ class StarterDraft {
         const offers = (this.game.gamedatas && this.game.gamedatas.starterOffer) || [];
         this.game.renderStarterOffer(offers);
         this.game.clearClickable();
-        if (!isActive) { this.bga.statusBar.setTitle(_('Drafting starters…')); return; }
-        this.bga.statusBar.setTitle(_('Pick your species starter to pre-build'));
+        if (!isActive) { this.bga.statusBar.setTitle(_('Choosing starter cards…')); return; }
+        this.bga.statusBar.setTitle(_('Choose a species starter card to pre-build'));
         this.game.setHint(_('Click one of your species starters to build it (it starts already-built).'));
         this.game.markClickable('starter', offers.map(c => c.id),
             id => this.bga.actions.performAction('actPickStarter', { cardId: id }));
@@ -687,7 +687,7 @@ export class Game {
                     ${builtRows}
                 </div>
             </div>
-            <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — pick one</h3><div id="rb-draft" class="rb-row"></div></div>
+            <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — choose one</h3><div id="rb-draft" class="rb-row"></div></div>
             </div>
         `);
 

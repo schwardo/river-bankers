@@ -9,8 +9,8 @@
         "description": "All players start identical — the simpler entry point."
       },
       "1": {
-        "name": "Asymmetric draft",
-        "description": "Each player drafts 1 of their 3 species starter cards, pre-built from turn 1.",
+        "name": "Asymmetric (choose a starter card)",
+        "description": "Each player chooses a species starter card from their 3, pre-built from turn 1.",
         "tmdisplay": "Species starters"
       }
     },
