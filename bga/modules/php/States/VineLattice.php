@@ -48,7 +48,7 @@ class VineLattice extends GameState
     {
         $ids = array_map(fn(array $c): int => $c['id'], $args['offer']);
         if (!in_array($cardId, $ids, true)) {
-            throw new UserException('Choose one of the drawn cards to keep.');
+            throw new UserException(clienttranslate('Choose one of the drawn cards to keep.'));
         }
         $this->game->latticeKeep($activePlayerId, $cardId);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);

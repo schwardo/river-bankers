@@ -54,7 +54,7 @@ class WhenBuilt extends GameState
     public function actEffectTarget(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose a valid target.');
+            throw new UserException(clienttranslate('Choose a valid target.'));
         }
         $effect = (string) $this->globals->get('pending_effect', '');
 

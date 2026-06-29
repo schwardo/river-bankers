@@ -44,7 +44,7 @@ class ReactReedWalkway extends GameState
     public function actReedTarget(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose a River-1 card with an uncovered icon.');
+            throw new UserException(clienttranslate('Choose a River-1 card with an uncovered icon.'));
         }
         $this->game->placeWorkers($activePlayerId, $cardId, 1);
         return $this->finish();

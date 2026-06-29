@@ -47,7 +47,7 @@ class SnagPile extends GameState
     public function actSnagChoose(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['headwatersCards'], true)) {
-            throw new UserException('Choose a Headwaters card to snag.');
+            throw new UserException(clienttranslate('Choose a Headwaters card to snag.'));
         }
         // Free trigger, forced 1🐟/item rate; the card floats to River 1 afterward.
         $this->game->startAuction($cardId, $activePlayerId, 1);

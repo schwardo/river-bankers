@@ -58,7 +58,7 @@ class DeferBid extends GameState
     {
         $minBid = $activePlayerId === (int) $args['triggerPlayer'] ? 1 : 0;
         if ($workers < $minBid || $workers > (int) $args['maxBid']) {
-            throw new UserException('Invalid bid.');
+            throw new UserException(clienttranslate('Invalid bid.'));
         }
         $auction = $this->game->getOpenAuction();
         $this->game->submitDeferredBid((int) $auction['auction_id'], $activePlayerId, $workers);

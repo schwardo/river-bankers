@@ -50,7 +50,7 @@ class ReactBurrowNetwork extends GameState
     public function actBurrowSource(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['source'] !== 0 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose one of your river cards.');
+            throw new UserException(clienttranslate('Choose one of your river cards.'));
         }
         // No legal destination for this source: nothing to do.
         if (count($this->game->burrowDests($activePlayerId, $cardId)) === 0) {
@@ -67,7 +67,7 @@ class ReactBurrowNetwork extends GameState
     public function actBurrowDest(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['source'] === 0 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose a destination river card.');
+            throw new UserException(clienttranslate('Choose a destination river card.'));
         }
         $this->game->burrowMove($activePlayerId, (int) $args['source'], $cardId);
         $this->globals->set('burrow_src', 0);

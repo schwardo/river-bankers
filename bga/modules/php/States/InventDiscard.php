@@ -49,11 +49,11 @@ class InventDiscard extends GameState
     public function actDiscard(#[IntArrayParam] array $cardIds, int $activePlayerId, array $args)
     {
         if (count($cardIds) !== (int) $args['nbToDiscard']) {
-            throw new UserException('You must discard exactly the number of cards you drew.');
+            throw new UserException(clienttranslate('You must discard exactly the number of cards you drew.'));
         }
         foreach ($cardIds as $id) {
             if (!in_array($id, $args['handStructureIds'], true)) {
-                throw new UserException('You can only discard cards from your hand.');
+                throw new UserException(clienttranslate('You can only discard cards from your hand.'));
             }
         }
 

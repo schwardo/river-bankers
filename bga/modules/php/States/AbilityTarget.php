@@ -53,7 +53,7 @@ class AbilityTarget extends GameState
     public function actAbilityTarget(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose a valid target.');
+            throw new UserException(clienttranslate('Choose a valid target.'));
         }
         $this->game->resolveAbility((string) $this->globals->get('pending_ability', ''), $cardId, $activePlayerId);
         return $this->finish();

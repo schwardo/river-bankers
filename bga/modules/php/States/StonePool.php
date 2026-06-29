@@ -46,7 +46,7 @@ class StonePool extends GameState
     public function actReorder(#[IntArrayParam] array $cardIds, int $activePlayerId)
     {
         if (!$this->game->reorderMaterialTop($cardIds)) {
-            throw new UserException('Submit a valid ordering of the shown cards.');
+            throw new UserException(clienttranslate('Submit a valid ordering of the shown cards.'));
         }
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         return BuildEffects::class;

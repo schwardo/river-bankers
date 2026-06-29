@@ -52,7 +52,7 @@ class MillWheel extends GameState
             }
         }
         if ($found === null) {
-            throw new UserException('You cannot copy that ability.');
+            throw new UserException(clienttranslate('You cannot copy that ability.'));
         }
         // Pay the copied ability's fixed cost (escalating/variable ones bill in
         // their own state) and resolve it as this player.

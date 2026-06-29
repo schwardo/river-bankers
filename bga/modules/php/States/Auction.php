@@ -103,7 +103,7 @@ class Auction extends GameState
         $maxBid = min($this->game->auctionOpenIcons(), $this->game->getPlayerSupply($currentPlayerId));
         $minBid = $currentPlayerId === (int) $auction['trigger_player'] ? 1 : 0;
         if ($workers < $minBid || $workers > $maxBid) {
-            throw new UserException('Invalid bid.');
+            throw new UserException(clienttranslate('Invalid bid.'));
         }
 
         $this->game->recordBid((int) $auction['auction_id'], $currentPlayerId, $workers);
@@ -122,7 +122,7 @@ class Auction extends GameState
     {
         $auction = $this->game->getOpenAuction();
         if (!$this->game->canDeferBid($currentPlayerId, (int) $auction['trigger_player'])) {
-            throw new UserException('You cannot defer your bid.');
+            throw new UserException(clienttranslate('You cannot defer your bid.'));
         }
         $this->game->recordDefer((int) $auction['auction_id'], $currentPlayerId, (int) $auction['trigger_player']);
         $this->notify->all('defer', clienttranslate('${player_name} defers and bids last.'), [
@@ -144,13 +144,13 @@ class Auction extends GameState
     {
         $auction = $this->game->getOpenAuction();
         if ($cardId === (int) $auction['lot_card_id']) {
-            throw new UserException('You cannot recall from the card being auctioned.');
+            throw new UserException(clienttranslate('You cannot recall from the card being auctioned.'));
         }
         $here = (int) $this->game->getUniqueValueFromDB(
             "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `player_id` = $currentPlayerId AND `card_id` = $cardId"
         );
         if ($here <= 0) {
-            throw new UserException('You have no worker to recall there.');
+            throw new UserException(clienttranslate('You have no worker to recall there.'));
         }
         $this->game->recallWorker($currentPlayerId, $cardId);
         // Streambank Hollow: slide back 1🐟 per worker recalled before an auction.
@@ -172,7 +172,7 @@ class Auction extends GameState
     {
         $auction = $this->game->getOpenAuction();
         if (!$this->game->canFloodgate($currentPlayerId, (int) $auction['trigger_player'])) {
-            throw new UserException('You cannot use Floodgate now.');
+            throw new UserException(clienttranslate('You cannot use Floodgate now.'));
         }
         $this->game->applyFloodgate($currentPlayerId);
         $this->notify->all('boardUpdate', clienttranslate('${player_name} uses Floodgate (slides the lot upstream).'), array_merge(

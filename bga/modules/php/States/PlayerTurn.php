@@ -61,7 +61,7 @@ class PlayerTurn extends GameState
             }
         }
         if ($found === null) {
-            throw new UserException('You cannot use that ability.');
+            throw new UserException(clienttranslate('You cannot use that ability.'));
         }
         // Restore point so the player can Undo the ability before it commits — it
         // refunds the fish cost and the stack order advanceFish() is about to
@@ -117,7 +117,7 @@ class PlayerTurn extends GameState
     public function actRetire(int $activePlayerId, array $args)
     {
         if (!$args['canRetire']) {
-            throw new UserException('You can only retire once another player has crossed the line.');
+            throw new UserException(clienttranslate('You can only retire once another player has crossed the line.'));
         }
         $this->game->retirePlayer($activePlayerId, $this->game->getFishLine());
         $this->notify->all('retire', clienttranslate('${player_name} retires.'), [
@@ -138,10 +138,10 @@ class PlayerTurn extends GameState
     public function actPull(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['headwatersCards'], true)) {
-            throw new UserException('That card is not in the Headwaters.');
+            throw new UserException(clienttranslate('That card is not in the Headwaters.'));
         }
         if (!$args['canTriggerAuction']) {
-            throw new UserException('You have no worker available or recallable to bid.');
+            throw new UserException(clienttranslate('You have no worker available or recallable to bid.'));
         }
 
         $row = $this->game->getCardRow($cardId);
@@ -175,10 +175,10 @@ class PlayerTurn extends GameState
     public function actAuction(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['auctionableRiverCards'], true)) {
-            throw new UserException('That card cannot be auctioned.');
+            throw new UserException(clienttranslate('That card cannot be auctioned.'));
         }
         if (!$args['canTriggerAuction']) {
-            throw new UserException('You have no worker available or recallable to bid.');
+            throw new UserException(clienttranslate('You have no worker available or recallable to bid.'));
         }
 
         $this->game->advanceFish($activePlayerId, 1); // flat trigger cost
@@ -210,10 +210,10 @@ class PlayerTurn extends GameState
     public function actFlush(int $activePlayerId, array $args)
     {
         if (!$args['canFlush']) {
-            throw new UserException('You cannot flush once the material deck is empty.');
+            throw new UserException(clienttranslate('You cannot flush once the material deck is empty.'));
         }
         if (!$args['canTriggerAuction']) {
-            throw new UserException('You have no worker available or recallable to bid.');
+            throw new UserException(clienttranslate('You have no worker available or recallable to bid.'));
         }
         $this->game->advanceFish($activePlayerId, 5);
         $this->game->flushHeadwaters();
@@ -236,7 +236,7 @@ class PlayerTurn extends GameState
     public function actInvent(int $n, int $activePlayerId)
     {
         if ($n < 2 || $n > 5) {
-            throw new UserException('Invent draws between 2 and 5 cards.');
+            throw new UserException(clienttranslate('Invent draws between 2 and 5 cards.'));
         }
         $this->game->advanceFish($activePlayerId, $n);
         $this->playerStats->inc('inventions', 1, $activePlayerId);
@@ -264,15 +264,15 @@ class PlayerTurn extends GameState
     public function actBuild(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['handStructureIds'], true)) {
-            throw new UserException('That structure is not in your hand.');
+            throw new UserException(clienttranslate('That structure is not in your hand.'));
         }
         $name = Material::$STRUCTURE[(int) $this->game->getCardRow($cardId)['card_type_arg']]['name'];
 
         if (!$this->game->tryBuild($activePlayerId, $cardId)) {
             $missing = $this->game->buildShortfallText($activePlayerId, $cardId);
             throw new UserException($missing === ''
-                ? 'You do not have the materials to build ' . $name . '.'
-                : 'You are short ' . $missing . ' to build ' . $name . '.');
+                ? sprintf(clienttranslate('You do not have the materials to build %s.'), $name)
+                : sprintf(clienttranslate('You are short %1$s to build %2$s.'), $missing, $name));
         }
         $this->game->refillHand($activePlayerId);
         $this->playerStats->inc('structures_built', 1, $activePlayerId, true);

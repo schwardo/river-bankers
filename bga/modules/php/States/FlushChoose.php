@@ -48,7 +48,7 @@ class FlushChoose extends GameState
     public function actChoose(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['headwatersCards'], true)) {
-            throw new UserException('Choose one of the revealed Headwaters cards.');
+            throw new UserException(clienttranslate('Choose one of the revealed Headwaters cards.'));
         }
 
         // Free trigger (the Flush's 5 fish covered it); auction runs at the

@@ -44,7 +44,7 @@ class FlushChannelBuild extends GameState
     public function actFlushChannelRemove(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['headwatersCards'], true)) {
-            throw new UserException('Choose a Headwaters card to remove.');
+            throw new UserException(clienttranslate('Choose a Headwaters card to remove.'));
         }
         $this->game->flushChannelRemove($cardId);
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());

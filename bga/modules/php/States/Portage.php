@@ -48,7 +48,7 @@ class Portage extends GameState
     public function actPortageSource(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['source'] !== 0 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose one of your river cards.');
+            throw new UserException(clienttranslate('Choose one of your river cards.'));
         }
         $this->globals->set('portage_src', $cardId);
         return Portage::class;
@@ -61,7 +61,7 @@ class Portage extends GameState
     public function actPortageDest(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['source'] === 0 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose another river card with a worker to swap.');
+            throw new UserException(clienttranslate('Choose another river card with a worker to swap.'));
         }
         $this->game->portageSwap($activePlayerId, (int) $args['source'], $cardId);
         $this->globals->set('portage_src', 0);

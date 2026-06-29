@@ -55,7 +55,7 @@ class SalmonRun extends GameState
     public function actSalmonCard(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['card'] !== 0 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose a river card.');
+            throw new UserException(clienttranslate('Choose a river card.'));
         }
         $this->globals->set('salmonrun_card', $cardId);
         return SalmonRun::class; // re-enter for the count
@@ -68,7 +68,7 @@ class SalmonRun extends GameState
     public function actSalmonCount(int $n, int $activePlayerId, array $args)
     {
         if ((int) $args['card'] === 0 || $n < 1 || $n > (int) $args['max']) {
-            throw new UserException('Choose how many workers to place.');
+            throw new UserException(clienttranslate('Choose how many workers to place.'));
         }
         $this->game->salmonRunPlace($activePlayerId, (int) $args['card'], $n);
         $this->globals->set('salmonrun_card', 0);

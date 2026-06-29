@@ -667,7 +667,7 @@ export class Game {
         const me = players.find(p => Number(p.id) === myId);
         const ordered = me ? [me, ...players.filter(p => p !== me)] : players;
         const builtRows = ordered.map(p =>
-            `<div class="rb-built-row"><div class="rb-sl-label">${p === me ? _('Your built') : p.name + ' — built'}</div>` +
+            `<div class="rb-built-row"><div class="rb-sl-label">${p === me ? _('Your built') : p.name + _(' — built')}</div>` +
             `<div id="built-${p.id}" class="rb-hrow"></div></div>`).join('');
 
         this.bga.gameArea.getElement().insertAdjacentHTML('beforeend', `
@@ -681,13 +681,13 @@ export class Game {
                     <div id="rb-board-img"></div>
                     <div id="rb-slots"></div>
                 </div>
-                <div class="rb-side-col" id="rb-shoreline-col"><div class="rb-sl-label">Shoreline</div><div id="rb-shoreline" class="rb-stack"></div></div>
+                <div class="rb-side-col" id="rb-shoreline-col"><div class="rb-sl-label">${_('Shoreline')}</div><div id="rb-shoreline" class="rb-stack"></div></div>
                 <div id="rb-right">
-                    <div class="rb-built-row"><div class="rb-sl-label">Your hand</div><div id="rb-hand" class="rb-hrow"></div></div>
+                    <div class="rb-built-row"><div class="rb-sl-label">${_('Your hand')}</div><div id="rb-hand" class="rb-hrow"></div></div>
                     ${builtRows}
                 </div>
             </div>
-            <div class="rb-section" id="rb-draft-section" style="display:none"><h3>Your species starters — choose one</h3><div id="rb-draft" class="rb-row"></div></div>
+            <div class="rb-section" id="rb-draft-section" style="display:none"><h3>${_('Your species starters — choose one')}</h3><div id="rb-draft" class="rb-row"></div></div>
             </div>
         `);
 
@@ -875,7 +875,7 @@ export class Game {
         const md = this.materialDeck;
         if (md) {
             html += this.slotHtml(DECK_SLOT.left, DECK_SLOT.top,
-                `<span class="rb-deck-count">${md.remaining}/${md.total} left</span>`);
+                `<span class="rb-deck-count">${md.remaining}/${md.total} ${_('left')}</span>`);
         }
 
         [1, 2, 3].forEach(slot => {

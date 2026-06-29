@@ -53,7 +53,7 @@ class Confluence extends GameState
     public function actConfA(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['cardA'] !== 0 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose the first river card.');
+            throw new UserException(clienttranslate('Choose the first river card.'));
         }
         $this->globals->set('conf_a', $cardId);
         return Confluence::class; // re-enter for the second card
@@ -67,7 +67,7 @@ class Confluence extends GameState
     {
         $a = (int) $args['cardA'];
         if ($a === 0 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose the second river card (same material).');
+            throw new UserException(clienttranslate('Choose the second river card (same material).'));
         }
         $slotA = (int) $this->game->getCardRow($a)['card_location_arg'];
         $slotB = (int) $this->game->getCardRow($cardId)['card_location_arg'];

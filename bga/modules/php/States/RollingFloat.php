@@ -48,7 +48,7 @@ class RollingFloat extends GameState
     public function actRollSource(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['source'] !== 0 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose one of your river cards.');
+            throw new UserException(clienttranslate('Choose one of your river cards.'));
         }
         $this->globals->set('rollingfloat_src', $cardId);
         return RollingFloat::class;
@@ -61,7 +61,7 @@ class RollingFloat extends GameState
     public function actRollDest(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['source'] === 0 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose an opponent worker in the same slot.');
+            throw new UserException(clienttranslate('Choose an opponent worker in the same slot.'));
         }
         $this->game->rollingFloatSwap($activePlayerId, (int) $args['source'], $cardId);
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());

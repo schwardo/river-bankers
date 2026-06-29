@@ -61,7 +61,7 @@ class TradingPost extends GameState
     public function actTradeSource(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['picked'] >= 3 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose a worker on a new material.');
+            throw new UserException(clienttranslate('Choose a worker on a new material.'));
         }
         // Recall one worker from this card (drops a blank only on river cards).
         $this->game->recallWorker($activePlayerId, $cardId, true);
@@ -80,7 +80,7 @@ class TradingPost extends GameState
     public function actTradeTarget(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['picked'] < 3 || !in_array($cardId, $args['targets'], true)) {
-            throw new UserException('Choose a river card to place workers on.');
+            throw new UserException(clienttranslate('Choose a river card to place workers on.'));
         }
         $this->game->tradingPostPlace($activePlayerId, $cardId);
         $this->globals->set('trade_mats', []);

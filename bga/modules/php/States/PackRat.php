@@ -48,7 +48,7 @@ class PackRat extends GameState
     public function actPackRatDiscard(int $cardId, int $activePlayerId, array $args)
     {
         if ((int) $args['drop'] !== 0 || !in_array($cardId, $args['handStructureIds'], true)) {
-            throw new UserException('Choose a hand card to discard.');
+            throw new UserException(clienttranslate('Choose a hand card to discard.'));
         }
         $this->globals->set('packrat_drop', $cardId);
         return PackRat::class; // re-enter for the take step
@@ -64,7 +64,7 @@ class PackRat extends GameState
         // The just-dropped card is now in the discard pile too â exclude it.
         $drop = (int) $args['drop'];
         if ($cardId === $drop || !in_array($cardId, $ids, true)) {
-            throw new UserException('Choose a card from the discard pile to take.');
+            throw new UserException(clienttranslate('Choose a card from the discard pile to take.'));
         }
         $this->game->packRatSwap($activePlayerId, $drop, $cardId);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);

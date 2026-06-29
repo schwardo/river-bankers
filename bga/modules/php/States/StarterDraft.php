@@ -48,7 +48,7 @@ class StarterDraft extends GameState
     {
         $offerIds = array_map(fn(array $c) => $c['id'], $this->game->getStarterOffer($currentPlayerId));
         if (!in_array($cardId, $offerIds, true)) {
-            throw new UserException('Choose one of your species starters.');
+            throw new UserException(clienttranslate('Choose one of your species starters.'));
         }
         $this->game->draftStarter($currentPlayerId, $cardId);
         $this->gamestate->setPlayerNonMultiactive($currentPlayerId, DealHands::class);

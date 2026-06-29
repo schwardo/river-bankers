@@ -47,7 +47,7 @@ class ReactDrawDiscard extends GameState
     public function actDiscardOne(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['handStructureIds'], true)) {
-            throw new UserException('Choose a card from your hand to discard.');
+            throw new UserException(clienttranslate('Choose a card from your hand to discard.'));
         }
         $this->game->discardStructures([$cardId]);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);

@@ -53,15 +53,15 @@ class FinalBuild extends GameState
     public function actFinalBuild(int $cardId, int $currentPlayerId)
     {
         if (!in_array($cardId, $this->game->getPlayerHand($currentPlayerId), true)) {
-            throw new UserException('That structure is not in your hand.');
+            throw new UserException(clienttranslate('That structure is not in your hand.'));
         }
         $name = Material::$STRUCTURE[(int) $this->game->getCardRow($cardId)['card_type_arg']]['name'] ?? '';
 
         if (!$this->game->tryBuild($currentPlayerId, $cardId)) {
             $missing = $this->game->buildShortfallText($currentPlayerId, $cardId);
             throw new UserException($missing === ''
-                ? 'You do not have the materials to build ' . $name . '.'
-                : 'You are short ' . $missing . ' to build ' . $name . '.');
+                ? sprintf(clienttranslate('You do not have the materials to build %s.'), $name)
+                : sprintf(clienttranslate('You are short %1$s to build %2$s.'), $missing, $name));
         }
 
         $this->playerStats->inc('structures_built', 1, $currentPlayerId, true);

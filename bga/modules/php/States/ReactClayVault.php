@@ -49,7 +49,7 @@ class ReactClayVault extends GameState
     public function actClaySwap(int $cardId, int $activePlayerId, array $args)
     {
         if (!in_array($cardId, $args['handStructureIds'], true)) {
-            throw new UserException('Choose a hand card to swap out.');
+            throw new UserException(clienttranslate('Choose a hand card to swap out.'));
         }
         $this->game->clayVaultSwap($activePlayerId, $cardId);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);

@@ -44,7 +44,7 @@ class SpringCascade extends GameState
     {
         $ids = array_map(fn(array $c): int => $c['id'], $args['spentCards']);
         if (!in_array($cardId, $ids, true)) {
-            throw new UserException('Choose one of your spent once-per-game cards.');
+            throw new UserException(clienttranslate('Choose one of your spent once-per-game cards.'));
         }
         $this->game->unflipCardUsed($cardId);
         return $this->finish();
