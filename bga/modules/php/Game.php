@@ -65,7 +65,7 @@ class Game extends \Bga\GameFramework\Table
         $result = [];
         // WARNING: only return info visible by $currentPlayerId (hide opponents' hands).
         $result["players"] = $this->getCollectionFromDb(
-            "SELECT `player_id` AS `id`, `player_name` AS `name`, `player_score` AS `score`,
+            "SELECT `player_id` AS `id`, `player_name` AS `name`,
                     `player_species` AS `species`, `player_fish_pos` AS `fish`,
                     `player_worker_supply` AS `supply`, `player_hand_limit` AS `handLimit`,
                     `player_retired` AS `retired`, `player_stack_order` AS `stack`
@@ -1174,12 +1174,15 @@ class Game extends \Bga\GameFramework\Table
         return $out;
     }
 
-    /** Public per-player display data (fish, supply, score, retired + fish-track pawn info). */
+    /** Public per-player display data (fish, supply, retired + fish-track pawn info).
+     *  Score is intentionally NOT selected here — it's owned by the $playerScore
+     *  counter, which the framework syncs to the player panel automatically. (BGA
+     *  "Check project" flags raw SQL access to player_score / player_score_aux.) */
     public function getPlayersPublic(): array
     {
         return $this->getCollectionFromDB(
             "SELECT `player_id` AS `id`, `player_fish_pos` AS `fish`, `player_worker_supply` AS `supply`,
-                    `player_score` AS `score`, `player_retired` AS `retired`,
+                    `player_retired` AS `retired`,
                     `player_stack_order` AS `stack`, `player_species` AS `species` FROM `player`"
         );
     }
