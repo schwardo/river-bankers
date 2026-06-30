@@ -42,6 +42,11 @@ class BuildEffects extends \Bga\GameFramework\States\GameState
         [$kind, $key] = explode(':', $next, 2);
 
         if ($kind === 'self') {
+            // Mill Wheel: let the builder pick which neighbour "when built" effect
+            // to copy; MillWheelBuild resolves it (inline or via the sub-states).
+            if ($key === 'millwheel') {
+                return MillWheelBuild::class;
+            }
             // River-target when-built choices go through WhenBuilt.
             if (in_array($key, ['spillway', 'sapdrip', 'mudlevee'], true)) {
                 $this->globals->set('pending_effect', $key);

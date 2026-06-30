@@ -167,6 +167,17 @@ final class Effects
      */
     public const MILL_WHEEL_COPYABLE = ['driftwoodsnag', 'towline', 'heronroost', 'salmonrun', 'portage', 'tradingpost'];
 
+    /**
+     * Structure names whose "when built" effect Mill Wheel can copy from a
+     * left/right neighbour (excludes Mill Wheel itself — no recursion — and the
+     * info-only Salt Lick). Resolution per name: Royal Lodge / Burrow Run /
+     * Springwater Pool are immediate self-effects; the rest route through the
+     * normal when-built sub-states (WhenBuilt / StonePool / VineLattice /
+     * SnagPile / FlushChannelBuild).
+     */
+    public const MILL_WHEEL_WHENBUILT = ['Royal Lodge', 'Sap Drip', 'Springwater Pool', 'Vine Lattice',
+        'Snag Pile', 'Spillway', 'Mud Levee', 'Flush Channel', 'Stone Pool', 'Burrow Run'];
+
     /** @return array{key:string, cost:int}|null */
     public static function actionAbility(string $name): ?array
     {

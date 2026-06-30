@@ -6849,11 +6849,69 @@ function neighborIdxs(playerIdx) {
   const right = (playerIdx + 1) % n;
   return left === right ? [left] : [left, right];
 }
-// What Mill Wheel can copy from a neighbour, in rough value order. When-built
-// excludes Mill Wheel (no recursion) and info-only Salt Lick; as-an-action set
-// matches the sim (Confluence excluded).
+// What Mill Wheel can copy from a neighbour. When-built excludes Mill Wheel (no
+// recursion) and info-only Salt Lick; as-an-action set matches the sim
+// (Confluence excluded). Order no longer implies priority — the copier scores
+// each in context (millWheelCopyScore) and copies the most beneficial.
 const MILL_WHEEL_WHENBUILT = ['Royal Lodge', 'Sap Drip', 'Springwater Pool', 'Vine Lattice',
   'Snag Pile', 'Spillway', 'Mud Levee', 'Flush Channel', 'Stone Pool', 'Burrow Run'];
+
+// Approximate VP-equivalent value to the COPIER of copying a neighbour's "when
+// built" effect right now, so Mill Wheel copies the most beneficial option (and
+// skips duds — Springwater Pool with nothing spent, Sap Drip with no needed
+// material, Snag Pile's paid auction). Mirrors sim.js millWheelCopyScore.
+// Heuristic: 1 material ≈ 1 VP, 1 fish(time) ≈ 0.3 VP.
+function millWheelCopyScore(playerIdx, name) {
+  const p = state.players[playerIdx];
+  switch (name) {
+    case 'Royal Lodge':
+      // Immediate extra turn — wasted if a bonus turn is already pending.
+      return state.bonusTurnPlayer == null ? 5 : 0;
+    case 'Burrow Run':
+      // Free tempo: slide back up to 5 on the 🐟 track (0.3 VP per fish).
+      return Math.min(5, p.timePos) * 0.3;
+    case 'Vine Lattice':
+      // Draw 3 structures, keep the best — only if the deck can deal them.
+      return structAvailable(state) > 0 ? 1.5 : 0;
+    case 'Sap Drip': {
+      // 2 free workers — only valuable placed on a needed, uncovered material.
+      if (p.supply === 0) return -0.3; // would commit supply for nothing
+      const wbm = playerWorkersByMaterial(state, playerIdx);
+      const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
+      let best = 0;
+      for (const c of state.riverCards) {
+        if (uncoveredIcons(c) <= 0) continue;
+        best = Math.max(best, Math.min(2, p.supply, need(c.material), uncoveredIcons(c)));
+      }
+      return best > 0 ? best : -0.3; // fallback placement wastes 2 workers
+    }
+    case 'Springwater Pool': {
+      // Ready spent once-per-game cards — worthless if none are spent.
+      const flags = ['granaryUsed', 'floodgateUsed', 'spyMoundUsed', 'tributeStoneUsed',
+        'slipstreamUsed', 'rollingFloatUsed', 'snareSetUsed', 'stoneToolUsed',
+        'woodPileUsed', 'hollowedLogUsed', 'packRatUsed', 'springCascadeUsed'];
+      return flags.filter(f => p[f]).length * 1.0;
+    }
+    case 'Spillway': {
+      // Wash an R1 card — mainly valuable when our own workers ride it.
+      let best = 0;
+      for (const c of state.riverCards) if (c.slot === 0) best = Math.max(best, workersOnCard(c, playerIdx));
+      return best > 0 ? best * 0.5 : 0.1;
+    }
+    case 'Stone Pool':
+      // Reorder upcoming materials toward our needs — minor.
+      return state.matDeck.length > 0 ? 0.5 : 0;
+    case 'Mud Levee':
+    case 'Flush Channel':
+      // Board denial — minor positive.
+      return 0.3;
+    case 'Snag Pile':
+      // Forces an auction the copier must pay for — barely worth it.
+      return 0.1;
+    default:
+      return 0;
+  }
+}
 const MILL_WHEEL_ASACTION = ['Salmon Run', 'Trading Post', 'Portage', 'Tow Line',
   'Heron Roost', 'Driftwood Snag'];
 
@@ -6879,20 +6937,38 @@ async function fireOnBuildEffect(playerIdx, struct) {
   // Spring Cascade is now a once-per-game on-demand ability (humanUseSpringCascade /
   // AI) — nothing fires on build.
   if (struct.name === 'Mill Wheel') {
-    // When built: copy one "when built" effect from a left/right neighbour's
-    // built structure, resolved for us (best by priority). The repeatable
+    // When built: copy the MOST BENEFICIAL "when built" effect from a left/right
+    // neighbour's built structure, resolved for us. AI scores each in context
+    // (millWheelCopyScore); a human picks (best pre-sorted first). The repeatable
     // as-an-action copy is a turn ability (humanUseMillWheel / AI).
     const neighborHas = new Set();
     for (const nIdx of neighborIdxs(playerIdx))
       for (const s of state.players[nIdx].built)
         if (effectActive(s.name)) neighborHas.add(s.name);
-    const copy = MILL_WHEEL_WHENBUILT.find(n => neighborHas.has(n));
-    if (copy) {
-      log(`⚙ Mill Wheel: ${speciesLabel(p)} copies ${copy} (when-built).`);
-      await fireOnBuildEffect(playerIdx, { name: copy });
-    } else {
+    const avail = MILL_WHEEL_WHENBUILT.filter(n => neighborHas.has(n))
+      .sort((a, b) => millWheelCopyScore(playerIdx, b) - millWheelCopyScore(playerIdx, a));
+    if (avail.length === 0) {
       log(`⚙ Mill Wheel: no neighbour "when built" effect to copy.`);
+      return;
     }
+    let copy;
+    if (isHuman) {
+      copy = await pickFromList(
+        '⚙ Mill Wheel — copy a neighbour\'s "when built" effect',
+        'Pick one built structure controlled by your left/right neighbour to activate its "when built" effect for you.',
+        avail,
+        n => {
+          const t = STRUCTURE_TEMPLATES.find(s => s.name === n);
+          return `<b>${n}</b>${t && t.effect ? `<br><i>${t.effect}</i>` : ''}`;
+        },
+        { cancelable: false }
+      );
+      if (!copy) copy = avail[0];
+    } else {
+      copy = avail[0];
+    }
+    log(`⚙ Mill Wheel: ${speciesLabel(p)} copies ${copy} (when-built).`);
+    await fireOnBuildEffect(playerIdx, { name: copy });
     return;
   }
   if (struct.name === 'Springwater Pool') {

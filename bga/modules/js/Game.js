@@ -489,6 +489,20 @@ class MillWheel {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class MillWheelBuild {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Mill Wheel — copy a neighbour\'s "when built" effect') : _('Mill Wheel…'));
+        if (!isActive) return;
+        this.bga.statusBar.removeActionButtons();
+        this.game.setHint(_('Pick a neighbour structure to copy its "when built" effect.'));
+        (args.options || []).forEach(o => this.bga.statusBar.addActionButton(
+            _('Copy ') + o.name,
+            () => this.bga.actions.performAction('actMillBuildPick', { card: o.name }), { color: 'secondary' }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
 class FinalBuild {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -650,6 +664,7 @@ export class Game {
         this.bga.states.register('TradingPost', new TradingPost(this, bga));
         this.bga.states.register('Confluence', new Confluence(this, bga));
         this.bga.states.register('MillWheel', new MillWheel(this, bga));
+        this.bga.states.register('MillWheelBuild', new MillWheelBuild(this, bga));
         this.bga.states.register('AbilityTarget', new AbilityTarget(this, bga));
         this.bga.states.register('FinalBuild', new FinalBuild(this, bga));
     }

@@ -1536,6 +1536,12 @@ class Game extends \Bga\GameFramework\Table
         if ($immediate !== null && $this->canRunImmediate($immediate, $playerId)) {
             $queue[] = 'self:' . $immediate;
         }
+        // Mill Wheel: copy the most beneficial "when built" effect of a built
+        // structure controlled by a left/right neighbour (resolved for us via the
+        // MillWheelBuild chooser). Only queue it if there's something to copy.
+        if ($name === 'Mill Wheel' && count($this->millWheelWhenBuiltOptions($playerId)) > 0) {
+            $queue[] = 'self:millwheel';
+        }
         // Vine Curtain material passive (set by tryBuild when its worker was spent).
         if ((int) $this->globals->get('vine_curtain_hit', 0) === 1 && $this->getMaterialDeckCount() >= 2) {
             $queue[] = 'self:vinecurtain';
@@ -2233,6 +2239,50 @@ class Game extends \Bga\GameFramework\Table
             }
         }
         return $out;
+    }
+
+    /**
+     * Distinct "when built" effects a left/right neighbour controls that Mill
+     * Wheel can copy for $playerId right now (i.e. that have a current legal
+     * target / can run). Mirrors millWheelOptions but for the when-built half.
+     *
+     * @return list<array{name:string, key:string}>
+     */
+    public function millWheelWhenBuiltOptions(int $playerId): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ($this->neighborIds($playerId) as $nid) {
+            foreach ($this->getBuiltNames($nid) as $name) {
+                if (!in_array($name, Effects::MILL_WHEEL_WHENBUILT, true) || isset($seen[$name])) {
+                    continue;
+                }
+                if (!$this->copiedWhenBuiltRunnable($name, $playerId)) {
+                    continue;
+                }
+                $seen[$name] = true;
+                $out[] = ['name' => $name, 'key' => Effects::whenBuiltChoice($name) ?? Effects::whenBuiltImmediate($name) ?? ''];
+            }
+        }
+        return $out;
+    }
+
+    /** Whether a copied "when built" effect $name could do something for $playerId now. */
+    public function copiedWhenBuiltRunnable(string $name, int $playerId): bool
+    {
+        // Immediate self effects are always offerable (worst case a small no-op).
+        if (in_array($name, ['Royal Lodge', 'Burrow Run', 'Springwater Pool'], true)) {
+            return true;
+        }
+        $choice = Effects::whenBuiltChoice($name);
+        if ($choice !== null) {
+            return count($this->whenBuiltTargets($choice)) > 0;
+        }
+        $imm = Effects::whenBuiltImmediate($name);
+        if ($imm !== null) {
+            return $this->canRunImmediate($imm, $playerId);
+        }
+        return false;
     }
 
     /** Floodgate: can the trigger slide the auctioned lot 1 space toward the Headwaters? */

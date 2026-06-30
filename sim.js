@@ -2874,28 +2874,96 @@ function aiBurrowNetworkMove(state, playerIdx) {
 }
 
 // "When built" effects a neighbour's structure might have, that Mill Wheel can
-// copy, in rough value-to-the-copier order. Excludes Mill Wheel (no recursion)
-// and Salt Lick (info-only, no sim effect).
+// copy. Excludes Mill Wheel (no recursion) and Salt Lick (info-only, no sim
+// effect). Order no longer implies priority — the copier scores each in context
+// (millWheelCopyScore) and picks the most beneficial.
 const MILL_WHEEL_WHENBUILT = ['Royal Lodge', 'Sap Drip', 'Springwater Pool', 'Vine Lattice',
   'Snag Pile', 'Spillway', 'Mud Levee', 'Flush Channel', 'Stone Pool', 'Burrow Run'];
+
+// Approximate VP-equivalent value to the COPIER of copying a neighbour's
+// "when built" effect right now. Mirrors each effect's own sim heuristic so the
+// copy picks the most beneficial option (and avoids duds — e.g. Springwater Pool
+// with nothing spent, Sap Drip with no needed material, Snag Pile's paid auction).
+// Heuristic scale: 1 material ≈ 1 VP, 1 fish(time) ≈ 0.3 VP (matches costEquivVP).
+function millWheelCopyScore(state, playerIdx, name) {
+  const p = state.players[playerIdx];
+  switch (name) {
+    case 'Royal Lodge':
+      // Immediate extra turn — wasted if a bonus turn is already pending.
+      return state.bonusTurnPlayer == null ? 5 : 0;
+    case 'Burrow Run':
+      // Free tempo: slide back up to 5 on the 🐟 track (0.3 VP per fish).
+      return Math.min(5, p.timePos) * 0.3;
+    case 'Vine Lattice':
+      // Draw 3 structures, keep the best — only if the deck can deal them.
+      return structAvailable(state) > 0 ? 1.5 : 0;
+    case 'Sap Drip': {
+      // 2 free workers — only valuable placed on a needed, uncovered material.
+      if (p.supply === 0) return -0.3; // would commit supply for nothing
+      const wbm = playerWorkersByMaterial(state, playerIdx);
+      const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
+      let best = 0;
+      for (const c of state.riverCards) {
+        if (uncoveredIcons(c) <= 0) continue;
+        best = Math.max(best, Math.min(2, p.supply, need(c.material), uncoveredIcons(c)));
+      }
+      return best > 0 ? best : -0.3; // fallback placement wastes 2 workers
+    }
+    case 'Springwater Pool': {
+      // Ready spent once-per-game cards — worthless if none are spent.
+      const flags = ['granaryUsed', 'floodgateUsed', 'spyMoundUsed', 'tributeStoneUsed',
+        'slipstreamUsed', 'rollingFloatUsed', 'snareSetUsed', 'stoneToolUsed',
+        'woodPileUsed', 'hollowedLogUsed', 'packRatUsed', 'springCascadeUsed'];
+      return flags.filter(f => p[f]).length * 1.0;
+    }
+    case 'Spillway': {
+      // Wash an R1 card — mainly valuable when our own workers ride it (carry to
+      // shoreline); otherwise mild board control.
+      let best = 0;
+      for (const c of state.riverCards) if (c.slot === 0) best = Math.max(best, workersOnCard(c, playerIdx));
+      return best > 0 ? best * 0.5 : 0.1;
+    }
+    case 'Stone Pool':
+      // Reorder upcoming materials toward our needs — minor.
+      return state.matDeck.length > 0 ? 0.5 : 0;
+    case 'Mud Levee':
+    case 'Flush Channel':
+      // Board denial (blank/discard opponents' icons) — minor positive.
+      return 0.3;
+    case 'Snag Pile':
+      // Forces an auction the copier must pay for — barely worth it.
+      return 0.1;
+    default:
+      return 0;
+  }
+}
+
+// Ablation hook: RB_NO_MILLWHEEL_WB=1 disables only Mill Wheel's "when built"
+// copy half (the as-an-action copy in tryMillWheel still works), so the
+// when-built clause's marginal balance impact can be measured in isolation.
+let MILL_WHEEL_WB_OFF = process.env.RB_NO_MILLWHEEL_WB === '1';
 
 function fireOnBuildEffect(state, playerIdx, struct) {
   const p = state.players[playerIdx];
   if (!effectActive(struct.name)) return;
   if (struct.name === 'Mill Wheel') {
-    // When built: copy one "when built" effect from a left/right neighbour's
-    // built structure, resolved for us. (The repeatable as-an-action copy lives
-    // in tryMillWheel.)
+    if (MILL_WHEEL_WB_OFF) return;
+    // When built: copy the MOST BENEFICIAL "when built" effect from a left/right
+    // neighbour's built structure, resolved for us. (The repeatable as-an-action
+    // copy lives in tryMillWheel.)
     const neighborHas = new Set();
     for (const nIdx of neighborIdxs(state, playerIdx))
       for (const s of state.players[nIdx].built)
         if (effectActive(s.name)) neighborHas.add(s.name);
+    let bestName = null, bestScore = -Infinity;
     for (const name of MILL_WHEEL_WHENBUILT) {
-      if (neighborHas.has(name)) {
-        fireOnBuildEffect(state, playerIdx, { name }); // resolve that effect for us
-        noteEffectUse(state, 'Mill Wheel');
-        break;
-      }
+      if (!neighborHas.has(name)) continue;
+      const sc = millWheelCopyScore(state, playerIdx, name);
+      if (sc > bestScore) { bestScore = sc; bestName = name; }
+    }
+    if (bestName) {
+      fireOnBuildEffect(state, playerIdx, { name: bestName }); // resolve that effect for us
+      noteEffectUse(state, 'Mill Wheel');
     }
     return;
   }
@@ -4236,6 +4304,109 @@ function sweepGameLength(numGamesArg, numPArg, workersArg) {
 // compared by injecting each as a free printed-VP-0 ability for player 0
 // (isolating the effect) and measuring win% / avgVP vs a no-bonus control.
 // Run with `cpulimit -l 50 -f -m --`.
+// Isolate the marginal balance impact of Mill Wheel's "when built" copy half.
+// Three conditions, same seeds-of-shuffle cohort: (1) full card, (2) when-built
+// copy OFF (as-an-action half only), (3) card fully disabled (no effect at all).
+// For each, report Mill-Wheel builders' win-rate and avg VP vs the field, so we
+// can see how much of Mill Wheel's edge comes from the when-built clause.
+function sweepMillWheel(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+
+  function runOneGame(state) {
+    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
+    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
+      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
+      state.metrics.turns++;
+      const cur = pickNextPlayer(state);
+      if (cur === -1) break;
+      state.currentPlayer = cur;
+      const p = state.players[cur];
+      aiStartOfTurnAbilities(state, p.idx);
+      const action = aiChooseAction(state, p.idx);
+      executeAction(state, p.idx, action);
+      cleanupShoreline(state);
+      if (state.endgame && !p.out) {
+        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
+      }
+      maybeFireSlipstream(state, p.idx);
+      if (state.endgame && state.players.every(pp => pp.out)) break;
+      if (checkGameEnd(state)) break;
+    }
+  }
+
+  function collect(label) {
+    let builders = 0, builderWins = 0, builderVP = 0;
+    let nonBuilders = 0, nonBuilderVP = 0, wbFires = 0, gamesWithBuilder = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      wbFires += (state.metrics.effectUses['Mill Wheel'] || 0);
+      const scored = state.players.map(p => ({
+        idx: p.idx, vp: totalVP(p, state), timePos: p.timePos,
+        hasMW: p.built.some(s => s.name === 'Mill Wheel'),
+      }));
+      scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+      const winnerIdx = scored[0].idx;
+      let anyBuilder = false;
+      for (const s of scored) {
+        if (s.hasMW) {
+          builders++; builderVP += s.vp; anyBuilder = true;
+          if (s.idx === winnerIdx) builderWins++;
+        } else { nonBuilders++; nonBuilderVP += s.vp; }
+      }
+      if (anyBuilder) gamesWithBuilder++;
+    }
+    return {
+      label, builders, gamesWithBuilder,
+      buildRate: builders / (numGames * numP),
+      winRate: builders ? builderWins / builders : NaN,
+      avgVP: builders ? builderVP / builders : NaN,
+      fieldVP: nonBuilders ? nonBuilderVP / nonBuilders : NaN,
+      wbFiresPerGame: wbFires / numGames,
+    };
+  }
+
+  const t0 = Date.now();
+  // Condition 1: full card.
+  MILL_WHEEL_WB_OFF = false;
+  Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+  process.stderr.write('\rmillwheel: full card ...           ');
+  const full = collect('full (both halves)');
+  // Condition 2: when-built copy off.
+  MILL_WHEEL_WB_OFF = true;
+  process.stderr.write('\rmillwheel: when-built off ...      ');
+  const wbOff = collect('when-built OFF (action only)');
+  // Condition 3: card fully disabled.
+  MILL_WHEEL_WB_OFF = false;
+  STRUCTURE_EFFECT_DISABLED['Mill Wheel'] = true;
+  process.stderr.write('\rmillwheel: fully disabled ...      ');
+  const dead = collect('fully disabled (no effect)');
+  delete STRUCTURE_EFFECT_DISABLED['Mill Wheel'];
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  const expWin = 100 / numP;
+  console.log(`\nRiver Bankers — Mill Wheel when-built isolation  (${numP}P × ${workers} workers × ${numGames} games)`);
+  console.log(`Fair-share win-rate for any one player = ${expWin.toFixed(1)}%.  'fires' counts both copy halves (effectUses).\n`);
+  console.log(pad('Condition', 30) + padL('builds', 8) + padL('build%', 9) + padL('winRate', 9) + padL('Δfair', 8) + padL('bldVP', 9) + padL('fieldVP', 9) + padL('VPedge', 8) + padL('fires/g', 9));
+  console.log('-'.repeat(30 + 8 + 9 + 9 + 8 + 9 + 9 + 8 + 9));
+  for (const r of [full, wbOff, dead]) {
+    console.log(
+      pad(r.label, 30) + padL(r.builders, 8) + padL((100 * r.buildRate).toFixed(1), 9) +
+      padL((100 * r.winRate).toFixed(1), 9) + padL(((100 * r.winRate) - expWin >= 0 ? '+' : '') + ((100 * r.winRate) - expWin).toFixed(1), 8) +
+      padL(r.avgVP.toFixed(2), 9) + padL(r.fieldVP.toFixed(2), 9) +
+      padL((r.avgVP - r.fieldVP >= 0 ? '+' : '') + (r.avgVP - r.fieldVP).toFixed(2), 8) +
+      padL(r.wbFiresPerGame.toFixed(3), 9));
+  }
+  console.log(`\nMarginal value of the when-built copy (full − when-built-off):`);
+  console.log(`  builder win-rate:  ${(100*(full.winRate - wbOff.winRate) >= 0 ? '+' : '')}${(100*(full.winRate - wbOff.winRate)).toFixed(1)} pts`);
+  console.log(`  builder avg VP:    ${((full.avgVP - wbOff.avgVP) >= 0 ? '+' : '')}${(full.avgVP - wbOff.avgVP).toFixed(2)} VP`);
+  console.log(`  builder VP edge:   ${((full.avgVP - full.fieldVP) - (wbOff.avgVP - wbOff.fieldVP) >= 0 ? '+' : '')}${(((full.avgVP - full.fieldVP) - (wbOff.avgVP - wbOff.fieldVP))).toFixed(2)} VP vs field`);
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
 function sweepBalance(numGamesArg, numPArg, workersArg) {
   const numP = parseInt(numPArg) || 4;
   const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
@@ -7073,6 +7244,7 @@ if (require.main === module) {
   else if (mode === 'confluence-trigger') sweepConfluenceTrigger(process.argv[3], process.argv[4], process.argv[5], process.argv[6]);
   else if (mode === 'confluence-matrix') sweepConfluenceMatrix(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'balance') sweepBalance(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'millwheel') sweepMillWheel(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'game-length') sweepGameLength(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-winrate') sweepSpeciesWinRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'fairness') sweepFairness(process.argv[3], process.argv[4], process.argv[5]);
