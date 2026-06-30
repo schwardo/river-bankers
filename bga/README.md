@@ -17,10 +17,14 @@ attributes (no Dojo).
   dir is the version-controlled mirror, synced to/from Studio over SFTP.
 - **SFTP:** `sftp://1.studio.boardgamearena.com:2022`, remote project path
   **`/riverbankers`** (lowercase). Pull: `lftp ... mirror /riverbankers <bga/>`;
-  push: `lftp ... mirror -R --only-newer <bga/> /riverbankers` with the
-  dev-tooling excludes below (so `vendor/`, tests, composer, etc. don't go to
-  Studio):
-  `--exclude README.md --exclude dev.sh --exclude composer.json --exclude composer.lock --exclude phpstan.neon --exclude phpunit.xml --exclude-glob vendor/* --exclude-glob tests/* --exclude-glob .phpunit*`
+  push: `lftp ... mirror -R <bga/> /riverbankers` with the dev-tooling excludes
+  below (so `vendor/`, tests, composer, etc. don't go to Studio):
+  `--exclude README.md --exclude dev.sh --exclude composer.json --exclude composer.lock --exclude phpstan.neon --exclude phpunit.xml --exclude _ide_helper.php --exclude-glob vendor/* --exclude-glob tests/* --exclude-glob .phpunit*`
+  - ⚠️ **Never add `--only-newer`** to the push. BGA stamps freshly-(re)created
+    template files with the *current* time, so `--only-newer` decides your local
+    files are "older" and silently **skips** them — the table then loads BGA's
+    dummy client (`"Player zone content goes here"`). Always push a full mirror.
+    The wrapper `games/river-bankers-bga-deploy.sh` (in the parent repo) does this.
 - The implementation checklist lives in the repo's
   `games/board-games.org` under
   *River Bankers → BoardGameArena multiplayer implementation →
