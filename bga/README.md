@@ -11,15 +11,33 @@ Built on BGA's **modern (2024+) framework**: PHP state *classes* (no
 generates HTML in JS (no `.tpl` / `.view.php`), and `#[PossibleAction]`
 attributes (no Dojo).
 
+## Build (JS/CSS) — edit the outputs, not `src/`
+
+The client is authored by **hand-editing the build outputs**: `modules/js/Game.js`
+(one self-contained ES module — all 27 classes inline) and `riverbankers.css`. The
+TypeScript/SCSS `src/` is **generated** from them by `npm run build:src` (and is
+gitignored); `npm run build` runs `build:src → build:ts (rollup) → build:scss
+(sass)`.
+
+Why it matters: BGA's **"test minified" / production path runs the build on the
+server** (`npm run build`). If `src/` is stale (the original skeleton), the build
+emits the **dummy template** — which is exactly what bit us [2026-06-30]. `build:src`
+regenerates `src/` from the real outputs first, so the minified build always
+compiles the real game. The deploy wrapper does the same regeneration before
+pushing, and ships the build config (`package.json`, `rollup.config.mjs`,
+`tsconfig.json`) so BGA can build.
+
 ## Workflow
 
 - BGA Studio is the source of record for the running game; this `bga/`
   dir is the version-controlled mirror, synced to/from Studio over SFTP.
 - **SFTP:** `sftp://1.studio.boardgamearena.com:2022`, remote project path
   **`/riverbankers`** (lowercase). Pull: `lftp ... mirror /riverbankers <bga/>`;
-  push: `lftp ... mirror -R <bga/> /riverbankers` with the dev-tooling excludes
-  below (so `vendor/`, tests, composer, etc. don't go to Studio):
-  `--exclude README.md --exclude dev.sh --exclude composer.json --exclude composer.lock --exclude phpstan.neon --exclude phpunit.xml --exclude _ide_helper.php --exclude-glob vendor/* --exclude-glob tests/* --exclude-glob .phpunit*`
+  push: **use `games/river-bankers-bga-deploy.sh`** (parent repo) — it regenerates
+  `src/`, then `lftp ... mirror -R <bga/> /riverbankers` with the dev-tooling +
+  node excludes (so `vendor/`, tests, composer, `node_modules/`, `package-lock.json`
+  don't go to Studio). The build config (`package.json`, `rollup.config.mjs`,
+  `tsconfig.json`) and a fresh `src/` **are** shipped — BGA needs them to build.
   - ⚠️ **Never add `--only-newer`** to the push. BGA stamps freshly-(re)created
     template files with the *current* time, so `--only-newer` decides your local
     files are "older" and silently **skips** them — the table then loads BGA's

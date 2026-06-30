@@ -3,3 +3,11 @@
 /.phpunit.cache/
 /.phpunit.result.cache
 /composer.lock
+
+# JS/CSS build: node deps + the generated TS/SCSS sources.
+# The canonical, hand-edited client is modules/js/Game.js + riverbankers.css;
+# src/ is regenerated from them by `npm run build:src` (see package.json), so it
+# is a build artifact, not source — never commit it.
+/node_modules/
+/package-lock.json
+/src/
