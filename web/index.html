@@ -6523,7 +6523,7 @@ async function performBuild(playerIdx, handIdx) {
   // Vine Curtain (Vines-4 effect card): when a worker is retrieved from it
   // during this build, the building player gets to peek + rearrange the top 2
   // of the material deck. Human gets a modal; AI rearranges greedily.
-  if (vineCurtainHit) {
+  if (vineCurtainHit && !state.coda) {
     if (p.isHuman) await humanVineCurtainRearrange(playerIdx);
     else aiVineCurtainRearrange(playerIdx);
   }
@@ -6537,8 +6537,10 @@ async function performBuild(playerIdx, handIdx) {
   p.hand.splice(handIdx, 1);
   p.built.push(struct);
   log(`🏗 ${speciesLabel(p)} builds <b>${struct.name}</b> (${timeCost}🐟, ${struct.vp}★).`);
-  // Fire on-build effect (one-time triggers).
-  await fireOnBuildEffect(playerIdx, struct);
+  // Fire on-build effect (one-time triggers) — SKIPPED in the final-build round
+  // (state.coda): a final build just consumes workers and places the structure,
+  // with no "when built" effect, so the simultaneous round has no timing races.
+  if (!state.coda) await fireOnBuildEffect(playerIdx, struct);
   // If an on-build modal flagged the build for cancellation, restore the
   // pre-build state in-place (so any outside references to `state` itself stay
   // valid) and bail before drawing replacements.
@@ -6557,7 +6559,8 @@ async function performBuild(playerIdx, handIdx) {
   // Passive build-triggered effects keyed off the builder's tableau (fire when
   // ANY structure with the matching material is built). Runs after the refill so
   // Stone Causeway's extra draw goes over the hand limit before re-filtering.
-  await firePassiveBuildEffects(playerIdx, struct);
+  // Also SKIPPED during the final-build round (state.coda) — see above.
+  if (!state.coda) await firePassiveBuildEffects(playerIdx, struct);
   cleanupShoreline();
 }
 

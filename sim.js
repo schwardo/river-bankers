@@ -2731,7 +2731,10 @@ function performBuild(state, playerIdx, handIdx) {
   p.built.push(struct);
   state.metrics.cardsBuilt++;
   markEngage(state, playerIdx);
-  fireOnBuildEffect(state, playerIdx, struct);
+  // On-build "when built" effects are SKIPPED in the final-build round
+  // (state.coda): a final build just consumes workers and places the structure,
+  // so the simultaneous coda has no board-mutation timing races. Matches web/BGA.
+  if (!state.coda) fireOnBuildEffect(state, playerIdx, struct);
   // Replace from deck up to maxHandSize (Cache Burrow → 4).
   while (p.hand.length < maxHandSize(p) && structAvailable(state) > 0) {
     p.hand.push(popStructDeck(state));
@@ -2739,7 +2742,8 @@ function performBuild(state, playerIdx, handIdx) {
   // Passive build-triggered effects keyed off the builder's tableau (fire when
   // ANY structure with the matching material is built). Runs after the refill so
   // Stone Causeway's extra draw goes over the hand limit before re-filtering.
-  firePassiveBuildEffects(state, playerIdx, struct);
+  // Also skipped during the final-build round (state.coda) — see above.
+  if (!state.coda) firePassiveBuildEffects(state, playerIdx, struct);
   cleanupShoreline(state);
 }
 
@@ -5765,6 +5769,9 @@ function egBestAuction(state, idx) {
 // reflects how much the coda adds). All players un-retired first.
 function egRunCoda(state, proc) {
   if (proc === 'g') return;
+  // Mark the final-build round: performBuild skips "when built" + passive
+  // build-triggered effects while state.coda is set (matches web/BGA).
+  state.coda = true;
   for (const p of state.players) { p.out = false; p.exhausted = false; }
   const order = state.players.slice()
     .sort((a, b) => a.timePos - b.timePos ||
