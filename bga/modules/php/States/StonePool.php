@@ -35,7 +35,10 @@ class StonePool extends GameState
     public function getArgs(): array
     {
         $n = (int) $this->globals->get('reorder_n', 5);
-        return ["topCards" => $this->game->topMaterialCards($n)];
+        // The top-N material cards are a PRIVATE peek at the face-down deck — only
+        // the arranging player may see them. Sent via _private so opponents,
+        // spectators, and replays never receive the upcoming material order.
+        return ["_private" => ["active" => ["topCards" => $this->game->topMaterialCards($n)]]];
     }
 
     /**

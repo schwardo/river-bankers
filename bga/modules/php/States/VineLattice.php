@@ -37,16 +37,20 @@ class VineLattice extends GameState
 
     public function getArgs(): array
     {
-        return ["offer" => $this->game->getLatticeOffer((int) $this->game->getActivePlayerId())];
+        // The 3-card draw is PRIVATE to the drawer (the kept card stays hidden in
+        // hand; only the two discards become public later). Sent via _private so
+        // opponents, spectators, and replays never see the full draw.
+        return ["_private" => ["active" => ["offer" => $this->game->getLatticeOffer((int) $this->game->getActivePlayerId())]]];
     }
 
     /**
      * @throws UserException
      */
     #[PossibleAction]
-    public function actLatticeKeep(int $cardId, int $activePlayerId, array $args)
+    public function actLatticeKeep(int $cardId, int $activePlayerId)
     {
-        $ids = array_map(fn(array $c): int => $c['id'], $args['offer']);
+        // Re-derive the offer server-side (it's no longer in public args).
+        $ids = array_map(fn(array $c): int => $c['id'], $this->game->getLatticeOffer($activePlayerId));
         if (!in_array($cardId, $ids, true)) {
             throw new UserException(clienttranslate('Choose one of the drawn cards to keep.'));
         }

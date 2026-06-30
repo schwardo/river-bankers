@@ -37,8 +37,11 @@ class ReactClayVault extends GameState
     {
         $top = $this->game->peekStructureTop();
         return [
-            "topName" => $top['name'] ?? '',
             "handStructureIds" => $this->game->getPlayerHand((int) $this->game->getActivePlayerId()),
+            // The deck-top peek is PRIVATE to the builder. Sent via _private (active
+            // player only) so it never reaches opponents, spectators, or replays —
+            // public state args would otherwise leak the next structure card.
+            "_private" => ["active" => ["topName" => $top['name'] ?? '']],
         ];
     }
 

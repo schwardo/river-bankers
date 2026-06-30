@@ -262,11 +262,13 @@ class ReactDrawDiscard {
 class ReactClayVault {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
+        // topName is a private arg (active player only) — read from _private.
+        const topName = ((args._private && args._private.active) || args).topName || '';
         this.bga.statusBar.setTitle(isActive
-            ? _('Clay Vault — deck top is ') + args.topName + _('; swap a hand card or skip')
+            ? _('Clay Vault — deck top is ') + topName + _('; swap a hand card or skip')
             : _('Clay Vault…'));
         if (!isActive) return;
-        this.game.setHint(_('Click a hand card to swap it for ') + args.topName + _(', or skip.'));
+        this.game.setHint(_('Click a hand card to swap it for ') + topName + _(', or skip.'));
         this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actClaySwap', { cardId: id }));
         this.bga.statusBar.addActionButton(_('Skip'), () => this.bga.actions.performAction('actClaySkip'), { color: 'secondary' });
     }
@@ -293,7 +295,9 @@ class StonePool {
     onEnteringState(args, isActive) {
         this.bga.statusBar.setTitle(isActive ? _('Stone Pool — set the new order of the top material cards') : _('Stone Pool…'));
         if (!isActive) return;
-        this.cards = args.topCards.slice();
+        // topCards is a private arg (active player only) — read from _private.
+        const priv = (args._private && args._private.active) || args;
+        this.cards = (priv.topCards || []).slice();
         this.order = [];
         this.render();
     }
@@ -324,7 +328,9 @@ class VineLattice {
         if (!isActive) return;
         this.bga.statusBar.removeActionButtons();
         this.game.setHint(_('Pick one card to keep; the others are discarded.'));
-        (args.offer || []).forEach(c => this.bga.statusBar.addActionButton(
+        // offer is a private arg (active player only) — read from _private.
+        const offer = ((args._private && args._private.active) || args).offer || [];
+        offer.forEach(c => this.bga.statusBar.addActionButton(
             _('Keep ') + c.name, () => this.bga.actions.performAction('actLatticeKeep', { cardId: c.id }), { color: 'secondary' }));
     }
     onLeavingState() { this.game.clearClickable(); }
