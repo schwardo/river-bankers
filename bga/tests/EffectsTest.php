@@ -119,7 +119,8 @@ final class EffectsTest extends TestCase
         self::assertSame(['key' => 'packrat', 'cost' => 0], Effects::onceAbility('Pack Rat Burrow'));
         self::assertSame(['key' => 'springcascade', 'cost' => 0], Effects::onceAbility('Spring Cascade'));
         self::assertSame(['key' => 'rollingfloat', 'cost' => 0], Effects::onceAbility('Rolling Float'));
-        self::assertSame(['key' => 'slipstream', 'cost' => 0], Effects::onceAbility('Slipstream'));
+        // Slipstream is intentionally excluded from the BGA port.
+        self::assertNull(Effects::onceAbility('Slipstream'));
         self::assertNull(Effects::onceAbility('Tow Line'));
     }
 

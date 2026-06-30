@@ -222,7 +222,7 @@ final class Effects
         'Pack Rat Burrow'  => ['key' => 'packrat', 'cost' => 0],   // discard 1 hand, take 1 from discard
         'Spring Cascade'   => ['key' => 'springcascade', 'cost' => 0], // ready one other spent once-card
         'Rolling Float'    => ['key' => 'rollingfloat', 'cost' => 0],  // swap workers in the same river slot
-        'Slipstream'       => ['key' => 'slipstream', 'cost' => 0],    // take an extra turn after this one
+        // Slipstream is intentionally excluded from the BGA port (see Material.php).
     ];
 
     /** @return array{key:string, cost:int}|null */

@@ -1902,8 +1902,6 @@ class Game extends \Bga\GameFramework\Table
                 return count($this->readyableSpentCards($playerId)) > 0;
             case 'rollingfloat':  // swap a worker with an opponent's in the same river slot
                 return count($this->rollingFloatSources($playerId)) > 0;
-            case 'slipstream':    // take an extra turn after this one
-                return $this->getBonusTurnPlayer() !== $playerId;
             case 'salmonrun':     // place 1-5 workers on a river card (escalating cost)
                 return $this->getPlayerSupply($playerId) > 0 && count($this->salmonRunTargets()) > 0;
             case 'portage':       // swap your worker with another worker on a different river card

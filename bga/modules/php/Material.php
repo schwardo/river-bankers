@@ -40,7 +40,10 @@ class Material
         23 => ['name' => 'Slipping Sandbar', 'material' => 'clay', 'icons' => 8, 'effect' => 'Enters the river at River 4. After any auction with workers placed here, slides one slot upstream. At River 1 with leftover icons, retires to shoreline.'],
     ];
 
-    // 49 shared structure-deck cards (excludes species starters).
+    // 48 shared structure-deck cards (excludes species starters). NOTE: Slipstream
+    // (id 43 in sim.js/web/cards.json) is intentionally NOT in the BGA port — its
+    // "interrupt after another player" timing has no clean BGA realization. See the
+    // "Cards not present in the BGA port" section in games/board-games.org.
     public static array $STRUCTURE = [
         0 => ['name' => 'Spillway', 'cost' => ['logs' => 4, 'mud' => 2], 'time' => 0, 'vp' => '6', 'effect' => 'When built: wash one card from River 1 to the shoreline (workers carry along).'],
         1 => ['name' => 'Hollowed-out Log', 'cost' => ['logs' => 3, 'reeds' => 1], 'time' => 2, 'vp' => '5', 'effect' => 'Once per game (flip card): recall one worker from a river card (no blank).'],
@@ -97,7 +100,6 @@ End of game: +3 VP per built structure of yours that uses Mud (max +9).'],
         40 => ['name' => 'Tow Line', 'cost' => ['mud' => 4, 'clay' => 2, 'vines' => 1], 'time' => 4, 'vp' => '8', 'effect' => 'As an action: pay 2🐟 to slide a river card 1 space toward the Headwaters.'],
         41 => ['name' => 'Portage', 'cost' => ['vines' => 3, 'stones' => 2], 'time' => 3, 'vp' => '6', 'effect' => 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.'],
         42 => ['name' => 'Salmon Run', 'cost' => ['logs' => 4, 'vines' => 2], 'time' => 4, 'vp' => '6', 'effect' => 'As an action: place 1-5 workers from your supply onto uncovered icons of one river card. 🐟 cost escalates 1/2/3/5/8 per successive worker.'],
-        43 => ['name' => 'Slipstream', 'cost' => ['mud' => 2, 'vines' => 2], 'time' => 3, 'vp' => '5', 'effect' => 'Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track.'],
         44 => ['name' => 'Trophy Lodge', 'cost' => ['clay' => 3, 'stones' => 2], 'time' => 3, 'vp' => '0', 'effect' => 'End of game: +3 VP per ?-VP structure you control, including this one (max +12).'],
         45 => ['name' => 'Springwater Pool', 'cost' => ['vines' => 3, 'mud' => 2], 'time' => 3, 'vp' => '5', 'effect' => 'When built: ready all of your spent once-per-game cards.'],
         46 => ['name' => 'Spring Cascade', 'cost' => ['logs' => 2, 'mud' => 1], 'time' => 1, 'vp' => '3', 'effect' => 'Once per game (flip card): ready one of your other spent once-per-game cards.'],

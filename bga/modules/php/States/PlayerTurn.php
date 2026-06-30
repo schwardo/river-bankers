@@ -70,20 +70,6 @@ class PlayerTurn extends GameState
         $this->game->advanceFish($activePlayerId, (int) $found['cost']);
         $this->playerStats->inc('abilities_used', 1, $activePlayerId);
 
-        // Slipstream: no target — flip the card and grant an extra turn after this
-        // one (a once-per-game self bonus turn), staying on the current turn.
-        if ($ability === 'slipstream') {
-            $this->game->flipCardUsed((int) $found['cardId']);
-            $this->globals->set('bonus_turn_player', $activePlayerId);
-            $this->notify->all('build', clienttranslate('${player_name} uses Slipstream (extra turn).'), [
-                'player_id' => $activePlayerId,
-                'player_name' => $this->game->getPlayerNameById($activePlayerId),
-            ]);
-            // Refresh so the flipped card shows its spent ("USED") stamp at once.
-            $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
-            return PlayerTurn::class;
-        }
-
         $this->globals->set('pending_ability', $ability);
         // Once-per-game and free repeatable (turn-start) abilities don't consume
         // the turn; only once-abilities flip their source card. As-an-action
