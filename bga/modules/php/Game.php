@@ -1175,9 +1175,9 @@ class Game extends \Bga\GameFramework\Table
     }
 
     /** Public per-player display data (fish, supply, retired + fish-track pawn info).
-     *  Score is intentionally NOT selected here — it's owned by the $playerScore
-     *  counter, which the framework syncs to the player panel automatically. (BGA
-     *  "Check project" flags raw SQL access to player_score / player_score_aux.) */
+     *  Score is intentionally NOT selected here — it's owned by the $playerScore /
+     *  $playerScoreAux counters, which the framework syncs to the player panel
+     *  automatically (so the score columns are never touched via raw SQL). */
     public function getPlayersPublic(): array
     {
         return $this->getCollectionFromDB(

@@ -65,9 +65,9 @@ CREATE TABLE IF NOT EXISTS `worker` (
 
 -- =====================================================================
 -- Per-player state (extends the standard "player" table).
--- NB: VP uses the standard player_score column, and the tie-breaker uses the
--- standard player_score_aux column (= -(player_fish_pos): furthest back on the
--- track wins ties) — neither is added here.
+-- NB: VP uses the framework's standard score counter, and the tie-breaker uses
+-- the standard score-aux counter (= -(player_fish_pos): furthest back on the
+-- track wins ties) — neither column is added here.
 -- =====================================================================
 -- ABSOLUTE position on the fish track (may exceed 59 — this is the running total
 -- across laps, not the 0-59 space; the physical "+60 flip" is just a readability
