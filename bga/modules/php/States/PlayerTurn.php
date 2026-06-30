@@ -69,6 +69,15 @@ class PlayerTurn extends GameState
         $this->game->undoSavepoint();
         $this->game->advanceFish($activePlayerId, (int) $found['cost']);
         $this->playerStats->inc('abilities_used', 1, $activePlayerId);
+        // Log the ability use — every ability routes through here, and the
+        // per-target sub-states only send a (log-less) boardUpdate, so without
+        // this nothing about an ability appears in the game log. The card name is
+        // a data-driven proper noun, so it is a plain substitution (not i18n).
+        $this->notify->all('abilityUsed', clienttranslate('${player_name} uses ${ability_name}'), [
+            'player_id' => $activePlayerId,
+            'player_name' => $this->game->getPlayerNameById($activePlayerId),
+            'ability_name' => (string) $found['name'],
+        ]);
 
         $this->globals->set('pending_ability', $ability);
         // Once-per-game and free repeatable (turn-start) abilities don't consume

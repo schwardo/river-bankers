@@ -511,7 +511,14 @@ class MillWheelBuild {
 
 class FinalBuild {
     constructor(game, bga) { this.game = game; this.bga = bga; }
-    onEnteringState(args, isActive) {
+    // MULTIPLE_ACTIVE_PLAYER: players are not yet active in onEnteringState, so
+    // the Skip button + clickable hand must be (re)built in onPlayerActivationChange
+    // (mirrors Auction). Without this the active player gets a blank action bar with
+    // no Skip button and the final-build round soft-locks before scoring.
+    onEnteringState(args, isActive) { this.onPlayerActivationChange(args, isActive); }
+    onPlayerActivationChange(args, isActive) {
+        this.game.clearClickable();
+        this.bga.statusBar.removeActionButtons();
         this.bga.statusBar.setTitle(isActive ? _('Final build — build one structure or skip') : _('Final builds…'));
         if (!isActive) return;
         this.game.setHint(_('One last build: click a hand card, or skip.'));
@@ -1346,6 +1353,7 @@ export class Game {
     async notif_build() {}
     async notif_flush() {}
     async notif_invent() {}
+    async notif_abilityUsed() {}
     async notif_retire() {}
     async notif_shorelinePenalty() {}
 }
