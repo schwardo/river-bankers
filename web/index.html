@@ -3742,8 +3742,8 @@ function renderActionPanel() {
       : 'Confluence: pool-auction two same-symbol cards';
     html = `<div class="action-panel-title">Your turn — choose an action</div>
       <div class="action-buttons">
-        <button onclick="humanChooseAction('preriv')" ${(triggerPool > 0 && hasPreriv) ? '' : 'disabled'}>1. Auction Headwaters card (2–4🐟)</button>
-        <button onclick="humanChooseAction('auction')" ${(triggerPool > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>2. Auction river card (1🐟)</button>
+        <button onclick="humanChooseAction('preriv')" ${(triggerPool > 0 && hasPreriv) ? '' : 'disabled'}>1. Pull Headwaters card (2–4🐟)</button>
+        <button onclick="humanChooseAction('auction')" ${(triggerPool > 0 && state.riverCards.some(c => uncoveredIcons(c) > 0)) ? '' : 'disabled'}>2. Swim to a river card (1🐟)</button>
         <button onclick="humanChooseAction('flush')" ${(triggerPool > 0 && state.matDeck.length > 0) ? '' : 'disabled'}>3. Flush Headwaters (5🐟)</button>
         <button onclick="humanChooseAction('browse')" ${structAvailable(state) > 0 ? '' : 'disabled'}>4. Draw structure cards (N🐟)</button>
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>5. Build a structure</button>
@@ -3753,7 +3753,7 @@ function renderActionPanel() {
         ${state.retireUnlocked ? `<button class="ghost" onclick="humanRetire()">🏁 Retire (advance to space ${lowestFreeFinishSpot()}🐟)</button>` : ''}
       </div>
       ${abilityRow}
-      <div class="action-hint">Tip: click any river or Headwaters card to auction it, or any buildable structure in your hand to build it. Out of supply? You can recall placed workers from the bid dialog.</div>`;
+      <div class="action-hint">Tip: click a river card to swim to it or a Headwaters card to pull it, or any buildable structure in your hand to build it. Out of supply? You can recall placed workers from the bid dialog.</div>`;
   } else if (state.phase === 'combined-pick') {
     const first = state.combinedPick && state.combinedPick.first;
     const cfg = combinedConfig();
@@ -3776,13 +3776,13 @@ function renderActionPanel() {
         <span class="action-hint">Click either highlighted card to place a worker. <b>${left}</b> left.</span>
       </div>`;
   } else if (state.phase === 'select-auction-card') {
-    html = `<div class="action-panel-title">Pick a river card to auction</div>
+    html = `<div class="action-panel-title">Pick a river card to swim to</div>
       <div class="action-buttons">
         <span class="action-hint">Click a card with open icons.</span>
         <button class="ghost" onclick="humanUndoLastMove()">↶ Undo</button>
       </div>`;
   } else if (state.phase === 'select-preriv-card') {
-    html = `<div class="action-panel-title">Pick a Headwaters card to auction</div>
+    html = `<div class="action-panel-title">Pick a Headwaters card to pull</div>
       <div class="action-buttons">
         <span class="action-hint">Click a Headwaters card. Move cost depends on the slot (4🐟 / 3🐟 / 2🐟).</span>
         <button class="ghost" onclick="humanUndoLastMove()">↶ Undo</button>

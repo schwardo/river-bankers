@@ -102,7 +102,7 @@ class PlayerTurn {
         this.bga.statusBar.setTitle(_('Your turn — choose an action'));
         const a = this.args;
         // Direct-click shortcuts stay live: click a Headwaters/river/hand card to
-        // Pull/Auction/Build it. The buttons below do the same via a guided select.
+        // Pull/Swim/Build it. The buttons below do the same via a guided select.
         if (a.canTriggerAuction) {
             this.game.markClickable('hw', a.headwatersCards, id => this.bga.actions.performAction('actPull', { cardId: id }));
             this.game.markClickable('river', a.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
@@ -113,7 +113,7 @@ class PlayerTurn {
             this.bga.statusBar.addActionButton(_('Pull Headwaters card (pay 2-4 🐟)'), () => this.enterPull());
         }
         if (a.canTriggerAuction && (a.auctionableRiverCards || []).length) {
-            this.bga.statusBar.addActionButton(_('Auction river card (pay 1 🐟)'), () => this.enterAuction());
+            this.bga.statusBar.addActionButton(_('Swim to a river card (pay 1 🐟)'), () => this.enterAuction());
         }
         if ((a.handStructureIds || []).length) {
             this.bga.statusBar.addActionButton(_('Build structure card'), () => this.enterBuild());
@@ -151,8 +151,8 @@ class PlayerTurn {
         this.cancelButton();
     }
     enterAuction() {
-        this.enterSubMode(_('Auction — select a river card'),
-            _('Click a river card to auction (pay 1 🐟 to trigger).'));
+        this.enterSubMode(_('Swim — select a river card'),
+            _('Click a river card to swim to (pay 1 🐟 to trigger).'));
         this.game.markClickable('river', this.args.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
         this.cancelButton();
     }
