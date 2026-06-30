@@ -11,21 +11,21 @@ Built on BGA's **modern (2024+) framework**: PHP state *classes* (no
 generates HTML in JS (no `.tpl` / `.view.php`), and `#[PossibleAction]`
 attributes (no Dojo).
 
-## Build (JS/CSS) — edit the outputs, not `src/`
+## Client: hand-edited, no build step on BGA
 
-The client is authored by **hand-editing the build outputs**: `modules/js/Game.js`
-(one self-contained ES module — all 27 classes inline) and `riverbankers.css`. The
-TypeScript/SCSS `src/` is **generated** from them by `npm run build:src` (and is
-gitignored); `npm run build` runs `build:src → build:ts (rollup) → build:scss
-(sass)`.
+The client is `modules/js/Game.js` (one self-contained ES module — all 27 classes
+inline) + `riverbankers.css`, **edited by hand**. BGA **serves these directly** in
+dev and **terser-minifies them directly** for production ("Use minified JS/CSS") —
+it does **not** build them from `src/`. The skeleton's rollup/sass/TS toolchain
+(`src/`, `package.json`, `rollup.config.mjs`, `tsconfig.json`, `node_modules/`) is
+**vestigial and unused**; it stays local and is **not** deployed.
 
-Why it matters: BGA's **"test minified" / production path runs the build on the
-server** (`npm run build`). If `src/` is stale (the original skeleton), the build
-emits the **dummy template** — which is exactly what bit us [2026-06-30]. `build:src`
-regenerates `src/` from the real outputs first, so the minified build always
-compiles the real game. The deploy wrapper does the same regeneration before
-pushing, and ships the build config (`package.json`, `rollup.config.mjs`,
-`tsconfig.json`) so BGA can build.
+The real production gotcha is **version control, not a build**: BGA's project is
+under **SVN**, and "test minified" runs on the **committed** snapshot — not the
+SFTP working copy. So the order is **deploy (SFTP) → "Commit my modifications now"
+on the Manage-game page → test minified**. Skipping the commit minifies the
+previously-committed code (e.g. the skeleton → the dummy template), which cost us a
+long debugging session [2026-06-30].
 
 ## Workflow
 
