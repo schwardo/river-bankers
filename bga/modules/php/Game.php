@@ -1304,7 +1304,13 @@ class Game extends \Bga\GameFramework\Table
         $this->globals->set('packrat_drop', 0);
         $this->globals->set('salmonrun_card', 0);
         $this->globals->set('trade_mats', []);
-        $this->notify->all('boardUpdate', '', $this->boardUpdatePayload());
+        // Do NOT manually notify here. undoRestorePoint() already rolls the move/
+        // packet counter back to the savepoint and reloads the client to that state;
+        // a notification sent afterward lands at an already-consumed packet id, which
+        // desyncs the client and strands its interface lock so the NEXT action (e.g.
+        // re-using the ability then clicking a target) fails with "an action is
+        // already in progress." The board snaps back via the framework's own
+        // post-restore reload, so the refund still shows.
         return \Bga\Games\RiverBankers\States\PlayerTurn::class;
     }
 
