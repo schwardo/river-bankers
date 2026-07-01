@@ -3857,7 +3857,7 @@ function renderActionPanel() {
               <span><b>${b}</b> worker${b === 1 ? '' : 's'}</span>
             </div>`;
           }).join('');
-        revealHtml = `<p class="small-note" style="margin-top:0;">🕵 Spy Mound — you've seen everyone else's bids:</p>
+        revealHtml = `<p class="small-note" style="margin-top:0;">${ctx.opts.deferViaQuickStrike ? '⚡ Quick Strike' : '🕵 Spy Mound'} — you've seen everyone else's bids:</p>
           <div class="auction-bidders">${rows}</div>`;
       }
 
@@ -3919,6 +3919,7 @@ function renderActionPanel() {
         <div id="bid-cross-warn">${humanCrossWarnHTML(initBid * ctx.cost)}</div>
         <div class="action-buttons" style="margin-top:10px;">
           <button id="bid-submit-btn" class="primary" onclick="state.humanBidContext && state.humanBidContext.submit()">Submit bid</button>
+          ${(ctx.opts && ctx.opts.canDefer && !ctx.opts.revealedBids) ? `<button class="ghost" onclick="state.humanBidContext && state.humanBidContext.defer()">${ctx.opts.deferViaQuickStrike ? '⚡ Quick Strike' : '🕵 Spy Mound'} — defer &amp; see bids first</button>` : ''}
           ${state._undoSnapshot ? `<button class="undo-last-btn" onclick="humanUndoLastMove()">↶ Undo (back to your turn)</button>` : ''}
         </div>`;
     }
@@ -4254,41 +4255,22 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     }
   }
   const human = state.players.find(p => p.isHuman);
+  // Spy Mound / Quick Strike deferral is offered *inline* in the human's bid
+  // dialog (a "Defer your bid" button), not as an upfront modal that fires on
+  // every auction. Here we only compute *eligibility*; the actual choice is
+  // made when the human bids (humanBidForAuction resolves with the 'defer'
+  // sentinel). Prefer Spy Mound (one-shot) if available, else Quick Strike
+  // (mink species starter, trigger player only). Only one deferrer per auction,
+  // so the human is offered it only when no AI has already deferred.
   let deferredHuman = -1;
   let deferredHumanViaQuickStrike = false;
+  let humanCanDefer = false, humanDeferViaQuickStrike = false;
   if (human && !human.out && !human.exhausted && deferredAi === -1) {
-    // Prefer Spy Mound (one-shot resource) if available; fall back to Quick
-    // Strike (unlimited mink species starter) otherwise. Only one prompt either way.
     if (hasEffect(human, 'Spy Mound') && !human.spyMoundUsed) {
-      startHumanTimer();
-      let useIt;
-      try {
-        useIt = await confirmModal(
-          '🕵 Spy Mound — defer your bid?',
-          `Wait for ${state.players.length - 1} other player${state.players.length - 1 === 1 ? '' : 's'} to reveal their bids before you decide yours? Once-per-game.`
-        );
-      } finally {
-        stopHumanTimer();
-      }
-      if (useIt) {
-        deferredHuman = human.idx;
-        human.spyMoundUsed = true;
-      }
+      humanCanDefer = true;
     } else if (hasEffect(human, 'Quick Strike') && human.idx === triggerPlayerIdx) {
-      startHumanTimer();
-      let useIt;
-      try {
-        useIt = await confirmModal(
-          '⚡ Quick Strike — defer your bid?',
-          `Wait for ${state.players.length - 1} other player${state.players.length - 1 === 1 ? '' : 's'} to reveal their bids before you decide yours? No use limit.`
-        );
-      } finally {
-        stopHumanTimer();
-      }
-      if (useIt) {
-        deferredHuman = human.idx;
-        deferredHumanViaQuickStrike = true;
-      }
+      humanCanDefer = true;
+      humanDeferViaQuickStrike = true;
     }
   }
   const bids = {};
@@ -4313,10 +4295,23 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     } else {
       const minBid = (human.idx === triggerPlayerIdx) ? minBidTrigger : 0;
       startHumanTimer();
+      let res;
       try {
-        bids[human.idx] = await humanBidForAuction(card, human, minBid);
+        res = await humanBidForAuction(card, human, minBid, {
+          canDefer: humanCanDefer,
+          deferViaQuickStrike: humanDeferViaQuickStrike,
+        });
       } finally {
         stopHumanTimer();
+      }
+      if (res === 'defer') {
+        // Human chose to wait for the reveal. Consume the resource now; the
+        // real bid resolves in the deferred block below (with revealedBids).
+        deferredHuman = human.idx;
+        deferredHumanViaQuickStrike = humanDeferViaQuickStrike;
+        if (!humanDeferViaQuickStrike) human.spyMoundUsed = true;
+      } else {
+        bids[human.idx] = res;
       }
     }
   }
@@ -4347,7 +4342,7 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     const minBid = (deferredHuman === triggerPlayerIdx) ? minBidTrigger : 0;
     startHumanTimer();
     try {
-      bids[sp.idx] = await humanBidForAuction(card, sp, minBid, { revealedBids: { ...bids } });
+      bids[sp.idx] = await humanBidForAuction(card, sp, minBid, { revealedBids: { ...bids }, deferViaQuickStrike: deferredHumanViaQuickStrike });
     } finally {
       stopHumanTimer();
     }
@@ -7560,6 +7555,18 @@ async function humanBidForAuction(card, human, minBid, opts = {}) {
         // turn loop) re-renders again.
         state.phase = 'auction-bidding';
         resolve(v);
+        render();
+      },
+      // "Defer your bid" — Spy Mound / Quick Strike. Tear down the bid UI
+      // without applying any recall or bid and resolve with the 'defer'
+      // sentinel; the caller re-prompts after the opponents' reveal. Guarded
+      // to the initial (pre-reveal) prompt only.
+      defer: () => {
+        if (!opts.canDefer || opts.revealedBids) return;
+        humanBidRecallState = null;
+        state.humanBidContext = null;
+        state.phase = 'auction-bidding';
+        resolve('defer');
         render();
       },
     };
