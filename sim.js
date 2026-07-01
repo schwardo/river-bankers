@@ -1383,8 +1383,6 @@ function collectAuctionBids(state, card, triggerPlayerIdx, minBidTrigger) {
   // they actually want. Spy Mound used first when both are available
   // (one-shot resource). The "want" check prevents wasted activations on
   // materials nothing in the player's hand needs.
-  let deferred = -1;
-  let deferredViaQuickStrike = false;
   const wantsMaterial = (p) => {
     const mats = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
     return p.hand.some(s => mats.some(m => (s.cost[m] || 0) > 0));
@@ -1408,43 +1406,53 @@ function collectAuctionBids(state, card, triggerPlayerIdx, minBidTrigger) {
     }
     return maxDeficit >= 2;
   };
+  // Deferral (Spy Mound / Quick Strike): a player bids LAST, seeing others'
+  // revealed bids. Multiple players may defer in the same auction; they reveal
+  // one at a time in turn order (lowest fish first, ties by stack order), each
+  // seeing only the bids already committed — mirrors the BGA BidReveal loop.
+  // A player who holds both prefers Quick Strike (free, unlimited) so the
+  // one-shot Spy Mound stays in reserve.
+  const deferrers = [];   // [{ idx, viaQuickStrike }]
   for (const p of state.players) {
-    if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out) {
-      if (spyMoundWorthIt(p)) { deferred = p.idx; break; }
+    if (p.exhausted || p.out) continue;
+    if (p.idx === triggerPlayerIdx && hasEffect(p, 'Quick Strike') && wantsMaterial(p)) {
+      deferrers.push({ idx: p.idx, viaQuickStrike: true });
+    } else if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && spyMoundWorthIt(p)) {
+      deferrers.push({ idx: p.idx, viaQuickStrike: false });
     }
   }
-  if (deferred === -1) {
-    // Quick Strike only fires when its owner is the one who triggered the
-    // auction (per the card text), unlike Spy Mound which works on any auction.
-    for (const p of state.players) {
-      if (p.idx !== triggerPlayerIdx) continue;
-      if (hasEffect(p, 'Quick Strike') && !p.exhausted && !p.out) {
-        if (wantsMaterial(p)) { deferred = p.idx; deferredViaQuickStrike = true; break; }
-      }
-    }
-  }
+  const deferredSet = new Set(deferrers.map(d => d.idx));
+  // Sealed round: everyone not deferring bids now.
   for (const p of state.players) {
     if (p.exhausted || p.out) { bids[p.idx] = 0; continue; }
-    if (p.idx === deferred) continue;
+    if (deferredSet.has(p.idx)) continue;
     const minBid = (p.idx === triggerPlayerIdx) ? minBidTrigger : 0;
     bids[p.idx] = aiDecideBid(state, p.idx, card, minBid);
   }
-  if (deferred !== -1) {
-    const p = state.players[deferred];
+  // Deferrers reveal sequentially in the game's turn order (fish asc, then
+  // stack position asc — same ordering pickNextPlayer/triggerEndgame use), so
+  // a later deferrer reacts to earlier deferrers' now-committed bids.
+  const stackPos = (idx) => state.stackOrder.indexOf(idx);
+  deferrers.sort((a, b) => {
+    const pa = state.players[a.idx], pb = state.players[b.idx];
+    return pa.timePos - pb.timePos || stackPos(a.idx) - stackPos(b.idx);
+  });
+  const open = uncoveredIcons(card);
+  for (const d of deferrers) {
+    const p = state.players[d.idx];
     // Spy Mound is once-per-game; Quick Strike has no use limit.
-    if (!deferredViaQuickStrike) p.spyMoundUsed = true;
-    const open = uncoveredIcons(card);
+    if (!d.viaQuickStrike) p.spyMoundUsed = true;
     const others = Object.values(bids).reduce((s, b) => s + b, 0);
     const room = open - others;
-    const minBid = (deferred === triggerPlayerIdx) ? minBidTrigger : 0;
+    const minBid = (d.idx === triggerPlayerIdx) ? minBidTrigger : 0;
     // Use the normal bid calculator (which considers material need) for the
     // base recommendation, then cap at remaining room so we never jam.
     let bid = aiDecideBid(state, p.idx, card, minBid);
     if (room <= 0) {
-      bid = deferred === triggerPlayerIdx ? Math.max(minBidTrigger, 1) : 0;
+      bid = d.idx === triggerPlayerIdx ? Math.max(minBidTrigger, 1) : 0;
     } else {
       bid = Math.min(bid, room);
-      if (deferred === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
+      if (d.idx === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
     }
     bids[p.idx] = bid;
   }

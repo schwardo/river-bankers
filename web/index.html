@@ -4245,52 +4245,42 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     }
     return maxDeficit >= 2;
   };
-  let deferredAi = -1;
-  let deferredAiViaQuickStrike = false;
+  // Deferral (Spy Mound / Quick Strike): holders bid LAST, after others reveal.
+  // Multiple players may defer in the same auction; they reveal one at a time
+  // in turn order (lowest fish first, ties by stack position), each seeing only
+  // the bids already committed — mirrors the BGA BidReveal loop. A player who
+  // holds both prefers Quick Strike (free, unlimited), keeping the one-shot Spy
+  // Mound in reserve. AIs use the worth-it heuristics to decide; the human is
+  // simply offered the choice inline in their bid dialog whenever eligible.
+  const deferrers = [];   // [{ idx, viaQuickStrike }]
   for (const p of state.players) {
-    if (p.isHuman) continue;
-    if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && !p.exhausted && !p.out && spyMoundWorthIt(p)) {
-      deferredAi = p.idx;
-      break;
-    }
-  }
-  if (deferredAi === -1) {
-    // Quick Strike only fires when its owner triggered the auction (per the
-    // card text), unlike Spy Mound which works on any auction.
-    for (const p of state.players) {
-      if (p.isHuman) continue;
-      if (p.idx !== triggerPlayerIdx) continue;
-      if (hasEffect(p, 'Quick Strike') && !p.exhausted && !p.out && wantsMaterial(p)) {
-        deferredAi = p.idx;
-        deferredAiViaQuickStrike = true;
-        break;
-      }
+    if (p.isHuman || p.exhausted || p.out) continue;
+    if (p.idx === triggerPlayerIdx && hasEffect(p, 'Quick Strike') && wantsMaterial(p)) {
+      deferrers.push({ idx: p.idx, viaQuickStrike: true });
+    } else if (hasEffect(p, 'Spy Mound') && !p.spyMoundUsed && spyMoundWorthIt(p)) {
+      deferrers.push({ idx: p.idx, viaQuickStrike: false });
     }
   }
   const human = state.players.find(p => p.isHuman);
-  // Spy Mound / Quick Strike deferral is offered *inline* in the human's bid
-  // dialog (a "Defer your bid" button), not as an upfront modal that fires on
-  // every auction. Here we only compute *eligibility*; the actual choice is
-  // made when the human bids (humanBidForAuction resolves with the 'defer'
-  // sentinel). Prefer Spy Mound (one-shot) if available, else Quick Strike
-  // (mink species starter, trigger player only). Only one deferrer per auction,
-  // so the human is offered it only when no AI has already deferred.
-  let deferredHuman = -1;
-  let deferredHumanViaQuickStrike = false;
+  // Human deferral is offered *inline* in the bid dialog (a "Defer your bid"
+  // button), not gated by the AI worth-it heuristic — the human decides. Prefer
+  // Quick Strike (free) over the one-shot Spy Mound if they hold both.
   let humanCanDefer = false, humanDeferViaQuickStrike = false;
-  if (human && !human.out && !human.exhausted && deferredAi === -1) {
-    if (hasEffect(human, 'Spy Mound') && !human.spyMoundUsed) {
-      humanCanDefer = true;
-    } else if (hasEffect(human, 'Quick Strike') && human.idx === triggerPlayerIdx) {
+  if (human && !human.out && !human.exhausted) {
+    if (hasEffect(human, 'Quick Strike') && human.idx === triggerPlayerIdx) {
       humanCanDefer = true;
       humanDeferViaQuickStrike = true;
+    } else if (hasEffect(human, 'Spy Mound') && !human.spyMoundUsed) {
+      humanCanDefer = true;
     }
   }
+  const deferredSet = new Set(deferrers.map(d => d.idx));
   const bids = {};
+  // Sealed round: every non-deferring AI bids now.
   for (const p of state.players) {
     if (p.isHuman) continue;
     if (p.exhausted || p.out) { bids[p.idx] = 0; continue; }
-    if (p.idx === deferredAi) continue;
+    if (deferredSet.has(p.idx)) continue;
     const minBid = (p.idx === triggerPlayerIdx) ? minBidTrigger : 0;
     bids[p.idx] = aiDecideBid(p.idx, card, minBid);
   }
@@ -4303,8 +4293,6 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     } else if (human.exhausted) {
       bids[human.idx] = 0;
       log(`💤 ${speciesLabel(human)} is exhausted — auto-passes (bid 0).`);
-    } else if (human.idx === deferredHuman) {
-      // Resolved below after all other bids are visible.
     } else {
       const minBid = (human.idx === triggerPlayerIdx) ? minBidTrigger : 0;
       startHumanTimer();
@@ -4319,48 +4307,51 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
       }
       if (res === 'defer') {
         // Human chose to wait for the reveal. Consume the resource now; the
-        // real bid resolves in the deferred block below (with revealedBids).
-        deferredHuman = human.idx;
-        deferredHumanViaQuickStrike = humanDeferViaQuickStrike;
+        // real bid resolves in the sequential block below (with revealedBids).
         if (!humanDeferViaQuickStrike) human.spyMoundUsed = true;
+        deferrers.push({ idx: human.idx, viaQuickStrike: humanDeferViaQuickStrike });
       } else {
         bids[human.idx] = res;
       }
     }
   }
-  // Spy Mound / Quick Strike deferred bid resolves now (after reveals). Uses
-  // aiDecideBid (which considers material need) capped at remaining room so
-  // we never jam — old "fill to capacity" logic over-bid on materials the
-  // player didn't want, which compounded badly for Quick Strike's unlimited use.
-  if (deferredAi !== -1) {
-    const sp = state.players[deferredAi];
-    if (!deferredAiViaQuickStrike) sp.spyMoundUsed = true;
-    const open = uncoveredIcons(card);
-    const others = Object.values(bids).reduce((s, b) => s + b, 0);
-    const room = open - others;
-    const minBid = (deferredAi === triggerPlayerIdx) ? minBidTrigger : 0;
-    let bid = aiDecideBid(sp.idx, card, minBid);
-    if (room <= 0) {
-      bid = deferredAi === triggerPlayerIdx ? Math.max(minBidTrigger, 1) : 0;
+  // Deferrers reveal sequentially in the game's turn order (fish asc, then
+  // stack position asc — same ordering pickNextPlayer/triggerEndgame use), each
+  // seeing the bids committed so far. Uses aiDecideBid (which considers material
+  // need) capped at remaining room so an AI never jams.
+  const stackPos = (idx) => state.stackOrder.indexOf(idx);
+  deferrers.sort((a, b) => {
+    const pa = state.players[a.idx], pb = state.players[b.idx];
+    return pa.timePos - pb.timePos || stackPos(a.idx) - stackPos(b.idx);
+  });
+  const open = uncoveredIcons(card);
+  for (const d of deferrers) {
+    const sp = state.players[d.idx];
+    const minBid = (d.idx === triggerPlayerIdx) ? minBidTrigger : 0;
+    if (sp.isHuman) {
+      startHumanTimer();
+      try {
+        bids[sp.idx] = await humanBidForAuction(card, sp, minBid, { revealedBids: { ...bids }, deferViaQuickStrike: d.viaQuickStrike });
+      } finally {
+        stopHumanTimer();
+      }
+      const label = d.viaQuickStrike ? '⚡ Quick Strike' : '🕵 Spy Mound';
+      log(`${label}: ${speciesLabel(sp)} bids ${bids[sp.idx]} after seeing reveals.`);
     } else {
-      bid = Math.min(bid, room);
-      if (deferredAi === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
+      if (!d.viaQuickStrike) sp.spyMoundUsed = true;
+      const others = Object.values(bids).reduce((s, b) => s + b, 0);
+      const room = open - others;
+      let bid = aiDecideBid(sp.idx, card, minBid);
+      if (room <= 0) {
+        bid = d.idx === triggerPlayerIdx ? Math.max(minBidTrigger, 1) : 0;
+      } else {
+        bid = Math.min(bid, room);
+        if (d.idx === triggerPlayerIdx) bid = Math.max(bid, minBidTrigger);
+      }
+      bids[sp.idx] = bid;
+      const label = d.viaQuickStrike ? 'Quick Strike' : 'Spy Mound';
+      log(`🕵 ${label}: ${speciesLabel(sp)} bids ${bid} after seeing reveals.`);
     }
-    bids[sp.idx] = bid;
-    const label = deferredAiViaQuickStrike ? 'Quick Strike' : 'Spy Mound';
-    log(`🕵 ${label}: ${speciesLabel(sp)} bids ${bid} after seeing reveals.`);
-  }
-  if (deferredHuman !== -1) {
-    const sp = state.players[deferredHuman];
-    const minBid = (deferredHuman === triggerPlayerIdx) ? minBidTrigger : 0;
-    startHumanTimer();
-    try {
-      bids[sp.idx] = await humanBidForAuction(card, sp, minBid, { revealedBids: { ...bids }, deferViaQuickStrike: deferredHumanViaQuickStrike });
-    } finally {
-      stopHumanTimer();
-    }
-    const label = deferredHumanViaQuickStrike ? '⚡ Quick Strike' : '🕵 Spy Mound';
-    log(`${label}: ${speciesLabel(sp)} bids ${bids[sp.idx]} after seeing reveals.`);
   }
 
   // Compact bid summary for the log
