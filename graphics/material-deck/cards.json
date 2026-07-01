@@ -1,5 +1,5 @@
 {
-  "_comment": "River Bankers material-deck card data. 24 cards = 6 materials × 4 icon-count tiers (4/5/7/8). 8 of 24 are effect-bearing. Names mirror MATERIALS.md. Effect prose mirrors web/index.html effectDescription() verbatim.",
+  "_comment": "River Bankers material-deck card data. 24 base cards = 6 materials × 4 icon-count tiers (4/5/7/8), plus Bramble Shoal (the 2P-only shared stones/vines wild-5 that replaces Rocky Shoal + Trailing Vine at 2 players) = 25 cards. 9 of 25 are effect-bearing. Names mirror MATERIALS.md. Effect prose mirrors web/index.html effectDescription() verbatim.",
   "materials": {
     "logs":   { "name": "Logs",   "color": "#8b5a2b", "ink": "#5a3a18", "glyph": "🪵" },
     "stones": { "name": "Stones", "color": "#6e6e6e", "ink": "#3f3f3f", "glyph": "🪨" },
@@ -22,6 +22,9 @@
     { "name": "Rocky Shoal",       "material": "stones", "icons": 5 },
     { "name": "Boulder Field",     "material": "stones", "icons": 7 },
     { "name": "Quarry Bank",       "material": "stones", "icons": 8 },
+    { "name": "Bramble Shoal",     "material": "stones", "icons": 5, "wildAlt": "vines", "twoPlayerOnly": true,
+      "effect_name": "Bramble Shoal",
+      "effect_text": "Wild: each claimed icon yields Stones OR Vines (chosen at build time)." },
 
     { "name": "Hidden Inlet",      "material": "reeds",  "icons": 4,
       "effect_name": "Hidden Inlet",

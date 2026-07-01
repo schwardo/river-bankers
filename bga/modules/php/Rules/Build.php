@@ -4,7 +4,8 @@
  *
  * Decides which workers to pick up to pay a structure's material cost. Workers
  * on a normal card pay that card's material; wild cards (Driftwood Tangle =
- * Logs/Reeds, Mud Slick = Mud/Clay) pay either of their two materials, chosen
+ * Logs/Reeds, Mud Slick = Mud/Clay, Bramble Shoal = Stones/Vines at 2P) pay
+ * either of their two materials, chosen
  * here to cover the remaining deficits. Mirrors the cover logic in sim.js
  * (playerWorkersByMaterial / canCoverWithWild).
  *

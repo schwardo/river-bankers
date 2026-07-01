@@ -220,32 +220,33 @@
 /* === BEGIN GENERATED SPRITES (build_sprites.py) === */
 /* Do not edit by hand — regenerate with: python3 img/build_sprites.py */
 .rb-art{background-repeat:no-repeat;display:inline-block;background-color:transparent;vertical-align:middle;}
-.rb-art-mat{background-image:url('img/cards-material.png');background-size:770.0px 550.0px;width:154.0px;height:110.0px;}
+.rb-art-mat{background-image:url('img/cards-material.png');background-size:770.0px 660.0px;width:154.0px;height:110.0px;}
 .rb-p-mat-_back{background-position:0.0px 0.0px;}
 .rb-p-mat-BoulderField{background-position:-154.0px 0.0px;}
-.rb-p-mat-Cairn{background-position:-308.0px 0.0px;}
-.rb-p-mat-CattailCluster{background-position:-462.0px 0.0px;}
-.rb-p-mat-ClayBank{background-position:-616.0px 0.0px;}
-.rb-p-mat-ClaySeep{background-position:0.0px -110.0px;}
-.rb-p-mat-DriftwoodTangle{background-position:-154.0px -110.0px;}
-.rb-p-mat-FallenLimb{background-position:-308.0px -110.0px;}
-.rb-p-mat-Floodplain{background-position:-462.0px -110.0px;}
-.rb-p-mat-HiddenInlet{background-position:-616.0px -110.0px;}
-.rb-p-mat-Logjam{background-position:0.0px -220.0px;}
-.rb-p-mat-MarshEdge{background-position:-154.0px -220.0px;}
-.rb-p-mat-MudFlat{background-position:-308.0px -220.0px;}
-.rb-p-mat-MudSlick{background-position:-462.0px -220.0px;}
-.rb-p-mat-MudWallow{background-position:-616.0px -220.0px;}
-.rb-p-mat-OldGrowth{background-position:0.0px -330.0px;}
-.rb-p-mat-QuarryBank{background-position:-154.0px -330.0px;}
-.rb-p-mat-ReedStand{background-position:-308.0px -330.0px;}
-.rb-p-mat-RockyShoal{background-position:-462.0px -330.0px;}
-.rb-p-mat-SiltBank{background-position:-616.0px -330.0px;}
-.rb-p-mat-SlippingSandbar{background-position:0.0px -440.0px;}
-.rb-p-mat-StranglerKnot{background-position:-154.0px -440.0px;}
-.rb-p-mat-TrailingVine{background-position:-308.0px -440.0px;}
-.rb-p-mat-VineCurtain{background-position:-462.0px -440.0px;}
-.rb-p-mat-VineThicket{background-position:-616.0px -440.0px;}
+.rb-p-mat-BrambleShoal{background-position:-308.0px 0.0px;}
+.rb-p-mat-Cairn{background-position:-462.0px 0.0px;}
+.rb-p-mat-CattailCluster{background-position:-616.0px 0.0px;}
+.rb-p-mat-ClayBank{background-position:0.0px -110.0px;}
+.rb-p-mat-ClaySeep{background-position:-154.0px -110.0px;}
+.rb-p-mat-DriftwoodTangle{background-position:-308.0px -110.0px;}
+.rb-p-mat-FallenLimb{background-position:-462.0px -110.0px;}
+.rb-p-mat-Floodplain{background-position:-616.0px -110.0px;}
+.rb-p-mat-HiddenInlet{background-position:0.0px -220.0px;}
+.rb-p-mat-Logjam{background-position:-154.0px -220.0px;}
+.rb-p-mat-MarshEdge{background-position:-308.0px -220.0px;}
+.rb-p-mat-MudFlat{background-position:-462.0px -220.0px;}
+.rb-p-mat-MudSlick{background-position:-616.0px -220.0px;}
+.rb-p-mat-MudWallow{background-position:0.0px -330.0px;}
+.rb-p-mat-OldGrowth{background-position:-154.0px -330.0px;}
+.rb-p-mat-QuarryBank{background-position:-308.0px -330.0px;}
+.rb-p-mat-ReedStand{background-position:-462.0px -330.0px;}
+.rb-p-mat-RockyShoal{background-position:-616.0px -330.0px;}
+.rb-p-mat-SiltBank{background-position:0.0px -440.0px;}
+.rb-p-mat-SlippingSandbar{background-position:-154.0px -440.0px;}
+.rb-p-mat-StranglerKnot{background-position:-308.0px -440.0px;}
+.rb-p-mat-TrailingVine{background-position:-462.0px -440.0px;}
+.rb-p-mat-VineCurtain{background-position:-616.0px -440.0px;}
+.rb-p-mat-VineThicket{background-position:0.0px -550.0px;}
 .rb-art-str{background-image:url('img/cards-structure.png');background-size:880.0px 1078.0px;width:110.0px;height:154.0px;}
 .rb-p-str-_back{background-position:0.0px 0.0px;}
 .rb-p-str-BurrowNetwork{background-position:-110.0px 0.0px;}
@@ -324,33 +325,6 @@
 .rb-p-chit-muskrat-back{background-position:-80.0px -40.0px;}
 .rb-p-chit-otter-back{background-position:-120.0px -40.0px;}
 .rb-p-chit-blank{background-position:0.0px -80.0px;}
-/* Overlay for worker-chit fly animations (place / spend) — sits above the board,
-   never intercepts clicks; chits are positioned in viewport (fixed) coords. */
-#rb-anim-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; }
-.rb-fly { position: fixed; pointer-events: none; transition: left 0.45s ease, top 0.45s ease; }
-/* Freshly revealed cards (no prior on-screen spot to slide from) fade/scale in. */
-.rb-card-enter { animation: rb-card-in 0.4s ease; }
-@keyframes rb-card-in { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .rb-fly { transition: none; } .rb-card-enter { animation: none; } }
-
-/* End-of-game scoring dialog (notif_finalScores). */
-.rb-score-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 10000;
-                     display: flex; align-items: center; justify-content: center; }
-.rb-score-panel { background: #f7f1e1; color: #1c2e44; border-radius: 10px; padding: 16px 22px;
-                  max-width: 92vw; max-height: 86vh; overflow: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
-.rb-score-panel h2 { margin: 0 0 10px; text-align: center; }
-.rb-score-table { border-collapse: collapse; margin: 0 auto; }
-.rb-score-table th, .rb-score-table td { padding: 4px 14px; text-align: center; border-bottom: 1px solid #d8cdb0; }
-.rb-score-table th:first-child, .rb-score-cat { text-align: left; }
-.rb-score-table tbody tr { opacity: 0; animation: rb-score-row 0.3s ease forwards; }
-@keyframes rb-score-row { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.rb-score-total td { font-weight: 800; border-top: 2px solid #1c2e44; border-bottom: none; }
-.rb-score-close { display: block; margin: 12px auto 0; padding: 5px 16px; cursor: pointer; }
-/* Salt Lick "opponents' hands" dialog (reuses the scoring modal chrome). */
-.rb-spy-note { text-align: center; font-style: italic; color: #5a5042; margin-bottom: 8px; }
-.rb-spy-player { padding: 4px 0; border-bottom: 1px solid #d8cdb0; max-width: 70ch; }
-@media (prefers-reduced-motion: reduce) { .rb-score-table tbody tr { opacity: 1; animation: none; } }
-
 .rb-art-wchit{background-image:url('img/chits.png');background-size:148.0px 111.0px;width:37.0px;height:37.0px;}
 .rb-p-wchit-beaver{background-position:0.0px 0.0px;}
 .rb-p-wchit-mink{background-position:-37.0px 0.0px;}

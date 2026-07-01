@@ -144,8 +144,19 @@ class Game extends \Bga\GameFramework\Table
 
         // ---- Material deck (sized by player count) ------------------------
         // Tiers: 5- and 7-icon cards always in; 4-icon at 3+ players; 8-icon at 4.
+        // 2P-only wild: at 2 players Rocky Shoal (arg 5) + Trailing Vine (arg 17)
+        // are swapped out for the single shared Bramble Shoal wild-5 (arg 24),
+        // which is left out of the deck at 3P+.
+        $twoP = $numPlayers < 3;
         $matArgs = [];
         foreach (Material::$MATERIAL as $arg => $c) {
+            if ($arg === Material::BRAMBLE_SHOAL_ARG) {
+                if ($twoP) { $matArgs[] = $arg; }
+                continue;
+            }
+            if ($twoP && ($arg === Material::ROCKY_SHOAL_ARG || $arg === Material::TRAILING_VINE_ARG)) {
+                continue;
+            }
             $icons = $c['icons'];
             $include = ($icons === 5 || $icons === 7)
                 || ($icons === 4 && $numPlayers >= 3)

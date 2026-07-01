@@ -11,8 +11,12 @@ namespace Bga\Games\RiverBankers;
 
 class Material
 {
-    // 24 material cards = 6 materials x 4 icon tiers (4,5,7,8).
-    // tier inclusion by player count is decided in Game::setupNewGame().
+    // 24 base material cards = 6 materials x 4 icon tiers (4,5,7,8), plus the
+    // 2P-only Bramble Shoal wild (arg 24). Tier inclusion + the 2P wild swap
+    // are decided in Game::setupNewGame().
+    public const ROCKY_SHOAL_ARG = 5;    // stones-5, swapped out at 2P
+    public const TRAILING_VINE_ARG = 17; // vines-5, swapped out at 2P
+    public const BRAMBLE_SHOAL_ARG = 24; // shared stones/vines wild-5, 2P only
     public static array $MATERIAL = [
         0 => ['name' => 'Fallen Limb', 'material' => 'logs', 'icons' => 4],
         1 => ['name' => 'Driftwood Tangle', 'material' => 'logs', 'icons' => 5, 'wildAlt' => 'reeds', 'effect' => 'Wild: each claimed icon yields Logs OR Reeds (chosen at build time).'],
@@ -38,6 +42,10 @@ class Material
         21 => ['name' => 'Clay Bank', 'material' => 'clay', 'icons' => 5],
         22 => ['name' => 'Mud Slick', 'material' => 'clay', 'icons' => 7, 'wildAlt' => 'mud', 'effect' => 'Wild: each claimed icon yields Mud OR Clay (chosen at build time).'],
         23 => ['name' => 'Slipping Sandbar', 'material' => 'clay', 'icons' => 8, 'effect' => 'Enters the river at River 4. After any auction with workers placed here, slides one slot upstream. At River 1 with leftover icons, retires to shoreline.'],
+        // 2P-ONLY shared stones/vines wild-5. At 2 players this replaces Rocky
+        // Shoal (arg 5) + Trailing Vine (arg 17); at 3P+ it is left out of the
+        // deck and the two vanilla 5s are used instead (see Game::setupNewGame).
+        24 => ['name' => 'Bramble Shoal', 'material' => 'stones', 'icons' => 5, 'wildAlt' => 'vines', 'effect' => 'Wild: each claimed icon yields Stones OR Vines (chosen at build time).'],
     ];
 
     // 48 shared structure-deck cards (excludes species starters). NOTE: Slipstream

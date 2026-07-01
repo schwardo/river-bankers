@@ -817,7 +817,8 @@ function effectiveBuildCost(struct, p, wbm) {
 //   "always"  → in deck for any player count   (2 cards/mat: [5,7] icons)
 //   "3+"      → only included when numPlayers >= 3 (1 card/mat: [4] icons)
 //   "4+"      → only included when numPlayers >= 4 (1 card/mat: [8] icons)
-// Counts: 2P=12, 3P=18, 4P=24 cards.
+// Counts: 2P=11, 3P=18, 4P=24 cards. (2P is net -1: the stones-5 and vines-5
+// vanilla cards are merged into a single shared wild-5 — see SV_WILD_CARD.)
 let ALWAYS_ICONS = [5, 7];
 let TIER_3PLUS_ICONS = [4];
 let TIER_4PLUS_ICONS = [8];
@@ -829,13 +830,28 @@ function setDeckTuning({ always, tier3, tier4, premium }) {
   if (premium  !== undefined) PREMIUM_4P       = premium;
 }
 
+// 2P-only stones/vines wild: at 2 players the two vanilla 5-icon cards on the
+// materials that otherwise lack a wildcard (stones → Rocky Shoal, vines →
+// Trailing Vine) are removed and replaced by ONE shared stones/vines wild-5
+// (Bramble Shoal). This manufactures mid-game contention at 2P (the only count
+// where the market flattens once each player settles into a niche) and
+// completes the symmetric set of three wild pairs (logs/reeds, clay/mud,
+// stones/vines). At 3P+ the deck is untouched — Rocky Shoal and Trailing Vine
+// stay, the wild is absent. See board-games.org "SV-wild deck variant".
+const SV_WILD_CARD = { material: 'stones', icons: 5, effect: 'wild', wildAlt: 'vines', name: 'Bramble Shoal' };
+
 function makeCardSpecs(numPlayers) {
   const specs = [];
+  const svWild = numPlayers < 3;
   for (const m of MAT_KEYS) {
-    for (const icons of ALWAYS_ICONS)              specs.push({ material: m, icons });
+    for (const icons of ALWAYS_ICONS) {
+      if (svWild && icons === 5 && (m === 'stones' || m === 'vines')) continue;
+      specs.push({ material: m, icons });
+    }
     if (numPlayers >= 3) for (const icons of TIER_3PLUS_ICONS) specs.push({ material: m, icons });
     if (numPlayers >= 4) for (const icons of TIER_4PLUS_ICONS) specs.push({ material: m, icons });
   }
+  if (svWild) specs.push({ material: 'stones', icons: 5, svWild: true });
   if (numPlayers >= 4) for (const p of PREMIUM_4P) specs.push({ material: p.material, icons: p.icons });
   return specs;
 }
@@ -893,7 +909,7 @@ function aiVineCurtainRearrange(state, playerIdx) {
 
 function buildMaterialDeck(numPlayers) {
   const deck = makeCardSpecs(numPlayers).map((spec, id) => {
-    const eff = effectSpecFor(spec.material, spec.icons);
+    const eff = spec.svWild ? SV_WILD_CARD : effectSpecFor(spec.material, spec.icons);
     return {
       id: 'm' + id,
       material: spec.material,

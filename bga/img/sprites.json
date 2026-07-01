@@ -8,7 +8,7 @@
         250
       ],
       "cols": 5,
-      "rows": 5,
+      "rows": 6,
       "items": [
         {
           "slug": "_back",
@@ -25,165 +25,172 @@
           "y": 0
         },
         {
-          "slug": "Cairn",
+          "slug": "BrambleShoal",
           "col": 2,
           "row": 0,
           "x": 700,
+          "y": 0
+        },
+        {
+          "slug": "Cairn",
+          "col": 3,
+          "row": 0,
+          "x": 1050,
           "y": 0
         },
         {
           "slug": "CattailCluster",
-          "col": 3,
+          "col": 4,
           "row": 0,
-          "x": 1050,
+          "x": 1400,
           "y": 0
         },
         {
           "slug": "ClayBank",
-          "col": 4,
-          "row": 0,
-          "x": 1400,
-          "y": 0
-        },
-        {
-          "slug": "ClaySeep",
           "col": 0,
           "row": 1,
           "x": 0,
+          "y": 250
+        },
+        {
+          "slug": "ClaySeep",
+          "col": 1,
+          "row": 1,
+          "x": 350,
           "y": 250
         },
         {
           "slug": "DriftwoodTangle",
-          "col": 1,
+          "col": 2,
           "row": 1,
-          "x": 350,
+          "x": 700,
           "y": 250
         },
         {
           "slug": "FallenLimb",
-          "col": 2,
+          "col": 3,
           "row": 1,
-          "x": 700,
+          "x": 1050,
           "y": 250
         },
         {
           "slug": "Floodplain",
-          "col": 3,
+          "col": 4,
           "row": 1,
-          "x": 1050,
+          "x": 1400,
           "y": 250
         },
         {
           "slug": "HiddenInlet",
-          "col": 4,
-          "row": 1,
-          "x": 1400,
-          "y": 250
-        },
-        {
-          "slug": "Logjam",
           "col": 0,
           "row": 2,
           "x": 0,
+          "y": 500
+        },
+        {
+          "slug": "Logjam",
+          "col": 1,
+          "row": 2,
+          "x": 350,
           "y": 500
         },
         {
           "slug": "MarshEdge",
-          "col": 1,
+          "col": 2,
           "row": 2,
-          "x": 350,
+          "x": 700,
           "y": 500
         },
         {
           "slug": "MudFlat",
-          "col": 2,
+          "col": 3,
           "row": 2,
-          "x": 700,
+          "x": 1050,
           "y": 500
         },
         {
           "slug": "MudSlick",
-          "col": 3,
+          "col": 4,
           "row": 2,
-          "x": 1050,
+          "x": 1400,
           "y": 500
         },
         {
           "slug": "MudWallow",
-          "col": 4,
-          "row": 2,
-          "x": 1400,
-          "y": 500
-        },
-        {
-          "slug": "OldGrowth",
           "col": 0,
           "row": 3,
           "x": 0,
+          "y": 750
+        },
+        {
+          "slug": "OldGrowth",
+          "col": 1,
+          "row": 3,
+          "x": 350,
           "y": 750
         },
         {
           "slug": "QuarryBank",
-          "col": 1,
-          "row": 3,
-          "x": 350,
-          "y": 750
-        },
-        {
-          "slug": "ReedStand",
           "col": 2,
           "row": 3,
           "x": 700,
           "y": 750
         },
         {
-          "slug": "RockyShoal",
+          "slug": "ReedStand",
           "col": 3,
           "row": 3,
           "x": 1050,
           "y": 750
         },
         {
-          "slug": "SiltBank",
+          "slug": "RockyShoal",
           "col": 4,
           "row": 3,
           "x": 1400,
           "y": 750
         },
         {
-          "slug": "SlippingSandbar",
+          "slug": "SiltBank",
           "col": 0,
           "row": 4,
           "x": 0,
           "y": 1000
         },
         {
-          "slug": "StranglerKnot",
+          "slug": "SlippingSandbar",
           "col": 1,
           "row": 4,
           "x": 350,
           "y": 1000
         },
         {
-          "slug": "TrailingVine",
+          "slug": "StranglerKnot",
           "col": 2,
           "row": 4,
           "x": 700,
           "y": 1000
         },
         {
-          "slug": "VineCurtain",
+          "slug": "TrailingVine",
           "col": 3,
           "row": 4,
           "x": 1050,
           "y": 1000
         },
         {
-          "slug": "VineThicket",
+          "slug": "VineCurtain",
           "col": 4,
           "row": 4,
           "x": 1400,
           "y": 1000
+        },
+        {
+          "slug": "VineThicket",
+          "col": 0,
+          "row": 5,
+          "x": 0,
+          "y": 1250
         }
       ]
     },

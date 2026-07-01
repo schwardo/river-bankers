@@ -311,7 +311,13 @@ TIER_BY_ICONS = {4: ("3+", "#c1701c"),  # orange  → 3P+ only
 
 
 def render_tier_badge(card):
-    spec = TIER_BY_ICONS.get(card["icons"])
+    # Bramble Shoal is the one card that's the reverse of a tier card: it's in
+    # the deck ONLY at 2 players (replacing Rocky Shoal + Trailing Vine), so it
+    # gets a distinct green "2P" badge rather than the icon-count tier badge.
+    if card.get("twoPlayerOnly"):
+        spec = ("2P", "#2e7d32")  # green → 2P only
+    else:
+        spec = TIER_BY_ICONS.get(card["icons"])
     if not spec:
         return ""
     label, color = spec

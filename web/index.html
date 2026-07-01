@@ -1736,7 +1736,8 @@ const MAT_KEYS = Object.keys(MATERIALS);
 //   "always"  — in deck for any player count   (2 cards/mat: [5,7] icons)
 //   "3+"      — added when numPlayers >= 3     (1 card/mat: [4] icons)
 //   "4+"      — added when numPlayers === 4    (1 card/mat: [8] icons)
-// Counts: 2P=12 cards, 3P=18 cards, 4P=24 cards.
+// Counts: 2P=11 cards, 3P=18 cards, 4P=24 cards. (2P is net -1: the stones-5
+// and vines-5 vanilla cards merge into one shared wild-5 — see SV_WILD_CARD.)
 const ALWAYS_ICONS = [5, 7];
 const TIER_3PLUS_ICONS = [4];
 const TIER_4PLUS_ICONS = [8];
@@ -1762,6 +1763,14 @@ const EFFECT_CARDS = [
 function effectSpecFor(material, icons) {
   return EFFECT_CARDS.find(e => e.material === material && e.icons === icons) || null;
 }
+
+// 2P-only stones/vines wild. At 2 players the two vanilla 5-icon cards on the
+// materials that otherwise lack a wildcard (stones → Rocky Shoal, vines →
+// Trailing Vine) are removed and replaced by ONE shared stones/vines wild-5
+// (Bramble Shoal) — manufacturing mid-game contention at the one count where
+// the market flattens, and completing the symmetric set of three wild pairs
+// (logs/reeds, clay/mud, stones/vines). At 3P+ the deck is untouched.
+const SV_WILD_CARD = { material: 'stones', icons: 5, effect: 'wild', wildAlt: 'vines', name: 'Bramble Shoal' };
 
 // Names for the 16 non-effect (material, icons) slots. Effect cards
 // (Driftwood Tangle, Old Growth, etc.) carry their own name on EFFECT_CARDS.
@@ -1794,25 +1803,29 @@ function buildMaterialDeck(numPlayers) {
   const iconCounts = ALWAYS_ICONS
     .concat(numPlayers >= 3 ? TIER_3PLUS_ICONS : [])
     .concat(numPlayers >= 4 ? TIER_4PLUS_ICONS : []);
+  const svWild = numPlayers < 3;
   const deck = [];
   let id = 0;
+  const pushCard = (m, icons, eff) => deck.push({
+    id: 'm' + (id++),
+    material: m,
+    totalIcons: icons,
+    name: eff ? eff.name : cardNameFor(m, icons),
+    slot: null,         // 0..3 in river, 'pre' in pre-river, 'shore', or null in deck
+    workers: {},        // playerIdx -> count
+    blanks: 0,
+    effect: eff ? eff.effect : null,
+    effectSpec: eff,
+    wildAlt: eff && eff.wildAlt ? eff.wildAlt : null,
+  });
   for (const m of MAT_KEYS) {
     for (const icons of iconCounts) {
-      const eff = effectSpecFor(m, icons);
-      deck.push({
-        id: 'm' + (id++),
-        material: m,
-        totalIcons: icons,
-        name: cardNameFor(m, icons),
-        slot: null,         // 0..3 in river, 'pre' in pre-river, 'shore', or null in deck
-        workers: {},        // playerIdx -> count
-        blanks: 0,
-        effect: eff ? eff.effect : null,
-        effectSpec: eff,
-        wildAlt: eff && eff.wildAlt ? eff.wildAlt : null,
-      });
+      // 2P: drop the stones-5 / vines-5 vanilla cards; the shared wild replaces them.
+      if (svWild && icons === 5 && (m === 'stones' || m === 'vines')) continue;
+      pushCard(m, icons, effectSpecFor(m, icons));
     }
   }
+  if (svWild) pushCard('stones', 5, SV_WILD_CARD);
   return shuffle(deck);
 }
 
