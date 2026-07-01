@@ -309,6 +309,10 @@ def render_header_block(card, materials):
 TIER_BY_ICONS = {4: ("3+", "#c1701c"),  # orange  → 3P+ only
                  8: ("4P", "#a52a2a")}  # red     → 4P only
 
+# The two 5-icon "always" vanilla cards on the wildcard-less materials get
+# swapped out for Bramble Shoal at 2P, so their true availability is 3P+.
+TIER_3PLUS_5ICON = {("stones", 5), ("vines", 5)}
+
 
 def render_tier_badge(card):
     # Bramble Shoal is the one card that's the reverse of a tier card: it's in
@@ -316,6 +320,13 @@ def render_tier_badge(card):
     # gets a distinct green "2P" badge rather than the icon-count tier badge.
     if card.get("twoPlayerOnly"):
         spec = ("2P", "#2e7d32")  # green → 2P only
+    elif (card["material"], card["icons"]) in TIER_3PLUS_5ICON:
+        # Rocky Shoal (stones-5) and Trailing Vine (vines-5) are nominally
+        # "always" tier, but at 2P they're pulled from the deck and replaced by
+        # the shared Bramble Shoal wild-5. So their real availability is 3P+ —
+        # identical to the 4-icon 3+ cards — and they carry the same "3+" badge
+        # to cue players to remove them at 2 players.
+        spec = ("3+", "#c1701c")  # orange → 3P+ only
     else:
         spec = TIER_BY_ICONS.get(card["icons"])
     if not spec:
