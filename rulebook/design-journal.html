@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>River Bankers — Design Journal</title>
+<style>
+  @page { size: letter; margin: 0.4in 0.6in 0.35in 0.6in; }
+  :root {
+    --water-deep:#1d4e6b; --water-mid:#3a8fb7; --bank:#6b5436; --bank-light:#a0825a;
+    --shore:#d4b97a; --forest:#2f5d3a; --paper:#faf3e3; --paper-warm:#f3e8cb;
+    --ink:#2c1f15; --ink-soft:#5a4a36;
+  }
+  * { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  html,body { margin:0; padding:0; background:#fff; }
+  body {
+    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    color:var(--ink); font-size:9.5pt; line-height:1.22;
+  }
+  h1,h2,h3 { font-family:inherit; color:var(--water-deep); margin:0 0 4pt; line-height:1.12; page-break-after:avoid; }
+  .masthead {
+    display:flex; align-items:baseline; justify-content:space-between;
+    border-bottom:2pt solid var(--water-mid); padding-bottom:5pt; margin-bottom:8pt;
+  }
+  .masthead h1 { font-size:21pt; letter-spacing:0.3pt; }
+  .masthead .sub { font-size:9pt; color:var(--ink-soft); font-style:italic; }
+  h2 {
+    font-size:12.5pt; border-bottom:1pt solid var(--bank-light);
+    padding-bottom:2pt; margin-top:11pt; margin-bottom:4pt; page-break-after:avoid;
+  }
+  h2 .wk { font-size:8.5pt; font-style:italic; color:var(--ink-soft); letter-spacing:0.2pt; font-weight:400; }
+  h2 .tag, h3 .tag { font-size:8pt; font-style:italic; color:var(--forest); letter-spacing:0.3pt; text-transform:uppercase; }
+  h3 { font-size:10.5pt; color:var(--forest); margin-top:8pt; margin-bottom:3pt; page-break-after:avoid; }
+  p { margin:0 0 4pt; }
+  ul { margin:0 0 6pt 16pt; padding:0; }
+  li { margin-bottom:1.5pt; }
+  strong { color:var(--water-deep); }
+  em { color:var(--ink-soft); }
+  .lead { font-size:10.4pt; color:var(--ink); margin-bottom:6pt; }
+  .note { font-size:8.7pt; color:var(--ink-soft); font-style:italic; }
+  table { width:100%; border-collapse:collapse; font-size:8.8pt; margin:3pt 0 7pt; }
+  th,td { text-align:left; padding:2pt 5pt; border-bottom:0.5pt solid var(--bank-light); vertical-align:top; }
+  th { background:var(--paper-warm); color:var(--water-deep); font-weight:700; font-size:8pt; text-transform:uppercase; letter-spacing:0.3pt; }
+  td.card { white-space:nowrap; font-weight:700; color:var(--ink); }
+  .before { color:var(--ink-soft); }
+  .arrow { color:var(--water-mid); }
+  .callout {
+    background:var(--paper); border-left:3pt solid var(--forest); border-radius:3pt;
+    padding:5pt 8pt; margin:5pt 0 7pt; font-size:9pt;
+  }
+  .callout.problem { border-left-color:var(--bank); }
+  .footer { margin-top:8pt; padding-top:4pt; border-top:0.5pt solid var(--bank-light); text-align:center; font-size:7.6pt; color:var(--ink-soft); font-style:italic; }
+  .phase { font-size:8pt; color:var(--water-mid); font-style:italic; letter-spacing:0.4pt; text-transform:uppercase; margin:9pt 0 -2pt; page-break-after:avoid; }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <h1>River Bankers — Design Journal</h1>
+  <span class="sub">Week-by-week development log · oldest first</span>
+</div>
+
+<p class="lead">This is the story of how River Bankers came together, told a week at a time.
+Where the <em>Release Notes</em> are a changelog for players, this journal is for the design
+record: what we were trying to <strong>fix</strong>, what we were trying to <strong>feel</strong>,
+and why each mechanic landed where it did. The through-line is a single question we kept
+re-asking — <em>how do you price a bid when there's no money on the table?</em></p>
+
+<p class="note">River Bankers began life on [2026-05-04] as a retheme of an earlier auction design —
+turning the money players used to pay into a shared <em>fish track</em>, and the bidding tokens into
+species-themed <em>worker meeples</em>. Focused development began the next day; that's where this
+journal picks up.</p>
+
+<div class="phase">Phase I · Core engine (May)</div>
+
+<h2>Week of May 5 <span class="wk">— the auction skeleton</span></h2>
+
+<p>The founding idea landed fully formed: <strong>there is no money.</strong> Instead of paying
+dollars to a bank, players spend <strong>fish</strong> by advancing a pawn along a shared track,
+and turn order <em>is</em> the track — whoever's pawn sits farthest back acts next. Cost never
+gates a bid; it only buries you deeper in the turn queue. Workers do double duty as both bid
+tokens and inventory: place them on a material card to win icons, and they sit there until you
+spend them building.</p>
+
+<div class="callout">
+  <strong>The core tension we were chasing:</strong> every bid should hurt in <em>time</em>, not
+  cash. A big grab is powerful but sends you to the back of the line, so several opponents act
+  before you do again. Patience — small bids that keep your pawn forward — buys you tempo. The
+  whole economy is a bet on when you'd rather act.
+</div>
+
+<p>By the end of the first week the spine was in place: a <strong>pre-river auction</strong> feeding
+a four-slot river, <strong>slot-based pricing</strong> (cards carry no printed cost — fish is paid
+by <em>where</em> a card sits), and the first playable digital prototype. Two early problems got their first
+fixes:</p>
+<ul>
+  <li><strong>Jammed auctions.</strong> When demand outstripped supply, a card could ping-pong down
+      the river with nobody ever winning. We introduced <strong>pay-for-bid in jams</strong>: every
+      worker you commit costs fish even if it doesn't clinch an icon. This one rule later proved to
+      cut wasted auctions ~35× in simulation.</li>
+  <li><strong>Endless games.</strong> Added a <strong>looping track with lap-exhaustion</strong> (a
+      pawn lapped a full loop flips over and sits out until the leader passes again) plus a
+      <strong>Flush</strong> action and a first-pass endgame phase, so games could actually end.</li>
+</ul>
+
+<p>We also grew the raw economy: the deck was shrunk to a tidy <strong>5 × [4–8] icon</strong>
+spread, and — crucially — we <strong>wrote a simulator</strong> that could play thousands of games
+against itself, giving us hard data on balance instead of guesswork. A sixth material
+(<strong>clay</strong>) replaced an awkward "fish material," giving three natural wildcard pairs. The
+pre-river queue got its lasting name — <strong>Headwaters</strong> — and the time track became the
+<strong>Fish Track</strong>.</p>
+
+<h3>Structure effects, in three phases <span class="tag">the build side</span></h3>
+<p>Materials are only half the game; the other half is <em>building</em>. We designed the structure-card
+effects in three waves — passive economy boosts, on-build one-shots, and reactive triggers — and
+taught the AI opponents to actually <em>use</em> those effects, so the simulated games would reflect
+real play. From here on, our main balancing method was to test each card by measuring how much it
+changed the outcome — play with it, play without it, and see how the win rates moved.</p>
+
+<h2>Week of May 12 <span class="wk">— quiet week</span></h2>
+<p>One structural fix: when the <strong>structure deck empties, its discard reshuffles back in</strong>,
+so the build economy can't dead-end in a long game.</p>
+
+<h2>Week of May 19 <span class="wk">— asymmetry &amp; card identity</span></h2>
+
+<p>This week River Bankers stopped being a symmetric resource race and grew a <strong>species
+identity</strong>.</p>
+
+<div class="callout problem">
+  <strong>Problem:</strong> four near-identical players making the same optimal moves is a solved,
+  flat game. We wanted beavers to <em>feel</em> like dam-builders and otters like nimble
+  opportunists without bolting on a rules exception per species.
+</div>
+
+<p><strong>Solution: asymmetric starter drafts.</strong> Each species draws one of three themed
+starter structures at setup, giving an opening personality without touching the core loop. We then spent real effort <strong>balancing the
+starters by printed VP</strong> (and a Stone Tool nerf) so no species opened ahead.</p>
+
+<p>Alongside that:</p>
+<ul>
+  <li><strong>Eight effect-bearing material cards</strong> were folded into existing deck slots —
+      wilds and small triggers — so the material half gained texture without inflating the deck.</li>
+  <li><strong>Four "novel-action" structures</strong> (Tribute Stone, Beaver Tow, Otter Trail, Salmon
+      Run) added cards that <em>do</em> something on your turn rather than just scoring.</li>
+  <li><strong>Vine Curtain</strong> — peek at the top two of a deck and rearrange — shipped for both
+      AI and human, our first hidden-information lever.</li>
+  <li><strong>Deferred bids</strong> (Spy Mound / Quick Strike: react to others' bids) got their
+      logic fixed, and several <strong>rebalance passes</strong> pushed end-game-effect cards toward
+      printed VP 0 so their <em>power</em> lived in the effect, not double-dipped into score.</li>
+</ul>
+
+<h2>Week of May 26 <span class="wk">— components, art &amp; the VP model</span></h2>
+
+<p>A production-minded week. We <strong>locked worker tokens</strong> at 0.63" discs in four
+species colors, named every material card, and moved the decks from placeholder text to real
+<strong>designed card art</strong> shown in the playable prototype.
+"Sea Otter" became <strong>River Otter</strong> throughout.</p>
+
+<div class="callout problem">
+  <strong>Problem our balance testing kept surfacing:</strong> a middle tier of 7-VP cards was
+  crowding the decision space — never clearly worth it, never clearly not. We
+  <strong>eliminated the 7-VP tier</strong> and bumped under-priced 0-VP cards, sharpening every
+  build into a real choice.
+</div>
+
+<p>Two lasting scoring/endgame ideas arrived:</p>
+<ul>
+  <li><strong>End-of-game pair-VP for unspent worker pairs</strong> — leftover workers aren't dead
+      weight, they convert to points, so hoarding has an exit value.</li>
+  <li><strong>Flush now shuffles Headwaters cards back into the deck</strong> rather than discarding
+      them outright, keeping the deck honest.</li>
+</ul>
+
+<p>The physical footprint firmed up too: a generated <strong>river-board mat</strong> (Headwaters row
+above a four-wide river), a <strong>tier badge</strong> on material cards marking which join at 3+
+and 4 players, and a small-but-real balance tweak — <strong>4-player games start with 7 workers,
+not 8</strong>, to tighten early capacity when the table is crowded.</p>
+
+<div class="phase">Phase II · Production &amp; the endgame problem (June)</div>
+
+<h2>Week of June 2 <span class="wk">— the box, the board, and a false start</span></h2>
+
+<p>Physical production in earnest: the <strong>60-cell perimeter fish board</strong> with an
+integrated structure deck/discard and Invent action, <strong>box lid and bottom artwork</strong> for
+the TGC retail box, printed <strong>worker chits</strong>, and the first real <strong>rulebook</strong>
+(drafts v0.1.1 → v0.1.6). Four new structures (Trophy Lodge, Springwater Pool, Spring Cascade,
+Trading Post) rounded out the deck, and effect text was standardized across every card.</p>
+
+<div class="callout problem">
+  <strong>An experiment we reverted.</strong> We tried having the endgame's <em>entry</em> fire all
+  the "at 0 fish / pass-0" freebie effects at once. In testing it distorted the final turns — a
+  burst of free value that rewarded whoever happened to hold those cards rather than good play. We
+  <strong>reverted it the same week</strong> and put more rigorous balance testing in place for the
+  next endgame idea. This was the first clear signal that the
+  <em>endgame itself</em> — not the cards — was the real problem.
+</div>
+
+<h2>Week of June 9 <span class="wk">— polish and a new auction shape</span></h2>
+
+<p>With a prototype ordered, attention turned to presentation (<strong>TGC shop assets</strong>, a
+<strong>promo video</strong>) and one meaningful new mechanic:</p>
+<ul>
+  <li><strong>Confluence</strong> — pay fish to run a <em>single</em> auction across two material
+      cards of the same item type, pooling their icons into one larger contested grab. It gives
+      players a way to <em>force</em> a big fight instead of waiting for supply to stack up
+      naturally.</li>
+  <li><strong>Double Vision</strong> shipped as an experimental optional rule (combined placement,
+      clockwise), and the AI was taught to reach the Beaver Tow / Salmon Run actions it had been
+      ignoring — an AI blind spot that had been quietly skewing balance data.</li>
+</ul>
+
+<h2>Week of June 16 <span class="wk">— the endgame overhaul</span></h2>
+
+<p>The headline of the whole project — and it was driven by the game's <strong>first in-person
+playtest</strong>. On [2026-06-16] the physical prototype hit the table with friends for the first
+time (every prior playtest had been against the computer in the digital prototype), and the human table reported the
+same feeling the sim never could: the game <em>should</em> wrap up about when the material deck ran
+dry, but the old "snap all pawns to 1, 2, 3… then grind to space 59" ending dragged well past that
+point. The overhaul landed the very next day.</p>
+
+<div class="callout">
+  <strong>The redesign:</strong> end on a <strong>finish line</strong>, not on the deck. Players race
+  toward a fish-track target; crossing it retires you; when all have retired everyone takes one last
+  build, then scores. The deck running out no longer ends the game — but once it's empty the active
+  player <strong>drifts +1 fish per turn</strong> so the dead-board tail rushes to a close instead of
+  grinding.
+</div>
+
+<p>The rework cascaded into several supporting changes:</p>
+<ul>
+  <li><strong>Lapping / exhaustion was removed entirely</strong> — with a hard finish line you pass 0
+      at most once or twice, so the lap-out safety net became dead weight. Pawns now just
+      <strong>flip to a "+60" side</strong> after a lap so their true position stays readable.</li>
+  <li>Fish lines were set to <strong>59 / 89 / 119</strong> (2P/3P/4P) — tuned so a single printed
+      "+60" chit exactly covers the second lap.</li>
+  <li><strong>Five "pass-0" cards were reworked.</strong> The new endgame capped laps, which
+      <em>gutted</em> cards that could only fire "at 0 on the fish track" — they'd get one shot at the
+      very end. We converted them to <strong>once-per-game abilities</strong>. Mill Wheel's old
+      board-clamp would have actively <em>blocked</em> a player from finishing, so it was rebuilt as a
+      copy-your-neighbour card.</li>
+</ul>
+
+<h3>Min-Invent, and other race-tuning</h3>
+<div class="callout problem">
+  <strong>Problem the finish line exposed:</strong> a player with nothing to build could sit at
+  Invent-for-1, drawing a card and inching forward one space at a time — a slow "draw one, inch
+  forward" grind right where the game most wants to end.
+</div>
+<p><strong>Fix: Invent now costs at least 2 fish</strong> (choose N = 2–5, was 1–5). A stuck player
+advances to the line faster without changing how much anyone actually builds. The same week added a
+player-facing <strong>strategy guide</strong>, made <strong>Cache Burrow's hand-size bonus
+stack</strong>, gave every species its own <strong>card back</strong>, reconciled a batch of
+species-named cards between docs and print, and taught <strong>Heron Roost</strong> to reshuffle its
+displaced card back into the deck (matching Flush's recycle rule). Starting player is now
+<strong>randomized with a documented first-player rule</strong> and a fairness audit.</p>
+
+<h2>Week of June 23 <span class="wk">— recalibration, then BoardGameArena</span></h2>
+
+<p>Two 4-player playtests drove a final endgame recalibration:</p>
+<ul>
+  <li>The fish line moved from the climbing <strong>89/109/119</strong> to a <strong>uniform 119</strong>,
+      then — after more data — to a <strong>flat 90 at every player count</strong>, paired with the
+      <strong>deck-empty +1 drift</strong> and a fix so <strong>no two pawns share a finish space</strong>.
+      Flat-90 landed games at roughly 30 / 40 / 55 minutes (2P/3P/4P).</li>
+  <li>An <strong>AI over-bidding fix</strong> plus worker/endgame recalibration cleaned up the
+      simulation baseline the balance data rides on.</li>
+  <li>A <strong>uniform rule</strong> was written down and enforced everywhere: <em>a card's own
+      effects never apply to the build that creates it.</em> This killed a class of self-referential
+      edge cases that had been handled inconsistently.</li>
+</ul>
+
+<div class="callout">
+  <strong>Bringing it to the table online.</strong> Mid-week we began building a version of the game
+  for <strong>BoardGameArena</strong>, so it could be played online against real opponents. Beyond
+  reaching more players, this rebuild earned its keep as a <em>rules auditor</em>: re-creating every
+  card effect from a blank slate forced us to pin down ambiguities the original prototype had let
+  slide.
+</div>
+
+<p>Smaller rules refinements landed alongside: a <strong>Pier "(max +6)" cap</strong>, and
+<strong>pre-auction worker recall from shoreline cards</strong> folded cleanly into the bid step.</p>
+
+<h2>Week of June 30 <span class="wk">— clarity pass &amp; the 2-player deck</span></h2>
+
+<p>The online build surfaced a set of rules questions that we answered <em>consistently across every
+version of the game</em> — the online play, the prototype, and the rulebook all kept in step:</p>
+<ul>
+  <li><strong>Confluence</strong> effect text nailed down to the min-cost rule.</li>
+  <li><strong>Final builds skip "when built" effects</strong> — the last-build coda shouldn't trigger
+      a fresh cascade of on-build value.</li>
+  <li>The river-card <strong>"Auction" action was renamed "Swim"</strong> to stop colliding with the
+      generic auction concept.</li>
+  <li><strong>Mill Wheel's copy</strong> now picks the most beneficial effect, and <strong>Slipstream
+      was pulled from the BGA port</strong> — its "take a turn immediately after another player"
+      queue-jump has no clean realization in BGA's turn model.</li>
+</ul>
+
+<h3>A card designed for two players <span class="tag">the last mechanic</span></h3>
+<div class="callout problem">
+  <strong>Problem:</strong> at 2 players the material market flattens — with only two bidders,
+  mid-game contention thins out and two of the wildcard-less materials (stones, vines) rarely fight.
+</div>
+<p><strong>Bramble Shoal</strong> is a 2-player-only card: at 2P the two vanilla 5-icon cards on
+stones and vines (Rocky Shoal, Trailing Vine) come out and are replaced by a single shared
+stones/vines wild, manufacturing contention at exactly the count where the market goes quiet — and
+completing the symmetric set of three wildcard pairs (logs/reeds, clay/mud, stones/vines). It ships
+with a green "2P" badge; its two displaced cards now carry matching <strong>"3+" badges</strong> so
+players know to pull them at two players. The auction engine also learned to support
+<strong>multiple simultaneous Spy Mound / Quick Strike deferrers</strong>, matching the BGA build.</p>
+
+<div class="footer">
+  River Bankers — a design journal · a week-by-week look back at the game's development ·
+  entries oldest-first, one heading per calendar week.
+</div>
+
+</body>
+</html>
