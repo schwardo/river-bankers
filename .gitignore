@@ -1,0 +1,4 @@
+# TGC Jumbo Booklet build outputs (regenerate with rulebook/build-jumbo.sh)
+rulebook/rulebook-jumbo.html
+rulebook/rulebook-jumbo.pdf
+rulebook/jumbo-pages/
