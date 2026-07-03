@@ -50,11 +50,16 @@ html = re.sub(
 # Jumbo-specific overrides appended last so they win the cascade.
 override = """
   <style id="jumbo-overrides">
-    /* Cover: full-bleed the gradient to the page edge, then re-pad to safe. */
+    /* Cover: give it its OWN zero-margin page so the gradient bleeds all the
+       way to the physical page edge (a negative margin gets clipped at the
+       @page margin box; a named zero-margin page does not). The cover's own
+       0.3in padding keeps its text/logo inside the 0.25in safe zone. */
+    @page cover { size: 8.25in 10.25in; margin: 0; }
     .cover {
-      height: 10.25in;
+      page: cover;
       width: 8.25in;
-      margin: -0.3in;          /* expand out through the @page margin to bleed */
+      height: 10.25in;
+      margin: 0;
       padding: 0.3in;
       box-sizing: border-box;
     }
@@ -79,9 +84,8 @@ def force_break_before(marker):
     global html
     html = html.replace(marker, '<div class="jbreak"></div>\n' + marker, 1)
 
-# Section starts chosen to spread 11 -> 12 pages and seat Quick reference last.
+# Section starts chosen to spread to 12 pages and seat Quick reference last.
 for m in ('<h2>Game elements</h2>',
-          '<h2>Turn order</h2>',
           '<h2>Quick reference</h2>'):
     force_break_before(m)
 
