@@ -38,60 +38,24 @@ import re, sys
 src, out = sys.argv[1], sys.argv[2]
 html = open(src, encoding='utf-8').read()
 
-# Replace the @page rule (letter -> 8.25x10.25 full-bleed, 0.3" safe margins).
-html = re.sub(
-    r'@page\s*\{[^}]*\}',
-    '@page {\n'
-    '    size: 8.25in 10.25in;   /* 8x10 trim + 0.125in bleed all sides */\n'
-    '    margin: 0.3in;          /* content sits inside the 0.25in safe zone */\n'
-    '  }',
-    html, count=1)
-
-# Jumbo-specific overrides appended last so they win the cascade.
+# The jumbo shares the Letter's page BREAKS verbatim, so both editions paginate
+# identically and ONE Table of Contents is correct for both. We change only the
+# page SIZE (via a cascading @page rule, so the Letter's @bottom-center
+# page-number counter survives) and give the cover its full-bleed treatment.
 override = """
   <style id="jumbo-overrides">
-    /* Cover: give it its OWN zero-margin page so the gradient bleeds all the
-       way to the physical page edge (a negative margin gets clipped at the
-       @page margin box; a named zero-margin page does not). The cover's own
-       0.3in padding keeps its text/logo inside the 0.25in safe zone. */
-    @page cover { size: 8.25in 10.25in; margin: 0; }
-    .cover {
-      page: cover;
-      width: 8.25in;
-      height: 10.25in;
-      margin: 0;
-      padding: 0.3in;
-      box-sizing: border-box;
-    }
+    /* Page size only — a later @page rule cascades over the Letter's, keeping
+       its @bottom-center page-number counter intact. */
+    @page { size: 8.25in 10.25in; margin: 0.3in; }
+    /* Cover full-bleed: the Letter already sets .cover{page:cover-page}; zero
+       that page's margin so the gradient reaches the physical edge, and fill the
+       page with 0.3in padding to hold art inside the 0.25in safe zone. */
+    @page cover-page { size: 8.25in 10.25in; margin: 0; }
+    .cover { width: 8.25in; height: 10.25in; margin: 0; padding: 0.3in; box-sizing: border-box; }
     .cover img.logo { width: 6.0in; max-height: 5.0in; }
-    /* Keep BOTH boards together on one page: shrink to fit the 8x10 page and
-       forbid the pair from splitting across a page boundary. */
-    .boards-pair { page-break-inside: avoid; break-inside: avoid; }
-    .boards-pair figure.river-figure img.board-art { width: 62%; }
-    .boards-pair figure.fish-figure img.board-art  { width: 40%; }
   </style>
 """
 html = html.replace('</head>', override + '</head>', 1)
-
-# --- Pagination for a tight 12-page booklet (multiple of 4) ------------------
-# Natural flow (no forced breaks) is 11 pages. We drop ALL the Letter rulebook's
-# forced section breaks, then re-add a small, deliberate set so the booklet
-# lands on exactly 12 pages with the QUICK REFERENCE as the final page (12).
-html = html.replace('.page-break { page-break-before: always; }',
-                    '.page-break { page-break-before: auto; }')  # neutralize source breaks
-
-def force_break_before(marker):
-    global html
-    html = html.replace(marker, '<div class="jbreak"></div>\n' + marker, 1)
-
-# Section starts chosen to spread to 12 pages and seat Quick reference last.
-for m in ('<h2>Game elements</h2>',
-          '<h2>Quick reference</h2>'):
-    force_break_before(m)
-
-# Real forced-break class for the ones we re-added.
-html = html.replace('</head>',
-    '<style>.jbreak{page-break-before:always;}</style></head>', 1)
 
 open(out, 'w', encoding='utf-8').write(html)
 print(f"generated {out}")
@@ -115,12 +79,11 @@ fi
 
 # --- 3. Export one full-bleed PNG per page -----------------------------------
 rm -rf "$PNGDIR"; mkdir -p "$PNGDIR"
-pdftoppm -png -r "$DPI" "$PDF" "$PNGDIR/page"
-# pdftoppm names page-1.png ... zero-pad to page-01.png for a clean upload set.
-for f in "$PNGDIR"/page-*.png; do
-  raw=$(echo "$f" | sed -E 's/.*page-([0-9]+)\.png/\1/')
-  n=$(printf '%02d' "$((10#$raw))")
-  dst="$PNGDIR/page-$n.png"
-  [ "$f" != "$dst" ] && mv "$f" "$dst"
+pdftoppm -png -r "$DPI" "$PDF" "$PNGDIR/tmp"
+# Rename to literal Page-N[N].png (page number appears twice, brackets included).
+for f in "$PNGDIR"/tmp-*.png; do
+  raw=$(echo "$f" | sed -E 's/.*tmp-0*([0-9]+)\.png/\1/')
+  n=$((10#$raw))
+  mv "$f" "$PNGDIR/Page-$n[$n].png"
 done
-echo "Wrote $(ls "$PNGDIR"/*.png | wc -l) PNGs to $PNGDIR/ ($(identify -format '%wx%h' "$PNGDIR/page-01.png") px @ ${DPI} DPI)"
+echo "Wrote $(ls "$PNGDIR"/*.png | wc -l) PNGs to $PNGDIR/ (Page-N[N].png, ${DPI} DPI, $(identify -format '%wx%h' "$PNGDIR/Page-1[1].png") px)"

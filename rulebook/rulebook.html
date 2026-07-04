@@ -7,6 +7,18 @@
   @page {
     size: letter;
     margin: 0.55in 0.6in 0.6in 0.6in;
+    @bottom-center {
+      content: counter(page);
+      font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+      font-size: 8.5pt;
+      color: #5a4a36;
+    }
+  }
+  /* Cover page carries no page number. */
+  @page cover-page {
+    size: letter;
+    margin: 0.55in 0.6in 0.6in 0.6in;
+    @bottom-center { content: ""; }
   }
   :root {
     --water-deep:   #1d4e6b;
@@ -74,6 +86,7 @@
 
   /* ============ COVER ============ */
   .cover {
+    page: cover-page;
     height: 9.4in;
     display: flex;
     flex-direction: column;
@@ -423,6 +436,7 @@
     border-bottom: 0.5pt solid var(--bank-light);
     vertical-align: top;
   }
+  table.tight th, table.tight td { padding-top: 1.5pt; padding-bottom: 1.5pt; }
   th {
     background: var(--paper-warm);
     color: var(--water-deep);
@@ -465,12 +479,87 @@
   .page-break { page-break-before: always; }
 
   .footer {
-    margin-top: 16pt;
+    margin-top: 5pt;
     text-align: center;
     font-size: 8pt;
     color: var(--ink-soft);
     font-style: italic;
   }
+
+  /* Labeled card-anatomy diagrams */
+  .anatomy-fig { display: flex; gap: 16pt; align-items: flex-start; flex-wrap: wrap; margin: 6pt 0 3pt; }
+  .anatomy { position: relative; display: inline-block; vertical-align: top; }
+  .anatomy img.scard { width: 1.9in; height: auto; display: block; }
+  .anatomy img.mcard { width: 1.9in; height: auto; display: block; }
+  .amark {
+    position: absolute; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--water-deep); color: #fff; font-size: 9.5px; font-weight: 700;
+    line-height: 16px; text-align: center; transform: translate(-50%, -50%);
+    border: 1.4px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+  .akey { font-size: 9pt; line-height: 1.5; }
+  .akey > div { margin-bottom: 1pt; }
+  .akey .n {
+    display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--water-deep); color: #fff; font-size: 8.5px; font-weight: 700;
+    line-height: 14px; text-align: center; margin-right: 4pt; vertical-align: 1px;
+  }
+
+  /* Setup diagram — the laid-out table */
+  .su-fig { width: 6.5in; margin: 6pt 0 3pt; }
+  .su-rel { position: relative; display: block; }
+  .su-fig img.su-board { width: 100%; display: block; border-radius: 4pt; box-shadow: 0 1pt 4pt rgba(0,0,0,0.28); }
+  .su-ov { position: absolute; transform: translate(-50%, -50%); box-shadow: 0 1pt 3pt rgba(0,0,0,0.45); border-radius: 2pt; }
+  .su-lower { display: flex; gap: 12pt; align-items: flex-start; margin-top: 8pt; }
+  .su-fishboard { width: 2.4in; flex-shrink: 0; }
+  .su-parea { flex: 1; border: 1pt solid var(--bank-light); border-radius: 5pt; background: var(--paper); padding: 7pt 9pt; }
+  .su-parea h4 { margin: 0 0 5pt; color: var(--water-deep); font-size: 10pt; }
+  .su-workers { display: flex; flex-wrap: wrap; gap: 2pt; max-width: 1.4in; }
+  .su-workers img { width: 0.17in; height: 0.17in; border-radius: 50%; }
+  .su-item { display: flex; gap: 8pt; align-items: center; margin-bottom: 5pt; }
+  .su-item .lbl { font-size: 8.7pt; }
+  .su-hand { position: relative; width: 1.5in; height: 0.72in; flex-shrink: 0; }
+  .su-hand img { position: absolute; width: 0.6in; border-radius: 2pt; box-shadow: 0 1pt 2pt rgba(0,0,0,0.35); }
+  .su-starter { width: 0.6in; border-radius: 2pt; box-shadow: 0 1pt 2pt rgba(0,0,0,0.35); }
+  .su-key { font-size: 9pt; line-height: 1.5; margin-top: 8pt; column-count: 2; column-gap: 20pt; }
+  .su-key > div { margin-bottom: 1pt; -webkit-column-break-inside: avoid; break-inside: avoid; }
+  .su-key .n { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--water-deep); color: #fff; font-size: 8.5px; font-weight: 700; line-height: 14px; text-align: center; margin-right: 4pt; vertical-align: 1px; }
+  .amark.su-inline { position: static; transform: none; display: inline-block; width: 15px; height: 15px; line-height: 15px; }
+
+  /* Banner header — makes a key section (the endgame) impossible to miss */
+  h2.section-banner {
+    background: var(--water-deep); color: #fff; border-bottom: none;
+    border-radius: 6pt; padding: 7pt 13pt; margin-top: 6pt; margin-bottom: 10pt;
+    box-shadow: 0 1pt 3pt rgba(0,0,0,0.25);
+  }
+  h2.section-banner .flag { margin-right: 6pt; }
+
+  /* Worked auction — a visual step-by-step play example */
+  .wt { display: flex; gap: 12pt; margin: 6pt 0 3pt; align-items: flex-start; }
+  .wt-panel { flex: 1; }
+  .wt-cardwrap { position: relative; width: 100%; }
+  .wt-cardwrap > img.wtcard { width: 100%; display: block; border-radius: 3pt; box-shadow: 0 1pt 3pt rgba(0,0,0,0.28); }
+  .wt-w { position: absolute; transform: translate(-50%, -50%); border-radius: 50%; box-shadow: 0 1pt 2pt rgba(0,0,0,0.45); }
+  .wt-chit { position: absolute; transform: translate(-50%, -50%); box-shadow: 0 1pt 2pt rgba(0,0,0,0.45); border-radius: 2pt; }
+  .wt-bids { display: flex; justify-content: center; gap: 16pt; margin-top: 5pt; }
+  .wt-bids img { width: 0.22in; height: 0.22in; border-radius: 50%; box-shadow: 0 1pt 1pt rgba(0,0,0,0.3); }
+  .wt-bids .grp { font-size: 7.5pt; color: var(--ink-soft); text-align: center; }
+  .wt-cap { font-size: 8.6pt; margin-top: 5pt; line-height: 1.35; }
+  .wt-cap .n { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--water-deep); color: #fff; font-size: 8.5px; font-weight: 700; line-height: 14px; text-align: center; margin-right: 3pt; vertical-align: 1px; }
+
+  /* Table of contents */
+  .toc { border: 1pt solid var(--bank-light); background: var(--paper); border-radius: 5pt; padding: 8pt 14pt 9pt; margin: 8pt auto 14pt; max-width: 5in; }
+  .toc-title { font-weight: 700; color: var(--water-deep); font-size: 11pt; letter-spacing: 0.5pt; text-transform: uppercase; margin-bottom: 6pt; text-align: center; }
+  .toc ul { list-style: none; margin: 0; padding: 0; }
+  .toc li { display: flex; align-items: baseline; font-size: 10pt; margin-bottom: 2.5pt; }
+  .toc .t { color: var(--ink); white-space: nowrap; }
+  .toc .dots { flex: 1; border-bottom: 1pt dotted var(--bank-light); margin: 0 5pt; position: relative; top: -3pt; }
+  .toc .p { color: var(--water-deep); font-weight: 700; }
+
+  /* Glossary */
+  .glossary { column-count: 2; column-gap: 24pt; font-size: 8.9pt; line-height: 1.34; margin-top: 4pt; }
+  .glossary p { margin: 0 0 4.5pt; break-inside: avoid; -webkit-column-break-inside: avoid; }
+  .glossary strong { color: var(--water-deep); }
 </style>
 </head>
 <body>
@@ -481,9 +570,10 @@
 <section class="cover">
   <img class="logo" src="../artwork/logo.png" alt="River Bankers">
   <div class="tagline">
-    Bid your workers on materials drifting downriver.<br>
-    Spend them to build structures on the bank.<br>
-    Every action costs fish.
+    Along a winding river, four clever builders — beaver, otter, muskrat, and mink — race to raise
+    the grandest works on the bank, claiming the timber, stone, and reed the current carries
+    downstream.<br>
+    When the waters settle, the finest architect of the riverbank wins the day.
   </div>
   <div class="meta">
     <span><strong>2–4</strong> Players</span>
@@ -513,20 +603,36 @@
   the track always acts next.
 </p>
 
+<div class="toc">
+  <div class="toc-title">Contents</div>
+  <ul>
+    <li><span class="t">Components, Goal &amp; Setup</span><span class="dots"></span><span class="p">2</span></li>
+    <li><span class="t">How the game plays</span><span class="dots"></span><span class="p">5</span></li>
+    <li><span class="t">Game elements</span><span class="dots"></span><span class="p">5</span></li>
+    <li><span class="t">Turn order &amp; your turn</span><span class="dots"></span><span class="p">8</span></li>
+    <li><span class="t">Auctions</span><span class="dots"></span><span class="p">10</span></li>
+    <li><span class="t">Card movement</span><span class="dots"></span><span class="p">11</span></li>
+    <li><span class="t">Endgame</span><span class="dots"></span><span class="p">12</span></li>
+    <li><span class="t">Material card effects reference</span><span class="dots"></span><span class="p">14</span></li>
+    <li><span class="t">Glossary</span><span class="dots"></span><span class="p">15</span></li>
+    <li><span class="t">Quick reference</span><span class="dots"></span><span class="p">16</span></li>
+  </ul>
+</div>
+
 <h2>Components</h2>
 <div class="col2">
   <ul>
     <li><strong>1 large river board</strong> — the Headwaters slots, the four river spaces, and the shoreline</li>
     <li><strong>1 small fish-track board</strong> — the 60-space fish-track loop, with slots for the structure deck and discard pile</li>
-    <li><strong>24 material cards</strong> — 6 materials × 4 icon-count variants (4, 5, 7, 8)</li>
+    <li><strong>25 material cards</strong></li>
     <li><strong>48 structure cards</strong> — the shared main deck players draw from and build out of</li>
     <li><strong>12 species starter cards</strong> — 3 per species, private to that species (used for the optional asymmetric draft at setup)</li>
-    <li><strong>32 worker discs</strong> (8 per species) in four colors:
+    <li><strong>32 worker tokens</strong> (8 per species) in four colors:
       <span class="worker beaver"></span> brown beaver,
       <span class="worker otter"></span> red river otter,
       <span class="worker muskrat"></span> green muskrat,
       <span class="worker mink"></span> purple mink</li>
-    <li><strong>4 fish-track pawns</strong> — one species chit per player, color-matched; double-sided, with a <strong>"+60"</strong> lap side on the back (flip it when you pass 0)</li>
+    <li><strong>4 fish-track pawns</strong> — one per player, in your species color; double-sided, with a <strong>"+60"</strong> lap side on the back (flip it when you pass 0)</li>
     <li><strong>41 blank chits</strong> — shared pool, drop onto vacated icons</li>
     <li><strong>1 auction chit</strong> — marks the card currently up for auction</li>
     <li><strong>1 rulebook</strong> (this booklet)</li>
@@ -534,15 +640,15 @@
   <div class="card-row" style="flex-direction: column; gap: 4pt; align-items: center;">
     <img class="card" src="../graphics/material-deck/out/web/Logjam.png" style="width: 1.7in;" alt="Material card example">
     <div style="font-size: 8pt; color: var(--ink-soft); font-style: italic;">A material card — 7 log icons, ready for workers.</div>
-    <img src="../graphics/auction-chit/auction-chit.png" style="width: 0.7in; margin-top: 4pt;" alt="Auction chit">
-    <div style="font-size: 8pt; color: var(--ink-soft); font-style: italic;">The auction chit.</div>
+    <img src="../graphics/auction-chit/auction-chit-upright.png" style="width: 0.97in; margin-top: 6pt;" alt="Auction chit">
+    <div style="font-size: 8pt; color: var(--ink-soft); font-style: italic;">The auction chit (1&times;2&Prime;), shown to scale.</div>
   </div>
 </div>
 
 <h2>Goal</h2>
 <p>
-  Score the most <span class="vp">victory points★</span> from structures you build along the bank.
-  Tiebreaker: the lower final fish total (your pawn ends farther back on the track).
+  Send workers to collect raw materials from cards as they float down the river. Use them to build
+  structures along the river bank, and score the most <span class="vp">victory points (★)</span>.
 </p>
 
 <!-- ============================================================ -->
@@ -550,59 +656,151 @@
 <!-- ============================================================ -->
 <h2>Setup</h2>
 <ol>
-  <li>Each player picks a species and takes its <strong>8 workers</strong> (the same at every player count) and a fish-track pawn. The <strong>last player to cross a river</strong> goes first (settle ties however you like). Place all pawns on space <strong>0</strong>, stacked in player order with the first player on top.</li>
-  <li><strong>Species starter draft</strong> (optional but recommended). Hand each player the <strong>3 starter cards</strong> for their species, face-up but private. Simultaneously, each player picks <strong>1</strong> to place in front of them already-built (counts as a built structure from turn 1). The other two go back in the box. Skip this step if you're playing the symmetric base game — see <em>Species starter cards</em> on the next page.</li>
+  <li>Each player picks a species and takes its <strong>8 workers</strong> and a fish-track pawn. The <strong>last player to cross a river</strong> goes first (settle ties however you like). Place all pawns on space <strong>0</strong> on the fish track, stacked in player order with the first player on top.</li>
+  <li><strong>Species starter draft</strong> (optional but recommended). Hand each player the <strong>3 starter cards</strong> for their species. Simultaneously, each player picks <strong>1</strong> to place in front of them already-built (counts as a built structure from turn 1). The other two go back in the box. Skip this step if you're playing the symmetric base game — see <em>Species starter cards</em> (p.&nbsp;7).</li>
   <li>Shuffle the structure deck. Deal each player <strong>3 cards face-down</strong> as a private hand.</li>
-  <li>Shuffle the material deck. Reveal <strong>3 cards into the Headwaters</strong> (one per slot). The river starts <strong>empty</strong> — it fills as players pull cards from the Headwaters. Place the rest of the material deck face-down beside the Headwaters.</li>
+  <li><strong>Build the material deck</strong> for your player count using the badge in each card's top-right corner: un-badged cards are always in, <strong>3+</strong> cards join at 3–4 players and <strong>4P</strong> cards at 4 players, and the <strong>2P</strong> card is used only at 2 players. Shuffle it, then reveal <strong>3 cards into the Headwaters</strong> (one per slot). The river starts <strong>empty</strong> — it fills as players pull cards from the Headwaters. Place the rest of the material deck face-down beside the Headwaters.</li>
   <li>The player on top of the stack at space 0 takes the first turn.</li>
 </ol>
 
-<div class="callout note">
-  <div class="label">Deck size by player count</div>
-  Material deck: <strong>11 cards (2P)</strong> · <strong>18 cards (3P)</strong> · <strong>24 cards (4P)</strong>.
-  <strong>7-icon cards</strong> are always included. <strong>5-icon cards</strong> are always included too — except for Stones and Vines, whose separate 5s (<strong>Rocky Shoal</strong> and <strong>Trailing Vine</strong>) appear only at 3+ players; at 2 players they are replaced by the single shared wildcard <strong>Bramble Shoal</strong> (Stones/Vines ×5). <strong>4-icon cards</strong> are added at 3+ players; <strong>8-icon cards</strong> at 4 players. See the wildcard reference at the back.
+<h3>Your table at the start</h3>
+<p>Here is the whole table once setup is done — every component in its place.</p>
+<div class="su-fig">
+  <div class="su-rel">
+    <img class="su-board" src="river-board-landscape.png" alt="River board, set up">
+    <img class="su-ov" style="left:13.6%;top:16.5%;width:19%" src="../graphics/material-deck-back-landscape.png" alt="">
+    <img class="su-ov" style="left:35.6%;top:16.5%;width:19%" src="../graphics/material-deck/out/web/Logjam.png" alt="">
+    <img class="su-ov" style="left:58.9%;top:16.5%;width:19%" src="../graphics/material-deck/out/web/ReedStand.png" alt="">
+    <img class="su-ov" style="left:82.8%;top:16.5%;width:19%" src="../graphics/material-deck/out/web/Cairn.png" alt="">
+    <span class="amark" style="left:13.6%;top:31%">1</span>
+    <span class="amark" style="left:47%;top:2%">2</span>
+    <span class="amark" style="left:47%;top:70%">3</span>
+  </div>
+  <div class="su-lower">
+    <div class="su-rel su-fishboard">
+      <img class="su-board" src="../graphics/fish-board/fish-board.png" alt="Fish-track board, set up">
+      <img class="su-ov" style="left:5%;top:4%;width:8%;border-radius:50%" src="../graphics/worker-chits/mink.svg" alt="">
+      <img class="su-ov" style="left:8%;top:6.5%;width:8%;border-radius:50%" src="../graphics/worker-chits/muskrat.svg" alt="">
+      <img class="su-ov" style="left:11%;top:9%;width:8%;border-radius:50%" src="../graphics/worker-chits/otter.svg" alt="">
+      <img class="su-ov" style="left:14%;top:11.5%;width:8%;border-radius:50%" src="../graphics/worker-chits/beaver.svg" alt="">
+      <span class="amark" style="left:27%;top:8%">5</span>
+      <span class="amark" style="left:29%;top:52%">4</span>
+    </div>
+    <div class="su-parea">
+      <h4>Each player&rsquo;s area <span style="font-weight:400;font-size:8pt;color:var(--ink-soft);">(beaver shown)</span></h4>
+      <div class="su-item">
+        <div class="su-workers">
+          <img src="../graphics/worker-chits/beaver.svg" alt=""><img src="../graphics/worker-chits/beaver.svg" alt=""><img src="../graphics/worker-chits/beaver.svg" alt=""><img src="../graphics/worker-chits/beaver.svg" alt=""><img src="../graphics/worker-chits/beaver.svg" alt=""><img src="../graphics/worker-chits/beaver.svg" alt=""><img src="../graphics/worker-chits/beaver.svg" alt=""><img src="../graphics/worker-chits/beaver.svg" alt="">
+        </div>
+        <div class="lbl"><span class="amark su-inline">6</span> <strong>8 workers</strong></div>
+      </div>
+      <div class="su-item">
+        <div class="su-hand">
+          <img style="left:0;top:6pt;transform:rotate(-9deg)" src="../graphics/structure-deck-back.png" alt="">
+          <img style="left:22pt;top:2pt" src="../graphics/structure-deck-back.png" alt="">
+          <img style="left:44pt;top:6pt;transform:rotate(9deg)" src="../graphics/structure-deck-back.png" alt="">
+        </div>
+        <div class="lbl"><span class="amark su-inline">7</span> <strong>3-card hand</strong> (face-down)</div>
+      </div>
+      <div class="su-item">
+        <img class="su-starter" src="../graphics/starter-deck/out/web/LodgeFoundation.png" alt="">
+        <div class="lbl"><span class="amark su-inline">8</span> <strong>1 drafted starter</strong>, built (face-up)</div>
+      </div>
+    </div>
+  </div>
+  <div class="su-key">
+    <div><span class="n">1</span><strong>Material deck</strong> — face-down beside the Headwaters</div>
+    <div><span class="n">2</span><strong>3 material cards</strong> revealed face-up, one per Headwaters slot</div>
+    <div><span class="n">3</span><strong>River starts empty</strong></div>
+    <div><span class="n">4</span><strong>Structure deck</strong> on the fish board (discard empty)</div>
+    <div><span class="n">5</span><strong>All pawns</strong> stacked on space 0</div>
+    <div><span class="n">6</span><strong>8 workers</strong> per player, in your colour</div>
+    <div><span class="n">7</span><strong>3-card hand</strong> dealt face-down</div>
+    <div><span class="n">8</span><strong>1 starter</strong> drafted &amp; built</div>
+  </div>
 </div>
 
-<h3>The boards</h3>
-<div class="boards-pair">
-  <figure class="river-figure">
-    <img class="board-art" src="river-board-landscape.png" alt="River board">
-    <figcaption>River board — Headwaters slots feed the four river spaces, which graduate to the shoreline.</figcaption>
-  </figure>
-  <figure class="fish-figure">
-    <img class="board-art" src="../graphics/fish-board/fish-board.png" alt="Fish track board">
-    <figcaption>Fish-track board — 0–59 loop around the structure deck and Invent action panel.</figcaption>
-  </figure>
-</div>
+<!-- ============================================================ -->
+<!-- HOW THE GAME PLAYS (overview)                                -->
+<!-- ============================================================ -->
+<div class="page-break"></div>
+<h2>How the game plays</h2>
+<p>Before the details, here is the shape of a game:</p>
+<ul>
+  <li><strong>No rounds — the fish track sets the order.</strong> The player whose pawn sits
+    <strong>farthest back</strong> on the fish track takes the next turn, and keeps going as long as
+    they stay farthest back.</li>
+  <li><strong>Take one action on your turn.</strong> Most turns you run an <strong>auction</strong>:
+    a material card goes up, everyone secretly bids workers, you pay <span class="fish">fish🐟</span>,
+    then place your winning workers on the card's icons to claim those materials. Other actions
+    refresh the market, draw structure cards, or build.</li>
+  <li><strong>Spend materials to build.</strong> The workers you're holding on material cards are
+    spent to <strong>build structure cards</strong> from your hand. Structures score
+    <span class="vp">victory points★</span>, and many grant ongoing powers.</li>
+  <li><strong>Fish is both cost and clock.</strong> Every action advances your pawn. Spending more
+    sends you farther back — but since the farthest-back player acts next, a big spend also buys you
+    more upcoming turns. Managing that tempo is the heart of the game.</li>
+  <li><strong>The game ends at the finish line.</strong> Once pawns cross the fish-track finish line,
+    the game winds down; the player with the most victory points wins.</li>
+</ul>
 
 <!-- ============================================================ -->
 <!-- GAME ELEMENTS                                                -->
 <!-- ============================================================ -->
-<div class="page-break"></div>
-<h2>Game elements</h2>
+<h2 style="margin-top: 16pt;">Game elements</h2>
 
 <h3>Material cards</h3>
 <p>
   Each card shows one material (Logs, Stones, Reeds, Mud, Vines, Clay) and a row of item icons.
   Cards <strong>do not carry a printed cost</strong> — every cost is determined by where the card sits.
-  Items are not separate tokens; players claim them by placing workers directly on the icons.
+  Items are not separate pieces; players claim them by placing workers directly on the icons.
 </p>
 <p>
   <strong>Eight of the 24 base cards carry printed effects</strong> (wildcards, fish-track bonuses,
   position-gated yield), plus the 2P-only <strong>Bramble Shoal</strong> wildcard.
-  See the reference at the back of this rulebook. Effects are gated by tier so
+  See the material card effects reference (p.&nbsp;14). Effects are gated by tier so
   2P games only see those that work without a crowded board.
 </p>
 
+<div class="anatomy-fig">
+  <div class="anatomy">
+    <img class="mcard" src="../graphics/material-deck/out/web/Logjam.png" alt="Plain material card">
+    <span class="amark" style="top:14%;left:5%">1</span>
+    <span class="amark" style="top:14%;left:66%">2</span>
+    <span class="amark" style="top:55%;left:37%">3</span>
+  </div>
+  <div class="anatomy">
+    <img class="mcard" src="../graphics/material-deck/out/web/OldGrowth.png" alt="Effect material card">
+    <span class="amark" style="top:35%;left:93%">4</span>
+    <span class="amark" style="top:83%;left:9%">5</span>
+  </div>
+  <div class="akey" style="max-width:2.2in;">
+    <div><span class="n">1</span><strong>Card name</strong></div>
+    <div><span class="n">2</span><strong>Material &amp; icon count</strong></div>
+    <div><span class="n">3</span><strong>Item icons</strong> — place a worker to claim one</div>
+    <div><span class="n">4</span><strong>Player-count badge</strong> — when the card joins the deck (3+ / 4P / 2P)</div>
+    <div><span class="n">5</span><strong>Effect</strong> — some cards add a special rule</div>
+  </div>
+</div>
+<div style="font-size: 8.5pt; color: var(--ink-soft); font-style: italic; margin-top: -1pt;">
+  Two material cards: a plain card (left) and an effect card (right).
+</div>
+
 <h3>Blank chits</h3>
-<p>
-  Round chits from a shared pool. A blank is dropped onto any icon a worker leaves behind, marking it
-  as already-sold and removing it from future auctions.
-</p>
+<div style="display:flex; gap:12pt; align-items:center;">
+  <figure style="margin:0; text-align:center; flex-shrink:0;">
+    <img src="../graphics/blank-chit/blank-chit.png" style="width:0.42in; height:0.42in; border-radius:50%; display:block; box-shadow:0 1pt 2pt rgba(0,0,0,0.2);" alt="Blank chit">
+    <figcaption style="font-size:7.5pt; color:var(--ink-soft); font-style:italic; margin-top:1pt;">blank chit</figcaption>
+  </figure>
+  <p style="margin:0;">
+    Round chits from a shared pool. A blank is dropped onto any icon a worker leaves behind, marking it
+    as already-sold and removing it from future auctions.
+  </p>
+</div>
 
 <h3>Headwaters</h3>
 <p>
-  Three numbered slots above the river: <strong>Headwaters 1, 2, 3</strong>, counting away from the
+  Three numbered slots — <strong>Headwaters 1, 2, and 3</strong> — hold cards waiting to enter the
   river. Headwaters 1 is closest to the river; Headwaters 3 is farthest upstream. Each slot has a
   fixed <em>move cost</em> — pay it to pull whichever card is in that slot down into the river.
 </p>
@@ -613,15 +811,15 @@
 </ul>
 <p>
   Headwaters auctions resolve at a flat <strong>Headwaters rate of 1🐟/item</strong> — slightly
-  cheaper than River 1.
+  cheaper than River 1. After the auction, the card flows downstream to <strong>River 1</strong>.
 </p>
 
 <h3>River track</h3>
 <p>
   Four spaces, each with a fixed <em>per-item cost</em>: <strong>River 1 = 2🐟/item</strong>,
   <strong>River 2 = 3🐟/item</strong>, <strong>River 3 = 4🐟/item</strong>,
-  <strong>River 4 = 5🐟/item</strong>. That's how many fish each worker you win on a card costs you —
-  cards drifting farther downriver demand longer swims and bigger meals.
+  <strong>River 4 = 5🐟/item</strong>. That's how many fish each worker you bid will cost you —
+  cards farther downriver demand longer swims and bigger meals.
 </p>
 <p>
   Cards enter the river at space 1 (after a Headwaters move). <strong>Multiple cards can occupy the
@@ -644,23 +842,32 @@
   the game (separate from the per-species starter pools described below). Discarded structures form
   a face-up pile beside the deck; when the deck runs out, shuffle the discard pile to form a new one.
 </p>
-<p><strong>Card anatomy.</strong> Each structure card shows:</p>
-<ul style="margin-top: -2pt;">
-  <li><strong>Title</strong> (top left) and <strong>VP block</strong> (top right corner).</li>
-  <li><strong>Cost row</strong> just below the title — fish cost disc (leftmost) followed by one
-    material disc per required material, each with its count. Wider cards wrap onto a second row.</li>
-  <li><strong>Effect text</strong> (lower half, italic) — the trigger and what it does.</li>
-</ul>
+<p><strong>Card anatomy.</strong> Each structure card carries a title, a VP block, a cost row, and effect text:</p>
 
-<div class="card-row">
-  <img class="card" src="../graphics/structure-deck/out/web/Spillway.png" alt="">
-  <img class="card" src="../graphics/structure-deck/out/web/StreambankHollow.png" alt="">
-  <img class="card" src="../graphics/structure-deck/out/web/CattailMarsh.png" alt="">
-  <img class="card" src="../graphics/structure-deck/out/web/MillWheel.png" alt="">
+<div class="anatomy-fig">
+  <div class="anatomy">
+    <img class="scard" src="../graphics/structure-deck/out/web/MillWheel.png" alt="Structure card">
+    <span class="amark" style="top:10%;left:5%">1</span>
+    <span class="amark" style="top:10%;left:73%">2</span>
+    <span class="amark" style="top:16%;left:29%">3</span>
+    <span class="amark" style="top:53%;left:11%">4</span>
+  </div>
+  <div class="akey" style="max-width:2.6in;">
+    <div><span class="n">1</span><strong>Title</strong></div>
+    <div><span class="n">2</span><strong>VP block</strong> — victory points at game end (★); notation below</div>
+    <div><span class="n">3</span><strong>Cost row</strong> — fish cost first, then one disc per required material with its count (wide cards wrap to a second row)</div>
+    <div><span class="n">4</span><strong>Effect text</strong> — the trigger and what it does; see effect timing below</div>
+  </div>
+  <div style="max-width:1.9in;">
+    <div style="font-size:8pt; color:var(--ink-soft); font-style:italic; margin-bottom:3pt;">More examples</div>
+    <div style="display:flex; gap:4pt;">
+      <img style="width:0.57in; height:auto; border-radius:2pt; box-shadow:0 1pt 2pt rgba(0,0,0,0.25);" src="../graphics/structure-deck/out/web/Spillway.png" alt="">
+      <img style="width:0.57in; height:auto; border-radius:2pt; box-shadow:0 1pt 2pt rgba(0,0,0,0.25);" src="../graphics/structure-deck/out/web/StreambankHollow.png" alt="">
+      <img style="width:0.57in; height:auto; border-radius:2pt; box-shadow:0 1pt 2pt rgba(0,0,0,0.25);" src="../graphics/structure-deck/out/web/CattailMarsh.png" alt="">
+    </div>
+  </div>
 </div>
-<div style="font-size: 8.5pt; color: var(--ink-soft); font-style: italic; text-align: center; margin-top: -2pt;">
-  Four sample structure cards. Top-right corner: VP. Cost row directly below the title: fish cost then materials. Effect prose fills the lower half.
-</div>
+
 
 <h4 style="margin-top: 10pt;">VP corner notation</h4>
 <ul style="margin-top: -2pt;">
@@ -765,26 +972,41 @@
 
 <h3>Worker tokens</h3>
 <p>
-  Each player gets 8 disc workers of their species color, sized to fully cover one icon on a
-  material card. The count is the same at every player count.
+  Each player gets 8 worker tokens in their species color, sized to fully cover one icon on a
+  material card.
 </p>
 
 <h3>Fish track</h3>
 <p>
-  A 60-space loop with one pawn (a species chit) per player. Every action slides your pawn
+  A 60-space loop with one pawn per player. Every action slides your pawn
   <strong>forward</strong> by its fish cost; the pawn farthest back acts next (see Turn order).
 </p>
 <p>
   When your pawn passes <strong>0</strong> (wraps past space 59 onto a new lap),
-  <strong>flip its chit over to the "+60" side</strong>. Your fish total is the space your pawn sits
-  on <em>plus 60 while the chit shows its "+60" side</em> — so a flipped pawn on space 12 is at 72.
+  <strong>flip your pawn over to the "+60" side</strong>. Your fish total is the space your pawn sits
+  on <em>plus 60 while it shows its "+60" side</em> — so a flipped pawn on space 12 is at 72.
   The flip keeps everyone's true position readable once play runs past a full lap.
 </p>
+
+<div style="display:flex; gap:12pt; align-items:center; margin:4pt 0 2pt;">
+  <figure style="margin:0; text-align:center;">
+    <img src="../graphics/worker-chits/beaver.svg" style="width:0.5in; height:0.5in; border-radius:50%; display:block; box-shadow:0 1pt 2pt rgba(0,0,0,0.25);" alt="Pawn front">
+    <figcaption style="font-size:7.5pt; color:var(--ink-soft); font-style:italic; margin-top:1pt;">front</figcaption>
+  </figure>
+  <span style="font-size:13pt; color:var(--water-mid);">→</span>
+  <figure style="margin:0; text-align:center;">
+    <img src="../graphics/worker-chits/beaver-back.svg" style="width:0.5in; height:0.5in; border-radius:50%; display:block; box-shadow:0 1pt 2pt rgba(0,0,0,0.25);" alt="Pawn +60 back">
+    <figcaption style="font-size:7.5pt; color:var(--ink-soft); font-style:italic; margin-top:1pt;">flip side (+60)</figcaption>
+  </figure>
+  <div style="font-size:8.5pt; color:var(--ink-soft); font-style:italic; max-width:2.9in;">
+    A fish-track pawn (beaver shown) — one per player, in your worker colour. Flip it to the
+    &ldquo;+60&rdquo; side the first time you pass 0.
+  </div>
+</div>
 
 <!-- ============================================================ -->
 <!-- TURN ORDER & YOUR TURN                                       -->
 <!-- ============================================================ -->
-<div class="page-break"></div>
 <h2>Turn order</h2>
 <p>
   There are no rounds. The next player to act is whoever is <strong>farthest back</strong> — the
@@ -794,12 +1016,13 @@
   so a big, expensive turn that buries you deep on the track hands several turns to everyone else.
 </p>
 
+<div class="page-break"></div>
 <h2>Your turn</h2>
 <p class="lead">
   Take exactly <strong>one</strong> action. Every action advances your pawn forward on the fish
   track by its fish cost. Any action that triggers an auction (<strong>Pull</strong>,
   <strong>Swim</strong>, or <strong>Flush</strong>) requires at least one worker available — in
-  your supply or placed on a card you could recall (see <em>Pre-auction recall</em>, next page).
+  your supply or placed on a card you could recall (see <em>Pre-auction recall</em>, p.&nbsp;10).
 </p>
 
 <div class="action">
@@ -870,7 +1093,7 @@
       For each material listed, pick up that many of <em>your</em> workers from cards of the matching
       type and return them to your supply. Drop a blank on each uncovered river-card icon. (Shoreline
       cards don't need blanks.) Place the structure face-up in front of you for scoring, then draw a
-      replacement structure card so your hand returns to your hand size (normally 3; Cache Burrow raises it).
+      replacement structure card so your hand returns to your hand size (normally 3).
     </p>
   </div>
 </div>
@@ -994,25 +1217,55 @@
 </p>
 <p>
   When a card reaches the shoreline, return any blanks on it to the pool. Workers stay on it until
-  spent on a build. Once the last worker leaves a shoreline card, the card is discarded.
+  spent on a build. Once the last worker leaves a shoreline card, the card is removed from the game.
 </p>
 <p>
   Spending or recalling a worker from a river card does <em>not</em> move the card — it just leaves
-  a blank on the icon. The card keeps drifting normally. New material cards only enter the river by
+  a blank on the icon. The card keeps sliding as normal. New material cards only enter the river by
   being pulled out of the Headwaters.
 </p>
+
+<h3>A worked auction</h3>
+<p>Bid, pay, place, move — one auction from start to finish:</p>
+<div class="wt">
+  <div class="wt-panel">
+    <div class="wt-cardwrap">
+      <img class="wtcard" src="../graphics/material-deck/out/web/ReedStand.png" alt="">
+      <img class="wt-chit" style="left:77%;top:85%;width:27%" src="../graphics/auction-chit/auction-chit-upright.png" alt="">
+    </div>
+    <div class="wt-cap"><span class="n">1</span>A card comes up on <strong>River&nbsp;2</strong> (3🐟 per reed). Drop the auction chit on it.</div>
+  </div>
+  <div class="wt-panel">
+    <div class="wt-cardwrap">
+      <img class="wtcard" src="../graphics/material-deck/out/web/ReedStand.png" alt="">
+    </div>
+    <div class="wt-bids">
+      <div class="grp"><img src="../graphics/worker-chits/beaver.svg" alt=""><img src="../graphics/worker-chits/beaver.svg" alt=""><br>Beaver&nbsp;2</div>
+      <div class="grp"><img src="../graphics/worker-chits/otter.svg" alt=""><img src="../graphics/worker-chits/otter.svg" alt=""><br>Otter&nbsp;2</div>
+    </div>
+    <div class="wt-cap"><span class="n">2</span>Everyone bids workers in secret, then reveals. Here 2 + 2 = 4, and the card has 5 reeds — it fits.</div>
+  </div>
+  <div class="wt-panel">
+    <div class="wt-cardwrap">
+      <img class="wtcard" src="../graphics/material-deck/out/web/ReedStand.png" alt="">
+      <img class="wt-w" style="left:30.7%;top:41%;width:15%" src="../graphics/worker-chits/beaver.svg" alt="">
+      <img class="wt-w" style="left:50%;top:41%;width:15%" src="../graphics/worker-chits/beaver.svg" alt="">
+      <img class="wt-w" style="left:69.3%;top:41%;width:15%" src="../graphics/worker-chits/otter.svg" alt="">
+      <img class="wt-w" style="left:40%;top:69%;width:15%" src="../graphics/worker-chits/otter.svg" alt="">
+    </div>
+    <div class="wt-cap"><span class="n">3</span>Pay first — each advances 2&times;3 = 6🐟 — then place. Four reeds claimed, one left, so the card drifts to <strong>River&nbsp;3</strong>.</div>
+  </div>
+</div>
 
 <!-- ============================================================ -->
 <!-- ENDGAME                                                      -->
 <!-- ============================================================ -->
-<h2>Endgame &amp; game end</h2>
+<div class="page-break"></div>
+<h2 class="section-banner">Endgame</h2>
 <p>
-  The fish track has a single <strong>finish line at 90 fish, the same for every player count</strong>.
-  It sits on the <strong>second lap</strong> — flip your chit to its &quot;+60&quot; side as you pass
-  <strong>0</strong>, then play on toward your finish space (90 = space 30 on the lap-2 side). (A
-  larger board at more players takes longer to mine out, but the extra workers and richer auctions
-  carry every pawn to the line at about the same depth, so one flat line ends all counts organically —
-  by pawns crossing — rather than stalling on a depleted board.)
+  The fish track has a single <strong>finish line at 90 fish</strong>.
+  It sits on the <strong>second lap</strong> — flip your pawn to its &quot;+60&quot; side as you pass
+  <strong>0</strong>, then play on toward your finish space (90 = space 30 on the lap-2 side).
 </p>
 <p>
   Play continues normally up to that point. The <strong>material deck running out does
@@ -1057,8 +1310,8 @@
 </p>
 <p>
   Wildcard cards (Driftwood Tangle, Mud Slick, and — at 2 players — Bramble Shoal) let each of their
-  workers count toward either of their two materials — assign each worker individually to maximize
-  your pair count.
+  workers count as <strong>one</strong> of their two materials — either one, but not both. Assign each
+  worker individually to maximize your pair count.
 </p>
 <h3>Variable-VP (<span class="vp">?</span>-VP) structures</h3>
 <p>
@@ -1219,6 +1472,32 @@
 </div>
 
 <!-- ============================================================ -->
+<!-- GLOSSARY                                                     -->
+<!-- ============================================================ -->
+<h2>Glossary</h2>
+<div class="glossary">
+  <p><strong>Auction chit</strong> — marker placed on the card currently up for auction.</p>
+  <p><strong>Blank chit</strong> — dropped onto an icon a worker leaves behind, marking it already claimed.</p>
+  <p><strong>Clinch</strong> — to win an item with your bid.</p>
+  <p><strong>Finish line</strong> — 90 fish; crossing it retires you and starts the game's end.</p>
+  <p><strong>Fish</strong> — the currency; you spend it by advancing your pawn on the fish track.</p>
+  <p><strong>Fish track</strong> — the shared 0–59 loop; it sets turn order and pays for every action.</p>
+  <p><strong>Graduate</strong> — when a card leaves the river for the shoreline (all icons claimed, or slid off River&nbsp;4).</p>
+  <p><strong>Headwaters</strong> — the three slots above the river where cards wait to be pulled in.</p>
+  <p><strong>Icon</strong> — a circle on a material card; a worker covers one to claim its item.</p>
+  <p><strong>Item</strong> — one claimable unit on a card (what an icon shows); slot costs are charged "per item".</p>
+  <p><strong>Jam</strong> — an auction where total bids exceed the card's icons; the overbid claims nothing.</p>
+  <p><strong>Material</strong> — the resource an item yields: logs, reeds, mud, clay, stones, or vines.</p>
+  <p><strong>Pawn</strong> — your marker on the fish track; flip it to its "+60" side after a lap.</p>
+  <p><strong>Recall</strong> — take your own workers back (free) just before an auction.</p>
+  <p><strong>River</strong> — the four auction spaces (River&nbsp;1–4); spaces farther down cost more per item.</p>
+  <p><strong>Shoreline</strong> — the off-river column where cards rest after they graduate.</p>
+  <p><strong>Tableau</strong> — your area of built structures in front of you.</p>
+  <p><strong>Wildcard</strong> — a card whose items count as either of two materials.</p>
+  <p><strong>Worker</strong> — the pieces you bid with and place to claim items (8 per player).</p>
+</div>
+
+<!-- ============================================================ -->
 <!-- QUICK REFERENCE                                              -->
 <!-- ============================================================ -->
 <div class="page-break"></div>
@@ -1284,7 +1563,7 @@
   <div class="keep">
     <h3>Passing 0</h3>
     <p style="font-size: 9.5pt;">
-      Wrap past space 59 → <strong>flip your chit to its "+60" side</strong>. Your total = space + 60 while flipped.
+      Wrap past space 59 → <strong>flip your pawn to its "+60" side</strong>. Your total = space + 60 while flipped.
     </p>
   </div>
 
@@ -1304,8 +1583,34 @@
 </div>
 
 <div class="keep">
+  <h3>Icon legend</h3>
+  <div style="display:flex; gap:22pt; flex-wrap:wrap; font-size:9.5pt; align-items:flex-start;">
+    <div>
+      <div style="font-weight:700; text-transform:uppercase; letter-spacing:0.4pt; font-size:8pt; color:var(--forest); margin-bottom:3pt;">Worker icons</div>
+      <div style="display:flex; gap:12pt; flex-wrap:wrap;">
+        <span><img src="../graphics/worker-chits/beaver.svg" style="width:0.19in;height:0.19in;border-radius:50%;vertical-align:-4pt;" alt=""> Beaver</span>
+        <span><img src="../graphics/worker-chits/otter.svg" style="width:0.19in;height:0.19in;border-radius:50%;vertical-align:-4pt;" alt=""> River otter</span>
+        <span><img src="../graphics/worker-chits/muskrat.svg" style="width:0.19in;height:0.19in;border-radius:50%;vertical-align:-4pt;" alt=""> Muskrat</span>
+        <span><img src="../graphics/worker-chits/mink.svg" style="width:0.19in;height:0.19in;border-radius:50%;vertical-align:-4pt;" alt=""> Mink</span>
+      </div>
+    </div>
+    <div>
+      <div style="font-weight:700; text-transform:uppercase; letter-spacing:0.4pt; font-size:8pt; color:var(--forest); margin-bottom:3pt;">Material icons</div>
+      <div style="display:flex; gap:12pt; flex-wrap:wrap;">
+        <span><img class="mi" src="../graphics/icons/logs.svg" alt=""> Logs</span>
+        <span><img class="mi" src="../graphics/icons/reeds.svg" alt=""> Reeds</span>
+        <span><img class="mi" src="../graphics/icons/mud.svg" alt=""> Mud</span>
+        <span><img class="mi" src="../graphics/icons/clay.svg" alt=""> Clay</span>
+        <span><img class="mi" src="../graphics/icons/stones.svg" alt=""> Stones</span>
+        <span><img class="mi" src="../graphics/icons/vines.svg" alt=""> Vines</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="keep">
   <h3>Material supply &amp; demand</h3>
-  <table style="font-size: 9pt;">
+  <table class="tight" style="font-size: 9pt;">
     <thead>
       <tr>
         <th rowspan="2">Material</th>
@@ -1328,10 +1633,6 @@
       <tr><td><img class="mi" src="../graphics/icons/vines.svg" alt=""> Vines</td><td class="sc">7x</td><td>+4x 5x</td><td>+8x</td><td class="sc">2(1x) 7(2x) 5(3x) 1(4x) = 35</td></tr>
     </tbody>
   </table>
-</div>
-
-<div class="footer">
-  River Bankers — draft rulebook · v0.1.9 · designed by Don Schwarz
 </div>
 
 </body>

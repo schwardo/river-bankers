@@ -267,7 +267,10 @@ displaced card back into the deck (matching Flush's recycle rule). Starting play
   <li>The fish line moved from the climbing <strong>89/109/119</strong> to a <strong>uniform 119</strong>,
       then — after more data — to a <strong>flat 90 at every player count</strong>, paired with the
       <strong>deck-empty +1 drift</strong> and a fix so <strong>no two pawns share a finish space</strong>.
-      Flat-90 landed games at roughly 30 / 40 / 55 minutes (2P/3P/4P).</li>
+      Flat-90 landed games at roughly 30 / 40 / 55 minutes (2P/3P/4P). Why one line works at every
+      count: a larger board at more players takes longer to mine out, but the extra workers and richer
+      auctions carry every pawn to the line at about the same depth — so a single flat line ends all
+      counts organically, by pawns crossing, rather than stalling on a depleted board.</li>
   <li>An <strong>AI over-bidding fix</strong> plus worker/endgame recalibration cleaned up the
       simulation baseline the balance data rides on.</li>
   <li>A <strong>uniform rule</strong> was written down and enforced everywhere: <em>a card's own
@@ -320,6 +323,81 @@ completing the symmetric set of three wildcard pairs (logs/reeds, clay/mud, ston
 with a green "2P" badge; its two displaced cards now carry matching <strong>"3+" badges</strong> so
 players know to pull them at two players. The auction engine also learned to support
 <strong>multiple simultaneous Spy Mound / Quick Strike deferrers</strong>, matching the BGA build.</p>
+
+<div class="phase">Phase III · Polish for print (July)</div>
+
+<h2>Week of June 30 <span class="wk">— v0.2: a sanity-test polish pass</span></h2>
+
+<div class="callout">
+  <strong>Outside eyes.</strong> On [2026-07-03] River Bankers came back from
+  <strong>The Game Crafter&rsquo;s Sanity Test</strong> — an independent review of the rulebook and
+  shop listing — with a score of <strong>77/100</strong> (&ldquo;an auction game with a charming
+  theme and professional presentation&rdquo;, reviewed by Chris Aylott). It praised the writing,
+  setup, and layout, and handed us a punch-list of concrete fixes. <strong>Everything in v0.2 is a
+  response to that review</strong> (cross-checked against two rulebook-writing guides — University
+  XP&rsquo;s <em>What Makes a Good Rule Book</em> and The Indie Game Report&rsquo;s <em>Rulebook
+  Cookbook</em>), so the game got sharper on the page without the rules changing underneath.
+</div>
+
+<p>The review scored <strong>Rules 66/80</strong> and <strong>Shop Presentation 11/20</strong>, and
+the feedback clustered into a few themes: add navigation (a table of contents), orient the reader
+with a summary of play up front, lean on more diagrams, and shore up the shop listing. The changes
+below work through that list.</p>
+
+<h3>Fixes shipped so far <span class="tag">in response to the sanity test</span></h3>
+<ul>
+  <li><strong>The sideways auction chit.</strong> The reviewer caught that the auction-chit picture
+      &ldquo;seems to be sideways.&rdquo; It was: the chit reuses the material-deck-back river scene,
+      which is deliberately rotated to fill the tall 1&times;2&Prime; token — so on the page it read
+      as a turned-on-its-side landscape. In the rulebook it now shows <strong>upright</strong> and is
+      <strong>sized to scale</strong> against the material card beside it.</li>
+  <li><strong>Labeled card anatomy.</strong> The review wanted more diagrams and a component-anatomy
+      treatment (echoing both writing guides). The rulebook now has <strong>numbered-callout
+      diagrams</strong> naming the parts of a structure card and of a material card — the kind of
+      &ldquo;what am I looking at&rdquo; reference a first-time reader reaches for.</li>
+  <li><strong>Icon legend.</strong> A key for the four worker chits and six material icons now sits
+      in the Quick reference, so the symbols in the tables and on the cards are all decodable in one
+      place.</li>
+  <li><strong>Every component pictured.</strong> An audit turned up two components that were
+      described but never shown — the <strong>fish-track pawn</strong> (now front-and-&ldquo;+60&rdquo;-back,
+      so the flip mechanic is visible) and the <strong>blank chit</strong>. Both had art sitting
+      unused in the repo; they&rsquo;re now on the page.</li>
+  <li><strong>A summary of play up front.</strong> The reviewer wanted the reader oriented with a
+      summary <em>before</em> the detailed &ldquo;game elements&rdquo; — the same &ldquo;game
+      overview&rdquo; both writing guides call for. A tight <strong>How the game plays</strong>
+      section now precedes the details: no rounds, one action a turn, fish as cost-and-clock, build
+      for VP, finish-line ending.</li>
+  <li><strong>A thematic cover intro.</strong> The cover led with mechanics (&ldquo;bid your workers
+      on materials&hellip; every action costs fish&rdquo;). Following the Cookbook&rsquo;s note that a
+      thematic intro should read like advertising copy and never name game terms, it now sets the
+      scene instead — beaver, otter, muskrat, and mink racing to raise the finest works on the
+      riverbank.</li>
+  <li><strong>A &ldquo;show the final state&rdquo; setup diagram.</strong> Both guides — and the
+      reviewer&rsquo;s note on setup pictures — ask for a picture of the completed setup. The plain
+      side-by-side board shots are replaced by a single <strong>laid-out-table</strong> diagram: the
+      material deck and three face-up Headwaters cards, an empty river, the structure deck with all
+      pawns stacked on space 0, and a player&rsquo;s eight workers, three-card hand, and drafted
+      starter — each labeled and keyed.</li>
+  <li><strong>The endgame stands out.</strong> The reviewer found the endgame &ldquo;gets a little
+      lost on the page&rdquo; and suggested a separate page or a stronger header — so it got both: its
+      own page, opened by a <strong>checkered-flag banner header</strong> that reads at a glance.</li>
+  <li><strong>A worked-auction walkthrough.</strong> The reviewer asked for &ldquo;a couple of visual
+      examples of play.&rdquo; A three-panel auction — a card comes up, secret bids are revealed, then
+      workers pay and place while the card drifts downstream — now shows the core loop in pictures,
+      and neatly fills the page the endgame&rsquo;s new page-break had emptied.</li>
+  <li><strong>A table of contents and page numbers.</strong> The reviewer&rsquo;s top structural note
+      — echoed by both guides — was that a rulebook this size wants a table of contents. There&rsquo;s
+      now a short <strong>Contents</strong> box up front and a page number on every content page, so
+      any section is a glance away. Inline cross-references were converted from &ldquo;at the
+      back&rdquo;/&ldquo;next page&rdquo; to real page numbers.</li>
+  <li><strong>Glossary and consistent wording.</strong> A short glossary near the back defines the
+      coined terms, and a vocabulary pass settled on one word per thing (both guides warn against
+      alternating synonyms): the fish-track piece is always the <em>pawn</em>, river cards
+      <em>slide</em>, an <em>icon</em> is the circle a worker covers while an <em>item</em> is the
+      abstract unit it yields, and the bidding pieces are <em>worker tokens</em>.</li>
+</ul>
+
+<p class="note">This section will grow as the rest of the v0.2 punch-list lands.</p>
 
 <div class="footer">
   River Bankers — a design journal · a week-by-week look back at the game's development ·
