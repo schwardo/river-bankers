@@ -214,8 +214,27 @@
    are shrunk (.rb-scard) so the row stays compact and 3+ fit. */
 .rb-hrow { display: flex; flex-wrap: nowrap; gap: 6px; height: 142px;
            overflow-x: auto; overflow-y: hidden; align-items: flex-start; }
-.rb-scard { flex: 0 0 auto; width: 90px; height: 126px; }   /* 110x154 * 0.82 */
+.rb-scard { flex: 0 0 auto; width: 90px; height: 126px; position: relative; }   /* 110x154 * 0.82 */
 .rb-scard .rb-card { transform: scale(0.82); transform-origin: top left; }
+
+/* Hand affordability overlay: have/need pills for each structure card in my hand
+   (see handReqsHtml() in Game.js). Stacked vertically on the RIGHT edge of the
+   card, centred, so they clip to the border like a tab and don't cover the
+   printed effect text. Only rendered in #rb-hand; built/opponent rows have none. */
+.rb-reqs { position: absolute; top: 50%; right: 1px; transform: translateY(-50%);
+           z-index: 4; display: flex; flex-direction: column; align-items: flex-end;
+           gap: 3px; pointer-events: none; }
+.rb-reqs:empty { display: none; }
+.rb-req-pill { display: inline-flex; align-items: center; gap: 1px;
+               font-size: 10px; font-weight: 700; line-height: 1.2; color: #3a1414;
+               background: rgba(244, 190, 190, 0.95); border: 1px solid rgba(0,0,0,0.3);
+               border-radius: 4px; padding: 1px 3px 1px 1px; white-space: nowrap;
+               box-shadow: 0 1px 3px rgba(0,0,0,0.55); }
+.rb-req-pill.rb-req-sat { color: #143a14; background: rgba(190, 236, 190, 0.97); }
+/* Shrink the 24px material-icon sprite to ~14px without breaking its sprite-sheet
+   coordinates (scaling background-size would misalign the frames). */
+.rb-req-ic { display: inline-block; width: 14px; height: 14px; }
+.rb-req-ic .rb-art-icon { transform: scale(0.5833); transform-origin: top left; }
 
 /* === BEGIN GENERATED SPRITES (build_sprites.py) === */
 /* Do not edit by hand — regenerate with: python3 img/build_sprites.py */

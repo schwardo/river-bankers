@@ -12,6 +12,83 @@
 const MAT_GLYPH = {
     logs: '🪵', stones: '🪨', reeds: '🌾', mud: '🟫', vines: '🍃', clay: '🧱', '': '❓',
 };
+const MAT_KEYS = ['logs', 'stones', 'reeds', 'mud', 'vines', 'clay'];
+
+// --- Hand affordability overlay (have vs. need per structure card) ----------
+// Faithful port of the web prototype's effectiveBuildCost / effectiveCoverage
+// (web/index.html) — themselves mirrors of the server's Rules\BuildCost::effective
+// + Rules\Build allocation. Kept client-side (not server-computed) so the pills
+// stay live on every boardUpdate as the player's placed workers change, without
+// re-sending the private hand. `wbm` is the builder's worker holdings:
+// { <material>: fixedCount, _wildPools: [{materials:[a,b], count}] }.
+// `flags` are the build-cost modifiers the player's built cards grant.
+function rbEffectiveBuildCost(cost, flags, wbm) {
+    const eff = {};
+    for (const m in cost) eff[m] = cost[m];
+    // Cattail Marsh: each reed worker counts as 2 reeds.
+    if (flags.cattailMarsh && eff.reeds) eff.reeds = Math.ceil(eff.reeds / 2);
+    // Charcoal Pit: 1 clay may substitute for 1 of any deficient other material.
+    if (flags.charcoalPit) {
+        const claySlack = (wbm.clay || 0) - (eff.clay || 0);
+        if (claySlack >= 1) {
+            for (const m of Object.keys(cost)) {
+                if (m === 'clay') continue;
+                if ((wbm[m] || 0) < eff[m]) { eff[m] -= 1; eff.clay = (eff.clay || 0) + 1; break; }
+            }
+        }
+    }
+    // Stone Tool (otter starter): once-per-game Charcoal-Pit variant on Stones.
+    if (flags.stoneTool && !flags.stoneToolUsed) {
+        const stoneSlack = (wbm.stones || 0) - (eff.stones || 0);
+        if (stoneSlack >= 1) {
+            for (const m of Object.keys(cost)) {
+                if (m === 'stones') continue;
+                if ((wbm[m] || 0) < eff[m]) { eff[m] -= 1; eff.stones = (eff.stones || 0) + 1; break; }
+            }
+        }
+    }
+    // Treaty Stone: cover 1 missing of one material by paying 2 of a surplus one.
+    if (flags.treatyStone) {
+        for (const target of MAT_KEYS) {
+            if ((wbm[target] || 0) >= (eff[target] || 0)) continue;
+            let found = false;
+            for (const source of MAT_KEYS) {
+                if (source === target) continue;
+                if ((wbm[source] || 0) - (eff[source] || 0) < 2) continue;
+                eff[target] -= 1; eff[source] = (eff[source] || 0) + 2; found = true; break;
+            }
+            if (found) break;
+        }
+    }
+    // Granary: once-per-game, drop 1 from a remaining deficient material.
+    if (flags.granary && !flags.granaryUsed) {
+        for (const m of Object.keys(eff)) {
+            if ((wbm[m] || 0) < eff[m]) { eff[m] -= 1; break; }
+        }
+    }
+    return eff;
+}
+
+// Per-material "have" count after greedily assigning wild-pool workers to the
+// material with the largest remaining deficit (same order the real build uses).
+function rbEffectiveCoverage(targetCost, wbm) {
+    const have = {};
+    for (const m in targetCost) have[m] = wbm[m] || 0;
+    for (const pool of (wbm._wildPools || [])) {
+        let avail = pool.count;
+        if (avail === 0) continue;
+        const relevant = pool.materials.filter(m => m in targetCost);
+        relevant.sort((a, b) => (targetCost[b] - have[b]) - (targetCost[a] - have[a]));
+        for (const m of relevant) {
+            if (avail === 0) break;
+            const deficit = Math.max(0, targetCost[m] - have[m]);
+            if (deficit === 0) continue;
+            const take = Math.min(avail, deficit);
+            have[m] += take; avail -= take;
+        }
+    }
+    return have;
+}
 
 function costStr(cost) {
     return Object.entries(cost || {}).map(([m, n]) => `${n}${MAT_GLYPH[m] || m}`).join(' ') || '—';
@@ -1086,11 +1163,59 @@ export class Game {
     }
 
     renderHand(hand) {
-        document.getElementById('rb-hand').innerHTML = (hand || []).map(c => `
+        this.lastHand = hand || [];
+        document.getElementById('rb-hand').innerHTML = this.lastHand.map(c => `
             <div class="rb-scard"><div id="card-${c.id}" class="rb-card rb-has-art rb-art rb-art-str rb-p-str-${slugify(c.name)}"
                  data-id="${c.id}" title="${c.effect || ''}">
-            </div></div>`).join('') || '<span class="rb-empty">—</span>';
+            </div><div class="rb-reqs" data-reqs="${c.id}"></div></div>`).join('') || '<span class="rb-empty">—</span>';
+        this.refreshHandReqs();
         this.applyClickableClasses();
+    }
+
+    // My build-cost modifier flags, derived from my built cards (name + used state).
+    myBuildFlags() {
+        const mine = (this.built || {})[this.myId()] || [];
+        const has = name => mine.some(b => b.name === name);
+        const used = name => mine.some(b => b.name === name && b.used);
+        return {
+            cattailMarsh: has('Cattail Marsh'), charcoalPit: has('Charcoal Pit'),
+            stoneTool: has('Stone Tool'), stoneToolUsed: used('Stone Tool'),
+            treatyStone: has('Treaty Stone'),
+            granary: has('Granary'), granaryUsed: used('Granary'),
+        };
+    }
+
+    // The have/need pills for one hand structure card, floated over its art.
+    handReqsHtml(card) {
+        const held = (this.materials || {})[this.myId()] || { fixed: {}, wild: [] };
+        const wbm = { ...(held.fixed || {}), _wildPools: held.wild || [] };
+        const flags = this.myBuildFlags();
+        const eff = rbEffectiveBuildCost(card.cost || {}, flags, wbm);
+        const have = rbEffectiveCoverage(eff, wbm);
+        // Pills show the printed materials only (any material the modifiers add to
+        // `eff`, e.g. Treaty Stone's surplus source, is one you provably have).
+        // All-green = buildable; no separate READY badge needed.
+        return Object.keys(card.cost || {}).map(m => {
+            const n = eff[m] != null ? eff[m] : card.cost[m];
+            const pure = (held.fixed || {})[m] || 0;
+            const got = have[m] || 0;
+            const wildAdd = got - pure;
+            const ok = got >= n;
+            const reduced = n < card.cost[m];
+            const count = wildAdd > 0 ? `${pure}+${wildAdd}/${n}` : `${got}/${n}`;
+            const ic = `<span class="rb-req-ic"><span class="rb-art rb-art-icon rb-p-icon-${m}"></span></span>`;
+            return `<span class="rb-req-pill${ok ? ' rb-req-sat' : ''}"${reduced ? ' title="' + _('reduced by your built effects') + '"' : ''}>${ic}${count}${reduced ? '*' : ''}</span>`;
+        }).join('');
+    }
+
+    // Repaint just the overlay pills on each hand card (leaves the card art and any
+    // selection/clickable state intact) — called on load and on every boardUpdate,
+    // since my placed workers (hence coverage) change without the hand contents.
+    refreshHandReqs() {
+        (this.lastHand || []).forEach(c => {
+            const el = document.querySelector(`.rb-reqs[data-reqs="${c.id}"]`);
+            if (el) el.innerHTML = this.handReqsHtml(c);
+        });
     }
 
     // A built card's face (structure or species-starter art) with an effect tooltip.
@@ -1105,6 +1230,7 @@ export class Game {
     }
 
     renderBuilt(built) {
+        this.built = built || {};
         Object.entries(built || {}).forEach(([pid, list]) => {
             const el = document.getElementById(`built-${pid}`);
             if (el) el.innerHTML = list.map(b => `<div class="rb-scard">${this.builtCardHtml(b)}</div>`).join('') || '<span class="rb-empty">—</span>';
@@ -1154,6 +1280,7 @@ export class Game {
     }
 
     renderMaterials(materials) {
+        this.materials = materials || {};
         Object.entries(materials || {}).forEach(([pid, held]) => {
             const el = document.getElementById(`materials-${pid}`);
             if (!el) return;
@@ -1162,6 +1289,7 @@ export class Game {
             const all = [...fixed, ...wild];
             el.innerHTML = all.length ? all.join(' ') : `<span class="rb-empty">${_('no materials yet')}</span>`;
         });
+        this.refreshHandReqs(); // my holdings changed → repaint hand have/need pills
     }
 
     // Draw one worker chit per worker in a player's supply (instead of "N 👷").
@@ -1237,6 +1365,7 @@ export class Game {
         });
         this.renderSupplies(); // supply chits; fish position shows on the track, VP on the BGA panel
         this.renderFishTrack();
+        this.refreshHandReqs(); // my placed workers changed → repaint hand have/need pills
     }
 
     // A single line across the top: each player's species chit at their position
