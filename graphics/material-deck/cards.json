@@ -56,6 +56,6 @@
       "effect_text": "Wild: each claimed icon yields Mud OR Clay (chosen at build time)." },
     { "name": "Slipping Sandbar",  "material": "clay",   "icons": 8,
       "effect_name": "Slipping Sandbar",
-      "effect_text": "Enters the river at River 4. After an auction on this card with workers placed, slides one slot upstream instead of downstream. At River 1, retires to shoreline instead." }
+      "effect_text": "Enters the river at River 4. After an auction on this card, slides one slot upstream instead of downstream. At River 1, retires to shoreline instead." }
   ]
 }
