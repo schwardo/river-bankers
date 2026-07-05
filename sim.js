@@ -61,7 +61,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
   { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'Once per game (flip card): discard 1 structure from your hand and take one of your choice from the discard pile.' },
   { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back 3🐟 in compensation.' },
-  { name: 'Tow Line',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'As an action: pay 2🐟 to slide a river card 1 space toward the Headwaters.' },
+  { name: 'Tow Line',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'Once per game (flip card): move any river card to River 1, then run an auction on it (no flat 🐟).' },
   { name: 'Portage',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.' },
   { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 6, effect: 'As an action: place 1-5 workers from your supply onto uncovered icons of one river card. 🐟 cost escalates 1/2/3/5/8 per successive worker.' },
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track.' },
@@ -306,7 +306,8 @@ function tryPackRat(state, playerIdx) {
 // could plausibly still use.
 const ONCE_PER_GAME_FLAGS = [
   ['Tribute Stone', 'tributeStoneUsed'], ['Snare Set', 'snareSetUsed'],
-  ['Floodgate', 'floodgateUsed'], ['Spy Mound', 'spyMoundUsed'],
+  ['Floodgate', 'floodgateUsed'], ['Tow Line', 'towLineUsed'],
+  ['Spy Mound', 'spyMoundUsed'],
   ['Granary', 'granaryUsed'], ['Slipstream', 'slipstreamUsed'],
   ['Wood Pile', 'woodPileUsed'], ['Hollowed-out Log', 'hollowedLogUsed'],
   ['Pack Rat Burrow', 'packRatUsed'],
@@ -368,10 +369,6 @@ function tryMillWheel(state, playerIdx) {
     if (t && p.timePos + cardCost(t.cardA) < SIM_FINISH_LINE) {
       doOtterTrail(state, playerIdx, t.cardA.id, t.cardB.id, t.otherIdx); noteEffectUse(state, 'Mill Wheel'); return;
     }
-  }
-  if (avail.has('Tow Line') && p.timePos + 2 < SIM_FINISH_LINE) {
-    const t = findBeaverTowTarget(state, playerIdx, needs);
-    if (t) { doBeaverTow(state, playerIdx, t.card.id); noteEffectUse(state, 'Mill Wheel'); return; }
   }
   if (avail.has('Heron Roost') && state.matDeck.length > 0 && p.timePos < SIM_FINISH_LINE - 1) {
     const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
@@ -968,6 +965,7 @@ function newGame(numPlayers, workersPerPlayer = null) {
       out: false,
       granaryUsed: false,
       floodgateUsed: false,
+      towLineUsed: false,
       spyMoundUsed: false,
       tributeStoneUsed: false,
       slipstreamUsed: false,
@@ -1856,7 +1854,7 @@ const EFFECT_VP_FIXED = {
   'Floodgate': 0,
   'Spy Mound': 0,
   'Tribute Stone': 0.5,
-  'Tow Line': 0.5,
+  'Tow Line': 1.2,
   'Portage': 0.5,
   'Salmon Run': 1,
   'Confluence': 0.5,
@@ -1871,6 +1869,7 @@ function aiEffectValue(struct, p, state) {
   // Once-per-game effects yield 0 if the slot is already burned.
   if (struct.name === 'Granary' && p.granaryUsed) return 0;
   if (struct.name === 'Floodgate' && p.floodgateUsed) return 0;
+  if (struct.name === 'Tow Line' && p.towLineUsed) return 0;
   if (struct.name === 'Spy Mound' && p.spyMoundUsed) return 0;
   if (struct.name === 'Tribute Stone' && p.tributeStoneUsed) return 0;
   if (struct.name === 'Wood Pile' && p.woodPileUsed) return 0;
@@ -2105,9 +2104,9 @@ function aiChooseAction(state, playerIdx) {
       candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'salmonRun', cardId: t.card.id, workerCount: t.n }) });
     }
   }
-  if (hasEffect(p, 'Tow Line') && p.timePos + 2 < SIM_FINISH_LINE) {
-    const t = findBeaverTowTarget(state, playerIdx, needs);
-    if (t) candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'beaverTow', cardId: t.card.id }) });
+  if (hasEffect(p, 'Tow Line') && !p.towLineUsed && p.timePos + 1 < SIM_FINISH_LINE) {
+    const t = findTowLineTarget(state, playerIdx, needs, triggerPool);
+    if (t) candidates.push({ score: t.score, needsTrigger: true, make: () => ({ type: 'towLine', cardId: t.card.id }) });
   }
   candidates.sort((a, b) => b.score - a.score);
   for (const cand of candidates) {
@@ -2361,10 +2360,6 @@ function findOtterTrailTarget(state, playerIdx) {
 
 // Salmon Run: marginal fish cost for the 1st/2nd/3rd/4th/5th worker placed.
 const SALMON_RUN_COSTS = [1, 2, 3, 5, 8];
-// Turn-delay penalty for Tow Line: towing spends a whole action now to set up
-// a cheaper auction later, so the future grab must be sizable to beat just
-// auctioning the card outright this turn. Tuned so tow only wins on big grabs.
-const BEAVER_TOW_DELAY = 1.5;
 function salmonRunCumulativeCost(n) {
   let total = 0;
   for (let i = 0; i < n && i < SALMON_RUN_COSTS.length; i++) total += SALMON_RUN_COSTS[i];
@@ -2408,52 +2403,39 @@ function findSalmonRunTarget(state, playerIdx, needs) {
   return best;
 }
 
-// Tow Line: pay 2 fish, slide a river card 1 slot upstream (toward Headwaters).
-function doBeaverTow(state, playerIdx, cardId) {
+// Tow Line (once per game): move any river card to River 1 (slot 0), then run
+// an auction on it in place — with NO flat trigger 🐟 (the Swim flat is waived).
+// Self-serving: the initiator is the one who auctions the yanked card, so the
+// per-item discount (down to the River-1 rate) accrues to them, not the table.
+function doTowLine(state, playerIdx, cardId) {
+  const p = state.players[playerIdx];
+  if (p.towLineUsed) return false;
   const card = state.riverCards.find(c => c.id === cardId);
-  if (!card || typeof card.slot !== 'number' || card.slot === 0) return false;
-  card.slot -= 1;
-  advancePlayer(state, playerIdx, 2);
+  if (!card || typeof card.slot !== 'number') return false;
+  card.slot = 0;                          // yank to River 1
+  p.towLineUsed = true;
   noteEffectUse(state, 'Tow Line');
+  runAuction(state, card, playerIdx, 1);  // no advancePlayer: the 1🐟 flat is waived
   return true;
 }
 
-function findBeaverTowTarget(state, playerIdx, needs) {
+function findTowLineTarget(state, playerIdx, needs, triggerPool) {
   const p = state.players[playerIdx];
-  // Tow Line's slide makes the card cheaper for *everyone* who auctions
-  // it next, so we should only tow when the builder is the dominant
-  // beneficiary. Two gates:
-  //   (1) No opponent has any hand structure that needs this material —
-  //       so the slid card's discount won't subsidize their auction.
-  //   (2) Builder has trigger pool to auction the slid card themselves.
-  // Without these, towing is a public-good action that costs the builder
-  // 2🐟 + a main action and disproportionately helps opponents.
-  const triggerPool = aiTriggerPool(state, playerIdx);
-  if (triggerPool === 0) return null;
-  const opponentNeedsMaterial = (mat) => {
-    for (const op of state.players) {
-      if (op.idx === playerIdx || op.exhausted || op.out) continue;
-      for (const s of op.hand) {
-        if ((s.cost[mat] || 0) > 0) return true;
-      }
-    }
-    return false;
-  };
+  if (p.towLineUsed || triggerPool <= 0) return null;
   let best = null;
   for (const c of state.riverCards) {
-    if (typeof c.slot !== 'number' || c.slot === 0) continue;
+    if (typeof c.slot !== 'number' || c.slot === 0) continue; // already at R1 → nothing to yank
     const need = needs[c.material] || 0;
-    if (need < 2) continue; // builder needs ≥2 of this material for the tow to pay off
-    if (uncoveredIcons(c) < 4) continue;
-    if (opponentNeedsMaterial(c.material)) continue;
-    // Tow sets up a cheaper future auction: sliding one slot upstream cuts the
-    // per-item cost by 1🐟. Score it on the auction scale as the value of that
-    // discounted future grab, minus the 2🐟 tow cost and a turn-delay penalty
-    // (an extra action spent now without gaining material) — so it only wins
-    // over auctioning the card outright when the future grab is large.
-    const futureGot = Math.min(need, uncoveredIcons(c), triggerPool);
-    const reducedCost = Math.max(1, playerCardCost(state, c, playerIdx) - 1);
-    const score = need * futureGot - reducedCost * futureGot * 0.4 - 2 * 0.4 - BEAVER_TOW_DELAY;
+    if (need === 0) continue;
+    const got = Math.min(need, uncoveredIcons(c), triggerPool);
+    if (got === 0) continue;
+    // Hold the one-shot flip for a genuinely impactful yank: the per-item drop
+    // to the River-1 rate plus the waived flat must save a real chunk of 🐟.
+    const saved = (playerCardCost(state, c, playerIdx) - riverSlotCost(0)) * got + 1;
+    if (saved < 4) continue;
+    // Scored on the SAME need-weighted scale as a single-card auction
+    // (need × workers − fish×0.4), but at the yanked River-1 cost and no flat.
+    const score = need * got - riverSlotCost(0) * got * 0.4;
     if (!best || score > best.score) best = { card: c, score };
   }
   return best;
@@ -2939,7 +2921,7 @@ function millWheelCopyScore(state, playerIdx, name) {
     }
     case 'Springwater Pool': {
       // Ready spent once-per-game cards — worthless if none are spent.
-      const flags = ['granaryUsed', 'floodgateUsed', 'spyMoundUsed', 'tributeStoneUsed',
+      const flags = ['granaryUsed', 'floodgateUsed', 'towLineUsed', 'spyMoundUsed', 'tributeStoneUsed',
         'slipstreamUsed', 'rollingFloatUsed', 'snareSetUsed', 'stoneToolUsed',
         'woodPileUsed', 'hollowedLogUsed', 'packRatUsed', 'springCascadeUsed'];
       return flags.filter(f => p[f]).length * 1.0;
@@ -3013,6 +2995,7 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     // reworked once-per-game cards (woodPile/hollowedLog/packRat/springCascade).
     p.granaryUsed = false;
     p.floodgateUsed = false;
+    p.towLineUsed = false;
     p.spyMoundUsed = false;
     p.tributeStoneUsed = false;
     p.slipstreamUsed = false;
@@ -3167,8 +3150,8 @@ function executeAction(state, playerIdx, action) {
     advancePlayer(state, playerIdx, 1);
     return;
   }
-  if (action.type === 'beaverTow') {
-    doBeaverTow(state, playerIdx, action.cardId);
+  if (action.type === 'towLine') {
+    doTowLine(state, playerIdx, action.cardId);
     return;
   }
   if (action.type === 'salmonRun') {

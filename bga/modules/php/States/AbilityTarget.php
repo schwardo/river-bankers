@@ -12,7 +12,7 @@ use Bga\Games\RiverBankers\Game;
 
 /**
  * Pick the target for an ability the player triggered (cost already paid in
- * PlayerTurn). As-an-action abilities (Driftwood Snag / Tow Line / Heron Roost)
+ * PlayerTurn). As-an-action abilities (Driftwood Snag / Heron Roost)
  * consume the turn; once-per-game abilities (Hollowed-out Log / Wood Pile /
  * Tribute Stone) are free, flip the source card, and return to the turn.
  */

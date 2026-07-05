@@ -154,7 +154,6 @@ final class Effects
      */
     public const ACTION_ABILITIES = [
         'Driftwood Snag' => ['key' => 'driftwoodsnag', 'cost' => 1],
-        'Tow Line'       => ['key' => 'towline', 'cost' => 2],
         'Heron Roost'    => ['key' => 'heronroost', 'cost' => 1],
         'Salmon Run'     => ['key' => 'salmonrun', 'cost' => 0],  // escalating cost billed in state
         'Portage'        => ['key' => 'portage', 'cost' => 0],    // pays source per-item in state
@@ -165,7 +164,7 @@ final class Effects
      * Abilities Mill Wheel can copy from a neighbour (every as-an-action ability
      * except Confluence's combined auction). Keyed by effect key.
      */
-    public const MILL_WHEEL_COPYABLE = ['driftwoodsnag', 'towline', 'heronroost', 'salmonrun', 'portage', 'tradingpost'];
+    public const MILL_WHEEL_COPYABLE = ['driftwoodsnag', 'heronroost', 'salmonrun', 'portage', 'tradingpost'];
 
     /**
      * Structure names whose "when built" effect Mill Wheel can copy from a
@@ -217,6 +216,8 @@ final class Effects
         'Hollowed-out Log' => ['key' => 'hollowedlog', 'cost' => 0],
         'Wood Pile'        => ['key' => 'woodpile', 'cost' => 1],
         'Tribute Stone'    => ['key' => 'tributestone', 'cost' => 0],
+        // Tow Line: move any river card to River 1, then auction it (no flat 🐟).
+        'Tow Line'         => ['key' => 'towline', 'cost' => 0],
         // Snare Set (mink starter) is mechanically identical to Tribute Stone.
         'Snare Set'        => ['key' => 'tributestone', 'cost' => 0],
         'Pack Rat Burrow'  => ['key' => 'packrat', 'cost' => 0],   // discard 1 hand, take 1 from discard

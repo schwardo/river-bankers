@@ -255,7 +255,6 @@ class AbilityTarget {
     onEnteringState(args, isActive) {
         const labels = {
             driftwoodsnag: _('Driftwood Snag — drop a blank on a river card'),
-            towline: _('Tow Line — slide a river card upstream'),
             heronroost: _('Heron Roost — replace a Headwaters card'),
             hollowedlog: _('Hollowed-out Log — recall a worker (no blank)'),
             woodpile: _('Wood Pile — claim a Log icon'),
@@ -420,6 +419,17 @@ class SnagPile {
         if (!isActive) return;
         this.game.setHint(_('Click a Headwaters card to snag and auction.'));
         this.game.markClickable('hw', args.headwatersCards, id => this.bga.actions.performAction('actSnagChoose', { cardId: id }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class TowLine {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive ? _('Tow Line — tow a river card to River 1 and auction it (2🐟/item)') : _('Tow Line…'));
+        if (!isActive) return;
+        this.game.setHint(_('Click a river card to tow to River 1 and auction.'));
+        this.game.markClickable('target', args.targets, id => this.bga.actions.performAction('actTowLine', { cardId: id }));
     }
     onLeavingState() { this.game.clearClickable(); }
 }
@@ -745,6 +755,7 @@ export class Game {
         this.bga.states.register('StonePool', new StonePool(this, bga));
         this.bga.states.register('VineLattice', new VineLattice(this, bga));
         this.bga.states.register('SnagPile', new SnagPile(this, bga));
+        this.bga.states.register('TowLine', new TowLine(this, bga));
         this.bga.states.register('FlushChannelBuild', new FlushChannelBuild(this, bga));
         this.bga.states.register('PackRat', new PackRat(this, bga));
         this.bga.states.register('SpringCascade', new SpringCascade(this, bga));

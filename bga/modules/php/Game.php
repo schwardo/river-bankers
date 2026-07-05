@@ -482,6 +482,12 @@ class Game extends \Bga\GameFramework\Table
 
     // --- auction lifecycle ---
 
+    /** Move a river card to a given river space (1..4). Used by Tow Line. */
+    public function moveRiverCardToSlot(int $cardId, int $slot): void
+    {
+        $this->DbQuery("UPDATE `card` SET `card_location_arg` = $slot WHERE `card_id` = $cardId AND `card_location` = 'river'");
+    }
+
     public function startAuction(int $lotCardId, int $triggerPlayer, ?int $forcedRate = null): void
     {
         $rate = $forcedRate === null ? 'NULL' : (string) $forcedRate;
@@ -1926,6 +1932,8 @@ class Game extends \Bga\GameFramework\Table
                 return $this->getPlayerSupply($playerId) > 0 && count($this->salmonRunTargets()) > 0;
             case 'portage':       // swap your worker with another worker on a different river card
                 return count($this->portageSources($playerId)) > 0;
+            case 'towline':       // tow any river card to River 1, then auction it
+                return $this->canTriggerAuction($playerId) && count($this->getAuctionableRiverCards()) > 0;
             case 'tailslap':      // drop a blank on a River-1 card (pay 1 on use)
                 return count($this->riverOneUncovered()) > 0;
             case 'channelclearer': // discard an opponent's Reed worker
@@ -2387,9 +2395,8 @@ class Game extends \Bga\GameFramework\Table
             return $this->getAuctionableRiverCards(); // river cards with an uncovered icon
         }
         if ($key === 'towline') {
-            return array_map('intval', $this->getObjectListFromDB(
-                "SELECT `card_id` FROM `card` WHERE `card_location` = 'river' AND `card_location_arg` > 1", true
-            ));
+            // Any auctionable river card can be towed to River 1 and auctioned.
+            return $this->getAuctionableRiverCards();
         }
         if ($key === 'heronroost') {
             return $this->getMaterialDeckCount() > 0 ? $this->getHeadwatersCards() : [];
@@ -2496,11 +2503,6 @@ class Game extends \Bga\GameFramework\Table
                 $this->recallWorker($oid, $cardId, true);
                 $this->moveBackFish($oid, 3);
             }
-            return;
-        }
-        if ($key === 'towline') {
-            $slot = (int) $this->getCardRow($cardId)['card_location_arg'];
-            $this->DbQuery("UPDATE `card` SET `card_location_arg` = " . max(1, $slot - 1) . " WHERE `card_id` = $cardId");
             return;
         }
         if ($key === 'tailslap') {

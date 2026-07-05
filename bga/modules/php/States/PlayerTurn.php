@@ -98,6 +98,7 @@ class PlayerTurn extends GameState
             'tradingpost'   => TradingPost::class,
             'confluence'    => Confluence::class,
             'millwheel'     => MillWheel::class,
+            'towline'       => TowLine::class,
             default         => AbilityTarget::class,
         };
     }

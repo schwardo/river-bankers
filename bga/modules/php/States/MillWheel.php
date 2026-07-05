@@ -13,7 +13,7 @@ use Bga\Games\RiverBankers\Game;
 /**
  * Mill Wheel (as an action): activate one as-an-action ability of a structure
  * built by your left or right neighbour, resolved for you. Copyable abilities are
- * the repeatable as-an-action ones (Salmon Run, Trading Post, Portage, Tow Line,
+ * the repeatable as-an-action ones (Salmon Run, Trading Post, Portage,
  * Heron Roost, Driftwood Snag) — never Confluence or a once-per-game ability.
  * Pays the copied ability's fish cost, then routes into that ability's own state.
  */
@@ -65,7 +65,7 @@ class MillWheel extends GameState
             'salmonrun'   => SalmonRun::class,
             'portage'     => Portage::class,
             'tradingpost' => TradingPost::class,
-            default       => AbilityTarget::class, // driftwoodsnag / towline / heronroost
+            default       => AbilityTarget::class, // driftwoodsnag / heronroost
         };
     }
 

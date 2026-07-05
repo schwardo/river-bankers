@@ -104,7 +104,7 @@ final class EffectsTest extends TestCase
 
     public function testActionAbilityMapping(): void
     {
-        self::assertSame(['key' => 'towline', 'cost' => 2], Effects::actionAbility('Tow Line'));
+        self::assertNull(Effects::actionAbility('Tow Line'));
         self::assertSame(['key' => 'heronroost', 'cost' => 1], Effects::actionAbility('Heron Roost'));
         self::assertNull(Effects::actionAbility('Spillway'));
     }
@@ -121,7 +121,7 @@ final class EffectsTest extends TestCase
         self::assertSame(['key' => 'rollingfloat', 'cost' => 0], Effects::onceAbility('Rolling Float'));
         // Slipstream is intentionally excluded from the BGA port.
         self::assertNull(Effects::onceAbility('Slipstream'));
-        self::assertNull(Effects::onceAbility('Tow Line'));
+        self::assertSame(['key' => 'towline', 'cost' => 0], Effects::onceAbility('Tow Line'));
     }
 
     public function testSalmonRunCumulativeCost(): void
