@@ -173,7 +173,8 @@ species colors, named every material card, and moved the decks from placeholder 
 <p>The physical footprint firmed up too: a generated <strong>river-board mat</strong> (Headwaters row
 above a four-wide river), a <strong>tier badge</strong> on material cards marking which join at 3+
 and 4 players, and a small-but-real balance tweak — <strong>4-player games start with 7 workers,
-not 8</strong>, to tighten early capacity when the table is crowded.</p>
+not 8</strong>, to tighten early capacity when the table is crowded. (Reverted in late June once the
+AI over-bidding fix removed the jams that motivated it — see the week of June 23.)</p>
 
 <div class="phase">Phase II · Production &amp; the endgame problem (June)</div>
 
@@ -264,15 +265,17 @@ displaced card back into the deck (matching Flush's recycle rule). Starting play
 
 <p>Two 4-player playtests drove a final endgame recalibration:</p>
 <ul>
-  <li>The fish line moved from the climbing <strong>89/109/119</strong> to a <strong>uniform 119</strong>,
-      then — after more data — to a <strong>flat 90 at every player count</strong>, paired with the
+  <li>The fish line moved from a <strong>uniform 119</strong> to a climbing <strong>89/109/119</strong>,
+      then — once the AI over-bidding fix below cleaned up the data — to a <strong>flat 90 at every
+      player count</strong>, paired with the
       <strong>deck-empty +1 drift</strong> and a fix so <strong>no two pawns share a finish space</strong>.
       Flat-90 landed games at roughly 30 / 40 / 55 minutes (2P/3P/4P). Why one line works at every
       count: a larger board at more players takes longer to mine out, but the extra workers and richer
       auctions carry every pawn to the line at about the same depth — so a single flat line ends all
       counts organically, by pawns crossing, rather than stalling on a depleted board.</li>
   <li>An <strong>AI over-bidding fix</strong> plus worker/endgame recalibration cleaned up the
-      simulation baseline the balance data rides on.</li>
+      simulation baseline the balance data rides on — and reversed May's 4-player worker trim:
+      <strong>every player count now starts with the full 8 workers</strong>.</li>
   <li>A <strong>uniform rule</strong> was written down and enforced everywhere: <em>a card's own
       effects never apply to the build that creates it.</em> This killed a class of self-referential
       edge cases that had been handled inconsistently.</li>

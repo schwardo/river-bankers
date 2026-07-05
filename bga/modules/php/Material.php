@@ -41,7 +41,7 @@ class Material
         20 => ['name' => 'Clay Seep', 'material' => 'clay', 'icons' => 4],
         21 => ['name' => 'Clay Bank', 'material' => 'clay', 'icons' => 5],
         22 => ['name' => 'Mud Slick', 'material' => 'clay', 'icons' => 7, 'wildAlt' => 'mud', 'effect' => 'Wild: each claimed icon yields Mud OR Clay (chosen at build time).'],
-        23 => ['name' => 'Slipping Sandbar', 'material' => 'clay', 'icons' => 8, 'effect' => 'Enters the river at River 4. After any auction with workers placed here, slides one slot upstream. At River 1 with leftover icons, retires to shoreline.'],
+        23 => ['name' => 'Slipping Sandbar', 'material' => 'clay', 'icons' => 8, 'effect' => 'Enters the river at River 4. After an auction on this card with workers placed, slides one slot upstream instead of downstream. At River 1, retires to shoreline instead.'],
         // 2P-ONLY shared stones/vines wild-5. At 2 players this replaces Rocky
         // Shoal (arg 5) + Trailing Vine (arg 17); at 3P+ it is left out of the
         // deck and the two vanilla 5s are used instead (see Game::setupNewGame).
