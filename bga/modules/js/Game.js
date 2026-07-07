@@ -156,6 +156,152 @@ const RIVER_SLOT_LEFT = { 1: 4.06, 2: 27.14, 3: 50.22, 4: 73.29 };
 // stack inside it at natural size (~2 visible) and scroll rather than overflowing
 // the board onto the content below.
 
+// Client-side walk of the *optional* build-cost modifiers (Charcoal Pit / Stone
+// Tool / Treaty Stone / Granary — Cattail Marsh is always-on and choiceless).
+// For each modifier the player controls that could actually help this build, it
+// asks Use? and, when ambiguous, which material — instead of the server silently
+// auto-firing it (and spending a once-per-game card) on the first deficit. The
+// step order and deficit maths mirror Rules\BuildCost::effective exactly, so any
+// combination offered here validates server-side. Nothing is sent until the
+// final build, so Cancel/decline are all free — one round-trip, same as before.
+class BuildChoiceFlow {
+    constructor(game, bga, opts) {
+        this.game = game; this.bga = bga;
+        this.actionName = opts.actionName;   // 'actBuild' | 'actFinalBuild'
+        this.cardId = opts.cardId;
+        this.cardName = opts.cardName || '';
+        this.onCancel = opts.onCancel || (() => {});
+        this.cost = opts.cost || {};
+        this.flags = opts.flags || {};
+        this.wbm = opts.wbm || {};
+        this.eff = { ...this.cost };
+        if (this.flags.cattailMarsh && this.eff.reeds) this.eff.reeds = Math.ceil(this.eff.reeds / 2);
+        this.choices = {};
+        this.queue = ['charcoalPit', 'stoneTool', 'treatyStone', 'granary'];
+    }
+
+    // Kick off: if no modifier needs a decision, build immediately.
+    start() { this.next(); }
+
+    finish() {
+        // Leave the action bar as-is: the framework disables it while the action
+        // is in flight and restores the state's buttons if the build is rejected
+        // (e.g. still short materials) — clearing here would strand an empty bar.
+        this.bga.actions.performAction(this.actionName, {
+            cardId: this.cardId,
+            choices: JSON.stringify(this.choices),
+        });
+    }
+
+    // Advance to the next modifier that offers a real decision, else build.
+    next() {
+        while (this.queue.length) {
+            const key = this.queue.shift();
+            const step = this.evaluate(key);
+            if (step) { this.render(key, step); return; }
+        }
+        this.finish();
+    }
+
+    // Fixed-material deficit? (wild pools are resolved later, server-side, so the
+    // modifier maths reads fixed counts only — matching effective().)
+    isDeficit(m) { return (this.wbm[m] || 0) < this.eff[m]; }
+
+    // Describe modifier $key for the current running eff, or null if it can't help.
+    evaluate(key) {
+        const f = this.flags;
+        if (key === 'charcoalPit') {
+            if (!f.charcoalPit || (this.wbm.clay || 0) - (this.eff.clay || 0) < 1) return null;
+            const targets = Object.keys(this.cost).filter(m => m !== 'clay' && this.isDeficit(m));
+            return targets.length ? { name: _('Charcoal Pit'), targets } : null;
+        }
+        if (key === 'stoneTool') {
+            if (!f.stoneTool || f.stoneToolUsed || (this.wbm.stones || 0) - (this.eff.stones || 0) < 1) return null;
+            const targets = Object.keys(this.cost).filter(m => m !== 'stones' && this.isDeficit(m));
+            return targets.length ? { name: _('Stone Tool'), targets, once: true } : null;
+        }
+        if (key === 'granary') {
+            if (!f.granary || f.granaryUsed) return null;
+            const targets = Object.keys(this.eff).filter(m => this.isDeficit(m));
+            return targets.length ? { name: _('Granary'), targets, once: true } : null;
+        }
+        if (key === 'treatyStone') {
+            if (!f.treatyStone) return null;
+            const sourcesFor = t => MAT_KEYS.filter(s => s !== t && (this.wbm[s] || 0) - (this.eff[s] || 0) >= 2);
+            const targets = MAT_KEYS.filter(t => (this.wbm[t] || 0) < (this.eff[t] || 0) && sourcesFor(t).length);
+            return targets.length ? { name: _('Treaty Stone'), targets, treaty: true, sourcesFor } : null;
+        }
+        return null;
+    }
+
+    // Ask Use <name>? — Yes leads to the target picker, No skips the modifier.
+    render(key, step) {
+        this.game.clearClickable();
+        this.bga.statusBar.removeActionButtons();
+        const verb = step.once ? _(' (once per game)') : '';
+        this.bga.statusBar.setTitle(step.name + _(' — use it for this build?') + verb);
+        this.game.setHint(_('Reduce this build\'s cost with ') + step.name + _('? You choose whether and where.'));
+        this.bga.statusBar.addActionButton(_('Use ') + step.name, () => this.pickTarget(key, step));
+        this.bga.statusBar.addActionButton(_('Don\'t use'), () => this.next(), { color: 'secondary' });
+        this.bga.statusBar.addActionButton(_('Cancel build'), () => this.onCancel(), { color: 'secondary' });
+    }
+
+    // Choose which deficit material the modifier covers (auto if only one).
+    pickTarget(key, step) {
+        if (step.targets.length === 1) return this.apply(key, step, step.targets[0]);
+        this.bga.statusBar.removeActionButtons();
+        this.bga.statusBar.setTitle(step.name + _(' — which material to reduce?'));
+        step.targets.forEach(m => this.bga.statusBar.addActionButton(
+            this.matLabel(m), () => this.apply(key, step, m)));
+        this.bga.statusBar.addActionButton(_('Cancel build'), () => this.onCancel(), { color: 'secondary' });
+    }
+
+    // Treaty Stone also needs a surplus source to pay 2-for-1 from.
+    pickSource(step, target) {
+        const sources = step.sourcesFor(target);
+        if (sources.length === 1) return this.applyTreaty(target, sources[0]);
+        this.bga.statusBar.removeActionButtons();
+        this.bga.statusBar.setTitle(_('Treaty Stone — pay 2 of which material?'));
+        sources.forEach(s => this.bga.statusBar.addActionButton(
+            this.matLabel(s), () => this.applyTreaty(target, s)));
+        this.bga.statusBar.addActionButton(_('Cancel build'), () => this.onCancel(), { color: 'secondary' });
+    }
+
+    apply(key, step, material) {
+        if (step.treaty) return this.pickSource(step, material);
+        if (key === 'charcoalPit') { this.eff[material] -= 1; this.eff.clay = (this.eff.clay || 0) + 1; this.choices.charcoalPit = material; }
+        else if (key === 'stoneTool') { this.eff[material] -= 1; this.eff.stones = (this.eff.stones || 0) + 1; this.choices.stoneTool = material; }
+        else if (key === 'granary') { this.eff[material] -= 1; this.choices.granary = material; }
+        this.next();
+    }
+
+    applyTreaty(target, source) {
+        this.eff[target] -= 1;
+        this.eff[source] = (this.eff[source] || 0) + 2;
+        this.choices.treatyStone = { target, source };
+        this.next();
+    }
+
+    matLabel(m) { return (MAT_GLYPH[m] || '') + ' ' + m; }
+}
+
+// Launch the build-cost-choice flow for a hand card, then fire $actionName.
+// `wbm` is fixed-material counts only (wild pools are resolved server-side after
+// the modifiers, so effective() reads fixed surplus) — the same holdings the
+// hand affordability pills use.
+function launchBuildFlow(game, bga, cardId, actionName, onCancel) {
+    const card = (game.lastHand || []).find(c => Number(c.id) === Number(cardId));
+    const held = (game.materials || {})[game.myId()] || { fixed: {}, wild: [] };
+    new BuildChoiceFlow(game, bga, {
+        actionName, cardId,
+        cardName: card ? card.name : '',
+        cost: (card && card.cost) || {},
+        flags: game.myBuildFlags(),
+        wbm: { ...(held.fixed || {}) },
+        onCancel,
+    }).start();
+}
+
 // ---- State classes --------------------------------------------------------
 
 class PlayerTurn {
@@ -184,7 +330,7 @@ class PlayerTurn {
             this.game.markClickable('hw', a.headwatersCards, id => this.bga.actions.performAction('actPull', { cardId: id }));
             this.game.markClickable('river', a.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
         }
-        this.game.markClickable('hand', a.handStructureIds, id => this.bga.actions.performAction('actBuild', { cardId: id }));
+        this.game.markClickable('hand', a.handStructureIds, id => this.startBuild(id));
         this.game.setHint(_('Click a Headwaters, river, or hand card directly — or use a button below.'));
         if (a.canTriggerAuction && (a.headwatersCards || []).length) {
             this.bga.statusBar.addActionButton(_('Pull Headwaters card (pay 2-4 🐟)'), () => this.enterPull());
@@ -236,8 +382,12 @@ class PlayerTurn {
     enterBuild() {
         this.enterSubMode(_('Build — select a structure from your hand'),
             _('Click a hand card to build it (pays its printed 🐟 cost in materials).'));
-        this.game.markClickable('hand', this.args.handStructureIds, id => this.bga.actions.performAction('actBuild', { cardId: id }));
+        this.game.markClickable('hand', this.args.handStructureIds, id => this.startBuild(id));
         this.cancelButton();
+    }
+    // Build a chosen hand card, first walking any optional cost-modifier choices.
+    startBuild(cardId) {
+        launchBuildFlow(this.game, this.bga, cardId, 'actBuild', () => this.showMain());
     }
     enterInvent() {
         this.enterSubMode(_('Invent — how many cards?'),
@@ -612,8 +762,14 @@ class FinalBuild {
         // Simultaneous round: each player builds from their own hand, so derive
         // the clickable ids from the rendered hand rather than a shared arg.
         const myHandIds = [...document.querySelectorAll('#rb-hand [data-id]')].map(el => Number(el.dataset.id));
-        this.game.markClickable('hand', myHandIds, id => this.bga.actions.performAction('actFinalBuild', { cardId: id }));
+        this.game.markClickable('hand', myHandIds, id => this.startBuild(id, args));
         this.bga.statusBar.addActionButton(_('Skip'), () => this.bga.actions.performAction('actSkipFinal'), { color: 'secondary' });
+    }
+    // Final build routes through the same cost-modifier choice flow; Cancel just
+    // re-renders this round's Skip/hand UI.
+    startBuild(cardId, args) {
+        launchBuildFlow(this.game, this.bga, cardId, 'actFinalBuild',
+            () => this.onPlayerActivationChange(args, true));
     }
     onLeavingState() { this.game.clearClickable(); }
 }

@@ -62,6 +62,72 @@ final class BuildCostTest extends TestCase
             BuildCost::effective(['logs' => 3, 'mud' => 2], ['mud' => 5], ['granary' => true, 'granaryUsed' => true])['eff']);
     }
 
+    // --- Explicit player choices (4th arg) -----------------------------------
+
+    public function testExplicitEmptyChoicesMatchesHeuristic(): void
+    {
+        // A non-null but empty choices array is still "heuristic mode".
+        $r = BuildCost::effective(['logs' => 3, 'mud' => 2], ['mud' => 5], ['granary' => true], []);
+        self::assertSame(['logs' => 2, 'mud' => 2], $r['eff']);
+        self::assertTrue($r['granaryUsed']);
+    }
+
+    public function testExplicitGranaryHonorsChosenMaterial(): void
+    {
+        // Two deficits (logs, stones): heuristic drops logs; the player picks stones.
+        $flags = ['granary' => true];
+        $cost = ['logs' => 3, 'stones' => 3];
+        $wbm = [];
+        self::assertSame(['logs' => 2, 'stones' => 3], BuildCost::effective($cost, $wbm, $flags)['eff']);
+        $r = BuildCost::effective($cost, $wbm, $flags, ['granary' => 'stones']);
+        self::assertSame(['logs' => 3, 'stones' => 2], $r['eff']);
+        self::assertTrue($r['granaryUsed']);
+    }
+
+    public function testExplicitDeclineLeavesCostUnchanged(): void
+    {
+        // Player owns Granary but declines (absent key in a non-empty choices set).
+        $r = BuildCost::effective(['logs' => 3, 'mud' => 2], ['mud' => 5], ['granary' => true], ['charcoalPit' => null]);
+        self::assertSame(['logs' => 3, 'mud' => 2], $r['eff']);
+        self::assertFalse($r['granaryUsed']);
+    }
+
+    public function testExplicitTreatyStoneHonorsPair(): void
+    {
+        // Cover reeds by paying 2 mud (both are legal surplus sources; player picks mud).
+        $r = BuildCost::effective(['reeds' => 2], ['logs' => 6, 'mud' => 6],
+            ['treatyStone' => true], ['treatyStone' => ['target' => 'reeds', 'source' => 'mud']]);
+        self::assertSame(['reeds' => 1, 'mud' => 2], $r['eff']);
+    }
+
+    public function testExplicitUnavailableModifierThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        BuildCost::effective(['logs' => 3], [], ['granary' => false], ['granary' => 'logs']);
+    }
+
+    public function testExplicitAlreadyUsedOnceCardThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        BuildCost::effective(['logs' => 3], ['stones' => 4],
+            ['stoneTool' => true, 'stoneToolUsed' => true], ['stoneTool' => 'logs']);
+    }
+
+    public function testExplicitNonDeficitTargetThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        // logs is fully covered — discounting it is illegal.
+        BuildCost::effective(['logs' => 3], ['logs' => 5], ['granary' => true], ['granary' => 'logs']);
+    }
+
+    public function testExplicitTreatyStoneInsufficientSurplusThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        // mud surplus is only 1 (<2), so paying 2 mud is illegal.
+        BuildCost::effective(['reeds' => 2], ['mud' => 1], ['treatyStone' => true],
+            ['treatyStone' => ['target' => 'reeds', 'source' => 'mud']]);
+    }
+
     /** @dataProvider simVectors */
     public function testMatchesSim(array $cost, array $wbm, array $flags, array $eff, bool $granaryUsed, bool $stoneToolUsed): void
     {

@@ -900,6 +900,40 @@ class Game extends \Bga\GameFramework\Table
         ];
     }
 
+    /**
+     * Parse the client's build-cost `choices` payload (a JSON object) into the
+     * whitelisted shape Rules\BuildCost::effective() expects. Unknown keys and
+     * ill-typed values are dropped; a null/absent modifier means "don't use it".
+     * An empty result ({} or malformed JSON) falls back to the auto-heuristic.
+     *
+     * @return array{
+     *     charcoalPit?:string, stoneTool?:string, granary?:string,
+     *     treatyStone?:array{target:string,source:string}
+     * }
+     */
+    public function decodeBuildChoices(string $choices): array
+    {
+        $raw = json_decode($choices, true);
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach (['charcoalPit', 'stoneTool', 'granary'] as $key) {
+            $v = $raw[$key] ?? null;
+            if (is_string($v) && in_array($v, BuildCost::MAT_KEYS, true)) {
+                $out[$key] = $v;
+            }
+        }
+        $t = $raw['treatyStone'] ?? null;
+        if (is_array($t)
+            && isset($t['target'], $t['source'])
+            && in_array($t['target'], BuildCost::MAT_KEYS, true)
+            && in_array($t['source'], BuildCost::MAT_KEYS, true)) {
+            $out['treatyStone'] = ['target' => $t['target'], 'source' => $t['source']];
+        }
+        return $out;
+    }
+
     /** True if the player has a built card of $name already flipped (used). */
     public function onceCardUsed(int $playerId, string $name): bool
     {
@@ -1371,19 +1405,19 @@ class Game extends \Bga\GameFramework\Table
      *
      * @return array<string,int>
      */
-    public function buildShortfall(int $playerId, int $structureCardId): array
+    public function buildShortfall(int $playerId, int $structureCardId, array $choices = []): array
     {
         $def = Material::$STRUCTURE[(int) $this->getCardRow($structureCardId)['card_type_arg']];
         $holdings = $this->getPlayerHoldings($playerId);
-        $bc = BuildCost::effective($def['cost'], $this->fixedMaterialCounts($holdings), $this->buildFlags($playerId));
+        $bc = BuildCost::effective($def['cost'], $this->fixedMaterialCounts($holdings), $this->buildFlags($playerId), $choices);
         return Build::shortfall($bc['eff'], $holdings);
     }
 
     /** Human-readable list of missing materials, e.g. "2 stones, 1 clay" (or '' if affordable). */
-    public function buildShortfallText(int $playerId, int $structureCardId): string
+    public function buildShortfallText(int $playerId, int $structureCardId, array $choices = []): string
     {
         $parts = [];
-        foreach ($this->buildShortfall($playerId, $structureCardId) as $material => $n) {
+        foreach ($this->buildShortfall($playerId, $structureCardId, $choices) as $material => $n) {
             $parts[] = $n . ' ' . $material;
         }
         return implode(', ', $parts);
@@ -1394,13 +1428,15 @@ class Game extends \Bga\GameFramework\Table
      * discount) + materials, place it, and apply its on-build effects. Returns
      * false (no change) if the player can't pay the materials.
      */
-    public function tryBuild(int $playerId, int $structureCardId): bool
+    public function tryBuild(int $playerId, int $structureCardId, array $choices = []): bool
     {
         $def = Material::$STRUCTURE[(int) $this->getCardRow($structureCardId)['card_type_arg']];
         $holdings = $this->getPlayerHoldings($playerId);
         // Apply the player's build-cost modifiers (Cattail Marsh / Charcoal Pit /
-        // Stone Tool / Treaty Stone / Granary) to the printed material cost.
-        $bc = BuildCost::effective($def['cost'], $this->fixedMaterialCounts($holdings), $this->buildFlags($playerId));
+        // Stone Tool / Treaty Stone / Granary) to the printed material cost. In
+        // heuristic mode ($choices empty) they auto-fire; when the player made
+        // explicit picks in the build UI, $choices drives which fire and where.
+        $bc = BuildCost::effective($def['cost'], $this->fixedMaterialCounts($holdings), $this->buildFlags($playerId), $choices);
         $alloc = Build::allocate($bc['eff'], $holdings);
         if ($alloc === null) {
             return false;

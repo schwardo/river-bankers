@@ -257,15 +257,21 @@ class PlayerTurn extends GameState
      * @throws UserException
      */
     #[PossibleAction]
-    public function actBuild(int $cardId, int $activePlayerId, array $args)
+    public function actBuild(int $cardId, int $activePlayerId, array $args, string $choices = '{}')
     {
         if (!in_array($cardId, $args['handStructureIds'], true)) {
             throw new UserException(clienttranslate('That structure is not in your hand.'));
         }
         $name = Material::$STRUCTURE[(int) $this->game->getCardRow($cardId)['card_type_arg']]['name'];
+        $picks = $this->game->decodeBuildChoices($choices);
 
-        if (!$this->game->tryBuild($activePlayerId, $cardId)) {
-            $missing = $this->game->buildShortfallText($activePlayerId, $cardId);
+        try {
+            $built = $this->game->tryBuild($activePlayerId, $cardId, $picks);
+        } catch (\InvalidArgumentException $e) {
+            throw new UserException(clienttranslate('That combination of build-cost effects is not legal.'));
+        }
+        if (!$built) {
+            $missing = $this->game->buildShortfallText($activePlayerId, $cardId, $picks);
             throw new UserException($missing === ''
                 ? sprintf(clienttranslate('You do not have the materials to build %s.'), $name)
                 : sprintf(clienttranslate('You are short %1$s to build %2$s.'), $missing, $name));
