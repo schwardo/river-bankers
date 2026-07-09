@@ -799,7 +799,12 @@ class Auction {
         const a = this.args;
         const maxBid = Math.min(a.open, this.game.mySupply());
         const minBid = (this.game.myId() === Number(a.triggerPlayer)) ? 1 : 0;
-        const lotDesc = id => { const c = this.game.cardById(id); return c ? `${c.name} (${c.icons}x ${c.material})` : _('this lot'); };
+        const lotDesc = id => {
+            const c = this.game.cardById(id);
+            if (!c) return _('this lot');
+            const mat = c.material + (c.wildAlt ? '/' + c.wildAlt : ''); // wilds name both types
+            return `${c.name} (${c.icons}x ${mat})`;
+        };
         let lot = lotDesc(a.lotCardId);
         if (a.lotCardId2) lot += ' + ' + lotDesc(a.lotCardId2);
         this.bga.statusBar.setTitle(_('How many workers would you like to send for ') + lot + ' ?');
