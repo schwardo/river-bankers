@@ -108,17 +108,20 @@ class ResolveAuction extends GameState
         }
 
         // Report what each bidder won (and that empty-handed bidders still paid).
+        $overbid = max(0, array_sum($bids) - $open);
         foreach ($bids as $pid => $bid) {
             $got = $clinched[$pid];
             $msg = $got > 0
                 ? clienttranslate('${player_name} wins ${n}x ${material} (paid ${paid} 🐟).')
-                : clienttranslate('${player_name} wins nothing (paid ${paid} 🐟).');
+                : clienttranslate('${player_name} wins nothing (bid ${bid} - overbid ${overbid}), but pays ${paid} 🐟.');
             $this->notify->all('auctionResolved', $msg, [
                 'player_id' => $pid,
                 'player_name' => $this->game->getPlayerNameById($pid),
                 'n' => $got,
                 'material' => $matLabel,
                 'paid' => $paid[$pid],
+                'bid' => $bid,
+                'overbid' => $overbid,
                 'i18n' => ['material'],
             ]);
         }
@@ -210,17 +213,20 @@ class ResolveAuction extends GameState
                 'i18n' => ['card'],
             ]);
         }
+        $overbid = max(0, array_sum($bids) - $open);
         foreach ($order as $pid) {
             $got = $clinched[$pid];
             $msg = $got > 0
                 ? clienttranslate('${player_name} wins ${n}x ${material} (paid ${paid} 🐟).')
-                : clienttranslate('${player_name} wins nothing (paid ${paid} 🐟).');
+                : clienttranslate('${player_name} wins nothing (bid ${bid} - overbid ${overbid}), but pays ${paid} 🐟.');
             $this->notify->all('auctionResolved', $msg, [
                 'player_id' => $pid,
                 'player_name' => $this->game->getPlayerNameById($pid),
                 'n' => $got,
                 'material' => $material,
                 'paid' => $paid[$pid],
+                'bid' => $bids[$pid],
+                'overbid' => $overbid,
                 'i18n' => ['material'],
             ]);
         }
