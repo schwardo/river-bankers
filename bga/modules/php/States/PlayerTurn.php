@@ -287,6 +287,11 @@ class PlayerTurn extends GameState
             'card_name' => $name,
         ]);
 
+        // A build changes VP (the structure's printed points, plus any leftover
+        // material pairs it consumed) — push the new score to the panel now rather
+        // than waiting for the end-of-turn NextPlayer refresh.
+        $this->game->refreshScores();
+
         // Queue any interactive when-built / reactive-when-you-build effects and
         // resolve them one at a time via the BuildEffects dispatcher.
         $queue = $this->game->pendingBuildEffects($activePlayerId, $cardId);

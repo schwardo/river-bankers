@@ -223,6 +223,10 @@ class Game extends \Bga\GameFramework\Table
         // first actor (top of the space-0 stack) via Rules\TurnOrder.
         $this->activeNextPlayer();
 
+        // Seed the VP / tie-breaker counters so the player panel shows "0" from
+        // the first frame instead of "-" (an unset PlayerCounter renders blank).
+        $this->refreshScores(true);
+
         // Draft first (then deal hands), or straight into the turn loop.
         return $draft ? StarterDraft::class : NextPlayer::class;
     }
@@ -2622,8 +2626,14 @@ class Game extends \Bga\GameFramework\Table
      * clauses + leftover pairs) and tie-breaker (aux = -fish), and push them to the
      * official BGA score counters. Safe to call live each turn — the PlayerCounter
      * only notifies when the value actually changes. Also used for the final score.
+     *
+     * Pass $force=true to write both counters even when the value is unchanged.
+     * This is required at game setup: a fresh PlayerCounter that has never been
+     * set() is rendered as "-" in the player panel, and the change-guard below
+     * would skip the write for any player still on 0 VP — leaving the panel stuck
+     * on "-" until their score first moves. Seeding once with $force fixes that.
      */
-    public function refreshScores(): void
+    public function refreshScores(bool $force = false): void
     {
         $shorelineTotal = $this->getShorelineTotal();
         foreach ($this->getTurnOrderRows() as $row) {
@@ -2636,10 +2646,10 @@ class Game extends \Bga\GameFramework\Table
                 $shorelineTotal,
                 $this->getShorelineCountWithWorkers($pid),
             );
-            if ($this->playerScore->get($pid) !== $vp) {
+            if ($force || $this->playerScore->get($pid) !== $vp) {
                 $this->playerScore->set($pid, $vp);
             }
-            if ($this->playerScoreAux->get($pid) !== -$row['fish']) {
+            if ($force || $this->playerScoreAux->get($pid) !== -$row['fish']) {
                 $this->playerScoreAux->set($pid, -$row['fish']);
             }
         }

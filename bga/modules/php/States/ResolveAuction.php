@@ -126,6 +126,10 @@ class ResolveAuction extends GameState
             ]);
         }
 
+        // Winners' clinched workers changed their leftover-material pairs (pair
+        // VP), so refresh the panel scores now instead of at end of turn.
+        $this->game->refreshScores();
+
         // Resume any queued build effects (e.g. Snag Pile auctions mid-queue);
         // an empty queue falls straight through to NextPlayer.
         return BuildEffects::class;
@@ -230,6 +234,9 @@ class ResolveAuction extends GameState
                 'i18n' => ['material'],
             ]);
         }
+
+        // Clinched workers changed winners' leftover-material pairs (pair VP).
+        $this->game->refreshScores();
 
         return BuildEffects::class;
     }
