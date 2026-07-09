@@ -327,8 +327,11 @@ class PlayerTurn {
         // Direct-click shortcuts stay live: click a Headwaters/river/hand card to
         // Pull/Swim/Build it. The buttons below do the same via a guided select.
         if (a.canTriggerAuction) {
-            this.game.markClickable('hw', a.headwatersCards, id => this.bga.actions.performAction('actPull', { cardId: id }));
-            this.game.markClickable('river', a.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
+            // Direct clicks are easy to trigger by accident, so they route through
+            // a client-side Confirm/Cancel spelling out the lot and its costs. The
+            // guided Pull/Swim buttons below are deliberate and skip the prompt.
+            this.game.markClickable('hw', a.headwatersCards, id => this.confirmDirectAuction(id, 'pull'));
+            this.game.markClickable('river', a.auctionableRiverCards, id => this.confirmDirectAuction(id, 'swim'));
         }
         this.game.markClickable('hand', a.handStructureIds, id => this.startBuild(id));
         this.game.setHint(_('Click a Headwaters, river, or hand card directly — or use a button below.'));
@@ -365,6 +368,29 @@ class PlayerTurn {
     }
     cancelButton() {
         this.bga.statusBar.addActionButton(_('Cancel'), () => this.showMain(), { color: 'secondary' });
+    }
+
+    // Client-side confirmation for a direct card-click Pull (headwaters) or Swim
+    // (river). Spells out the lot's name, material(s), open items, trigger cost,
+    // and per-item rate before committing. Costs mirror the server: Pull pays the
+    // headwaters move cost (slot+1) and auctions at 1/item; Swim pays a flat 1 🐟
+    // and auctions at the river rate (slot+1). Per-item is the printed positional
+    // rate — before any per-player discounts, which the server applies on resolve.
+    confirmDirectAuction(cardId, kind) {
+        const c = this.game.cardById(cardId);
+        if (!c) return;
+        const slot = Number(c.slot) || 0;
+        const mat = c.material + (c.wildAlt ? '/' + c.wildAlt : ''); // wilds name both
+        const triggerCost = kind === 'pull' ? (slot + 1) : 1;
+        const perItem = kind === 'pull' ? 1 : (slot + 1);
+        const verb = kind === 'pull' ? _('Pull') : _('Swim to');
+        const msg = `${verb} <b>${c.name}</b> (${mat})?<br>`
+            + `${c.uncovered} ${_('open item(s)')}<br>`
+            + `${_('Cost to auction:')} ${triggerCost} 🐟<br>`
+            + `${_('Cost per item:')} ${perItem} 🐟`;
+        this.bga.dialogs.confirmation(msg).then(ok => {
+            if (ok) this.bga.actions.performAction(kind === 'pull' ? 'actPull' : 'actAuction', { cardId });
+        });
     }
 
     enterPull() {
