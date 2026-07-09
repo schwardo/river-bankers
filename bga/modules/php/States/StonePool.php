@@ -48,10 +48,23 @@ class StonePool extends GameState
     #[PossibleAction]
     public function actReorder(#[IntArrayParam] array $cardIds, int $activePlayerId)
     {
-        if (!$this->game->reorderMaterialTop($cardIds)) {
+        // An empty submission means "keep the current order" (a legal no-op) — e.g.
+        // if the private peek never reached the client. Don't error the player out.
+        if (count($cardIds) > 0 && !$this->game->reorderMaterialTop($cardIds)) {
             throw new UserException(clienttranslate('Submit a valid ordering of the shown cards.'));
         }
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
+        return BuildEffects::class;
+    }
+
+    /**
+     * Keep the current order (no rearrangement). A dedicated no-arg action so the
+     * "Keep current order" button always works — even when the private peek failed
+     * to load — without sending an empty array param that could fail to bind.
+     */
+    #[PossibleAction]
+    public function actKeepOrder(int $activePlayerId)
+    {
         return BuildEffects::class;
     }
 

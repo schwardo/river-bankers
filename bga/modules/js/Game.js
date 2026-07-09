@@ -535,11 +535,28 @@ class ReactDrawDiscard {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+// Read the active player's private state args. The framework may deliver them
+// under args._private.active, under args._private[<playerId>] (it can resolve the
+// "active" key to the concrete player id), or — if alwaysMergePrivate() is on —
+// merged directly into args. Fall back across every shape so the acting player
+// always sees their private peek, including after a page reload.
+function privateArgs(bga, args) {
+    const p = args && args._private;
+    if (!p) return args || {};
+    if (p.active) return p.active;
+    try {
+        const myId = Number(bga.players.getCurrentPlayerId());
+        if (p[myId]) return p[myId];
+    } catch (e) { /* players not ready */ }
+    const vals = Object.values(p);
+    return vals.length ? vals[0] : args;
+}
+
 class ReactClayVault {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
         // topName is a private arg (active player only) — read from _private.
-        const topName = ((args._private && args._private.active) || args).topName || '';
+        const topName = (privateArgs(this.bga, args)).topName || '';
         this.bga.statusBar.setTitle(isActive
             ? _('Clay Vault — deck top is ') + topName + _('; swap a hand card or skip')
             : _('Clay Vault…'));
@@ -572,7 +589,7 @@ class StonePool {
         this.bga.statusBar.setTitle(isActive ? _('Stone Pool — set the new order of the top material cards') : _('Stone Pool…'));
         if (!isActive) return;
         // topCards is a private arg (active player only) — read from _private.
-        const priv = (args._private && args._private.active) || args;
+        const priv = privateArgs(this.bga, args);
         this.cards = (priv.topCards || []).slice();
         this.order = [];
         this.render();
@@ -585,7 +602,7 @@ class StonePool {
         remaining.forEach(c => this.bga.statusBar.addActionButton(
             (MAT_GLYPH[c.material] || '?') + ' ' + c.icons, () => { this.order.push(c.id); this.maybeSubmit(); }, { color: 'secondary' }));
         this.bga.statusBar.addActionButton(_('Keep current order'),
-            () => this.bga.actions.performAction('actReorder', { cardIds: this.cards.map(c => c.id) }));
+            () => this.bga.actions.performAction('actKeepOrder'));
     }
     maybeSubmit() {
         if (this.order.length === this.cards.length) {
@@ -605,7 +622,7 @@ class VineLattice {
         this.bga.statusBar.removeActionButtons();
         this.game.setHint(_('Pick one card to keep; the others are discarded.'));
         // offer is a private arg (active player only) — read from _private.
-        const offer = ((args._private && args._private.active) || args).offer || [];
+        const offer = privateArgs(this.bga, args).offer || [];
         offer.forEach(c => this.bga.statusBar.addActionButton(
             _('Keep ') + c.name, () => this.bga.actions.performAction('actLatticeKeep', { cardId: c.id }), { color: 'secondary' }));
     }
