@@ -333,7 +333,7 @@ class PlayerTurn {
             this.game.markClickable('hw', a.headwatersCards, id => this.confirmDirectAuction(id, 'pull'));
             this.game.markClickable('river', a.auctionableRiverCards, id => this.confirmDirectAuction(id, 'swim'));
         }
-        this.game.markClickable('hand', a.handStructureIds, id => this.startBuild(id));
+        this.game.markClickable('hand', a.handStructureIds, id => this.confirmDirectBuild(id));
         this.game.setHint(_('Click a Headwaters, river, or hand card directly — or use a button below.'));
         if (a.canTriggerAuction && (a.headwatersCards || []).length) {
             this.bga.statusBar.addActionButton(_('Pull Headwaters card (pay 2-4 🐟)'), () => this.enterPull());
@@ -405,6 +405,30 @@ class PlayerTurn {
         this.game.markClickable('river', this.args.auctionableRiverCards, id => this.bga.actions.performAction('actAuction', { cardId: id }));
         this.cancelButton();
     }
+    // Client-side confirmation for a direct hand-card click Build. First checks
+    // affordability (same effective-cost + coverage maths as the hand pills): if
+    // the player is short, we surface that error instead of the dialog. Otherwise
+    // we confirm the card name and its effective material cost before building.
+    // The guided Build button skips this — a deliberate, already-chosen action.
+    confirmDirectBuild(cardId) {
+        const card = (this.game.lastHand || []).find(c => Number(c.id) === Number(cardId));
+        if (!card) return;
+        const held = (this.game.materials || {})[this.game.myId()] || { fixed: {}, wild: [] };
+        const wbm = { ...(held.fixed || {}), _wildPools: held.wild || [] };
+        const flags = this.game.myBuildFlags();
+        const eff = rbEffectiveBuildCost(card.cost || {}, flags, wbm);
+        const have = rbEffectiveCoverage(eff, wbm);
+        const short = {};
+        Object.keys(eff).forEach(m => { const d = eff[m] - (have[m] || 0); if (d > 0) short[m] = d; });
+        if (Object.keys(short).length) {
+            this.bga.dialogs.showMessage(
+                _('You are short') + ' ' + costStr(short) + ' ' + _('to build') + ' ' + card.name + '.', 'error');
+            return;
+        }
+        const msg = `${_('Build')} <b>${card.name}</b> ${_('for')} ${costStr(eff)}?`;
+        this.bga.dialogs.confirmation(msg).then(ok => { if (ok) this.startBuild(cardId); });
+    }
+
     enterBuild() {
         this.enterSubMode(_('Build — select a structure from your hand'),
             _('Click a hand card to build it (pays its printed 🐟 cost in materials).'));
