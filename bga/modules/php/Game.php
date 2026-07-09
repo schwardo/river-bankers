@@ -66,6 +66,7 @@ class Game extends \Bga\GameFramework\Table
         // WARNING: only return info visible by $currentPlayerId (hide opponents' hands).
         $result["players"] = $this->getCollectionFromDb(
             "SELECT `player_id` AS `id`, `player_name` AS `name`,
+                    `player_score` AS `score`,
                     `player_species` AS `species`, `player_fish_pos` AS `fish`,
                     `player_worker_supply` AS `supply`, `player_hand_limit` AS `handLimit`,
                     `player_retired` AS `retired`, `player_stack_order` AS `stack`
