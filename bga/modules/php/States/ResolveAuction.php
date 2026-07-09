@@ -112,7 +112,7 @@ class ResolveAuction extends GameState
         foreach ($bids as $pid => $bid) {
             $got = $clinched[$pid];
             $msg = $got > 0
-                ? clienttranslate('${player_name} wins ${n}x ${material} (paid ${paid} 🐟).')
+                ? clienttranslate('${player_name} wins ${n}x ${material} (bid ${bid} - overbid ${overbid}), pays ${paid} 🐟.')
                 : clienttranslate('${player_name} wins nothing (bid ${bid} - overbid ${overbid}), but pays ${paid} 🐟.');
             $this->notify->all('auctionResolved', $msg, [
                 'player_id' => $pid,
@@ -217,7 +217,7 @@ class ResolveAuction extends GameState
         foreach ($order as $pid) {
             $got = $clinched[$pid];
             $msg = $got > 0
-                ? clienttranslate('${player_name} wins ${n}x ${material} (paid ${paid} 🐟).')
+                ? clienttranslate('${player_name} wins ${n}x ${material} (bid ${bid} - overbid ${overbid}), pays ${paid} 🐟.')
                 : clienttranslate('${player_name} wins nothing (bid ${bid} - overbid ${overbid}), but pays ${paid} 🐟.');
             $this->notify->all('auctionResolved', $msg, [
                 'player_id' => $pid,
