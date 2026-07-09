@@ -4151,7 +4151,18 @@ function prerivIndexOf(card) {
 }
 
 // Cleanup shoreline cards that have no workers
+// Remove-when-fully-covered rule: a river card whose icons are ALL covered
+// (uncovered == 0) can never be auctioned again, so graduate it out of the river
+// now instead of leaving it stuck. moveCardToShoreline retires it (workers score
+// on the shoreline); a worker-less card then falls out in the shoreline filter
+// below, so a dead, fully-blanked card is removed entirely.
+function sweepFullyCoveredRiver() {
+  for (const card of [...state.riverCards]) {
+    if (uncoveredIcons(card) <= 0) moveCardToShoreline(card);
+  }
+}
 function cleanupShoreline() {
+  sweepFullyCoveredRiver();
   state.shorelineCards = state.shorelineCards.filter(c => {
     const totalWorkers = Object.values(c.workers).reduce((s, n) => s + n, 0);
     if (totalWorkers === 0) {

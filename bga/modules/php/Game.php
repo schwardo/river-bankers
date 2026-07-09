@@ -469,6 +469,7 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery("UPDATE `player` SET `player_worker_supply` = `player_worker_supply` + 1 WHERE `player_id` = $playerId");
         if ($dropBlank && $this->getCardRow($cardId)['card_location'] === 'river') {
             $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + 1 WHERE `card_id` = $cardId");
+            $this->graduateIfFullyCovered($cardId);
         }
     }
 
@@ -1002,6 +1003,7 @@ class Game extends \Bga\GameFramework\Table
             $row = $this->getCardRow($cardId);
             if ($row['card_location'] === 'river') {
                 $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + $count WHERE `card_id` = $cardId");
+                $this->graduateIfFullyCovered($cardId);
             } elseif ($row['card_location'] === 'shoreline') {
                 $left = (int) $this->getUniqueValueFromDB(
                     "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $cardId"
@@ -1904,6 +1906,7 @@ class Game extends \Bga\GameFramework\Table
     {
         if ($this->uncoveredIcons($cardId) > 0) {
             $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + 1 WHERE `card_id` = $cardId");
+            $this->graduateIfFullyCovered($cardId);
         }
     }
 
@@ -2620,6 +2623,32 @@ class Game extends \Bga\GameFramework\Table
             $this->moveBackFish((int) $pid, (int) $spaces);
         }
         return $penalties;
+    }
+
+    /**
+     * Remove-when-fully-covered rule. A river card whose icons are ALL covered
+     * (uncovered == 0) can never be auctioned again, so it must leave the river
+     * immediately rather than sit there stuck forever. If it still holds workers
+     * it graduates to the shoreline (blanks return to the pool; arrival penalty
+     * fires, mirroring an auction graduation); with no workers it is a dead card
+     * and is discarded outright (same as a spent shoreline card). Call this after
+     * any operation that drops blanks or spends workers on a river card.
+     */
+    public function graduateIfFullyCovered(int $cardId): void
+    {
+        $row = $this->getCardRow($cardId);
+        if ($row['card_location'] !== 'river' || $this->uncoveredIcons($cardId) > 0) {
+            return;
+        }
+        $hasWorkers = (int) $this->getUniqueValueFromDB(
+            "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $cardId"
+        ) > 0;
+        if ($hasWorkers) {
+            $this->DbQuery("UPDATE `card` SET `card_location` = 'shoreline', `card_location_arg` = 0, `card_blanks` = 0 WHERE `card_id` = $cardId");
+            $this->applyShorelineArrival($cardId);
+        } else {
+            $this->DbQuery("UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0 WHERE `card_id` = $cardId");
+        }
     }
 
     /**

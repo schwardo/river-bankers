@@ -1318,7 +1318,18 @@ function heronReplacePreriv(state, idx) {
   return newCard;
 }
 function prerivIndexOf(state, card) { return state.prerivCards.indexOf(card); }
+// Remove-when-fully-covered rule: a river card whose icons are ALL covered
+// (uncovered == 0) can never be auctioned again, so graduate it out of the river
+// now instead of leaving it stuck. moveCardToShoreline retires it (workers score
+// on the shoreline); a worker-less card then falls out in the shoreline filter
+// below, so a dead, fully-blanked card is removed entirely.
+function sweepFullyCoveredRiver(state) {
+  for (const card of [...state.riverCards]) {
+    if (uncoveredIcons(card) <= 0) moveCardToShoreline(state, card);
+  }
+}
 function cleanupShoreline(state) {
+  sweepFullyCoveredRiver(state);
   state.shorelineCards = state.shorelineCards.filter(c => {
     const totalWorkers = Object.values(c.workers).reduce((s, n) => s + n, 0);
     return totalWorkers !== 0;
