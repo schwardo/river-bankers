@@ -970,7 +970,16 @@ export class Game {
                     <div id="materials-${p.id}" class="rb-mats"></div>
                 </div>
             `);
+            // Fish-track position shown right next to the official BGA VP score,
+            // so a player's money reads on the same line as their points.
+            const scoreEl = document.getElementById(`player_score_${p.id}`);
+            const scoreRow = scoreEl && scoreEl.closest('.player_score');
+            if (scoreRow) {
+                scoreRow.insertAdjacentHTML('beforeend',
+                    `<span id="rb-fishcount-${p.id}" class="rb-fishcount" title="${_('Fish track')}"></span>`);
+            }
         });
+        this.updateFishCounts();
 
         // Delegated click handling so clickability survives board re-renders.
         this.bga.gameArea.getElement().addEventListener('click', e => {
@@ -1532,7 +1541,17 @@ export class Game {
         });
         this.renderSupplies(); // supply chits; fish position shows on the track, VP on the BGA panel
         this.renderFishTrack();
+        this.updateFishCounts();
         this.refreshHandReqs(); // my placed workers changed → repaint hand have/need pills
+    }
+
+    // Fish-track total next to each player's VP score. Kept in sync with the
+    // track pawns; sits on the same line as the official BGA score counter.
+    updateFishCounts() {
+        Object.values(this.players).forEach(p => {
+            const el = document.getElementById(`rb-fishcount-${p.id}`);
+            if (el) el.textContent = `${Number(p.fish) || 0}🐟`;
+        });
     }
 
     // A single line across the top: each player's species chit at their position

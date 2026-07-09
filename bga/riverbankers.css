@@ -47,6 +47,9 @@
 /* ===== Fish track (single line across the top) ===== */
 /* Height is set inline by renderFishTrack: one row normally, growing only when
    tokens stack on a space. */
+/* Fish-track total shown on the same line as the official BGA VP score. */
+.rb-fishcount { margin-left: 8px; font-weight: bold; white-space: nowrap; }
+
 #rb-fishtrack { position: relative; margin: 2px 0 6px; }
 .rb-ft-fish { position: absolute; left: 2px; bottom: 7px; font-size: 18px; }
 .rb-ft-inner { position: relative; height: 100%; margin: 0 18px 0 28px; }
