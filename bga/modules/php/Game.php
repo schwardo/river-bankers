@@ -1233,9 +1233,10 @@ class Game extends \Bga\GameFramework\Table
     }
 
     /** Public per-player display data (fish, supply, retired + fish-track pawn info).
-     *  Score is intentionally NOT selected here — it's owned by the $playerScore /
-     *  $playerScoreAux counters (write via ->set(); never raw SQL), which push LIVE
-     *  score updates to the panel during play.
+     *  Score is intentionally NOT selected here — it's owned by the
+     *  $this->bga->playerScore / $this->bga->playerScoreAux counters (write via
+     *  ->set(); never raw SQL), which push LIVE score updates to the panel during
+     *  play.
      *  NOTE: this is the incremental-update helper. getAllDatas() is different — it
      *  MUST select `player_score AS score` so the panel renders the score on first
      *  load and on every page reload (the counters only fire on change, not on load).

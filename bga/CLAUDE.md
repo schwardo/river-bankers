@@ -9,8 +9,13 @@ VP and the tie-breaker live in the framework's standard `player` table columns
 `player_score` and `player_score_aux`. **Manipulate them only through the
 framework PlayerCounter properties — never raw SQL:**
 
-- `$this->playerScore` ↔ `player_score` (the VP shown in the player panel)
-- `$this->playerScoreAux` ↔ `player_score_aux` (tie-breaker; here `-fish`)
+- `$this->bga->playerScore` ↔ `player_score` (the VP shown in the player panel)
+- `$this->bga->playerScoreAux` ↔ `player_score_aux` (tie-breaker; here `-fish`)
+
+These counters hang off `$this->bga`, so the same access works from both `Game`
+and state classes. (`Game` also inherits a `$this->playerScore` shorthand for the
+same object — the existing `refreshScores()` code uses it — but prefer the
+`$this->bga->…` form everywhere for consistency.)
 
 Read/write with `->get($pid)` / `->set($pid, $value)`. Setting a counter pushes a
 **live** score update to the panel automatically. `refreshScores()` is the single
