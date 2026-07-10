@@ -3,18 +3,17 @@
 //   data/games.csv      — flat per-game row, columns named to match sim `emit`
 //   data/players.csv     — one row per (game, player)
 //
-// Two sources per game, each used for what it's authoritative about:
-//   * tableinfos stats  — the server's own end-of-game counters (turns,
-//     auctions_triggered, jammed/plenty/fully_jammed, structures_built,
-//     icons_won, fish_spent). These match the sim metric definitions directly.
-//   * notification log  — the public replay stream. We use it for the two things
-//     the stats don't give cleanly: no-bid auctions (a jam/plenty stat can't tell
-//     "everyone sent 0 workers") and the final VP array (for spread/margin). We
-//     also recompute the auction breakdown from the stream as a cross-check.
+// Sources per game:
+//   * notification log (archive/logs)  — the PRIMARY source. BGA's tableinfos
+//     carries NO stats block, so every aggregate metric (turns, auctions,
+//     jam/plenty/no-bid/no-winner, builds, icons, invents, flushes, abilities)
+//     is reconstructed from the public replay stream. See reconstructFromStream.
+//   * tableinfos                        — metadata only: players (id/fullname/
+//     order), final scores + placement on FINISHED tables, game start time,
+//     options. Used for names, VP, and the player roster.
 //
-// The BGA stat block shape varies across framework versions, so extractStats()
-// searches defensively by the stat NAMES defined in bga/stats.jsonc. Verify the
-// numbers against one known table (see README) and tighten if needed.
+// Archive logs exist only for FINISHED games; an in-progress table yields
+// metadata with hasLog:false and null metrics.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,23 +22,6 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RAW = path.join(HERE, 'data', 'raw');
 const DATA = path.join(HERE, 'data');
-
-// stat name (as in bga/stats.jsonc) → our normalized field.
-const STAT_NAMES = {
-  'Turns played': 'turns',
-  'Fish spent': 'fishSpent',
-  'Structures built': 'cardsBuilt',
-  'Auctions held': 'auctions',
-  'Auctions triggered': 'auctionsTriggered', // per-player variant
-  'Auctions won (>=1 icon)': 'auctionsWon',
-  'Material icons won': 'iconsWon',
-  'Auctions with plenty (no overbid)': 'plentyAuctions',
-  'Jammed auctions (overbid)': 'jamAuctions',
-  'Auctions won by nobody': 'noWinnerAuctions',
-  'Invent actions': 'invents',
-  'Headwaters flushes': 'flushes',
-  'Abilities used': 'abilitiesUsed',
-};
 
 const KNOWN_NOTIFS = new Set([
   'auctionStarted', 'auctionBids', 'auctionResolved', 'build', 'turnInfo',
@@ -58,23 +40,6 @@ function collectNotifs(node, out = []) {
   }
   if (Array.isArray(node)) { for (const v of node) collectNotifs(v, out); }
   else { for (const v of Object.values(node)) collectNotifs(v, out); }
-  return out;
-}
-
-// Depth-first: find every node that carries a stat `name` we recognise together
-// with a numeric `value`. Returns [{name, value, pid?}] — pid captured when the
-// stat node (or an ancestor key) identifies a player.
-function collectStats(node, out = [], pidHint = null) {
-  if (node == null || typeof node !== 'object') return out;
-  if (typeof node.name === 'string' && STAT_NAMES[node.name] != null && node.value != null && !Number.isNaN(Number(node.value))) {
-    out.push({ field: STAT_NAMES[node.name], value: Number(node.value), pid: pidHint });
-  }
-  const entries = Array.isArray(node) ? node.map((v, i) => [i, v]) : Object.entries(node);
-  for (const [k, v] of entries) {
-    // If a key looks like a player id (all digits, > 6 chars is a BGA id), pass it down.
-    const nextPid = /^\d{5,}$/.test(String(k)) ? String(k) : pidHint;
-    collectStats(v, out, nextPid);
-  }
   return out;
 }
 
@@ -99,6 +64,19 @@ function extractPlayers(info) {
   return [];
 }
 
+// player_id → player_name, harvested from every notif that names a player. Lets
+// us build a roster from the log when tableinfos.players is empty (finished
+// tables return an empty players array).
+function namesByPid(notifs) {
+  const map = {};
+  for (const n of notifs) {
+    const pid = n.args?.player_id;
+    const name = n.args?.player_name;
+    if (pid != null && name && map[String(pid)] == null) map[String(pid)] = String(name);
+  }
+  return map;
+}
+
 // Final VP per player, preferring the finalScores packet (authoritative VP,
 // pre-tiebreak) and falling back to the tableinfos player score.
 function extractScores(notifs, players) {
@@ -109,38 +87,75 @@ function extractScores(notifs, players) {
       total: Number(s.total ?? 0),
     }));
   }
-  return players.map((p) => ({ pid: p.pid, total: p.score ?? 0 }));
+  // p.score is null on unfinished tables → total stays null and is filtered out,
+  // so an in-progress game contributes no VP to the comparison.
+  return players.map((p) => ({ pid: p.pid, total: p.score != null ? Number(p.score) : null }));
 }
 
-// Reconstruct auction outcomes from the stream. Each auction is one auctionBids
-// packet (jam iff overbid>0) followed by one auctionResolved per bidder. We
-// segment resolves by the preceding bids packet.
-function reconstructAuctions(notifs) {
-  let auctions = 0, jam = 0, plenty = 0, noBid = 0, noWinner = 0, iconsWon = 0;
-  let curBidSum = null, curMaxClinch = 0, curOpen = 0;
-  const flush = () => {
+// Reconstruct the whole per-game metric set from the notification stream. Since
+// tableinfos carries NO stats block, this is the primary (not fallback) source.
+// Returns { game: {...aggregate...}, perPlayer: { pid: {...} } }.
+//
+// Auction segmentation: each auction is one `auctionBids` packet (jam iff
+// overbid>0) followed by one `auctionResolved` per bidder; we close out the
+// previous auction when the next `auctionBids` (or end of stream) arrives.
+function reconstructFromStream(notifs) {
+  let turns = 0, auctions = 0, jam = 0, plenty = 0, noBid = 0, noWinner = 0;
+  let iconsWon = 0, cardsBuilt = 0, invents = 0, flushes = 0, abilitiesUsed = 0;
+  const per = {}; // pid → per-player counters
+  const P = (pid) => (per[pid] ??= { auctionsTriggered: 0, auctionsWon: 0, iconsWon: 0, invents: 0, flushes: 0, abilitiesUsed: 0 });
+
+  let curBidSum = null, curMaxClinch = 0;
+  const closeAuction = () => {
     if (curBidSum == null) return;
     auctions++;
     if (curBidSum === 0) noBid++;
     else if (curMaxClinch === 0) noWinner++;
   };
+
   for (const n of notifs) {
-    if (n.type === 'auctionBids') {
-      flush();
-      const bidsStr = String(n.args.bids ?? '');
-      let sum = 0; for (const m of bidsStr.matchAll(/sends\s+(\d+)\s+worker/g)) sum += Number(m[1]);
-      curBidSum = sum;
-      curMaxClinch = 0;
-      curOpen = Number(n.args.open ?? 0);
-      if (Number(n.args.overbid ?? 0) > 0) jam++; else plenty++;
-    } else if (n.type === 'auctionResolved') {
-      const got = Number(n.args.n ?? 0);
-      iconsWon += got;
-      if (got > curMaxClinch) curMaxClinch = got;
+    const a = n.args;
+    const pid = a.player_id != null ? String(a.player_id) : null;
+    switch (n.type) {
+      case 'turnInfo': // NextPlayer announces the next actor once per turn
+        turns++;
+        break;
+      case 'auctionStarted':
+        if (pid) P(pid).auctionsTriggered++;
+        break;
+      case 'auctionBids': {
+        closeAuction();
+        let sum = 0; for (const m of String(a.bids ?? '').matchAll(/sends\s+(\d+)\s+worker/g)) sum += Number(m[1]);
+        curBidSum = sum; curMaxClinch = 0;
+        if (Number(a.overbid ?? 0) > 0) jam++; else plenty++;
+        break;
+      }
+      case 'auctionResolved': {
+        const got = Number(a.n ?? 0);
+        iconsWon += got;
+        if (got > curMaxClinch) curMaxClinch = got;
+        if (pid) { const pp = P(pid); pp.iconsWon += got; if (got > 0) pp.auctionsWon++; }
+        break;
+      }
+      case 'build': // real structure builds carry card_id (draws/Mill-Wheel copies don't)
+        if (a.card_id != null) cardsBuilt++;
+        break;
+      case 'invent':
+        invents++; if (pid) P(pid).invents++;
+        break;
+      case 'flush':
+        flushes++; if (pid) P(pid).flushes++;
+        break;
+      case 'abilityUsed':
+        abilitiesUsed++; if (pid) P(pid).abilitiesUsed++;
+        break;
     }
   }
-  flush();
-  return { auctions, jam, plenty, noBid, noWinner, iconsWon };
+  closeAuction();
+  return {
+    game: { turns, auctions, jam, plenty, noBid, noWinner, iconsWon, cardsBuilt, invents, flushes, abilitiesUsed },
+    perPlayer: per,
+  };
 }
 
 function parseGame(tableId) {
@@ -150,54 +165,56 @@ function parseGame(tableId) {
   const log = fs.existsSync(logPath) ? JSON.parse(fs.readFileSync(logPath, 'utf8')) : null;
   const hasLog = !!log;
 
-  const players = info ? extractPlayers(info) : [];
   const notifs = log ? collectNotifs(log) : [];
-  const stream = reconstructAuctions(notifs);
+  let players = info ? extractPlayers(info) : [];
   const scores = extractScores(notifs, players);
+  // Finished tables return an empty tableinfos.players array, so fall back to a
+  // roster built from the log: one entry per scored player, named from the notif
+  // stream. Placement (rank) comes from VP order.
+  if (!players.length && scores.length) {
+    const names = namesByPid(notifs);
+    const ranked = [...scores].sort((a, b) => b.total - a.total);
+    players = ranked.map((sc, i) => ({
+      pid: sc.pid, name: names[sc.pid] ?? ('#' + sc.pid), order: null,
+      score: sc.total, rank: i + 1,
+    }));
+  }
+  const { game: s, perPlayer } = reconstructFromStream(notifs);
   const numP = players.length || null;
 
-  // Authoritative server stats (best-effort by name), split table vs per-player.
-  const statNodes = info ? collectStats(info) : [];
-  const tableStat = {};
-  const playerStat = {}; // pid → {field: value}
-  for (const s of statNodes) {
-    if (s.pid) { (playerStat[s.pid] ??= {})[s.field] = s.value; }
-    else if (tableStat[s.field] == null) tableStat[s.field] = s.value;
-  }
+  // Metrics come from the notification stream (tableinfos has no stats block).
+  // Without a log we can still record metadata + final scores, but the aggregate
+  // metrics are null (hasLog:false).
+  const m = (v) => (hasLog ? v : null);
 
-  // Prefer server stats; fall back to stream reconstruction where a stat is absent.
-  const g = (statField, streamVal) => (tableStat[statField] != null ? tableStat[statField] : streamVal);
-
-  const vps = scores.map((s) => s.total).sort((a, b) => b - a);
+  const vps = scores.map((sc) => sc.total).filter((v) => v != null).sort((a, b) => b - a);
   const rec = {
     tableId: String(tableId),
     hasLog,
     numP,
-    workers: null, // RB uses a fixed starting worker count; not exposed per-table. Left null.
-    date: info?.data?.result?.time_end ?? info?.data?.gamestart ?? null,
+    workers: null, // RB uses a fixed starting worker count; not exposed per-table.
+    date: info?.data?.gamestart ?? null,
     // Aggregate metrics (aligned to sim `emit` field names)
-    turns: g('turns', null),
-    auctions: g('auctions', stream.auctions),
-    jamAuctions: g('jamAuctions', stream.jam),
-    plentyAuctions: g('plentyAuctions', stream.plenty),
-    noBidAuctions: stream.noBid,               // stream-only (no server stat)
-    noWinnerAuctions: g('noWinnerAuctions', stream.noWinner),
-    cardsBuilt: g('cardsBuilt', null),
-    iconsWon: g('iconsWon', stream.iconsWon),
-    fishSpent: g('fishSpent', null),
-    // Scoring
+    turns: m(s.turns),
+    auctions: m(s.auctions),
+    jamAuctions: m(s.jam),
+    plentyAuctions: m(s.plenty),
+    noBidAuctions: m(s.noBid),
+    noWinnerAuctions: m(s.noWinner),
+    cardsBuilt: m(s.cardsBuilt),
+    iconsWon: m(s.iconsWon),
+    fishSpent: null, // not reliably reconstructable from the public stream
+    // Scoring (from finalScores packet, else tableinfos player scores)
     winnerVP: vps[0] ?? null,
     runnerUpVP: vps.length > 1 ? vps[1] : null,
     loserVP: vps.length ? vps[vps.length - 1] : null,
     vpSpread: vps.length ? vps[0] - vps[vps.length - 1] : null,
     winMargin: vps.length > 1 ? vps[0] - vps[1] : (vps[0] ?? null),
-    totalVP: vps.reduce((s, x) => s + x, 0) || null,
+    totalVP: vps.reduce((sum, x) => sum + x, 0) || null,
     players: players.map((p) => {
-      const sc = scores.find((s) => s.pid === p.pid);
-      return { ...p, finalVP: sc ? sc.total : p.score, stats: playerStat[p.pid] || {} };
+      const sc = scores.find((x) => x.pid === p.pid);
+      return { ...p, finalVP: sc ? sc.total : p.score, stats: perPlayer[p.pid] || {} };
     }),
-    // Stream cross-check (helps spot stat-shape problems during verification).
-    _stream: stream,
   };
   return rec;
 }

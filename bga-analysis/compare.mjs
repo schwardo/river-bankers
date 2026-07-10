@@ -61,8 +61,16 @@ function main() {
   const gamesFile = path.join(DATA, 'games.csv');
   if (!fs.existsSync(gamesFile)) { console.error('No data/games.csv. Run: node parse-games.mjs'); process.exit(1); }
   const games = readCsv(gamesFile);
+  // Only finished games (a reconstructed `turns` implies a full log) are
+  // comparable; in-progress tables have null metrics and are skipped.
+  const finished = games.filter((g) => num(g.turns) != null);
   const byP = {};
-  for (const g of games) { const p = num(g.numP); if (p) (byP[p] ??= []).push(g); }
+  for (const g of finished) { const p = num(g.numP); if (p) (byP[p] ??= []).push(g); }
+  if (!Object.keys(byP).length) {
+    console.error(`No finished games in ${path.relative(process.cwd(), gamesFile)} yet (need at least one with a downloaded log).`);
+    process.exit(1);
+  }
+  console.log(`Comparing ${finished.length} finished game(s) of ${games.length} total.`);
 
   const md = ['# River Bankers — real BGA games vs. simulator', '',
     `Sim baseline: ${SIM_GAMES} games per player-count (default starting workers).`,
