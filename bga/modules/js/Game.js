@@ -906,13 +906,12 @@ class Auction {
         if (a.lotCardId2) lot += ' + ' + lotDesc(a.lotCardId2);
         this.bga.statusBar.setTitle(_('How many workers would you like to send for ') + lot + ' ?');
         this.game.setHint(_('Bid up to ') + maxBid + _(' workers (this lot has ') + a.open + _(' open icons).'));
-        // Upper-bound the fish cost of an N-worker bid: rate is the lot's printed
-        // positional rate (slot+1), combined lots use the cheaper of the two, and
-        // billable workers <= bid. Per-player discounts (applied server-side) only
-        // lower it, so this over-estimates — the dialog says "up to".
-        const rateOf = id => { const c = this.game.cardById(id); return c ? (Number(c.slot) || 0) + 1 : 1; };
-        let rate = rateOf(a.lotCardId);
-        if (a.lotCardId2) rate = Math.min(rate, rateOf(a.lotCardId2));
+        // Fish cost of an N-worker bid = N × my discounted per-item rate (you pay
+        // for every worker you send, win or lose). Combined lots use the cheaper of
+        // the two cards' rates. Exact for a normal swim; Pontoon and forced-rate
+        // pulls only lower it, so it's a safe upper bound ("up to").
+        let rate = this.game.myAuctionRate(a.lotCardId);
+        if (a.lotCardId2) rate = Math.min(rate, this.game.myAuctionRate(a.lotCardId2));
         for (let b = minBid; b <= maxBid; b++) {
             const est = b * rate;
             this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.game.confirmFishCross(
@@ -957,9 +956,8 @@ class DeferBid {
         if (!isActive) return;
         const minBid = (this.game.myId() === Number(args.triggerPlayer)) ? 1 : 0;
         this.game.setHint(_('You bid last. Revealed bids — ') + revealed);
-        const rateOf = id => { const c = this.game.cardById(id); return c ? (Number(c.slot) || 0) + 1 : 1; };
-        let rate = rateOf(args.lotCardId);
-        if (args.lotCardId2) rate = Math.min(rate, rateOf(args.lotCardId2));
+        let rate = this.game.myAuctionRate(args.lotCardId);
+        if (args.lotCardId2) rate = Math.min(rate, this.game.myAuctionRate(args.lotCardId2));
         for (let b = minBid; b <= args.maxBid; b++) {
             const est = b * rate;
             this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.game.confirmFishCross(
@@ -1613,13 +1611,33 @@ export class Game {
     mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
     myFish() { const p = this.players[this.myId()]; return p ? Number(p.fish) || 0 : 0; }
     amRetired() { const p = this.players[this.myId()]; return p ? !!Number(p.retired) : false; }
+    // Per-item auction discount my built cards grant on a given material, mirroring
+    // Effects::auctionDiscount / MATERIAL_DISCOUNTS.
+    auctionDiscount(material) {
+        const D = { reeds: { 'Reed Bed': 1, 'Kelp Bed': 1 }, mud: { 'Mud Burrow': 1 }, clay: { 'Clay Den': 2 } };
+        const names = ((this.built || {})[this.myId()] || []).map(b => b.name);
+        return Object.entries(D[material] || {}).reduce((t, [n, a]) => t + (names.includes(n) ? a : 0), 0);
+    }
+    // My effective per-item fish rate on a lot card: printed positional rate
+    // (slot+1) minus my material discounts, min 1 (Effects::perItemForPlayer). This
+    // is exact for a normal river swim; it can only *over*-estimate for forced-rate
+    // pulls (e.g. Snag Pile auctions at 1/item — not known client-side), so a bid
+    // built from it is a safe upper bound.
+    myAuctionRate(cardId) {
+        const c = this.cardById(cardId);
+        if (!c) return 1;
+        const base = (Number(c.slot) || 0) + 1;
+        return Math.max(1, base - this.auctionDiscount(c.material));
+    }
     // Fish-line guard. If an action's fish cost would move me to or past the
     // finish line (retiring my beaver — no more turns), confirm before committing.
-    // estCost may be an upper bound: auction bids don't know rivals' sealed bids,
-    // and rates ignore per-player discounts (which only lower the cost), so pass
-    // approx=true there and the dialog says "up to". Below the line, or already
-    // retired, we just proceed(). Mirrors the server's inclusive `fish >= FISH_LINE`
-    // retirement check (NextPlayer.php).
+    // For bids, billable workers == the bid exactly (you pay for every worker you
+    // send, win or lose — Auction::billableWorkers), and the rate is my discounted
+    // per-item rate, so the estimate is exact save for two effects that only *lower*
+    // it — Pontoon (shaves 1 when jammed) and forced-rate pulls. Hence approx=true
+    // makes the dialog say "up to" (a safe upper bound), not a guess about rivals.
+    // Below the line, or already retired, we just proceed(). Mirrors the server's
+    // inclusive `fish >= FISH_LINE` retirement check (NextPlayer.php).
     confirmFishCross(estCost, label, proceed, approx = false) {
         const line = Number(this.fishLine) || 90;
         const projected = this.myFish() + Math.max(0, Number(estCost) || 0);
