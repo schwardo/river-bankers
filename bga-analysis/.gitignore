@@ -1,0 +1,3 @@
+# Secrets and downloaded data — never commit.
+config.json
+data/

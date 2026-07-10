@@ -1,0 +1,8 @@
+{
+  "_comment": "Copy to config.json (gitignored) and fill in. Grab `cookie` from a logged-in boardgamearena.com session: DevTools > Network > any request > Request Headers > copy the FULL value of the `Cookie:` header. `requestToken` is the value of the `bgacookie`-derived request token BGA sends as `X-Request-Token` (see any XHR request header); leave empty to start and add it only if fetch-games reports a token error. `playerId` is your numeric BGA id (from your profile URL /player/<id>). `gameId` is River Bankers' numeric game id on the live site (from a table/replay URL, e.g. game=<slug> maps to a numeric id shown in tableinfos).",
+  "baseUrl": "https://boardgamearena.com",
+  "cookie": "PASTE_FULL_COOKIE_HEADER_HERE",
+  "requestToken": "",
+  "playerId": 0,
+  "gameId": 0
+}

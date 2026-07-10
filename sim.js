@@ -7319,7 +7319,51 @@ if (require.main === module) {
   else if (mode === 'tune-dvcard') sweepTuneDVCard(process.argv[3], process.argv[4]);
   else if (mode === 'tune-invent') sweepTuneInvent(process.argv[3], process.argv[4]);
   else if (mode === 'matcost') sweepMatcost(process.argv[3], process.argv[4]);
+  else if (mode === 'emit') emitGames(process.argv[3], process.argv[4], process.argv[5]);
   else sweep();
+}
+
+// Emit one JSON line per simulated game (JSONL) for downstream comparison against
+// real BGA games — see games/river-bankers/bga-analysis/. Unlike the sweep modes
+// (which print averaged ASCII tables), this dumps the raw per-game `metrics`
+// object runGame() returns, so the analysis tooling can build its own
+// distributions in the SAME schema it extracts from BGA game logs. Each line also
+// carries the config (numP, workers, numMats) so a mixed file can be grouped.
+// Usage: node sim.js emit [numP] [workers] [numGames]
+function emitGames(numPArg, workersArg, nArg) {
+  const numP = parseInt(numPArg) || 3;
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(nArg) || 1000;
+  const numMats = 6;
+  for (let g = 0; g < numGames; g++) {
+    const m = runGame(numP, numMats, workers);
+    // Flatten the fields the comparison uses to a stable, scalar-only shape
+    // (drop the bulky arrays/objects like riverExitSlots/effectUses/bidHist).
+    console.log(JSON.stringify({
+      numP, workers, numMats,
+      turns: m.turns,
+      auctions: m.auctions,
+      jamAuctions: m.jamAuctions,
+      plentyAuctions: m.plentyAuctions,
+      noBidAuctions: m.noBidAuctions,
+      // sim's zero-clinch auctions = a jam nobody won any icon in — the analog of
+      // BGA's fully_jammed_auctions ("won by nobody").
+      noWinnerAuctions: m.zeroClinchAuctions || 0,
+      cardsBuilt: m.cardsBuilt,
+      iconsSpawned: m.iconsSpawned,
+      iconsClaimed: m.iconsClaimed,
+      iconsWastedToShore: m.iconsWastedToShore,
+      invents: m.invents,
+      flushes: m.flushes,
+      endgameTriggered: m.endgameTriggered ? 1 : 0,
+      winnerVP: m.winnerVP,
+      runnerUpVP: m.runnerUpVP,
+      loserVP: m.loserVP,
+      vpSpread: m.vpSpread,
+      winMargin: m.winMargin,
+      totalVP: m.totalVP,
+    }));
+  }
 }
 
 // Mean/median 🐟 spent per material item won, broken down by item type, with
