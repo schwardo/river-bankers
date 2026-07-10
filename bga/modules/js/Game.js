@@ -613,16 +613,42 @@ class ReactBurrowNetwork {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+// Stone Pool (top 5) / Vine Curtain (top 2): rearrange the peeked material cards.
+// The peek is private and arrives via the materialPeek notification (reliable) or
+// the _private state args (best-effort). Because the notification and this state's
+// entry can land in either order, we register the live instance on the game so
+// notif_materialPeek can push cards in after entry, and we also read any peek that
+// already arrived. Title/label name the actual triggering card (n === 2 → Vine
+// Curtain), fixing the old always-"Stone Pool" label.
 class StonePool {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
-        this.bga.statusBar.setTitle(isActive ? _('Stone Pool — set the new order of the top material cards') : _('Stone Pool…'));
-        if (!isActive) return;
-        // topCards is a private arg (active player only) — read from _private.
-        const priv = privateArgs(this.bga, args);
-        this.cards = (priv.topCards || []).slice();
+        this.isActive = isActive;
         this.order = [];
+        // Prefer a peek the notification already delivered; else the _private args.
+        const priv = privateArgs(this.bga, args);
+        const peek = this.game.materialPeek;
+        this.cards = ((peek && peek.cards) || priv.topCards || []).slice();
+        this.n = (peek && peek.n) || priv.n || this.cards.length;
+        this.game.activeStonePool = isActive ? this : null;
+        this.renderTitle();
+        if (!isActive) return;
         this.render();
+    }
+    // Called by notif_materialPeek if the peek arrives after we've entered.
+    applyPeek(peek) {
+        this.cards = (peek.cards || []).slice();
+        this.n = peek.n || this.cards.length;
+        this.order = [];
+        this.renderTitle();
+        if (this.isActive) this.render();
+    }
+    label() { return this.n === 2 ? _('Vine Curtain') : _('Stone Pool'); }
+    renderTitle() {
+        const n = this.cards.length || this.n || 0;
+        this.bga.statusBar.setTitle(this.isActive
+            ? this.label() + ' — ' + _('set the new order of the top') + ' ' + n + ' ' + _('material cards')
+            : this.label() + '…');
     }
     render() {
         this.bga.statusBar.removeActionButtons();
@@ -641,7 +667,7 @@ class StonePool {
             this.render();
         }
     }
-    onLeavingState() { this.game.clearClickable(); }
+    onLeavingState() { this.game.clearClickable(); this.game.activeStonePool = null; this.game.materialPeek = null; }
 }
 
 class VineLattice {
@@ -1693,6 +1719,14 @@ export class Game {
 
     setupNotifications() {
         this.bga.notifications.setupPromiseNotifications();
+    }
+
+    // Private peek at the top material cards for Stone Pool / Vine Curtain. Stored
+    // on the game so the StonePool state picks it up whether the notification lands
+    // before or after the state is entered (see StonePool.onEnteringState/applyPeek).
+    async notif_materialPeek(args) {
+        this.materialPeek = { cards: args.cards || [], n: Number(args.n) || (args.cards || []).length };
+        if (this.activeStonePool) this.activeStonePool.applyPeek(this.materialPeek);
     }
 
     async notif_boardUpdate(args) {

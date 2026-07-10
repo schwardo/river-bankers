@@ -29,16 +29,28 @@ class StonePool extends GameState
         if ($this->game->getMaterialDeckCount() < 2) {
             return BuildEffects::class;
         }
+        // The top-N material cards are a PRIVATE peek at the face-down deck — only
+        // the arranging player may see them. The framework's `_private` STATE ARGS
+        // (see getArgs) don't reliably reach the client on state entry — that's why
+        // actKeepOrder exists as a "peek never arrived" fallback. So ALSO push the
+        // peek over the reliable private-NOTIFICATION channel (same mechanism as
+        // Salt Lick's peekHands), which the client prefers. `n` picks the label
+        // (2 = Vine Curtain's top-2 peek, else Stone Pool's top-5).
+        $n = (int) $this->globals->get('reorder_n', 5);
+        $playerId = (int) $this->game->getActivePlayerId();
+        $this->notify->player($playerId, 'materialPeek', '', [
+            'cards' => $this->game->topMaterialCards($n),
+            'n' => $n,
+        ]);
         return null;
     }
 
     public function getArgs(): array
     {
         $n = (int) $this->globals->get('reorder_n', 5);
-        // The top-N material cards are a PRIVATE peek at the face-down deck — only
-        // the arranging player may see them. Sent via _private so opponents,
-        // spectators, and replays never receive the upcoming material order.
-        return ["_private" => ["active" => ["topCards" => $this->game->topMaterialCards($n)]]];
+        // Kept as a best-effort fallback alongside the materialPeek notification
+        // (onEnteringState) — opponents, spectators, and replays never receive it.
+        return ["_private" => ["active" => ["topCards" => $this->game->topMaterialCards($n), "n" => $n]]];
     }
 
     /**
