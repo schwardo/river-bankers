@@ -87,9 +87,13 @@ function extractPlayers(info) {
   if (p && typeof p === 'object') {
     return Object.values(p).map((x) => ({
       pid: String(x.id ?? x.player_id ?? ''),
-      name: String(x.name ?? x.player_name ?? ''),
+      // BGA tableinfos uses `fullname`; `name` only appears on some endpoints.
+      name: String(x.fullname ?? x.name ?? x.player_name ?? ''),
+      order: x.table_order != null ? Number(x.table_order) : null,
+      // Final VP + finishing place appear only on FINISHED tables. `rank` here is
+      // the player's ELO, not their placement — use `gamerank` for placement.
       score: x.score != null ? Number(x.score) : null,
-      rank: x.gamerank != null ? Number(x.gamerank) : (x.rank != null ? Number(x.rank) : null),
+      rank: x.gamerank != null ? Number(x.gamerank) : null,
     })).filter((x) => x.pid);
   }
   return [];

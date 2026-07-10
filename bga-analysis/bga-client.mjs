@@ -52,15 +52,25 @@ export async function getJson(cfg, relPath, params = {}) {
 
   const res = await fetch(url, { headers });
   const body = await res.text();
-  if (res.status === 403 || /login|You are not logged/i.test(body.slice(0, 400))) {
+  if (res.status === 403 || /You are not logged|must be logged/i.test(body.slice(0, 400))) {
     throw new Error(`Auth failed (HTTP ${res.status}) for ${url.pathname} — refresh your cookie in config.json.`);
   }
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url.pathname}${url.search}: ${body.slice(0, 200)}`);
+  let json;
   try {
-    return JSON.parse(body);
+    json = JSON.parse(body);
   } catch {
     throw new Error(`Non-JSON response for ${url.pathname}${url.search} (HTTP ${res.status}): ${body.slice(0, 200)}`);
   }
+  // BGA answers HTTP 200 with a status:"0" envelope for auth/session/token
+  // failures (e.g. code 806 "Invalid session information"). Treat those as hard
+  // errors so we never cache an error page as if it were game data.
+  if (json && (json.status === '0' || json.status === 0) && json.error) {
+    const stale = json.code === 806 || /session|logged|token/i.test(json.error);
+    throw new Error(`BGA error ${json.code ?? ''} for ${url.pathname}: ${json.error}` +
+      (stale ? '\n  → Your cookie/requestToken is stale or incomplete. Re-copy BOTH from a fresh "Copy as cURL" (the cookie must include the HttpOnly PHPSESSID).' : ''));
+  }
+  return json;
 }
 
 // List the caller's finished tables for the configured game. BGA paginates; we
