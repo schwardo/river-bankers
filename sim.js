@@ -1467,6 +1467,25 @@ function collectAuctionBids(state, card, triggerPlayerIdx, minBidTrigger) {
   }
   return bids;
 }
+// --- Per-material auction cost instrumentation ----------------------------
+// Global accumulator for the `matcost` sweep: item-type key -> { fish, items,
+// perItem: [] }. `fish` is total 🐟 paid for items actually won; `items` is the
+// count won; `perItem` holds one per-item 🐟 cost per item won (for medians).
+// Wildcard cards are keyed separately as `${material}(wild:${wildAlt})`.
+const MATCOST = {};
+function matcostRecord(card, perItemCost, itemsWon, fishPaid) {
+  if (!MATCOST_ACTIVE || itemsWon <= 0) return;
+  const key = card.wildAlt
+    ? `${card.material}(wild:${card.wildAlt})`
+    : card.material;
+  let e = MATCOST[key];
+  if (!e) e = MATCOST[key] = { fish: 0, items: 0, perItem: [] };
+  e.fish += fishPaid;
+  e.items += itemsWon;
+  for (let i = 0; i < itemsWon; i++) e.perItem.push(perItemCost);
+}
+let MATCOST_ACTIVE = false;
+// --------------------------------------------------------------------------
 function resolveAuction(state, card, bids) {
   const open = uncoveredIcons(card);
   const totalBid = Object.values(bids).reduce((s, n) => s + n, 0);
@@ -1489,8 +1508,10 @@ function resolveAuction(state, card, bids) {
       const p = state.players[idx];
       p.supply -= bid;
       card.workers[idx] = (card.workers[idx] || 0) + bid;
-      const timeAdvance = bid * playerCardCost(state, card, idx);
+      const perItem = playerCardCost(state, card, idx);
+      const timeAdvance = bid * perItem;
       advancePlayer(state, idx, timeAdvance);
+      matcostRecord(card, perItem, bid, timeAdvance);
       state.metrics.iconsClaimed += bid;
       state.metrics.nonZeroBidders++;
       // got === bid > 0 in plenty case, so no zero-clinch increment.
@@ -1527,8 +1548,10 @@ function resolveAuction(state, card, bids) {
       }
       let billable = bid;
       if (got < bid && hasEffect(p, 'Pontoon')) billable = Math.max(0, bid - 1);
-      const timeAdvance = billable * playerCardCost(state, card, idx);
+      const perItem = playerCardCost(state, card, idx);
+      const timeAdvance = billable * perItem;
       advancePlayer(state, idx, timeAdvance);
+      if (got > 0) matcostRecord(card, perItem, got, got * perItem);
       state.metrics.iconsClaimed += got;
       state.metrics.nonZeroBidders++;
       if (got === 0) {
@@ -7295,5 +7318,58 @@ if (require.main === module) {
   else if (mode === 'tune-dv') sweepTuneDV(process.argv[3], process.argv[4]);
   else if (mode === 'tune-dvcard') sweepTuneDVCard(process.argv[3], process.argv[4]);
   else if (mode === 'tune-invent') sweepTuneInvent(process.argv[3], process.argv[4]);
+  else if (mode === 'matcost') sweepMatcost(process.argv[3], process.argv[4]);
   else sweep();
+}
+
+// Mean/median 🐟 spent per material item won, broken down by item type, with
+// wildcard cards split out separately. Sweeps all player counts.
+// Usage: node sim.js matcost [numGames] [workers]
+function sweepMatcost(numGamesArg, workersArg) {
+  const numGames = parseInt(numGamesArg) || 20000;
+  const workers = parseInt(workersArg) || 8;
+  const numMats = 6;
+  const median = (a) => {
+    if (!a.length) return 0;
+    const s = a.slice().sort((x, y) => x - y);
+    const m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  MATCOST_ACTIVE = true;
+  for (const numP of [2, 3, 4]) {
+    for (const k in MATCOST) delete MATCOST[k];
+    const line = simFishLine(numP);
+    process.stderr.write(`Running ${numGames} games (${numP}P, ${workers} wkrs)...\r`);
+    for (let g = 0; g < numGames; g++) {
+      configureMaterials(numMats);
+      const state = newGame(numP, workers);
+      instrFishPlayout(state, line, 'd', true);
+    }
+    process.stderr.write(' '.repeat(50) + '\r');
+    const keys = Object.keys(MATCOST).sort();
+    console.log(`\nRiver Bankers — 🐟 spent per material item won  (${numGames} games, ${numP}P, ${workers} wkrs)`);
+    console.log(pad('item type', 20) + padL('items', 11) + padL('fish', 11) + padL('mean', 8) + padL('median', 8));
+    console.log('-'.repeat(20 + 11 + 11 + 8 + 8));
+    let allItems = 0, allFish = 0, allPer = [];
+    for (const key of keys) {
+      const e = MATCOST[key];
+      allItems += e.items; allFish += e.fish; allPer = allPer.concat(e.perItem);
+      console.log(
+        pad(key, 20) + padL(e.items.toLocaleString(), 11) + padL(e.fish.toLocaleString(), 11) +
+        padL((e.fish / e.items).toFixed(2), 8) + padL(median(e.perItem).toFixed(2), 8)
+      );
+    }
+    console.log('-'.repeat(20 + 11 + 11 + 8 + 8));
+    console.log(
+      pad('ALL', 20) + padL(allItems.toLocaleString(), 11) + padL(allFish.toLocaleString(), 11) +
+      padL((allFish / allItems).toFixed(2), 8) + padL(median(allPer).toFixed(2), 8)
+    );
+    const hist = {};
+    for (const v of allPer) hist[v] = (hist[v] || 0) + 1;
+    console.log('  per-item cost dist: ' +
+      Object.keys(hist).sort((a, b) => a - b).map(c => `${c}🐟:${(100 * hist[c] / allPer.length).toFixed(1)}%`).join('  '));
+  }
+  MATCOST_ACTIVE = false;
+  console.log('\nNote: per-item 🐟 cost = river-slot cost (River N = N+1; Headwaters = 1), min 1 after discounts.');
+  console.log('  "(wild:X)" rows are wildcard cards (Driftwood Tangle etc.); Confluence combined auctions excluded.');
 }
