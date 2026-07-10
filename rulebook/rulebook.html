@@ -1223,8 +1223,11 @@
 </p>
 <p>
   Spending or recalling a worker from a river card does <em>not</em> move the card — it just leaves
-  a blank on the icon. The card keeps sliding as normal. New material cards only enter the river by
-  being pulled out of the Headwaters.
+  a blank on the icon, and the card keeps sliding as normal. The one exception: if covering an icon
+  (with a blank or a worker) leaves the card with no uncovered icons at all, it has nothing left to
+  auction and leaves the river immediately — to the shoreline if it still holds any workers, or out of
+  the game entirely if it holds none. New material cards only enter the river by being pulled out of
+  the Headwaters.
 </p>
 
 <h3>A worked auction</h3>
@@ -1551,7 +1554,7 @@
     <ul style="font-size: 9.5pt;">
       <li>Only the auctioned card moves.</li>
       <li>Icons still uncovered → slide one space downstream.</li>
-      <li>All icons claimed → straight to shoreline.</li>
+      <li>All icons covered (workers or blanks) → leaves the river: shoreline if it has workers, else removed.</li>
       <li>From River 4 → shoreline.</li>
     </ul>
   </div>
