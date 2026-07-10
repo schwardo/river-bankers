@@ -69,6 +69,19 @@ function rbEffectiveBuildCost(cost, flags, wbm) {
     return eff;
 }
 
+// The 🐟 a build advances you, mirroring Effects::buildFishCost: printed time
+// minus Lodge Foundation (Logs builds) and Log Flume (any build) discounts, but
+// never below 1 (a 0-time build is never discounted up to 1). `builtNames` is the
+// list of the builder's built-structure names.
+function rbBuildFishCost(card, builtNames) {
+    const time = Number(card.time) || 0;
+    if (time < 1) return time;
+    let discount = 0;
+    if ((card.cost || {}).logs > 0 && builtNames.includes('Lodge Foundation')) discount += 1;
+    if (builtNames.includes('Log Flume')) discount += 3;
+    return Math.max(1, time - discount);
+}
+
 // Per-material "have" count after greedily assigning wild-pool workers to the
 // material with the largest remaining deficit (same order the real build uses).
 function rbEffectiveCoverage(targetCost, wbm) {
@@ -346,15 +359,17 @@ class PlayerTurn {
         }
         this.bga.statusBar.addActionButton(_('Invent structure cards (pay 2-5 🐟)'), () => this.enterInvent());
         if (a.canFlush && a.canTriggerAuction) {
-            this.bga.statusBar.addActionButton(_('Flush Headwaters (5🐟)'), () => this.bga.actions.performAction('actFlush'), { color: 'secondary' });
+            this.bga.statusBar.addActionButton(_('Flush Headwaters (5🐟)'), () => this.game.confirmFishCross(
+                5, _('Flush Headwaters (5🐟)'), () => this.bga.actions.performAction('actFlush')), { color: 'secondary' });
         }
         if (a.canRetire) {
             this.bga.statusBar.addActionButton(_('Retire'), () => this.bga.actions.performAction('actRetire'), { color: 'secondary' });
         }
         (a.abilities || []).forEach(ab => {
             const label = ab.name + (ab.cost ? ' (' + ab.cost + '🐟)' : '') + (ab.once ? ' ⚡' : '');
-            this.bga.statusBar.addActionButton(label,
-                () => this.bga.actions.performAction('actUseAbility', { ability: ab.key }), { color: 'secondary' });
+            this.bga.statusBar.addActionButton(label, () => this.game.confirmFishCross(
+                Number(ab.cost) || 0, ab.name,
+                () => this.bga.actions.performAction('actUseAbility', { ability: ab.key })), { color: 'secondary' });
         });
     }
 
@@ -387,7 +402,8 @@ class PlayerTurn {
         const msg = `${verb} <b>${c.name}</b> (${mat})?<br>`
             + `${c.uncovered} ${_('open item(s)')}<br>`
             + `${_('Cost to auction:')} ${triggerCost} 🐟<br>`
-            + `${_('Cost per item:')} ${perItem} 🐟`;
+            + `${_('Cost per item:')} ${perItem} 🐟`
+            + this.game.fishCrossNote(triggerCost);
         this.bga.dialogs.confirmation(msg).then(ok => {
             if (ok) this.bga.actions.performAction(kind === 'pull' ? 'actPull' : 'actAuction', { cardId });
         });
@@ -425,25 +441,39 @@ class PlayerTurn {
                 _('You are short') + ' ' + costStr(short) + ' ' + _('to build') + ' ' + card.name + '.', 'error');
             return;
         }
-        const msg = `${_('Build')} <b>${card.name}</b> ${_('for')} ${costStr(eff)}?`;
+        const builtNames = ((this.game.built || {})[this.game.myId()] || []).map(b => b.name);
+        const msg = `${_('Build')} <b>${card.name}</b> ${_('for')} ${costStr(eff)}?`
+            + this.game.fishCrossNote(rbBuildFishCost(card, builtNames));
         this.bga.dialogs.confirmation(msg).then(ok => { if (ok) this.startBuild(cardId); });
     }
 
     enterBuild() {
         this.enterSubMode(_('Build — select a structure from your hand'),
             _('Click a hand card to build it (pays its printed 🐟 cost in materials).'));
-        this.game.markClickable('hand', this.args.handStructureIds, id => this.startBuild(id));
+        this.game.markClickable('hand', this.args.handStructureIds, id => this.guardedBuild(id));
         this.cancelButton();
     }
     // Build a chosen hand card, first walking any optional cost-modifier choices.
     startBuild(cardId) {
         launchBuildFlow(this.game, this.bga, cardId, 'actBuild', () => this.showMain());
     }
+    // Guided build (from the "Build structure card" menu → clicking a hand card):
+    // unlike the direct hand-click, this path has no cost confirmation, so guard
+    // just the fish-line crossing before launching the flow.
+    guardedBuild(cardId) {
+        const card = (this.game.lastHand || []).find(c => Number(c.id) === Number(cardId));
+        const builtNames = ((this.game.built || {})[this.game.myId()] || []).map(b => b.name);
+        const est = card ? rbBuildFishCost(card, builtNames) : 0;
+        this.game.confirmFishCross(est, _('Build') + (card ? ' ' + card.name : ''),
+            () => this.startBuild(cardId));
+    }
     enterInvent() {
         this.enterSubMode(_('Invent — how many cards?'),
             _('Draw N structure cards then discard N; pay N 🐟.'));
         for (let n = 2; n <= 5; n++) {
-            this.bga.statusBar.addActionButton(n + ' (' + n + '🐟)', () => this.bga.actions.performAction('actInvent', { n }), { color: 'secondary' });
+            this.bga.statusBar.addActionButton(n + ' (' + n + '🐟)', () => this.game.confirmFishCross(
+                n, _('Invent') + ' ' + n + ' (' + n + '🐟)',
+                () => this.bga.actions.performAction('actInvent', { n })), { color: 'secondary' });
         }
         this.cancelButton();
     }
@@ -876,8 +906,18 @@ class Auction {
         if (a.lotCardId2) lot += ' + ' + lotDesc(a.lotCardId2);
         this.bga.statusBar.setTitle(_('How many workers would you like to send for ') + lot + ' ?');
         this.game.setHint(_('Bid up to ') + maxBid + _(' workers (this lot has ') + a.open + _(' open icons).'));
+        // Upper-bound the fish cost of an N-worker bid: rate is the lot's printed
+        // positional rate (slot+1), combined lots use the cheaper of the two, and
+        // billable workers <= bid. Per-player discounts (applied server-side) only
+        // lower it, so this over-estimates — the dialog says "up to".
+        const rateOf = id => { const c = this.game.cardById(id); return c ? (Number(c.slot) || 0) + 1 : 1; };
+        let rate = rateOf(a.lotCardId);
+        if (a.lotCardId2) rate = Math.min(rate, rateOf(a.lotCardId2));
         for (let b = minBid; b <= maxBid; b++) {
-            this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.bga.actions.performAction('actBid', { workers: b }));
+            const est = b * rate;
+            this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.game.confirmFishCross(
+                est, _('Bid ') + b + _(' worker(s)'),
+                () => this.bga.actions.performAction('actBid', { workers: b }), true));
         }
         if (this.game.myRecallTargets(a.lotCardId).length) {
             this.bga.statusBar.addActionButton(_('Recall Workers'), () => this.enterRecall(), { color: 'secondary' });
@@ -917,9 +957,14 @@ class DeferBid {
         if (!isActive) return;
         const minBid = (this.game.myId() === Number(args.triggerPlayer)) ? 1 : 0;
         this.game.setHint(_('You bid last. Revealed bids — ') + revealed);
+        const rateOf = id => { const c = this.game.cardById(id); return c ? (Number(c.slot) || 0) + 1 : 1; };
+        let rate = rateOf(args.lotCardId);
+        if (args.lotCardId2) rate = Math.min(rate, rateOf(args.lotCardId2));
         for (let b = minBid; b <= args.maxBid; b++) {
-            this.bga.statusBar.addActionButton(_('Bid ') + b,
-                () => this.bga.actions.performAction('actDeferredBid', { workers: b }));
+            const est = b * rate;
+            this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.game.confirmFishCross(
+                est, _('Bid ') + b + _(' worker(s)'),
+                () => this.bga.actions.performAction('actDeferredBid', { workers: b }), true));
         }
     }
     onLeavingState() { this.game.clearClickable(); }
@@ -1566,6 +1611,35 @@ export class Game {
             .find(c => c.id === Number(id)) || null;
     }
     mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
+    myFish() { const p = this.players[this.myId()]; return p ? Number(p.fish) || 0 : 0; }
+    amRetired() { const p = this.players[this.myId()]; return p ? !!Number(p.retired) : false; }
+    // Fish-line guard. If an action's fish cost would move me to or past the
+    // finish line (retiring my beaver — no more turns), confirm before committing.
+    // estCost may be an upper bound: auction bids don't know rivals' sealed bids,
+    // and rates ignore per-player discounts (which only lower the cost), so pass
+    // approx=true there and the dialog says "up to". Below the line, or already
+    // retired, we just proceed(). Mirrors the server's inclusive `fish >= FISH_LINE`
+    // retirement check (NextPlayer.php).
+    confirmFishCross(estCost, label, proceed, approx = false) {
+        const line = Number(this.fishLine) || 90;
+        const projected = this.myFish() + Math.max(0, Number(estCost) || 0);
+        if (this.amRetired() || projected < line) { proceed(); return; }
+        const amt = approx ? (_('up to') + ' ') : '';
+        const msg = `<b>${label}</b><br>`
+            + _('This moves you to') + ` ${amt}<b>${projected}🐟</b> `
+            + _('of the') + ` ${line}🐟 ` + _('finish line, retiring your beaver (no more turns).')
+            + `<br>${_('Continue?')}`;
+        this.bga.dialogs.confirmation(msg).then(ok => { if (ok) proceed(); });
+    }
+    // A one-line warning to append to an existing confirmation dialog when a
+    // fish cost of `estCost` would move me to/past the finish line. Empty string
+    // otherwise (or if already retired), so it drops cleanly into any message.
+    fishCrossNote(estCost) {
+        const line = Number(this.fishLine) || 90;
+        const projected = this.myFish() + Math.max(0, Number(estCost) || 0);
+        if (this.amRetired() || projected < line) return '';
+        return `<br>⚠️ ${_('This retires your beaver')} (${projected}🐟 ≥ ${line}🐟) — ${_('no more turns.')}`;
+    }
     // River OR shoreline cards (excluding the auction lot) where I have a worker
     // to recall. Shoreline recalls drop no blank (handled server-side).
     myRecallTargets(lotCardId) {
