@@ -82,14 +82,23 @@ export async function listMyTables(cfg, { pageSize = 100, maxPages = 100 } = {})
     const data = await getJson(cfg, '/gamestats/gamestats/getGames.html', {
       player: cfg.playerId,
       game_id: cfg.gameId,
+      updateStats: 1, // mandatory arg; tells BGA to (re)compute the player's stat rollup
       finished: 1,
       start: page * pageSize,
     });
     // BGA wraps payloads as { status, data: {...} }. The table list lives under
     // data.tables (a map or array depending on endpoint version).
-    const tablesRaw = data?.data?.tables ?? data?.data?.games ?? data?.tables ?? [];
-    const rows = Array.isArray(tablesRaw) ? tablesRaw : Object.values(tablesRaw);
-    if (!rows.length) break;
+    const tablesRaw = data?.data?.tables ?? data?.data?.games ?? data?.tables ?? null;
+    const rows = tablesRaw == null ? [] : (Array.isArray(tablesRaw) ? tablesRaw : Object.values(tablesRaw));
+    if (!rows.length) {
+      if (page === 0) {
+        // Nothing found on the first page — surface the actual shape so we can map it.
+        console.warn('  getGames returned no recognizable table list. Response shape:');
+        console.warn('    top keys:', Object.keys(data || {}));
+        console.warn('    data keys:', Object.keys(data?.data || {}));
+      }
+      break;
+    }
     for (const r of rows) {
       const id = r.table_id ?? r.id ?? r.table;
       if (id != null) ids.push(String(id));
