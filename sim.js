@@ -497,6 +497,15 @@ function setDeviant(idx, mode) { DEVIANT_IDX = idx; DEVIANT_MODE = mode || null;
 let BID_CONTENTION_K = process.env.BID_K !== undefined ? Number(process.env.BID_K) : 1;
 function setBidContentionK(k) { BID_CONTENTION_K = k; }
 
+// Naive-bidder mode (NAIVE_BID=1): the player bids purely on its own hand's
+// material deficit, limited only by the icons still open and the workers it can
+// physically marshal (recalling freely). It ignores (a) worker economy — no
+// safe/fallback rationing to protect build plans — and (b) opponents entirely —
+// no contention discount, no most-workers race. Meant to model an unsophisticated
+// human; compare against real BGA games via `NAIVE_BID=1 node compare.mjs`.
+let NAIVE_BID = process.env.NAIVE_BID === '1';
+function setNaiveBid(v) { NAIVE_BID = !!v; }
+
 // Live rule: ANY plenty-to-go-around with leftover icons slides the card one
 // slot downstream (pre→R1, R1→R2, ..., R4→shore) instead of graduating it to
 // the shoreline directly. Cards only go to the shoreline when no icons remain
@@ -1764,6 +1773,20 @@ function aiDecideBid(state, playerIdx, card, minBid) {
     need += cardNeed;
     if (cardNeed > maxNeed) maxNeed = cardNeed;
   }
+  // Naive bidder: grab exactly the hand's deficit for this material, capped only
+  // by open icons and workers we can physically marshal (recall freely). Skip all
+  // the worker-rationing and opponent-modeling that follows.
+  if (NAIVE_BID) {
+    let t = Math.max(minBid, Math.min(need, open, totalPool));
+    let nr = t - p.supply;
+    if (nr > 0) {
+      const tookSafe = aiRecallFromList(state, playerIdx, safe, nr);
+      nr -= tookSafe;
+      if (nr > 0) aiRecallFromList(state, playerIdx, fallback, nr);
+    }
+    return Math.min(t, p.supply);
+  }
+
   let target = Math.round((need + maxNeed) / 2);
   target = Math.min(target, safePool, open, 4);
   // Use the player-specific per-item cost so Reed Bed makes reed auctions more attractive.
