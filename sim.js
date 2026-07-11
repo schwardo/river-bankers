@@ -84,7 +84,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, when building, 1 of your Stones workers may substitute for any other material.' },
   // Muskrat (Mud bias)
   { name: 'Mud Burrow',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Mud icons cost you 1 less fish per item (min 1).' },
-  { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'At the start of your turn, you may pay 1 fish to discard 1 worker from any Reeds river card (not a wild card); it returns to that player\'s supply without a blank.' },
+  { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 1, species: 'muskrat', effect: 'At the start of your turn, you may pay 1 fish to discard 1 worker from any Reeds river card (not a wild card); it returns to that player\'s supply without a blank.' },
   { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 2, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
   // Mink (Clay bias)
   { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 2 less fish per item (min 1).' },
@@ -7336,6 +7336,11 @@ if (require.main === module) {
   // RB_FORCE_CC=1 forces every muskrat to draft Channel Clearer (measurement
   // tool for the fish-cost experiment; otherwise the AI drafts Mud Burrow).
   if (process.env.RB_FORCE_CC === '1') setForcedSpeciesStarter({ muskrat: 'Channel Clearer' });
+  // RB_CC_VP overrides Channel Clearer's printed VP (measurement hook).
+  if (process.env.RB_CC_VP !== undefined) {
+    const cc = BASE_STRUCTURE_TEMPLATES.find(s => s.name === 'Channel Clearer');
+    if (cc) cc.vp = parseInt(process.env.RB_CC_VP, 10) || 0;
+  }
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
   else if (mode === 'bid-diag') sweepBidDiag(process.argv[3], process.argv[4]);
