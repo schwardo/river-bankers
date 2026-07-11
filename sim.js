@@ -7352,6 +7352,7 @@ function emitGames(numPArg, workersArg, nArg) {
       cardsBuilt: m.cardsBuilt,
       iconsSpawned: m.iconsSpawned,
       iconsClaimed: m.iconsClaimed,
+      iconsWon: m.iconsClaimed, // alias matching the BGA-side field name (icons a player clinched)
       iconsWastedToShore: m.iconsWastedToShore,
       invents: m.invents,
       flushes: m.flushes,
