@@ -75,28 +75,51 @@ record: what we were trying to <strong>fix</strong>, what we were trying to <str
 and why each mechanic landed where it did. The through-line is a single question we kept
 re-asking — <em>how do you price a bid when there's no money on the table?</em></p>
 
-<p class="note">River Bankers began life on [2026-05-04] as a retheme of an earlier auction design —
-turning the money players used to pay into a shared <em>fish track</em>, and the bidding tokens into
-species-themed <em>worker meeples</em>. Focused development began the next day; that's where this
-journal picks up.</p>
+<div class="phase">Phase 0 · Origins (late April)</div>
+
+<h2>Week of April 28 <span class="wk">where the auction came from</span></h2>
+
+<p>River Bankers didn't start as a river, or even as a game about building. Its core idea came from an
+earlier project I never finished: <strong>Filament</strong>, a nanotech game themed around 3-D printers
+building matter atom by atom. Filament as a whole didn't come together, but one part of it did: a
+<strong>multi-item auction</strong> I had already built and playtested. It put several items up at once
+and let players bid across them, with the tension coming from who commits to what. That part worked
+well enough to justify a game built around just that mechanic.</p>
+
+<p>Around that time, The Game Crafter announced the <strong>&ldquo;Everything Has a Price&rdquo;</strong>
+contest, an auction-design challenge. It was a good fit for the part of Filament that had been working,
+so I decided to enter. This time I wanted to keep the scope tight. Instead of carrying a whole game's
+worth of subsystems, I would slim everything down to feature the one mechanic I had already tested and
+build the smallest game around it.</p>
+
+<p>The piece I still needed was <em>cost</em>. An auction needs a price, and I didn't want to use money,
+since money makes bidding a matter of arithmetic. What worked was pairing the auction with a
+<strong>time track</strong>. You don't pay dollars, you pay <em>position</em>, and because the track is
+shared, a large bid moves you past your opponents. You can <strong>overspend</strong>, and overspending
+costs you tempo instead of cash. With those two pieces, a multi-item auction and a track you can
+overrun, the design had enough to build on, and I started looking for a theme.</p>
+
+<div class="callout">
+  <strong>Where it started.</strong> Two of River Bankers' three pillars were set before the theme
+  existed: the <em>multi-item auction</em> (later, bidding workers across a card's icons) and paying in
+  <em>time rather than money</em> (later, the fish track). The weeks that follow are mostly about
+  finding the game that best fits those two ideas.
+</div>
+
+<p class="note">On [2026-05-04] the theme arrived: a riverbank of beavers, otters, muskrats, and mink.
+The money became a shared <em>fish track</em>, the bidding tokens became species-themed <em>worker
+meeples</em>, and focused development began the next day, where the rest of this journal picks up.</p>
 
 <div class="phase">Phase I · Core engine (May)</div>
 
 <h2>Week of May 5 <span class="wk">— the auction skeleton</span></h2>
 
-<p>The founding idea landed fully formed: <strong>there is no money.</strong> Instead of paying
-dollars to a bank, players spend <strong>fish</strong> by advancing a pawn along a shared track,
-and turn order <em>is</em> the track — whoever's pawn sits farthest back acts next. Cost never
-gates a bid; it only buries you deeper in the turn queue. Workers do double duty as both bid
-tokens and inventory: place them on a material card to win icons, and they sit there until you
-spend them building.</p>
-
-<div class="callout">
-  <strong>The core tension we were chasing:</strong> every bid should hurt in <em>time</em>, not
-  cash. A big grab is powerful but sends you to the back of the line, so several opponents act
-  before you do again. Patience — small bids that keep your pawn forward — buys you tempo. The
-  whole economy is a bet on when you'd rather act.
-</div>
+<p>The week before had settled the two core ideas; this week turned them into something playable. Turn
+order became the track itself: whoever's pawn sits farthest back acts next, so a bid is never blocked
+by its cost, it only pushes you deeper into the queue. A big grab is still powerful, but it sends you
+to the back of the line while several opponents act, so keeping small and forward buys you tempo.
+Workers did double duty as bid tokens and inventory, sitting on a material card once they win its icons
+until you spend them building.</p>
 
 <p>By the end of the first week the spine was in place: a <strong>pre-river auction</strong> feeding
 a four-slot river, <strong>slot-based pricing</strong> (cards carry no printed cost — fish is paid
@@ -116,8 +139,7 @@ fixes:</p>
 spread, and — crucially — we <strong>wrote a simulator</strong> that could play thousands of games
 against itself, giving us hard data on balance instead of guesswork. A sixth material
 (<strong>clay</strong>) replaced an awkward "fish material," giving three natural wildcard pairs. The
-pre-river queue got its lasting name — <strong>Headwaters</strong> — and the time track became the
-<strong>Fish Track</strong>.</p>
+pre-river queue also got its lasting name this week: <strong>Headwaters</strong>.</p>
 
 <h3>Structure effects, in three phases <span class="tag">the build side</span></h3>
 <p>Materials are only half the game; the other half is <em>building</em>. We designed the structure-card
