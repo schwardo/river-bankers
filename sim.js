@@ -274,6 +274,7 @@ function tryHollowedLog(state, playerIdx) {
   if (target.workers[playerIdx] === 0) delete target.workers[playerIdx];
   p.supply += 1;
   p.hollowedLogUsed = true;
+  noteRecall(state);
   noteEffectUse(state, 'Hollowed-out Log');
 }
 
@@ -1072,6 +1073,7 @@ function newGame(numPlayers, workersPerPlayer = null) {
       cardsBuilt: 0,
       invents: 0, // count of Invent (browse) actions taken across the game
       flushes: 0, // count of Flush actions taken across the game
+      workersRecalled: 0, // total workers pulled back to supply (matches BGA recallWorker: pre-auction recall, Hollowed-out Log, Tribute Stone, Snare Set, Trading Post, Channel Clearer)
       endgameTriggered: false,
       // Endgame action breakdown (counted only between triggerEndgame and game end)
       endgameTurns: 0,
@@ -1105,6 +1107,9 @@ function newGame(numPlayers, workersPerPlayer = null) {
 function noteEffectUse(state, name) {
   const u = state.metrics.effectUses;
   u[name] = (u[name] || 0) + 1;
+}
+function noteRecall(state, n = 1) {
+  state.metrics.workersRecalled += n;
 }
 function noteBlanks(state) {
   let total = 0;
@@ -1351,6 +1356,7 @@ function callWorkersHome(state, playerIdx, recallSpec) {
     total += take;
   }
   noteBlanks(state);
+  if (total > 0) noteRecall(state, total);
   // Streambank Hollow: slide back 1 fish per worker recalled.
   if (total > 0 && hasEffect(p, 'Streambank Hollow')) {
     p.timePos = Math.max(0, p.timePos - total);
@@ -2185,6 +2191,7 @@ function doTributeStone(state, playerIdx, victimIdx, card) {
   victim.supply += 1;
   victim.timePos = Math.max(0, victim.timePos - 3);
   p.tributeStoneUsed = true;
+  noteRecall(state);
   return true;
 }
 
@@ -2239,6 +2246,7 @@ function doTradingPost(state, playerIdx, action) {
     if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
     if (TRADE_POST_DROPS_BLANKS && typeof c.slot === 'number') c.blanks += 1;
     p.supply += 1;
+    noteRecall(state);
   }
   // Pay 1 fish and place 2 workers on the target card's uncovered icons.
   p.timePos += 1;
@@ -2297,6 +2305,7 @@ function doSnareSet(state, playerIdx, victimIdx, card) {
   victim.supply += 1;
   victim.timePos = Math.max(0, victim.timePos - 3);
   p.snareSetUsed = true;
+  noteRecall(state);
   return true;
 }
 
@@ -2578,6 +2587,7 @@ function aiStartOfTurnAbilities(state, playerIdx) {
       pick.card.workers[pick.victimIdx] -= 1;
       if (pick.card.workers[pick.victimIdx] === 0) delete pick.card.workers[pick.victimIdx];
       state.players[pick.victimIdx].supply += 1;
+      noteRecall(state);
       noteEffectUse(state, 'Channel Clearer');
     }
   }
@@ -7356,6 +7366,7 @@ function emitGames(numPArg, workersArg, nArg) {
       iconsWastedToShore: m.iconsWastedToShore,
       invents: m.invents,
       flushes: m.flushes,
+      workersRecalled: m.workersRecalled,
       endgameTriggered: m.endgameTriggered ? 1 : 0,
       winnerVP: m.winnerVP,
       runnerUpVP: m.runnerUpVP,

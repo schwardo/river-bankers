@@ -135,10 +135,11 @@ class Game extends \Bga\GameFramework\Table
         $this->playerStats->init([
             'turns', 'fish_spent', 'structures_built', 'auctions_triggered',
             'auctions_won', 'icons_won', 'inventions', 'flushes', 'abilities_used',
+            'workers_recalled',
         ], 0);
         $this->tableStats->init([
             'turns', 'fish_spent', 'structures_built', 'auctions_triggered', 'icons_won',
-            'plenty_auction', 'jammed_auctions', 'fully_jammed_auctions',
+            'plenty_auction', 'jammed_auctions', 'fully_jammed_auctions', 'workers_recalled',
         ], 0);
 
         $numPlayers = count($players);
@@ -464,6 +465,12 @@ class Game extends \Bga\GameFramework\Table
      */
     public function recallWorker(int $playerId, int $cardId, bool $dropBlank = true): void
     {
+        $this->playerStats->inc('workers_recalled', 1, $playerId, true);
+        // Silent stream marker (no client message) so offline analysis can count
+        // recalls per player from the notification log — every recall path funnels
+        // through here (pre-auction recall, Trading Post, Hollowed-out Log, Tribute
+        // Stone, Snare Set, Channel Clearer).
+        $this->notify->all('workerRecalled', '', ['player_id' => $playerId, 'card_id' => $cardId]);
         $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $playerId AND `card_id` = $cardId");
         $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $cardId AND `workers` <= 0");
         $this->DbQuery("UPDATE `player` SET `player_worker_supply` = `player_worker_supply` + 1 WHERE `player_id` = $playerId");

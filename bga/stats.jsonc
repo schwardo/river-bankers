@@ -11,7 +11,8 @@
         "icons_won":             { "id": 14, "name": "Material icons won", "type": "int" },
         "plenty_auction":        { "id": 15, "name": "Auctions with plenty (no overbid)", "type": "int" },
         "jammed_auctions":       { "id": 16, "name": "Jammed auctions (overbid)",         "type": "int" },
-        "fully_jammed_auctions": { "id": 17, "name": "Auctions won by nobody",            "type": "int" }
+        "fully_jammed_auctions": { "id": 17, "name": "Auctions won by nobody",            "type": "int" },
+        "workers_recalled":      { "id": 18, "name": "Workers recalled",                  "type": "int" }
     },
 
     // Statistics for each player.
@@ -24,6 +25,7 @@
         "icons_won":          { "id": 15, "name": "Material icons won",      "type": "int" },
         "inventions":         { "id": 16, "name": "Invent actions",          "type": "int" },
         "flushes":            { "id": 17, "name": "Headwaters flushes",      "type": "int" },
-        "abilities_used":     { "id": 18, "name": "Abilities used",          "type": "int" }
+        "abilities_used":     { "id": 18, "name": "Abilities used",          "type": "int" },
+        "workers_recalled":   { "id": 19, "name": "Workers recalled",        "type": "int" }
     }
 }

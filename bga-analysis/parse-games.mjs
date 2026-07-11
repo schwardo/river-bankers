@@ -101,9 +101,9 @@ function extractScores(notifs, players) {
 // previous auction when the next `auctionBids` (or end of stream) arrives.
 function reconstructFromStream(notifs) {
   let turns = 0, auctions = 0, jam = 0, plenty = 0, noBid = 0, noWinner = 0;
-  let iconsWon = 0, cardsBuilt = 0, invents = 0, flushes = 0, abilitiesUsed = 0;
+  let iconsWon = 0, cardsBuilt = 0, invents = 0, flushes = 0, abilitiesUsed = 0, workersRecalled = 0;
   const per = {}; // pid → per-player counters
-  const P = (pid) => (per[pid] ??= { auctionsTriggered: 0, auctionsWon: 0, iconsWon: 0, invents: 0, flushes: 0, abilitiesUsed: 0 });
+  const P = (pid) => (per[pid] ??= { auctionsTriggered: 0, auctionsWon: 0, iconsWon: 0, invents: 0, flushes: 0, abilitiesUsed: 0, workersRecalled: 0 });
 
   let curBidSum = null, curMaxClinch = 0;
   const closeAuction = () => {
@@ -149,11 +149,14 @@ function reconstructFromStream(notifs) {
       case 'abilityUsed':
         abilitiesUsed++; if (pid) P(pid).abilitiesUsed++;
         break;
+      case 'workerRecalled': // one per recall (silent marker); pid is the recalled worker's owner
+        workersRecalled++; if (pid) P(pid).workersRecalled++;
+        break;
     }
   }
   closeAuction();
   return {
-    game: { turns, auctions, jam, plenty, noBid, noWinner, iconsWon, cardsBuilt, invents, flushes, abilitiesUsed },
+    game: { turns, auctions, jam, plenty, noBid, noWinner, iconsWon, cardsBuilt, invents, flushes, abilitiesUsed, workersRecalled },
     perPlayer: per,
   };
 }
@@ -203,6 +206,7 @@ function parseGame(tableId) {
     noWinnerAuctions: m(s.noWinner),
     cardsBuilt: m(s.cardsBuilt),
     iconsWon: m(s.iconsWon),
+    workersRecalled: m(s.workersRecalled),
     fishSpent: null, // not reliably reconstructable from the public stream
     // Scoring (from finalScores packet, else tableinfos player scores)
     winnerVP: vps[0] ?? null,
@@ -222,10 +226,10 @@ function parseGame(tableId) {
 // --- CSV ------------------------------------------------------------------------
 
 const GAME_COLS = ['tableId', 'date', 'numP', 'workers', 'turns', 'auctions', 'jamAuctions',
-  'plentyAuctions', 'noBidAuctions', 'noWinnerAuctions', 'cardsBuilt', 'iconsWon', 'fishSpent',
+  'plentyAuctions', 'noBidAuctions', 'noWinnerAuctions', 'cardsBuilt', 'iconsWon', 'workersRecalled', 'fishSpent',
   'winnerVP', 'runnerUpVP', 'loserVP', 'vpSpread', 'winMargin', 'totalVP', 'hasLog'];
 const PLAYER_COLS = ['tableId', 'pid', 'name', 'rank', 'finalVP', 'auctionsTriggered',
-  'auctionsWon', 'iconsWon', 'invents', 'flushes', 'abilitiesUsed', 'fishSpent'];
+  'auctionsWon', 'iconsWon', 'invents', 'flushes', 'abilitiesUsed', 'workersRecalled', 'fishSpent'];
 
 const csvCell = (v) => {
   if (v == null) return '';

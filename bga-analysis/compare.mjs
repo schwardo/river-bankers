@@ -25,7 +25,7 @@ const SIM_GAMES = parseInt(process.argv[2]) || 3000;
 // Metrics compared, in report order. All exist in both the sim `emit` output and
 // the parsed real games.csv.
 const METRICS = ['turns', 'auctions', 'jamAuctions', 'plentyAuctions', 'noBidAuctions',
-  'noWinnerAuctions', 'cardsBuilt', 'iconsWon', 'winnerVP', 'runnerUpVP', 'loserVP',
+  'noWinnerAuctions', 'cardsBuilt', 'iconsWon', 'workersRecalled', 'winnerVP', 'runnerUpVP', 'loserVP',
   'vpSpread', 'winMargin', 'totalVP'];
 
 function readCsv(file) {

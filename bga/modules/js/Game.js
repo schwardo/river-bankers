@@ -1869,4 +1869,5 @@ export class Game {
     async notif_abilityUsed() {}
     async notif_retire() {}
     async notif_shorelinePenalty() {}
+    async notif_workerRecalled() {} // stats-only marker; the board repaints via boardUpdate
 }
