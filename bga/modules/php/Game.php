@@ -1366,6 +1366,14 @@ class Game extends \Bga\GameFramework\Table
         // The globals "cache" can be stale right after undoRestorePoint() (see the
         // framework docs), so force the pending-ability bookkeeping back to the
         // pre-ability values the savepoint already restored at the DB level.
+        // If the undone ability was a once-per-turn one, un-record its use so the
+        // player can pick it again this turn.
+        $undone = (string) $this->globals->get('pending_ability', '');
+        if ($undone !== '') {
+            $turnUsed = $this->globals->get('turn_abilities_used', []);
+            $turnUsed = array_values(array_filter($turnUsed, fn($k) => $k !== $undone));
+            $this->globals->set('turn_abilities_used', $turnUsed);
+        }
         $this->globals->set('pending_ability', '');
         $this->globals->set('pending_ability_free', 0);
         $this->globals->set('pending_ability_card', 0);
@@ -1928,11 +1936,13 @@ class Game extends \Bga\GameFramework\Table
      * Abilities the player controls (as-an-action turn abilities + unused
      * once-per-game abilities) that have a legal target.
      *
-     * @return list<array{key:string, name:string, cost:int, once:bool, repeat:bool, cardId:int}>
+     * @return list<array{key:string, name:string, cost:int, once:bool, repeat:bool, turn?:bool, cardId:int}>
      */
     public function getPlayerAbilities(int $playerId): array
     {
         $out = [];
+        // Turn abilities already used this turn (reset each turn in NextPlayer).
+        $turnUsed = $this->globals->get('turn_abilities_used', []);
         $rows = $this->getObjectListFromDB(
             "SELECT `card_id`, `card_type`, `card_type_arg`, `card_used` FROM `card`
              WHERE `card_location` = 'built' AND `card_location_arg` = $playerId"
@@ -1948,8 +1958,10 @@ class Game extends \Bga\GameFramework\Table
                 $out[] = ['key' => $aa['key'], 'name' => $name, 'cost' => $aa['cost'], 'once' => false, 'repeat' => false, 'cardId' => 0];
             }
             $ta = Effects::turnAbility($name);
-            if ($ta !== null && $this->abilityUsable($ta['key'], $playerId)) {
-                $out[] = ['key' => $ta['key'], 'name' => $name, 'cost' => $ta['cost'], 'once' => false, 'repeat' => true, 'cardId' => 0];
+            if ($ta !== null && !in_array($ta['key'], $turnUsed, true) && $this->abilityUsable($ta['key'], $playerId)) {
+                // Turn abilities (Tail Slap, Channel Clearer) are once per turn:
+                // free (don't consume the turn) but not repeatable within it.
+                $out[] = ['key' => $ta['key'], 'name' => $name, 'cost' => $ta['cost'], 'once' => false, 'repeat' => false, 'turn' => true, 'cardId' => 0];
             }
             $oa = Effects::onceAbility($name);
             if ($oa !== null && (int) $r['card_used'] === 0 && $this->abilityUsable($oa['key'], $playerId)) {
@@ -2470,7 +2482,8 @@ class Game extends \Bga\GameFramework\Table
             $ids = [];
             foreach ($this->getObjectListFromDB("SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_location` = 'river'") as $r) {
                 $def = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
-                if ($def !== null && $def['material'] === 'logs' && $this->uncoveredIcons((int) $r['card_id']) > 0) {
+                // Wildcards are never an exact-logs target (see Channel Clearer / Confluence).
+                if ($def !== null && $def['material'] === 'logs' && !isset($def['wildAlt']) && $this->uncoveredIcons((int) $r['card_id']) > 0) {
                     $ids[] = (int) $r['card_id'];
                 }
             }
@@ -2500,7 +2513,9 @@ class Game extends \Bga\GameFramework\Table
              WHERE c.`card_location` = 'river' AND w.`player_id` <> $playerId AND w.`workers` > 0"
         ) as $r) {
             $def = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
-            if ($def !== null && $def['material'] === 'reeds') {
+            // Wildcards carry two equal materials, so they are never an exact-reeds
+            // target (matches Confluence's wildAlt exclusion).
+            if ($def !== null && $def['material'] === 'reeds' && !isset($def['wildAlt'])) {
                 $ids[] = (int) $r['card_id'];
             }
         }

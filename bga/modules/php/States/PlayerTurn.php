@@ -80,11 +80,21 @@ class PlayerTurn extends GameState
         ]);
 
         $this->globals->set('pending_ability', $ability);
-        // Once-per-game and free repeatable (turn-start) abilities don't consume
+        // Once-per-game and once-per-turn (turn-start) abilities don't consume
         // the turn; only once-abilities flip their source card. As-an-action
         // abilities consume the turn.
         $repeat = (bool) ($found['repeat'] ?? false);
-        $this->globals->set('pending_ability_free', ($found['once'] || $repeat) ? 1 : 0);
+        $turn = (bool) ($found['turn'] ?? false);
+        // Turn abilities are usable once per turn — record the use so
+        // getPlayerAbilities stops offering it until the next turn.
+        if ($turn) {
+            $turnUsed = $this->globals->get('turn_abilities_used', []);
+            if (!in_array($ability, $turnUsed, true)) {
+                $turnUsed[] = $ability;
+                $this->globals->set('turn_abilities_used', $turnUsed);
+            }
+        }
+        $this->globals->set('pending_ability_free', ($found['once'] || $repeat || $turn) ? 1 : 0);
         $this->globals->set('pending_ability_card', $found['once'] ? (int) $found['cardId'] : 0);
 
         // Multi-step abilities have their own states; the rest pick a single

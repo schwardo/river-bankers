@@ -34,7 +34,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top of the material deck at any time.' },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +2 VP per shoreline card with at least one of your workers (max +6).' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build: each Reed worker counts as 2 reeds.' },
-  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any river card for 1🐟.' },
+  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any non-wild river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck; shuffle the replaced card back into the deck.' },
   { name: 'Pontoon',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 2 },            time: 4, vp: 6, effect: 'When built: activate one "when built" effect of a built structure controlled by the player to your left or right.\n\nAs an action: activate the "as an action" ability of a built structure controlled by the player to your left or right.' },
@@ -84,7 +84,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, when building, 1 of your Stones workers may substitute for any other material.' },
   // Muskrat (Mud bias)
   { name: 'Mud Burrow',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Mud icons cost you 1 less fish per item (min 1).' },
-  { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'At the start of your turn, you may discard 1 Reed worker from any river card; returns to that player\'s supply without a blank.' },
+  { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'At the start of your turn, you may pay 1 fish to discard 1 worker from any Reeds river card (not a wild card); it returns to that player\'s supply without a blank.' },
   { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 2, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
   // Mink (Clay bias)
   { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 2 less fish per item (min 1).' },
@@ -248,7 +248,7 @@ function tryWoodPile(state, playerIdx) {
   let need = 0;
   for (const s of p.hand) need = Math.max(need, Math.max(0, (s.cost.logs || 0) - (wbm.logs || 0)));
   if (need <= 0) return; // only grab a log when a hand card actually wants logs
-  const target = state.riverCards.find(c => c.material === 'logs' && uncoveredIcons(c) > 0);
+  const target = state.riverCards.find(c => c.material === 'logs' && !c.wildAlt && uncoveredIcons(c) > 0);
   if (!target) return;
   p.supply -= 1;
   target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
@@ -2227,6 +2227,16 @@ function doTributeStone(state, playerIdx, victimIdx, card) {
 // for that material, then (b) lowest worker count parked there.
 const TRADE_POST_DROPS_BLANKS = true;
 
+// Channel Clearer costs 1 fish and fires once per turn (v0.3 rule, harmonized
+// with Tail Slap). The muskrat AI only fires when the denial is worth it
+// (target reed card still has >=3 uncovered icons) and the fish is affordable.
+// RB_CC_COST / RB_CC_REPEAT env overrides remain for balance measurement:
+// RB_CC_COST=0 restores free use; RB_CC_REPEAT=1 restores the old BGA
+// repeat-per-turn behavior (both used only for the fish-cost sweeps).
+const CHANNEL_CLEARER_COST = process.env.RB_CC_COST !== undefined
+  ? (parseInt(process.env.RB_CC_COST, 10) || 0) : 1;
+const CHANNEL_CLEARER_REPEAT = process.env.RB_CC_REPEAT === '1';
+
 function findTradingPostAction(state, playerIdx) {
   const p = state.players[playerIdx];
   // Tally how much each material is needed across our current hand.
@@ -2593,25 +2603,39 @@ function aiStartOfTurnAbilities(state, playerIdx) {
     }
   }
   // Channel Clearer (muskrat species starter): discard 1 opponent Reed worker
-  // from any river card. No fish cost, no blank.
+  // from any river card, returns to supply without a blank. When
+  // CHANNEL_CLEARER_COST is 0 this is the live rule (free, once/turn, fires on
+  // any target). When >0 it's an "as an action, pay N fish" ability: only fire
+  // when the denial is worth it (target reed card still has >=3 uncovered icons)
+  // and the fish are affordable (won't cross the finish line).
   if (hasEffect(p, 'Channel Clearer')) {
-    let pick = null;
-    for (const c of state.riverCards) {
-      if (c.material !== 'reeds') continue;
-      for (const k in c.workers) {
-        const opIdx = parseInt(k);
-        if (opIdx === playerIdx || c.workers[k] <= 0) continue;
-        pick = { card: c, victimIdx: opIdx };
-        break;
+    // Repeatable (BGA) fires on every eligible target; once/turn fires on one.
+    const maxUses = CHANNEL_CLEARER_REPEAT ? Infinity : 1;
+    let uses = 0;
+    while (uses < maxUses &&
+           (CHANNEL_CLEARER_COST === 0 || p.timePos + CHANNEL_CLEARER_COST < SIM_FINISH_LINE)) {
+      let pick = null;
+      for (const c of state.riverCards) {
+        // Wildcards carry two equal materials, so they are never an exact-reeds
+        // target (matches Confluence's !wildAlt rule).
+        if (c.material !== 'reeds' || c.wildAlt) continue;
+        if (CHANNEL_CLEARER_COST > 0 && uncoveredIcons(c) < 3) continue;
+        for (const k in c.workers) {
+          const opIdx = parseInt(k);
+          if (opIdx === playerIdx || c.workers[k] <= 0) continue;
+          pick = { card: c, victimIdx: opIdx };
+          break;
+        }
+        if (pick) break;
       }
-      if (pick) break;
-    }
-    if (pick) {
+      if (!pick) break;
       pick.card.workers[pick.victimIdx] -= 1;
       if (pick.card.workers[pick.victimIdx] === 0) delete pick.card.workers[pick.victimIdx];
       state.players[pick.victimIdx].supply += 1;
+      if (CHANNEL_CLEARER_COST > 0) p.timePos += CHANNEL_CLEARER_COST;
       noteRecall(state);
       noteEffectUse(state, 'Channel Clearer');
+      uses++;
     }
   }
 }
@@ -7309,6 +7333,9 @@ function sweepWorkers(numGamesArg, numPArg, workersArg) {
 }
 
 if (require.main === module) {
+  // RB_FORCE_CC=1 forces every muskrat to draft Channel Clearer (measurement
+  // tool for the fish-cost experiment; otherwise the AI drafts Mud Burrow).
+  if (process.env.RB_FORCE_CC === '1') setForcedSpeciesStarter({ muskrat: 'Channel Clearer' });
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
   else if (mode === 'bid-diag') sweepBidDiag(process.argv[3], process.argv[4]);

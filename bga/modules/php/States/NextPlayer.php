@@ -66,6 +66,8 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         }
 
         $this->game->clearBonusTurnPlayer();
+        // New turn: clear the once-per-turn ability record (Tail Slap, Channel Clearer).
+        $this->globals->set('turn_abilities_used', []);
         $this->globals->set('turn_player', $next);
         $this->gamestate->changeActivePlayer($next);
         $this->game->giveExtraTime($next);

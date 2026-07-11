@@ -56,6 +56,44 @@
   <span class="sub">Changelog · newest version first</span>
 </div>
 
+<h2>Version v0.3 (July 2026)</h2>
+
+<p class="lead">The first balance pass driven by <strong>Alpha playtesting on BoardGameArena</strong>.
+With the game live in private Alpha, real turns surfaced a starter card that was quietly far too
+strong — and a rule fix, confirmed in simulation, brings it back into line.</p>
+
+<div class="callout">
+  <strong>Why:</strong> the BGA implementation let <strong>Channel Clearer</strong> be used
+  <em>repeatedly</em> each turn — a muskrat could clear <em>every</em> opponent Reed worker off the
+  river, every turn, for free. It felt mean and dominant in Alpha, and the simulator agreed: forcing
+  the card into play pushed the muskrat win-rate <strong>+6 points</strong> above its fair share
+  (31% at 4-player where 25% is even; 39% at 3-player where 33% is even) — well outside the
+  &plusmn;5-point balance band.
+</div>
+
+<h3>Card changes <span class="tag">before &rarr; after</span></h3>
+<ul>
+  <li><strong>Channel Clearer, reined in.</strong> Old: <em>&ldquo;At the start of your turn, you may
+      discard 1 Reed worker from any river card&hellip;&rdquo;</em> &mdash; free, and (on BGA) usable
+      as many times as there were targets. New: <em>&ldquo;At the start of your turn, you may
+      <strong>pay 1 fish</strong> to discard 1 worker from any Reeds river card (not a wild card); it
+      returns to that player&rsquo;s supply without a blank.&rdquo;</em> Two changes: it now costs
+      <strong>1 fish</strong> and fires <strong>once per turn</strong>. That harmonizes it with the
+      beaver&rsquo;s <strong>Tail Slap</strong> (the game&rsquo;s other start-of-turn ability, already
+      1&#128031; and once per turn). The wording also nails down a corner case: a
+      <strong>wild card</strong> (Driftwood Tangle, the Logs/Reeds wild) is <em>not</em> a valid target
+      &mdash; wild cards carry two equal materials and never count as an exact-material card, the same
+      rule Confluence already follows. In simulation the fixed card lands inside the balance band at
+      every player count. (Balance-checked in simulation at 3&ndash;4 players; applied consistently
+      across the physical cards, the web prototype, the simulator, and the BGA port.)</li>
+  <li><strong>Wood Pile, wording tightened.</strong> Same wildcard clean-up, applied the other
+      direction: Wood Pile now reads <em>&ldquo;claim 1 uncovered Log icon from any <strong>non-wild</strong>
+      river card for 1&#128031;.&rdquo;</em> It always excluded wild cards in spirit; the card and code now
+      say so outright, so the Logs/Reeds wild (Driftwood Tangle) is never a Wood Pile target. No change to
+      how the card plays &mdash; just the same &ldquo;wilds are never an exact-material card&rdquo; rule made
+      explicit everywhere it&rsquo;s tested.</li>
+</ul>
+
 <h2>Version v0.2 (July 2026)</h2>
 
 <p class="lead">A polish pass driven by <strong>The Game Crafter Sanity Test</strong> (77/100,

@@ -10,7 +10,7 @@
     { "name": "Stone Tool",       "species": "otter",   "vp": 0, "effect": "Once per game, when building, 1 of your Stones workers may substitute for any other material." },
 
     { "name": "Mud Burrow",       "species": "muskrat", "vp": 0, "effect": "Mud icons cost you 1 less fish per item (min 1)." },
-    { "name": "Channel Clearer",  "species": "muskrat", "vp": 0, "effect": "At the start of your turn, you may discard 1 Reed worker from any river card; returns to that player's supply without a blank." },
+    { "name": "Channel Clearer",  "species": "muskrat", "vp": 0, "effect": "At the start of your turn, you may pay 1 fish to discard 1 worker from any Reeds river card (not a wild card); it returns to that player's supply without a blank." },
     { "name": "Marsh Lookout",    "species": "muskrat", "vp": 2, "effect": "Peek at the top card of the material deck at any time." },
 
     { "name": "Clay Den",         "species": "mink",    "vp": 0, "effect": "Clay icons cost you 2 less fish per item (min 1)." },

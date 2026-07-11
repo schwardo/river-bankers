@@ -486,6 +486,58 @@ behavior explains all the rest: more jams means fewer clean auctions, fewer icon
 not a trend. The amber marker only becomes a shape of its own once several finished games stack up.
 But it's the first time real play has talked back to the model, and it had something to say.</p>
 
+<h2>Week of July 11 <span class="wk">— Alpha ships its first fix back</span></h2>
+
+<p>Last week's entry ended on a promise: now that real games talk back to the model, the model can be
+corrected. This week that happened for the first time &mdash; and it came not from the telemetry
+distributions but from a player simply <em>noticing something felt unfair</em>. The card in question is
+<strong>Channel Clearer</strong>, the muskrat starter that lets you pluck an opponent's worker off a
+Reed card and hand it back to them. On the tabletop and in the simulator it fires <em>once</em> at the
+start of your turn. But the Board Game Arena port had quietly implemented it as a <em>repeatable</em>
+turn-start ability &mdash; and for free. In Alpha a muskrat could sweep <em>every</em> opponent Reed
+worker off the river, every single turn, at no cost. It read as mean, and it played as dominant.</p>
+
+<p>The interesting part is that the simulator had never caught this, because the simulator's own draft
+AI doesn't <em>want</em> Channel Clearer &mdash; it reaches for Mud Burrow every time. So to measure
+the card at all we had to force the muskrat to run it, then compare four versions of the rule across
+four thousand games apiece:</p>
+
+<table>
+  <thead><tr><th>Rule variant</th><th>4P win% (fair = 25%)</th><th>3P win% (fair = 33%)</th></tr></thead>
+  <tbody>
+    <tr><td class="card">BGA: repeatable, free</td><td>31.1% <span class="before">(+6.1)</span></td><td>38.8% <span class="before">(+5.5)</span></td></tr>
+    <tr><td class="card">Once/turn, free</td><td>26.1% (+1.1)</td><td>36.3% (+3.0)</td></tr>
+    <tr><td class="card">Once/turn, pay 1&#128031;</td><td>23.5% (&minus;1.5)</td><td>32.8% (&minus;0.5)</td></tr>
+    <tr><td class="card">Once/turn, pay 2&#128031;</td><td>22.3% (&minus;2.8)</td><td>33.5% (+0.1)</td></tr>
+  </tbody>
+</table>
+
+<p>The repeatable version is plainly out of band &mdash; six points of free win-rate is exactly the
+&ldquo;feels unfair&rdquo; the Alpha player reported, quantified. Capping it at once per turn does the
+heavy lifting on its own. The question the player actually asked &mdash; <em>would charging fish be
+more balanced?</em> &mdash; has a subtler answer: a 1-fish cost isn't dramatically better than free, but
+it's the <em>steadiest</em> option, the only one inside &plusmn;1.5 points at <em>both</em> player
+counts. And it carries a bonus: the beaver's <strong>Tail Slap</strong>, the game's only other
+start-of-turn ability, already costs 1 fish and fires once per turn. Making Channel Clearer match it
+turns two one-off special cases into a single, learnable rule &mdash; <em>start-of-turn abilities cost a
+fish and fire once.</em></p>
+
+<p>So v0.3's headline change: Channel Clearer now reads <em>&ldquo;pay 1 fish to discard 1 worker from
+any Reeds river card (not a wild card)&hellip; once per turn.&rdquo;</em> The fix went in four places at
+once &mdash; the printed card, the web prototype, the simulator, and the BGA port &mdash; because the
+whole point of this month's work is that those four should never again disagree about what a card does.
+The first time a discrepancy between them mattered, it cost a muskrat's opponents a fair game; the
+telemetry pipeline exists so the next one gets caught in software instead of at the table.</p>
+
+<p>Writing the fix surfaced a smaller, sharper question: does &ldquo;a Reeds card&rdquo; include
+<strong>Driftwood Tangle</strong>, the Logs/Reeds <em>wild</em>? The honest answer is that a wild card
+has no primary material &mdash; its two materials are equal &mdash; so it shouldn't count as an exact
+&ldquo;Reeds card&rdquo; at all, and Confluence had already settled this precedent by refusing wilds as
+same-material pairs. The lesson generalized into a rule for the whole codebase: <em>any effect that
+tests a card's material must decide, explicitly, whether wilds are in or out</em> &mdash; never lean on
+which of a wild's two materials happens to be printed first. Channel Clearer now excludes them by name,
+in code and on the card.</p>
+
 <div class="footer">
   River Bankers — a design journal · a week-by-week look back at the game's development ·
   entries oldest-first, one heading per calendar week.

@@ -189,7 +189,7 @@ final class Effects
      */
     public const TURN_ABILITIES = [
         'Tail Slap'       => ['key' => 'tailslap', 'cost' => 1],       // drop a blank on a River-1 card
-        'Channel Clearer' => ['key' => 'channelclearer', 'cost' => 0], // discard an opponent's Reed worker
+        'Channel Clearer' => ['key' => 'channelclearer', 'cost' => 1], // pay 1🐟, discard an opponent's Reed worker
     ];
 
     /** @return array{key:string, cost:int}|null */

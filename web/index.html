@@ -1850,7 +1850,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top of the material deck at any time.' },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +2 VP per shoreline card with at least one of your workers (max +6).' },
   { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build: each Reed worker counts as 2 reeds.' },
-  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any river card for 1🐟.' },
+  { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any non-wild river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck; shuffle the replaced card back into the deck.' },
   { name: 'Pontoon',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
   { name: 'Mill Wheel',     cost: { logs: 3, stones: 2 },            time: 4, vp: 6, effect: 'When built: activate one "when built" effect of a built structure controlled by the player to your left or right.\n\nAs an action: activate the "as an action" ability of a built structure controlled by the player to your left or right.' },
@@ -1900,7 +1900,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, when building, 1 of your Stones workers may substitute for any other material.' },
   // Muskrat (Mud bias)
   { name: 'Mud Burrow',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Mud icons cost you 1 less fish per item (min 1).' },
-  { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'At the start of your turn, you may discard 1 Reed worker from any river card; returns to that player\'s supply without a blank.' },
+  { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'At the start of your turn, you may pay 1 fish to discard 1 worker from any Reeds river card (not a wild card); it returns to that player\'s supply without a blank.' },
   { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 2, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
   // Mink (Clay bias)
   { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 2 less fish per item (min 1).' },
@@ -3693,11 +3693,12 @@ function renderActionPanel() {
       const anyR1Open = state.riverCards.some(c => c.slot === 0 && uncoveredIcons(c) > 0);
       if (anyR1Open) abilityBtns.push(`<button class="ability-btn" onclick="humanUseTailSlap()">🦫 Tail Slap (1🐟): drop blank on a R1 card</button>`);
     }
-    // Channel Clearer (muskrat species starter): free per-turn opponent Reed worker discard.
-    if (hasEffect(cur, 'Channel Clearer')) {
+    // Channel Clearer (muskrat species starter): pay 1🐟 to discard an opponent
+    // Reed worker. Once per turn.
+    if (hasEffect(cur, 'Channel Clearer') && !cur.ccUsedThisTurn && canAffordTimeCost(cur, 1)) {
       const anyOppReed = state.riverCards.some(c =>
-        c.material === 'reeds' && Object.keys(c.workers).some(k => parseInt(k) !== cur.idx && c.workers[k] > 0));
-      if (anyOppReed) abilityBtns.push(`<button class="ability-btn" onclick="humanUseChannelClearer()">🐭 Channel Clearer (free): discard an opponent Reed worker</button>`);
+        c.material === 'reeds' && !c.wildAlt && Object.keys(c.workers).some(k => parseInt(k) !== cur.idx && c.workers[k] > 0));
+      if (anyOppReed) abilityBtns.push(`<button class="ability-btn" onclick="humanUseChannelClearer()">🐭 Channel Clearer (1🐟): discard an opponent Reed worker</button>`);
     }
     // Rolling Float (otter species starter): once-per-game free same-slot swap.
     if (hasEffect(cur, 'Rolling Float') && !cur.rollingFloatUsed) {
@@ -3715,7 +3716,7 @@ function renderActionPanel() {
     }
     // Reworked once-per-game cards.
     if (hasEffect(cur, 'Wood Pile') && !cur.woodPileUsed && cur.supply > 0 &&
-        state.riverCards.some(c => c.material === 'logs' && uncoveredIcons(c) > 0)) {
+        state.riverCards.some(c => c.material === 'logs' && !c.wildAlt && uncoveredIcons(c) > 0)) {
       abilityBtns.push(`<button class="ability-btn" onclick="humanUseWoodPile()">${MATERIALS.logs.icon} Wood Pile (once per game, 1🐟): claim a Log icon</button>`);
     }
     if (hasEffect(cur, 'Hollowed-out Log') && !cur.hollowedLogUsed &&
@@ -5531,12 +5532,14 @@ function aiStartOfTurnAbilities(playerIdx) {
       log(`🦫 Tail Slap: ${speciesLabel(p)} drops a blank on R1 ${MATERIALS[target.material].name} (+1🐟).`);
     }
   }
-  // Channel Clearer (muskrat species starter): discard 1 opponent Reed worker
-  // from any river card. No fish cost, no blank.
-  if (hasEffect(p, 'Channel Clearer')) {
+  // Channel Clearer (muskrat species starter): pay 1🐟 to discard 1 opponent
+  // Reed worker (returns to supply, no blank). Once per turn; AI only fires when
+  // the denial is worth it (target reed card still has >=3 uncovered icons).
+  if (hasEffect(p, 'Channel Clearer') && canAffordTimeCost(p, 1)) {
     let pick = null;
     for (const c of state.riverCards) {
-      if (c.material !== 'reeds') continue;
+      // Wildcards (two equal materials) are never an exact-reeds target.
+      if (c.material !== 'reeds' || c.wildAlt || uncoveredIcons(c) < 3) continue;
       for (const k in c.workers) {
         const opIdx = parseInt(k);
         if (opIdx === playerIdx || c.workers[k] <= 0) continue;
@@ -5549,7 +5552,8 @@ function aiStartOfTurnAbilities(playerIdx) {
       pick.card.workers[pick.victimIdx] -= 1;
       if (pick.card.workers[pick.victimIdx] === 0) delete pick.card.workers[pick.victimIdx];
       state.players[pick.victimIdx].supply += 1;
-      log(`🐭 Channel Clearer: ${speciesLabel(p)} clears 1 Reed worker from ${speciesLabel(state.players[pick.victimIdx])}.`);
+      p.timePos += 1;
+      log(`🐭 Channel Clearer: ${speciesLabel(p)} clears 1 Reed worker from ${speciesLabel(state.players[pick.victimIdx])} (+1🐟).`);
     }
   }
   // Rolling Float (otter species starter): once-per-game free same-slot swap.
@@ -5604,7 +5608,7 @@ function aiTryWoodPile(playerIdx) {
   let need = 0;
   for (const s of p.hand) need = Math.max(need, Math.max(0, (s.cost.logs || 0) - (wbm.logs || 0)));
   if (need <= 0) return;
-  const target = state.riverCards.find(c => c.material === 'logs' && uncoveredIcons(c) > 0);
+  const target = state.riverCards.find(c => c.material === 'logs' && !c.wildAlt && uncoveredIcons(c) > 0);
   if (!target) return;
   p.supply -= 1;
   target.workers[playerIdx] = (target.workers[playerIdx] || 0) + 1;
@@ -5785,7 +5789,7 @@ async function humanUseHeronRoost() {
 async function humanUseWoodPile() {
   const h = state.players.find(p => p.isHuman);
   if (!h || !hasEffect(h, 'Wood Pile') || h.woodPileUsed || h.supply <= 0) return;
-  const cands = state.riverCards.filter(c => c.material === 'logs' && uncoveredIcons(c) > 0);
+  const cands = state.riverCards.filter(c => c.material === 'logs' && !c.wildAlt && uncoveredIcons(c) > 0);
   if (!cands.length) return;
   const pick = await pickFromList('🪵 Wood Pile — claim a Log icon',
     'Place 1 worker on a Log river card for 1🐟. (Once per game.)', cands,
@@ -6069,7 +6073,7 @@ async function humanUseChannelClearer() {
   if (!human || !hasEffect(human, 'Channel Clearer')) return;
   const cands = [];
   for (const c of state.riverCards) {
-    if (c.material !== 'reeds') continue;
+    if (c.material !== 'reeds' || c.wildAlt) continue; // wildcards are never an exact-reeds target
     for (const k in c.workers) {
       const opIdx = parseInt(k);
       if (opIdx === human.idx || c.workers[k] <= 0) continue;
@@ -6079,7 +6083,7 @@ async function humanUseChannelClearer() {
   if (cands.length === 0) return;
   const pick = await pickFromList(
     '🐭 Channel Clearer — discard a Reed worker',
-    `Pick 1 opponent's Reed worker on a river card. It returns to their supply (no blank, no fish compensation). Free; once per turn.`,
+    `Pay 1🐟 to pick 1 opponent's Reed worker on a river card. It returns to their supply (no blank). Once per turn.`,
     cands,
     x => `River ${x.card.slot + 1}: ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
   );
@@ -6088,7 +6092,9 @@ async function humanUseChannelClearer() {
   pick.card.workers[pick.victimIdx] -= 1;
   if (pick.card.workers[pick.victimIdx] === 0) delete pick.card.workers[pick.victimIdx];
   victim.supply += 1;
-  log(`🐭 Channel Clearer: ${speciesLabel(human)} clears 1 Reed worker from ${speciesLabel(victim)}.`);
+  human.timePos += 1;
+  human.ccUsedThisTurn = true;
+  log(`🐭 Channel Clearer: ${speciesLabel(human)} clears 1 Reed worker from ${speciesLabel(victim)} (+1🐟).`);
   render();
 }
 
@@ -7671,6 +7677,7 @@ async function runOneTurn() {
   state.currentPlayer = pickNextPlayer();
   if (state.currentPlayer === -1) { await enterCoda(); return; }
   const p = state.players[state.currentPlayer];
+  p.ccUsedThisTurn = false; // Channel Clearer is once per turn
   const space = p.timePos;
   log(`— ${speciesLabel(p)} advances to ${space}🐟 on the fish track.`);
   render();
