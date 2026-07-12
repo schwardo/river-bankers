@@ -45,15 +45,18 @@ class Game extends \Bga\GameFramework\Table
     }
 
     /**
-     * Current game progression 0..100, driven by the furthest-along pawn's
-     * progress toward the fish line.
+     * Current game progression 0..100, driven by the TRAILING pawn's progress
+     * toward the fish line. The game ends only when every player has crossed the
+     * line (retired), so the slowest still-racing pawn is what determines how
+     * close the game is to ending — using the leader (MAX) would report 100% at
+     * the first crossing while the retire cascade still had many turns to run.
      */
     public function getGameProgression()
     {
-        $max = (int) $this->getUniqueValueFromDB(
-            "SELECT MAX(`player_fish_pos`) FROM `player`"
+        $min = (int) $this->getUniqueValueFromDB(
+            "SELECT MIN(`player_fish_pos`) FROM `player`"
         );
-        return min(100, (int) floor($max * 100 / self::FISH_LINE));
+        return min(100, (int) floor($min * 100 / self::FISH_LINE));
     }
 
     public function upgradeTableDb($from_version)
