@@ -33,7 +33,23 @@ import subprocess
 import sys
 from pathlib import Path
 
+from PIL import ImageFont
+
 HERE = Path(__file__).resolve().parent
+
+# Title auto-fit needs the real rendered width. The SVG renderer (inkscape)
+# draws a "Npt" font-size as N × 96/72 px in a viewBox where 1 user unit = 1pt,
+# so a "9pt" title actually occupies 12 user units of width. Measure with the
+# same TTF the CSS names ('DejaVu Serif' bold) and apply that scale so the fit
+# matches what gets printed.
+_TITLE_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
+_PT_TO_UU = 96.0 / 72.0
+
+
+def _rendered_width(text, size_pt):
+    """Width of `text` in viewBox user units as the SVG will actually render it."""
+    px = max(1, int(round(size_pt * _PT_TO_UU * 4)))  # 4x oversample for precision
+    return ImageFont.truetype(_TITLE_FONT_PATH, px).getlength(text) / 4.0
 TEMPLATE = HERE / "template.svg"
 CARDS_JSON = HERE / "cards.json"
 OUT_DIR = HERE / "out"
@@ -144,26 +160,48 @@ def wrap_words(text: str, max_chars: int):
 
 # --------------------- per-card SVG fragments ---------------------
 
+# Title baseline x and the minimum clearance to keep between the title's right
+# edge and the VP block's left edge.
+TITLE_X = 22.0
+TITLE_GAP = 6.0
+
+
+def _vp_label(card):
+    """The header VP string — mirrors render_vp_block. Thin space (U+2009) +
+    star (U+2605). Used to reserve the VP block's width when fitting the title."""
+    vp = card.get("vp", 0)
+    effect = card.get("effect") or ""
+    has_endgame = bool(re.search(r"[Ee]nd of game", effect))
+    star = " ★"  # thin space + ★
+    if vp == 0:
+        return ("?" if has_endgame else "0") + star
+    if has_endgame:
+        return f"{vp}+?" + star
+    return f"{vp}" + star
+
+
 def render_title_block(card):
     """Auto-fit the title font so it clears the VP indicator on the right.
-    VP at 13pt serif bold needs ~32pt; title baseline starts at x=22, so the
-    title has ~122pt of horizontal room. DejaVu Serif Bold averages ~0.75 ×
-    font-size pt per char, so we pick the biggest size that fits."""
+
+    The title runs from x=TITLE_X; the VP label is right-anchored at VP_X. We
+    reserve THIS card's actual VP-label width (rendered at 11pt) plus a small
+    gap, then pick the largest font size (6..12pt) whose measured width fits the
+    remaining room — measured the way the renderer draws it (see _rendered_width),
+    which the old character-count buckets under-estimated (they let the 17-char
+    'Streambank Hollow' collide with the VP number)."""
     name = card["name"]
-    L = len(name)
-    if L <= 10:
-        size = 12
-    elif L <= 12:
-        size = 11
-    elif L <= 13:
-        size = 10
-    else:
-        size = 9
+    vp_w = _rendered_width(_vp_label(card), 11)
+    avail = VP_X - vp_w - TITLE_GAP - TITLE_X
+    size = 6
+    for s in (12, 11, 10, 9, 8, 7, 6):
+        if _rendered_width(name, s) <= avail:
+            size = s
+            break
     # Baseline y nudges with font size so caps stay vertically centered in
     # the header band (y=18..46, center y=32).
-    y = {12: 37, 11: 37, 10: 36, 9: 35}[size]
+    y = {12: 37, 11: 37, 10: 36, 9: 35, 8: 35, 7: 34, 6: 34}[size]
     return (
-        f'<text x="22" y="{y}" font-size="{size}pt" class="card-name">'
+        f'<text x="{TITLE_X:.0f}" y="{y}" font-size="{size}pt" class="card-name">'
         f'{html.escape(name)}</text>'
     )
 
