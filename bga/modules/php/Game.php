@@ -1375,6 +1375,7 @@ class Game extends \Bga\GameFramework\Table
             $this->globals->set('turn_abilities_used', $turnUsed);
         }
         $this->globals->set('pending_ability', '');
+        $this->globals->set('pending_ability_name', '');
         $this->globals->set('pending_ability_free', 0);
         $this->globals->set('pending_ability_card', 0);
         $this->globals->set('portage_src', 0);
@@ -2169,6 +2170,19 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $oid AND `card_id` = $dstId AND `workers` <= 0");
         $this->DbQuery("INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($oid, $srcId, 1)
                         ON DUPLICATE KEY UPDATE `workers` = `workers` + 1");
+        // Detailed log: whose worker was swapped, and between which cards.
+        $srcName = (string) (Material::$MATERIAL[(int) $this->getCardRow($srcId)['card_type_arg']]['name'] ?? 'a river card');
+        $dstName = (string) (Material::$MATERIAL[(int) $this->getCardRow($dstId)['card_type_arg']]['name'] ?? 'a river card');
+        $this->notify->all('abilityUsed',
+            clienttranslate('${player_name} uses ${ability_name}: swaps their worker on ${src_card} with ${victim_name}\'s on ${dst_card}'),
+            [
+                'player_id'    => $playerId,
+                'player_name'  => $this->getPlayerNameById($playerId),
+                'ability_name' => (string) $this->globals->get('pending_ability_name', 'Rolling Float'),
+                'victim_name'  => $this->getPlayerNameById($oid),
+                'src_card'     => $srcName,
+                'dst_card'     => $dstName,
+            ]);
     }
 
     // --- Salmon Run / Portage (as-an-action) ---
@@ -2221,6 +2235,19 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $oid AND `card_id` = $dstId AND `workers` <= 0");
         $this->DbQuery("INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($oid, $srcId, 1)
                         ON DUPLICATE KEY UPDATE `workers` = `workers` + 1");
+        // Detailed log: whose worker moved between which cards (pre-swap positions).
+        $srcName = (string) (Material::$MATERIAL[(int) $this->getCardRow($srcId)['card_type_arg']]['name'] ?? 'a river card');
+        $dstName = (string) (Material::$MATERIAL[(int) $this->getCardRow($dstId)['card_type_arg']]['name'] ?? 'a river card');
+        $this->notify->all('abilityUsed',
+            clienttranslate('${player_name} uses ${ability_name}: swaps their worker on ${src_card} for ${victim_name}\'s on ${dst_card}'),
+            [
+                'player_id'    => $playerId,
+                'player_name'  => $this->getPlayerNameById($playerId),
+                'ability_name' => (string) $this->globals->get('pending_ability_name', 'Portage'),
+                'victim_name'  => $this->getPlayerNameById($oid),
+                'src_card'     => $srcName,
+                'dst_card'     => $dstName,
+            ]);
     }
 
     // --- Confluence (combined two-card auction over same-material river cards) ---
@@ -2571,8 +2598,21 @@ class Game extends \Bga\GameFramework\Table
             );
             if (count($opp) > 0) {
                 $oid = (int) $opp[0]['player_id'];
+                $def = Material::$MATERIAL[(int) $this->getCardRow($cardId)['card_type_arg']] ?? null;
+                $cardName = (string) ($def['name'] ?? 'a river card');
                 $this->recallWorker($oid, $cardId, true);
                 $this->moveBackFish($oid, 3);
+                // Detailed log: Tribute Stone / Snare Set (same key) forces a recall
+                // AND slides the victim back 3🐟 — both were previously silent.
+                $this->notify->all('abilityUsed',
+                    clienttranslate('${player_name} uses ${ability_name}: returns ${victim_name}\'s worker from ${card_name} and slides them back 3🐟'),
+                    [
+                        'player_id'    => $playerId,
+                        'player_name'  => $this->getPlayerNameById($playerId),
+                        'ability_name' => (string) $this->globals->get('pending_ability_name', 'Tribute Stone'),
+                        'victim_name'  => $this->getPlayerNameById($oid),
+                        'card_name'    => $cardName,
+                    ]);
             }
             return;
         }

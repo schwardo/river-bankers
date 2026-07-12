@@ -73,9 +73,11 @@ class PlayerTurn extends GameState
         // per-target sub-states only send a (log-less) boardUpdate, so without
         // this nothing about an ability appears in the game log. The card name is
         // a data-driven proper noun, so it is a plain substitution (not i18n).
-        // Exception: Channel Clearer emits its own detailed message at resolution
-        // (naming the victim and the card), so skip the generic line for it.
-        if ($ability !== 'channelclearer') {
+        // Exception: the opponent-affecting abilities below emit their own
+        // detailed message at resolution (naming the victim and the card), so
+        // skip the generic line for them to avoid a redundant entry.
+        $selfLogged = ['channelclearer', 'tributestone', 'portage', 'rollingfloat'];
+        if (!in_array($ability, $selfLogged, true)) {
             $this->notify->all('abilityUsed', clienttranslate('${player_name} uses ${ability_name}'), [
                 'player_id' => $activePlayerId,
                 'player_name' => $this->game->getPlayerNameById($activePlayerId),
@@ -84,6 +86,10 @@ class PlayerTurn extends GameState
         }
 
         $this->globals->set('pending_ability', $ability);
+        // Display name for the detailed resolution messages — Tribute Stone and
+        // Snare Set share the 'tributestone' key, so the name must be threaded
+        // through rather than inferred from the key.
+        $this->globals->set('pending_ability_name', (string) $found['name']);
         // Once-per-game and once-per-turn (turn-start) abilities don't consume
         // the turn; only once-abilities flip their source card. As-an-action
         // abilities consume the turn.
