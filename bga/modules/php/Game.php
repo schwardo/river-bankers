@@ -2587,7 +2587,20 @@ class Game extends \Bga\GameFramework\Table
                  ORDER BY `workers` DESC LIMIT 1"
             );
             if (count($opp) > 0) {
-                $this->recallWorker((int) $opp[0]['player_id'], $cardId, false); // no blank, no fish
+                $victimId = (int) $opp[0]['player_id'];
+                $def = Material::$MATERIAL[(int) $this->getCardRow($cardId)['card_type_arg']] ?? null;
+                $cardName = (string) ($def['name'] ?? 'a river card');
+                $this->recallWorker($victimId, $cardId, false); // no blank, no fish
+                // Detailed log: who cleared whose worker, and from which card. Card
+                // names are data-driven proper nouns, so they are plain substitutions.
+                $this->notify->all('abilityUsed',
+                    clienttranslate('${player_name} uses Channel Clearer: returns ${victim_name}\'s worker from ${card_name} to their supply'),
+                    [
+                        'player_id'   => $playerId,
+                        'player_name' => $this->getPlayerNameById($playerId),
+                        'victim_name' => $this->getPlayerNameById($victimId),
+                        'card_name'   => $cardName,
+                    ]);
             }
             return;
         }
