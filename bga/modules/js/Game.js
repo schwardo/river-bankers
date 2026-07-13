@@ -103,10 +103,6 @@ function rbEffectiveCoverage(targetCost, wbm) {
     return have;
 }
 
-function costStr(cost) {
-    return Object.entries(cost || {}).map(([m, n]) => `${n}${MAT_GLYPH[m] || m}`).join(' ') || '—';
-}
-
 // Card name -> art-file slug. Mirrors the deck generators' safe_filename():
 // keep ASCII letters/digits, drop everything else ("Boulder Field" -> "BoulderField").
 function slugify(name) { return (name || '').replace(/[^A-Za-z0-9]/g, ''); }
@@ -395,7 +391,7 @@ class PlayerTurn {
         const c = this.game.cardById(cardId);
         if (!c) return;
         const slot = Number(c.slot) || 0;
-        const mat = c.material + (c.wildAlt ? '/' + c.wildAlt : ''); // wilds name both
+        const mat = matIcon(c.material) + (c.wildAlt ? '/' + matIcon(c.wildAlt) : ''); // wilds show both icons
         const triggerCost = kind === 'pull' ? (slot + 1) : 1;
         const perItem = kind === 'pull' ? 1 : (slot + 1);
         const verb = kind === 'pull' ? _('Pull') : _('Swim to');
@@ -438,11 +434,11 @@ class PlayerTurn {
         Object.keys(eff).forEach(m => { const d = eff[m] - (have[m] || 0); if (d > 0) short[m] = d; });
         if (Object.keys(short).length) {
             this.bga.dialogs.showMessage(
-                _('You are short') + ' ' + costStr(short) + ' ' + _('to build') + ' ' + card.name + '.', 'error');
+                _('You are short') + ' ' + costIcons(short) + ' ' + _('to build') + ' ' + card.name + '.', 'error');
             return;
         }
         const builtNames = ((this.game.built || {})[this.game.myId()] || []).map(b => b.name);
-        const msg = `${_('Build')} <b>${card.name}</b> ${_('for')} ${costStr(eff)}?`
+        const msg = `${_('Build')} <b>${card.name}</b> ${_('for')} ${costIcons(eff)}?`
             + this.game.fishCrossNote(rbBuildFishCost(card, builtNames));
         this.bga.dialogs.confirmation(msg).then(ok => { if (ok) this.startBuild(cardId); });
     }
@@ -1588,7 +1584,7 @@ export class Game {
     paintPeekReveal() {
         const r = document.getElementById('rb-peek-reveal');
         if (!r || r.hidden) return;
-        r.innerHTML = this.peekTop ? ` ${MAT_GLYPH[this.peekTop.material] || ''} ${this.peekTop.icons}` : ` ${_('(deck empty)')}`;
+        r.innerHTML = this.peekTop ? ` ${matIcon(this.peekTop.material)} ${this.peekTop.icons}` : ` ${_('(deck empty)')}`;
     }
 
     renderStarterOffer(offers) {
@@ -1856,7 +1852,7 @@ export class Game {
             `<div class="rb-spy-note">${_('Snapshot from when Salt Lick was built.')}</div>`;
         Object.entries(this.peekHands).forEach(([pid, cards]) => {
             const list = (cards && cards.length)
-                ? cards.map(c => `${c.name} (${costStr(c.cost)}${c.vpLabel && c.vpLabel !== '0' ? ', ' + c.vpLabel + ' VP' : ''})`).join('; ')
+                ? cards.map(c => `${c.name} (${costIcons(c.cost)}${c.vpLabel && c.vpLabel !== '0' ? ', ' + c.vpLabel + ' VP' : ''})`).join('; ')
                 : _('no cards');
             html += `<div class="rb-spy-player"><b>${this.playerName(pid)}</b>: ${list}</div>`;
         });
