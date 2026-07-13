@@ -34,7 +34,17 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         if ($turnPlayer > 0) {
             $this->playerStats->inc('turns', 1, $turnPlayer, true); // count the turn that just ended
             if ($this->game->getMaterialDeckCount() === 0) {
+                // Announce the deck running dry once (guarded so it fires a single
+                // time), then log each per-turn drift so the +1🐟 isn't a silent jump.
+                if ((int) $this->globals->get('deck_empty_announced', 0) === 0) {
+                    $this->globals->set('deck_empty_announced', 1);
+                    $this->notify->all('deckEmpty', clienttranslate('🏁 The material deck is empty — the river is drying up. From now on the active player drifts +1🐟 toward the finish line at the end of each turn.'), []);
+                }
                 $this->game->advanceFish($turnPlayer, 1);
+                $this->notify->all('deckDrift', clienttranslate('${player_name} drifts +1🐟 (empty material deck).'), [
+                    'player_id' => $turnPlayer,
+                    'player_name' => $this->game->getPlayerNameById($turnPlayer),
+                ]);
             }
         }
 

@@ -1873,5 +1873,7 @@ export class Game {
     async notif_abilityUsed() {}
     async notif_retire() {}
     async notif_shorelinePenalty() {}
+    async notif_deckEmpty() {}   // one-time "deck is empty" banner (board repaints via boardUpdate)
+    async notif_deckDrift() {}   // per-turn +1🐟 drift once the deck is empty
     async notif_workerRecalled() {} // stats-only marker; the board repaints via boardUpdate
 }
