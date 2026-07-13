@@ -82,6 +82,7 @@ class Auction extends GameState
         return [
             "lotCardId" => (int) $auction['lot_card_id'],
             "lotCardId2" => $auction['lot_card_id2'] === null ? null : (int) $auction['lot_card_id2'],
+            "baseRate" => $this->game->auctionBaseRate($auction), // per-item rate before my discount
             "open" => $this->game->auctionOpenIcons(), // sum of both cards when combined (Confluence)
             "triggerPlayer" => $trigger,
             "canDefer" => $canDefer,

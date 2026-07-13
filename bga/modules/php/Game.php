@@ -520,6 +520,22 @@ class Game extends \Bga\GameFramework\Table
         return $this->getNonEmptyObjectFromDB("SELECT * FROM `auction` ORDER BY `auction_id` DESC LIMIT 1");
     }
 
+    /**
+     * Authoritative base per-item fish rate for an auction lot, BEFORE the viewing
+     * player's material discount. Location- and forced-rate-aware, so it is correct
+     * for a normal river slot (slot+1), a Headwaters pull (flat 1/item), and any
+     * forced-rate auction (Snag Pile = 1, Confluence = the lesser of the two). The
+     * client subtracts its own material discount to get the exact per-worker cost,
+     * matching ResolveAuction's `Effects::perItemForPlayer($base, …)`. Sent in the
+     * bid args so the client no longer has to guess the rate from the slot alone.
+     */
+    public function auctionBaseRate(array $auction): int
+    {
+        $forced = $auction['forced_rate'] === null ? null : (int) $auction['forced_rate'];
+        $lot = $this->getCardRow((int) $auction['lot_card_id']);
+        return Cost::perItem((string) $lot['card_location'], (int) $lot['card_location_arg'], $forced);
+    }
+
     public function hasOpenAuction(): bool
     {
         return (int) $this->getUniqueValueFromDB("SELECT COUNT(*) FROM `auction`") > 0;

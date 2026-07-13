@@ -43,6 +43,7 @@ class DeferBid extends GameState
         $open = $this->game->auctionOpenIcons(); // combined-aware (Confluence)
         return [
             "lotCardId" => $lot,
+            "baseRate" => $this->game->auctionBaseRate($auction), // per-item rate before my discount
             "open" => $open,
             "triggerPlayer" => (int) $auction['trigger_player'],
             "maxBid" => min($open, $this->game->getPlayerSupply($playerId)),

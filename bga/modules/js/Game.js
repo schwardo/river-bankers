@@ -933,11 +933,11 @@ class Auction {
         this.bga.statusBar.setTitle(_('How many workers would you like to send for ') + lot + ' ?');
         this.game.setHint(_('Bid up to ') + maxBid + _(' workers (this lot has ') + a.open + _(' open icons).'));
         // Fish cost of an N-worker bid = N × my discounted per-item rate (you pay
-        // for every worker you send, win or lose). Combined lots use the cheaper of
-        // the two cards' rates. Exact for a normal swim; Pontoon and forced-rate
-        // pulls only lower it, so it's a safe upper bound ("up to").
-        let rate = this.game.myAuctionRate(a.lotCardId);
-        if (a.lotCardId2) rate = Math.min(rate, this.game.myAuctionRate(a.lotCardId2));
+        // for every worker you send, win or lose). The server sends the exact base
+        // rate for this lot (river slot / Headwaters 1-per-item / forced Snag Pile /
+        // Confluence lesser-rate); I subtract my own material discount. Exact except
+        // for a Pontoon jam-shave, which only lowers it — hence "up to".
+        const rate = this.game.myBidRate(a);
         for (let b = minBid; b <= maxBid; b++) {
             const est = b * rate;
             // Show the fish cost on the button itself so bidders see what each
@@ -986,13 +986,13 @@ class DeferBid {
         if (!isActive) return;
         const minBid = (this.game.myId() === Number(args.triggerPlayer)) ? 1 : 0;
         this.game.setHint(_('You bid last. Revealed bids — ') + revealed);
-        let rate = this.game.myAuctionRate(args.lotCardId);
-        if (args.lotCardId2) rate = Math.min(rate, this.game.myAuctionRate(args.lotCardId2));
+        const rate = this.game.myBidRate(args);
         for (let b = minBid; b <= args.maxBid; b++) {
             const est = b * rate;
-            this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.game.confirmFishCross(
-                est, _('Bid ') + b + _(' worker(s)'),
-                () => this.bga.actions.performAction('actDeferredBid', { workers: b }), true));
+            this.bga.statusBar.addActionButton(_('Bid ') + b + ' (' + _('pay') + ' ' + est + '🐟)',
+                () => this.game.confirmFishCross(
+                    est, _('Bid ') + b + _(' worker(s)'),
+                    () => this.bga.actions.performAction('actDeferredBid', { workers: b }), true));
         }
     }
     onLeavingState() { this.game.clearClickable(); }
@@ -1648,16 +1648,16 @@ export class Game {
         const names = ((this.built || {})[this.myId()] || []).map(b => b.name);
         return Object.entries(D[material] || {}).reduce((t, [n, a]) => t + (names.includes(n) ? a : 0), 0);
     }
-    // My effective per-item fish rate on a lot card: printed positional rate
-    // (slot+1) minus my material discounts, min 1 (Effects::perItemForPlayer). This
-    // is exact for a normal river swim; it can only *over*-estimate for forced-rate
-    // pulls (e.g. Snag Pile auctions at 1/item — not known client-side), so a bid
-    // built from it is a safe upper bound.
-    myAuctionRate(cardId) {
-        const c = this.cardById(cardId);
-        if (!c) return 1;
-        const base = (Number(c.slot) || 0) + 1;
-        return Math.max(1, base - this.auctionDiscount(c.material));
+    // Exact per-worker fish cost for a bid on the current lot: the server-sent
+    // base per-item rate (args.baseRate — river slot / Headwaters 1 / forced Snag
+    // Pile / Confluence lesser-rate) minus my material discount on the lot's
+    // material, min 1. Mirrors ResolveAuction's Effects::perItemForPlayer($base…),
+    // so the button now matches what the server actually bills. (The old version
+    // recomputed slot+1 client-side, which over-charged Headwaters/forced auctions.)
+    myBidRate(args) {
+        const lot = this.cardById(args.lotCardId);
+        const base = Number(args.baseRate) || 1;
+        return Math.max(1, base - this.auctionDiscount(lot ? lot.material : ''));
     }
     // Fish-line guard. If an action's fish cost would move me to or past the
     // finish line (retiring my beaver — no more turns), confirm before committing.
