@@ -940,9 +940,13 @@ class Auction {
         if (a.lotCardId2) rate = Math.min(rate, this.game.myAuctionRate(a.lotCardId2));
         for (let b = minBid; b <= maxBid; b++) {
             const est = b * rate;
-            this.bga.statusBar.addActionButton(_('Bid ') + b, () => this.game.confirmFishCross(
-                est, _('Bid ') + b + _(' worker(s)'),
-                () => this.bga.actions.performAction('actBid', { workers: b }), true));
+            // Show the fish cost on the button itself so bidders see what each
+            // bid costs without opening the confirm dialog. est is the per-worker
+            // rate × workers (a safe upper bound; Pontoon / forced rates only lower it).
+            this.bga.statusBar.addActionButton(_('Bid ') + b + ' (' + _('pay') + ' ' + est + '🐟)',
+                () => this.game.confirmFishCross(
+                    est, _('Bid ') + b + _(' worker(s)'),
+                    () => this.bga.actions.performAction('actBid', { workers: b }), true));
         }
         if (this.game.myRecallTargets(a.lotCardId).length) {
             this.bga.statusBar.addActionButton(_('Recall Workers'), () => this.enterRecall(), { color: 'secondary' });
