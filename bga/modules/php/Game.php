@@ -1078,13 +1078,28 @@ class Game extends \Bga\GameFramework\Table
             $arg = (int) $r['card_type_arg'];
             if ($r['card_type'] === 'structure' && isset(Material::$STRUCTURE[$arg])) {
                 $def = Material::$STRUCTURE[$arg];
-                $out[] = ['name' => (string) $def['name'], 'vp' => (int) $def['vp'], 'cost' => $def['cost']];
+                $out[] = ['name' => (string) $def['name'], 'vp' => (int) $def['vp'], 'vpLabel' => self::vpLabel($def), 'cost' => $def['cost']];
             } elseif ($r['card_type'] === 'starter' && isset(Material::$STARTER[$arg])) {
                 $def = Material::$STARTER[$arg];
-                $out[] = ['name' => (string) $def['name'], 'vp' => (int) $def['vp'], 'cost' => []];
+                $out[] = ['name' => (string) $def['name'], 'vp' => (int) $def['vp'], 'vpLabel' => self::vpLabel($def), 'cost' => []];
             }
         }
         return $out;
+    }
+
+    /**
+     * Printed-VP display string, mirroring the card art (structure-deck
+     * generate.py) and the web vpDisplay(): a card whose end-of-game effect mints
+     * points shows '?' (or 'N+?'), never a misleading flat '0'/'N'.
+     */
+    public static function vpLabel(array $def): string
+    {
+        $vp = (int) ($def['vp'] ?? 0);
+        $eg = (bool) preg_match('/[Ee]nd of game/', (string) ($def['effect'] ?? ''));
+        if ($vp === 0) {
+            return $eg ? '?' : '0';
+        }
+        return $eg ? "{$vp}+?" : "{$vp}";
     }
 
     /**

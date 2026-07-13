@@ -3221,7 +3221,10 @@ function effectDescription(card) {
 //   vp=N, no end-game effect  → 'N'
 //   vp=N, end-game effect     → 'N+?'  (fixed base plus variable bonus)
 function vpDisplay(s) {
-  const eg = !!(s && s.effect && /End [Gg]ame/.test(s.effect));
+  // Match "End of game" — the canonical phrasing every end-game card uses.
+  // (An earlier /End [Gg]ame/ pattern missed all of them because of the "of",
+  // so every variable-VP card wrongly showed "0"; mirror the print generator.)
+  const eg = !!(s && s.effect && /[Ee]nd of game/.test(s.effect));
   if (!s || s.vp === 0) return eg ? '?' : '0';
   return eg ? `${s.vp}+?` : `${s.vp}`;
 }

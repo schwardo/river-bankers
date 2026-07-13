@@ -1856,7 +1856,7 @@ export class Game {
             `<div class="rb-spy-note">${_('Snapshot from when Salt Lick was built.')}</div>`;
         Object.entries(this.peekHands).forEach(([pid, cards]) => {
             const list = (cards && cards.length)
-                ? cards.map(c => `${c.name} (${costStr(c.cost)}${c.vp ? ', ' + c.vp + ' VP' : ''})`).join('; ')
+                ? cards.map(c => `${c.name} (${costStr(c.cost)}${c.vpLabel && c.vpLabel !== '0' ? ', ' + c.vpLabel + ' VP' : ''})`).join('; ')
                 : _('no cards');
             html += `<div class="rb-spy-player"><b>${this.playerName(pid)}</b>: ${list}</div>`;
         });
