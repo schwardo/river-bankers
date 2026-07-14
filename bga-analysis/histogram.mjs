@@ -140,7 +140,7 @@ const PAGE = `<!doctype html>
     <div class="chips" id="chips"></div>
     <div class="legend">
       <span class="item"><span class="sw-bar"></span> Simulated distribution</span>
-      <span class="item"><span class="sw-line"></span> Actual — from BGA</span>
+      <span class="item"><span class="sw-line"></span> Actual — from BGA (one color per game)</span>
       <span class="item" style="color:var(--faint)">z = distance from sim mean, in sim standard deviations</span>
     </div>
   </header>
@@ -155,6 +155,9 @@ const fmt=(x,d=1)=>(x==null||Number.isNaN(x))?"—":Number(x).toFixed(d);
 const tt=document.getElementById("tt");
 const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
 const totalReal=DATA.groups.reduce((s,g)=>s+g.realN,0);
+// Distinct per-game colors (readable on both themes); cycles if >palette.
+const PALETTE=["#b9741c","#c0397b","#3b9e5b","#7b5cd6","#c0563a","#2f8f8f"];
+const realColor=(i)=>PALETTE[i%PALETTE.length];
 
 document.getElementById("lede").textContent =
   \`Teal bars bin \${DATA.simN.toLocaleString()} simulated games per player-count; each amber line marks one of \`
@@ -167,14 +170,15 @@ const chips=document.getElementById("chips");
 const charts=[];
 for(const grp of DATA.groups){
   const sec=document.createElement("section");sec.className="pc";
-  sec.innerHTML=\`<h2>\${grp.numP}-player games <span class="sub">\${grp.realN} game\${grp.realN===1?"":"s"} · tables \${grp.realTables.join(", ")}</span></h2>\`;
+  const tchips=grp.realTables.map((t,i)=>\`<span style="color:\${realColor(i)}">■</span> \${t}\`).join("&nbsp;&nbsp;&nbsp;");
+  sec.innerHTML=\`<h2>\${grp.numP}-player games <span class="sub">\${grp.realN} game\${grp.realN===1?"":"s"} · \${tchips}</span></h2>\`;
   const grid=document.createElement("div");grid.className="grid";sec.appendChild(grid);
   document.getElementById("sections").appendChild(sec);
   for(const m of grp.metrics){
     const far=Math.abs(m.z)>=2, arrow=m.z>0?"▲":m.z<0?"▼":"·";
     const card=document.createElement("div");card.className="card";
     card.innerHTML=\`<div class="top"><span class="name">\${m.label}</span><span class="zpill \${far?"far":""}">z \${m.z>0?"+":""}\${fmt(m.z,2)} \${arrow}</span></div><canvas></canvas>\`
-      +\`<div class="cap"><span><span class="k">actual</span> <span class="actual">\${m.real.join(", ")}</span></span><span><span class="k">sim</span> \${fmt(m.simMean)} <span class="k">±</span> \${fmt(m.simSd)}</span></div>\`;
+      +\`<div class="cap"><span><span class="k">actual</span> \${m.real.map((rv,i)=>\`<span style="color:\${realColor(i)}">\${rv}</span>\`).join(", ")}</span><span><span class="k">sim</span> \${fmt(m.simMean)} <span class="k">±</span> \${fmt(m.simSd)}</span></div>\`;
     grid.appendChild(card);
     charts.push({m,canvas:card.querySelector("canvas"),simN:grp.simN});
   }
@@ -194,12 +198,11 @@ function draw(entry,t=1){
     g.beginPath();g.moveTo(x0,baseY);g.lineTo(x0,y+r);g.arcTo(x0,y,x0+r,y,r);g.lineTo(x1-r,y);g.arcTo(x1,y,x1,y+r,r);g.lineTo(x1,baseY);g.closePath();g.fill();}
   g.strokeStyle=css("--sim");g.globalAlpha=.5;g.lineWidth=1;g.setLineDash([3,3]);
   g.beginPath();g.moveTo(X(m.simMean),padT-4);g.lineTo(X(m.simMean),baseY);g.stroke();g.setLineDash([]);g.globalAlpha=1;
-  g.fillStyle=g.strokeStyle=css("--actual");
-  for(const rv of m.real){const x=X(rv);g.lineWidth=2;
+  g.font=\`600 11px \${css("--mono")}\`;g.textAlign="center";
+  m.real.forEach((rv,i)=>{const x=X(rv);g.fillStyle=g.strokeStyle=realColor(i);g.lineWidth=2;
     g.beginPath();g.moveTo(x,padT-2);g.lineTo(x,baseY);g.stroke();
     g.beginPath();g.moveTo(x-4,padT-6);g.lineTo(x+4,padT-6);g.lineTo(x,padT+1);g.closePath();g.fill();
-    g.font=\`600 11px \${css("--mono")}\`;g.textAlign="center";
-    g.fillText(String(rv),Math.max(padL+10,Math.min(W-padR-10,x)),padT-9);}
+    g.fillText(String(rv),Math.max(padL+10,Math.min(W-padR-10,x)),padT-9);});
   g.fillStyle=css("--faint");g.font=\`11px \${css("--mono")}\`;
   g.textAlign="left";g.fillText(String(Math.round(lo)),padL,H-3);
   g.textAlign="right";g.fillText(String(Math.round(hi)),W-padR,H-3);
