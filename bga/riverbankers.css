@@ -140,6 +140,10 @@
 .rb-pchit { display: inline-block; width: 22px; height: 22px; vertical-align: middle; overflow: hidden;
             margin-right: -4px; } /* overlap the sprite's transparent border so all 8 fit without wrapping */
 .rb-pchit .rb-art-wchit { transform: scale(0.6); transform-origin: top left; }
+/* The (worker) chit shown inline immediately after the player's name (outside
+   .rb-panel, so no zoom context). Kept on the same line as the name. */
+.rb-namechit { margin-left: 4px; white-space: nowrap; }
+.rb-namechit .rb-pchit { margin-right: 0; vertical-align: -6px; }
 /* Supply: one worker chit per worker in the player's supply. */
 .rb-supply { display: flex; flex-wrap: wrap; gap: 0; align-items: center; min-height: 22px; }
 .rb-mats { font-size: 15px; margin-top: 2px; }

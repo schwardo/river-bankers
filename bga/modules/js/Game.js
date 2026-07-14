@@ -1111,6 +1111,13 @@ export class Game {
                     <div id="materials-${p.id}" class="rb-mats"></div>
                 </div>
             `);
+            // A small species worker chit right after the player's name, so you
+            // can tell at a glance which worker disc belongs to which player.
+            const nameEl = document.getElementById(`player_name_${p.id}`);
+            if (nameEl) {
+                nameEl.insertAdjacentHTML('beforeend',
+                    `<span class="rb-namechit" title="${_('Worker')}"> (<span class="rb-pchit"><span class="rb-art rb-art-wchit rb-p-wchit-${p.species || 'beaver'}"></span></span>)</span>`);
+            }
             // Fish-track position shown right next to the official BGA VP score,
             // so a player's money reads on the same line as their points.
             const scoreEl = document.getElementById(`player_score_${p.id}`);
