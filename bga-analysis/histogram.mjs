@@ -23,6 +23,7 @@ const METRICS = [
   ['turns', 'Turns played'], ['auctions', 'Auctions held'],
   ['jamAuctions', 'Jammed auctions'], ['plentyAuctions', 'Plenty auctions'],
   ['cardsBuilt', 'Structures built'], ['iconsWon', 'Icons won'],
+  ['workersRecalled', 'Workers recalled'],
   ['winnerVP', 'Winner VP'], ['vpSpread', 'VP spread'],
 ];
 
