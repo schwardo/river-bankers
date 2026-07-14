@@ -26,6 +26,7 @@ const DATA = path.join(HERE, 'data');
 const KNOWN_NOTIFS = new Set([
   'auctionStarted', 'auctionBids', 'auctionResolved', 'build', 'turnInfo',
   'retire', 'invent', 'flush', 'defer', 'abilityUsed', 'finalScores', 'shorelinePenalty',
+  'workerRecalled',
 ]);
 
 // --- generic helpers on unknown-shaped BGA JSON --------------------------------
