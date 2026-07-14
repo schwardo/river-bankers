@@ -84,6 +84,7 @@ class Game extends \Bga\GameFramework\Table
         $result["auction"] = $this->getAuctionView(); // null unless an auction is open (board highlight on reconnect)
         $result["materialDeck"] = $this->getMaterialDeckView(); // remaining / original deck size
         $result["peekTop"] = $this->getPeekTop($currentPlayerId); // Lookout Tree / Marsh Lookout
+        $result["finalScores"] = $this->globals->get('final_scores', null); // set once the game ends; drives the persistent scoring dialog/button
 
         return $result;
     }
@@ -2823,6 +2824,9 @@ class Game extends \Bga\GameFramework\Table
             }
             $scores[] = ['playerId' => $pid, 'name' => $this->getPlayerNameById($pid), 'rows' => $rows, 'total' => $total];
         }
+        // Persist so getAllDatas can re-offer the breakdown after a page reload
+        // (notifications only play live / during replay, not on reconnect).
+        $this->globals->set('final_scores', $scores);
         $this->notify->all('finalScores', '', ['scores' => $scores]);
     }
 

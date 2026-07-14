@@ -1148,6 +1148,13 @@ export class Game {
         this.setupZoom();
         this.setupCardPreview();
         this.setupNotifications();
+
+        // If the game is already over (reconnect / reload of a finished table),
+        // getAllDatas re-seeds the breakdown so the button is available again.
+        if (gamedatas.finalScores && gamedatas.finalScores.length) {
+            this.finalScores = gamedatas.finalScores;
+            this.addFinalScoresButton();
+        }
     }
 
     // Zoom slider for the whole board area (#rb-root), persisted per browser.
@@ -1810,7 +1817,21 @@ export class Game {
     }
     async notif_handUpdate(args) { this.renderHand(args.hand); }
     async notif_peekUpdate(args) { this.renderPeek(args.peekTop); }
-    async notif_finalScores(args) { this.showFinalScores(args.scores || []); }
+    async notif_finalScores(args) {
+        this.finalScores = args.scores || [];
+        this.addFinalScoresButton();
+        this.showFinalScores(this.finalScores);
+    }
+
+    // A persistent "Final scores" button so the breakdown can be reopened any
+    // time after the game ends — including after a page reload, where the
+    // finalScores notification does not replay (getAllDatas re-seeds the data).
+    addFinalScoresButton() {
+        if (!this.finalScores || !this.finalScores.length || document.getElementById('rb-scores-btn')) return;
+        (document.getElementById('rb-root') || this.bga.gameArea.getElement()).insertAdjacentHTML('beforeend',
+            `<button id="rb-scores-btn" class="rb-peek-btn" title="${_('Final VP breakdown')}">🏆 ${_('Final scores')}</button>`);
+        document.getElementById('rb-scores-btn').addEventListener('click', () => this.showFinalScores(this.finalScores));
+    }
 
     // End-of-game scoring dialog: a grid of VP components (rows) per player
     // (columns) revealed row-by-row, with a Total. Dismissible.
