@@ -150,7 +150,18 @@ const PAGE = `<!doctype html>
 <div class="tooltip" id="tt"></div>
 <script>
 const DATA = __DATA__;
-const css=(n)=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+// Canvas reads its colors from the CSS tokens; when this page is embedded in a
+// wrapper where getComputedStyle can't resolve the custom properties (e.g. an
+// artifact host), fall back to explicit per-theme values so the bars/axes/mean
+// still draw (the overlay lines use hard-coded hex and were never affected).
+const CSS_FALLBACK={light:{"--sim":"#0e8ba0","--line":"#dce5e4","--faint":"#8aa09e","--actual":"#b9741c","--mono":"ui-monospace,Menlo,Consolas,monospace"},
+  dark:{"--sim":"#34a3b5","--line":"#26333d","--faint":"#5f7078","--actual":"#c2842e","--mono":"ui-monospace,Menlo,Consolas,monospace"}};
+const css=(n)=>{
+  const v=getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  if(v) return v;
+  const dark=(document.documentElement.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"))==="dark";
+  return (CSS_FALLBACK[dark?"dark":"light"][n])||"";
+};
 const fmt=(x,d=1)=>(x==null||Number.isNaN(x))?"—":Number(x).toFixed(d);
 const tt=document.getElementById("tt");
 const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
