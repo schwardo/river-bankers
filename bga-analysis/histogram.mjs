@@ -113,9 +113,14 @@ const PAGE = `<!doctype html>
   .sw-line{position:relative;width:22px;height:14px;}
   .sw-line::before{content:"";position:absolute;left:10px;top:0;width:2px;height:14px;background:var(--actual);border-radius:2px;}
   .sw-line::after{content:"";position:absolute;left:6px;top:-1px;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--actual);}
-  section.pc{margin-top:30px;} section.pc>h2{font-size:15px;font-weight:650;margin:0 0 4px;color:var(--ink);display:flex;align-items:baseline;gap:10px;}
-  section.pc>h2 .sub{font-weight:400;color:var(--faint);font-size:13px;font-family:var(--mono);}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:16px;}
+  section.metric{margin-top:26px;} section.metric>h2{font-size:15px;font-weight:650;margin:0 0 10px;color:var(--ink);display:flex;align-items:baseline;gap:10px;}
+  .pcrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;}
+  .card.empty{display:flex;align-items:center;justify-content:center;opacity:.6;}
+  .card .nodata{color:var(--faint);font-size:12.5px;font-family:var(--mono);padding:26px 0;text-align:center;}
+  .gameslegend{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0 2px;font-size:12.5px;color:var(--muted);}
+  .gameslegend .pcgroup{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .gameslegend .pcgroup b{color:var(--ink);font-family:var(--mono);}
+  .gameslegend .g{font-family:var(--mono);font-size:12px;}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 16px 12px;box-shadow:var(--shadow);}
   .card .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:2px;}
   .card .name{font-size:14px;font-weight:620;letter-spacing:-.01em;}
@@ -144,6 +149,7 @@ const PAGE = `<!doctype html>
       <span class="item"><span class="sw-line"></span> Actual — from BGA (one color per game)</span>
       <span class="item" style="color:var(--faint)">z = distance from sim mean, in sim standard deviations</span>
     </div>
+    <div class="gameslegend" id="gameslegend"></div>
   </header>
   <div id="sections"></div>
   <footer id="foot"></footer>
@@ -179,25 +185,47 @@ const chips=document.getElementById("chips");
  ["Player counts",DATA.groups.map(g=>g.numP+"P").join(" · ")]]
  .forEach(([k,v])=>{const c=document.createElement("span");c.className="chip";c.innerHTML=\`\${k} <b>\${v}</b>\`;chips.appendChild(c);});
 
+// Assign every real game a globally-unique color, so a game keeps its color
+// across every metric chart. Colors are grouped by player-count for the legend.
+let __cc=0; const colorIdx={};
+for(const g of DATA.groups) colorIdx[g.numP]=g.realTables.map(()=>__cc++);
+const colorFor=(numP,i)=>realColor(colorIdx[numP][i]);
+
+// Per-player-count game legend (color ■ tableId), shown once under the header.
+const gl=document.getElementById("gameslegend");
+for(const g of DATA.groups){
+  const grp=document.createElement("span");grp.className="pcgroup";
+  const games=g.realTables.map((t,i)=>\`<span class="g"><span style="color:\${colorFor(g.numP,i)}">■</span> \${t}</span>\`).join("&nbsp;&nbsp;");
+  grp.innerHTML=\`<b>\${g.numP}P</b> \${games||'<span class="g" style="color:var(--faint)">none</span>'}\`;
+  gl.appendChild(grp);
+}
+
+// Master metric order (union across player-counts, preserving first appearance).
+const metricOrder=[]; const __seen=new Set();
+for(const g of DATA.groups) for(const m of g.metrics){ if(!__seen.has(m.key)){__seen.add(m.key);metricOrder.push({key:m.key,label:m.label});} }
+
 const charts=[];
-for(const grp of DATA.groups){
-  const sec=document.createElement("section");sec.className="pc";
-  const tchips=grp.realTables.map((t,i)=>\`<span style="color:\${realColor(i)}">■</span> \${t}\`).join("&nbsp;&nbsp;&nbsp;");
-  sec.innerHTML=\`<h2>\${grp.numP}-player games <span class="sub">\${grp.realN} game\${grp.realN===1?"":"s"} · \${tchips}</span></h2>\`;
-  const grid=document.createElement("div");grid.className="grid";sec.appendChild(grid);
-  document.getElementById("sections").appendChild(sec);
-  for(const m of grp.metrics){
-    const far=Math.abs(m.z)>=2, arrow=m.z>0?"▲":m.z<0?"▼":"·";
+for(const mo of metricOrder){
+  const sec=document.createElement("section");sec.className="metric";
+  sec.innerHTML=\`<h2>\${mo.label}</h2>\`;
+  const row=document.createElement("div");row.className="pcrow";sec.appendChild(row);
+  for(const grp of DATA.groups){
+    const m=grp.metrics.find(x=>x.key===mo.key);
     const card=document.createElement("div");card.className="card";
-    card.innerHTML=\`<div class="top"><span class="name">\${m.label}</span><span class="zpill \${far?"far":""}">z \${m.z>0?"+":""}\${fmt(m.z,2)} \${arrow}</span></div><canvas></canvas>\`
-      +\`<div class="cap"><span><span class="k">actual</span> \${m.real.map((rv,i)=>\`<span style="color:\${realColor(i)}">\${rv}</span>\`).join(", ")}</span><span><span class="k">sim</span> \${fmt(m.simMean)} <span class="k">±</span> \${fmt(m.simSd)}</span></div>\`;
-    grid.appendChild(card);
-    charts.push({m,canvas:card.querySelector("canvas"),simN:grp.simN});
+    if(!m){card.classList.add("empty");card.innerHTML=\`<div class="nodata">\${grp.numP}P · no games</div>\`;row.appendChild(card);continue;}
+    const cols=m.real.map((_,i)=>colorFor(grp.numP,i));
+    const far=Math.abs(m.z)>=2, arrow=m.z>0?"▲":m.z<0?"▼":"·";
+    card.innerHTML=\`<div class="top"><span class="name">\${grp.numP}P</span><span class="zpill \${far?"far":""}">z \${m.z>0?"+":""}\${fmt(m.z,2)} \${arrow}</span></div><canvas></canvas>\`
+      +\`<div class="cap"><span><span class="k">actual</span> \${m.real.length?m.real.map((rv,i)=>\`<span style="color:\${cols[i]}">\${rv}</span>\`).join(", "):"—"}</span><span><span class="k">sim</span> \${fmt(m.simMean)} <span class="k">±</span> \${fmt(m.simSd)}</span></div>\`;
+    row.appendChild(card);
+    charts.push({m,canvas:card.querySelector("canvas"),simN:grp.simN,colors:cols});
   }
+  document.getElementById("sections").appendChild(sec);
 }
 
 function draw(entry,t=1){
   const {m,canvas}=entry;
+  const cols=entry.colors||m.real.map((_,i)=>realColor(i));
   const dpr=Math.min(devicePixelRatio||1,2), W=canvas.clientWidth, H=canvas.clientHeight;
   canvas.width=W*dpr;canvas.height=H*dpr;
   const g=canvas.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
@@ -211,7 +239,7 @@ function draw(entry,t=1){
   g.strokeStyle=css("--sim");g.globalAlpha=.5;g.lineWidth=1;g.setLineDash([3,3]);
   g.beginPath();g.moveTo(X(m.simMean),padT-4);g.lineTo(X(m.simMean),baseY);g.stroke();g.setLineDash([]);g.globalAlpha=1;
   g.font=\`600 11px \${css("--mono")}\`;g.textAlign="center";
-  m.real.forEach((rv,i)=>{const x=X(rv);g.fillStyle=g.strokeStyle=realColor(i);g.lineWidth=2;
+  m.real.forEach((rv,i)=>{const x=X(rv);g.fillStyle=g.strokeStyle=cols[i];g.lineWidth=2;
     g.beginPath();g.moveTo(x,padT-2);g.lineTo(x,baseY);g.stroke();
     g.beginPath();g.moveTo(x-4,padT-6);g.lineTo(x+4,padT-6);g.lineTo(x,padT+1);g.closePath();g.fill();
     g.fillText(String(rv),Math.max(padL+10,Math.min(W-padR-10,x)),padT-9);});
