@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>River Bankers — Sell Sheet</title>
+<style>
+  @page {
+    size: letter;
+    margin: 0;
+    @bottom-center { content: ""; }
+  }
+  :root {
+    --water-deep:   #1d4e6b;
+    --water-mid:    #3a8fb7;
+    --water-light:  #c4dde9;
+    --bank:         #6b5436;
+    --bank-light:   #a0825a;
+    --shore:        #d4b97a;
+    --shore-light:  #ecd9a8;
+    --forest:       #2f5d3a;
+    --forest-light: #4a8056;
+    --reed-green:   #6ba14a;
+    --paper:        #faf3e3;
+    --paper-warm:   #f3e8cb;
+    --ink:          #2c1f15;
+    --ink-soft:     #5a4a36;
+    --beaver:       #8b5a2b;
+    --otter:        #b04545;
+    --muskrat:      #4a8056;
+    --mink:         #6a4a8a;
+  }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin: 0; padding: 0; }
+  html { height: 100%; }
+  body {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    color: var(--ink);
+    font-size: 9.6pt;
+    line-height: 1.34;
+    background:
+      radial-gradient(ellipse at 50% -10%, var(--water-light) 0%, transparent 55%),
+      linear-gradient(180deg, var(--paper) 0%, var(--paper-warm) 100%);
+  }
+  .sheet { padding: 0.6in; flex: 1; display: flex; flex-direction: column; }
+  strong { color: var(--water-deep); }
+  em { color: var(--ink-soft); }
+
+  /* ============ HEADER ============ */
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 0.35in;
+    border-bottom: 2pt solid var(--water-mid);
+    padding-bottom: 11pt;
+    margin-bottom: 11pt;
+  }
+  .head img.logo { width: 2.75in; height: auto; filter: drop-shadow(0 2pt 5pt rgba(0,0,0,0.22)); }
+  .head .pitch { flex: 1; }
+  .head .pitch .hookline {
+    font-size: 11.5pt;
+    font-weight: 700;
+    color: var(--water-deep);
+    line-height: 1.2;
+    margin-bottom: 5pt;
+    letter-spacing: 0.1pt;
+    white-space: nowrap;
+  }
+  .head .pitch .tag {
+    font-size: 11pt;
+    font-style: italic;
+    color: var(--ink-soft);
+    line-height: 1.3;
+  }
+  .head .pitch .tag b { color: var(--water-deep); font-style: normal; }
+  .specs {
+    display: flex;
+    gap: 0.12in;
+    margin-top: 7pt;
+    flex-wrap: wrap;
+  }
+  .spec {
+    background: var(--water-deep);
+    color: #fff;
+    border-radius: 4pt;
+    padding: 3pt 7pt;
+    font-size: 8pt;
+    letter-spacing: 0.4pt;
+    text-transform: uppercase;
+  }
+  .spec b { color: #fff; font-size: 10.5pt; }
+
+  /* ============ BODY GRID ============ */
+  .cols { display: flex; gap: 0.32in; }
+  .colL { flex: 1.15; }
+  .colR { flex: 1; display: flex; flex-direction: column; }
+
+  h2 {
+    font-size: 13pt;
+    color: var(--water-deep);
+    margin: 0 0 6pt;
+    line-height: 1.1;
+  }
+  h2 .sub { font-size: 9pt; color: var(--forest); font-style: italic; }
+
+  .hero-lead { margin: 0 0 6pt; font-size: 9.5pt; line-height: 1.36; }
+  .steps { list-style: none; margin: 0 0 7pt; padding: 0; }
+  .steps li {
+    display: flex;
+    gap: 7pt;
+    align-items: flex-start;
+    margin-bottom: 6pt;
+    background: rgba(255,255,255,0.55);
+    border: 1pt solid var(--bank-light);
+    border-left: 3pt solid var(--water-mid);
+    border-radius: 5pt;
+    padding: 6pt 9pt;
+  }
+  .steps li:nth-child(2) { border-left-color: var(--otter); }
+  .steps li:nth-child(3) { border-left-color: var(--bank-light); }
+  .steps .n {
+    flex: none;
+    width: 15pt; height: 15pt;
+    border-radius: 50%;
+    background: var(--water-deep);
+    color: #fff;
+    font-size: 9pt;
+    font-weight: 700;
+    text-align: center;
+    line-height: 15pt;
+  }
+  .steps li:nth-child(2) .n { background: var(--otter); }
+  .steps li:nth-child(3) .n { background: var(--bank-light); }
+  .steps .s { font-size: 8.9pt; line-height: 1.32; }
+
+  .why { list-style: none; margin: 0; padding: 0; }
+  .why li {
+    position: relative;
+    padding: 4pt 0 4pt 0;
+    border-bottom: 0.75pt solid rgba(107,84,54,0.22);
+  }
+  .why li:last-child { border-bottom: none; }
+  .why .h {
+    display: block;
+    font-size: 10pt;
+    color: var(--forest);
+    text-transform: uppercase;
+    letter-spacing: 0.5pt;
+    font-weight: 700;
+    margin-bottom: 1pt;
+  }
+  .why .h .dot {
+    display: inline-block;
+    width: 8pt; height: 8pt;
+    border-radius: 50%;
+    margin-right: 5pt;
+    vertical-align: 0;
+  }
+  .d1 { background: var(--water-mid); }
+  .d2 { background: var(--otter); }
+  .d3 { background: var(--reed-green); }
+  .d4 { background: var(--mink); }
+  .d5 { background: var(--bank-light); }
+
+  .photo-wrap { margin: 0 0 4pt; }
+  h2.features { margin: 10pt 0 5pt; }
+  .photo-wrap img {
+    width: 100%;
+    height: 1.4in;
+    object-fit: cover;
+    object-position: center 38%;
+    border-radius: 6pt;
+    border: 2pt solid #fff;
+    box-shadow: 0 2pt 7pt rgba(0,0,0,0.28);
+    display: block;
+  }
+  .photo-wrap .cap {
+    font-size: 7.6pt;
+    color: var(--ink-soft);
+    font-style: italic;
+    text-align: center;
+    margin-top: 3pt;
+  }
+
+  /* Section heading shared by "How it plays" and "In the box" — matches
+     the "The hook" / "Features" h2 treatment. */
+  h3.sec {
+    font-size: 13pt;
+    color: var(--water-deep);
+    margin: 14pt 0 5pt;
+    line-height: 1.1;
+    font-weight: 700;
+  }
+
+  .howbox { margin-bottom: 13pt; }
+  .howbox p { margin: 0; font-size: 9pt; line-height: 1.4; }
+
+  .components { margin-bottom: 0; }
+  .box-row { display: flex; gap: 9pt; align-items: center; }
+  .box-img {
+    width: 0.8in;
+    height: auto;
+    flex: none;
+  }
+  .components ul { margin: 0; padding-left: 15pt; font-size: 9pt; line-height: 1.5; color: var(--ink); }
+  .components ul li { margin-bottom: 1pt; }
+
+  .quote {
+    margin: 14pt 0 7pt;
+  }
+  .quote p {
+    margin: 0 0 3pt;
+    font-size: 9.7pt;
+    font-style: italic;
+    color: var(--forest);
+    line-height: 1.35;
+  }
+  .quote .attr {
+    font-size: 8pt;
+    color: var(--ink-soft);
+    letter-spacing: 0.3pt;
+  }
+
+  .ready {
+    background: var(--forest);
+    color: var(--shore-light);
+    border-radius: 5pt;
+    padding: 8pt 10pt;
+  }
+  .ready h3 {
+    margin: 0 0 4pt;
+    color: #fff;
+    font-size: 9.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.7pt;
+  }
+  .ready ul { margin: 0; padding-left: 14pt; font-size: 8.6pt; line-height: 1.4; }
+  .ready ul li { margin-bottom: 1.5pt; }
+  .ready strong { color: #fff; }
+
+  /* ============ FOOTER ============ */
+  .foot {
+    display: flex;
+    align-items: center;
+    gap: 0.3in;
+    border-top: 2pt solid var(--water-mid);
+    margin-top: auto;
+    padding-top: 8pt;
+  }
+  .foot .qr { width: 0.82in; height: 0.82in; border: 3pt solid #fff; border-radius: 3pt; box-shadow: 0 1pt 3pt rgba(0,0,0,0.2); }
+  .foot .ftxt { flex: 1; font-size: 9pt; line-height: 1.4; }
+  .foot .ftxt .big {
+    font-size: 11pt;
+    color: var(--water-deep);
+    font-weight: 700;
+    letter-spacing: 0.3pt;
+  }
+  .foot .ftxt .url { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 8.4pt; color: var(--forest); }
+  .foot .brand { text-align: right; font-size: 8.4pt; color: var(--ink-soft); line-height: 1.5; }
+  .foot .brand .pub { font-size: 9.5pt; color: var(--forest); font-weight: 700; text-transform: uppercase; letter-spacing: 1pt; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- HEADER -->
+  <div class="head">
+    <img class="logo" src="../artwork/logo.png" alt="River Bankers">
+    <div class="pitch">
+      <div class="hookline">The river brings the materials. You bring the ambition.</div>
+      <div class="tag">
+        An engine builder built on a <b>novel, multi-unit auction mechanic</b> — blind-bid
+        workers for materials on cards drifting downriver, and spend them to build structures
+        along the riverbank.
+      </div>
+      <div class="specs">
+        <span class="spec"><b>2–4</b> Players</span>
+        <span class="spec"><b>30–60</b> Min</span>
+        <span class="spec">Ages <b>10+</b></span>
+        <span class="spec">Family <b>Strategy</b></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="cols">
+    <!-- LEFT: the mechanic, start to finish -->
+    <div class="colL">
+      <h2>The hook<span class="sub"> — a multi-unit auction that's genuinely new</span></h2>
+      <p class="hero-lead">
+        Each material card shows a row of item icons at a posted per-item price. Every player
+        <strong>secretly bids how many items they want</strong>, then all reveal at once.
+        <strong>Add up the bids and subtract from the number available — that's the overbid.</strong>
+      </p>
+      <ol class="steps">
+        <li><span class="s"><strong>Plenty to go around (overbid = 0)</strong> — everyone takes exactly what they bid for. Done.</span></li>
+        <li><span class="s"><strong>River jam (overbid &gt; 0)</strong> — subtract the overbid from each player's bid to see what they won; the price ticks up and the card <strong>slides one step downriver</strong> to be fought over again.</span></li>
+      </ol>
+      <p class="hero-lead" style="margin-bottom:2pt;">
+        Bids are capped by the workers in front of you, so <strong>overspending is impossible</strong>
+        — no change-making, no math. The river does the price discovery on its own.
+      </p>
+
+      <div class="howbox">
+        <h3 class="sec">How it plays</h3>
+        <p>
+          On your turn, <strong>bid workers</strong> on a material drifting down the river, or
+          <strong>build a structure</strong> from your hand by paying its materials. Every action
+          moves you along the fish track; whoever sits furthest back goes again. When the fish run
+          out, the grandest builder on the bank wins.
+        </p>
+      </div>
+
+      <div class="ready">
+        <h3>Ready for a publisher</h3>
+        <ul>
+          <li><strong>Fully developed &amp; extensively playtested</strong> at 2–4 players</li>
+          <li><strong>Solo-playable</strong> against full-featured AI, with simulations that verify balance</li>
+          <li><strong>Launched in private Alpha</strong> on Board Game Arena</li>
+          <li>Tight, teachable ruleset; scales cleanly 2→4</li>
+          <li>Seeking a publishing partner to bring it to shelf</li>
+        </ul>
+      </div>
+
+      <div class="quote">
+        <p>&ldquo;An auction game with a charming theme and professional presentation.&rdquo;</p>
+        <div class="attr">— Chris Aylott, The Game Crafter Sanity Test</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: photo, features, components -->
+    <div class="colR">
+      <div class="photo-wrap">
+        <img src="sell-sheet-photo.jpg" alt="River Bankers in play">
+        <div class="cap">River Bankers in play — the river fills as builders claim what drifts by.</div>
+      </div>
+
+      <h2 class="features">Features</h2>
+      <ul class="why">
+        <li>
+          <span class="h"><span class="dot d1"></span>Turn order you buy and spend</span>
+          Actions are paid in <em>fish</em> on a shared 60-space track that <strong>is</strong> the
+          turn order — furthest-back always acts next, so a cheap move can hand you two turns in a row.
+        </li>
+        <li>
+          <span class="h"><span class="dot d4"></span>Asymmetry and a deck full of combos</span>
+          An optional <strong>species draft</strong> gives each of the four mammals a distinct opening
+          power. A deck of <strong>~50 structure cards, each with its own effect</strong>, keeps every
+          game different.
+        </li>
+        <li>
+          <span class="h"><span class="dot d5"></span>Charming and low-cost to produce</span>
+          Cards, wooden workers, two small boards, a warm nature theme — broad shelf appeal on a
+          friendly bill of materials.
+        </li>
+      </ul>
+
+      <div class="components">
+        <h3 class="sec">In the box</h3>
+        <div class="box-row">
+          <img class="box-img" src="../bga/img/metadata/box.png" alt="River Bankers box">
+          <ul>
+            <li>1 river board &amp; 1 fish-track board</li>
+            <li>25 material cards · 49 structure cards</li>
+            <li>12 species starter cards</li>
+            <li>32 wooden worker meeples (8 per species)</li>
+            <li>4 fish-track pawns · 42 chits · rulebook</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="foot">
+    <img class="qr" src="../graphics/qr/play-qr.png" alt="Play in your browser">
+    <div class="ftxt">
+      <div class="big">Play it right now in your browser</div>
+      <div class="url">leftfield.games/games/river-bankers</div>
+    </div>
+    <div class="brand">
+      <div class="pub">Left Field Games</div>
+      Designed by Don Schwarz<br>
+      don.schwarz@gmail.com
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

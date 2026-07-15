@@ -18,3 +18,4 @@ bga/img/metadata/title.png filter=lfs diff=lfs merge=lfs -text
 bga/img/cards-material.png filter=lfs diff=lfs merge=lfs -text
 bga/img/cards-structure.png filter=lfs diff=lfs merge=lfs -text
 bga/img/river-board.png filter=lfs diff=lfs merge=lfs -text
+rulebook/*.jpg filter=lfs diff=lfs merge=lfs -text
