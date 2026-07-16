@@ -539,6 +539,12 @@ function reluctantRecallCap(target, supply, minBid) {
 // both the naive and normal bidders.
 let OVERBID = process.env.OVERBID !== undefined ? Number(process.env.OVERBID) : 0;
 function setOverbid(x) { OVERBID = Math.max(0, Number(x) || 0); }
+// Per-player-count OVERBID override (set by --human). Contention scales with the
+// player count, so the over-bid needed to match real jam rates differs sharply:
+// 2P must over-bid hard to jam at all, 4P barely. When set, runGame resolves the
+// active OVERBID from this map by the game's player count. Null = use flat OVERBID.
+let OVERBID_BY_COUNT = null;
+function setOverbidByCount(map) { OVERBID_BY_COUNT = map; }
 // Lift a bid target toward `open` (capped by the marshalable pool) by the OVERBID
 // fraction. Only fires when the card is contestable for a jam — an auction the
 // player could clinch outright (pool covers all open icons alone) needs no flood.
@@ -3429,6 +3435,8 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
   if (workersPerPlayer == null) workersPerPlayer = defaultWorkersPerPlayer(numPlayers);
   configureMaterials(numMats);
   const state = newGame(numPlayers, workersPerPlayer);
+  // Per-count OVERBID (from --human): resolve the active over-bid by player count.
+  if (OVERBID_BY_COUNT && OVERBID_BY_COUNT[numPlayers] !== undefined) setOverbid(OVERBID_BY_COUNT[numPlayers]);
   // Rules-accurate endgame: the game ends when pawns cross the fish-track finish
   // line (90), NOT on material-deck exhaustion. egPlayOut('fish') marks a player
   // out when timePos >= the line, keeps auctioning the board once the deck is dry
@@ -7381,16 +7389,27 @@ if (require.main === module) {
     if (cc) cc.vp = parseInt(process.env.RB_CC_VP, 10) || 0;
   }
   // --human preset: the human-play profile calibrated against real BGA games
-  // (bga-analysis), re-fit after the fish-line endgame fix — mildly over-bid
-  // contested cards (OVERBID=0.2) and never make a discretionary recall
-  // (RECALL_RELUCTANCE=1.0). Under the correct fish-line endgame this matches real
-  // game length at 3P/4P (turns z ~0) with scored mean|z| ~1.2 vs the default AI's
-  // ~2.4. Explicit env vars still win; the flag is stripped from argv so positional
-  // args (emit's numP/workers/games) don't shift.
+  // (bga-analysis) under the rules-accurate fish-line endgame. Two ingredients:
+  //   • COST_AVERSION=0 — humans bid their full material need on pricier downriver
+  //     cards instead of pulling back, winning more icons per auction (so they
+  //     reach the fish line in fewer, bigger auctions and still BUILD — this is
+  //     the efficient length lever; the older OVERBID-only profile matched length
+  //     by wasting fish and starved builds to a mode of 0).
+  //   • light per-count OVERBID {2:0.3, 3:0, 4:0} — only 2P needs contention
+  //     flooding (2 players rarely jam otherwise). 3P/4P get NONE on purpose:
+  //     over-bidding there matches jam rate/length only by wasting fish, which
+  //     collapses the build distribution to a mode of 0 (the pathology we're
+  //     avoiding). So we accept under-matched jams (sim ~7 vs real ~13) and a
+  //     long 4P (real players reach the fish line in ~34 turns while still
+  //     building 11 — the sim needs ~57, because it re-auctions each card ~2x
+  //     more than real; that CARD-RECIRCULATION gap, not bidding, is the true
+  //     remaining discrepancy). Builds/VP/icons match well; jams/length don't.
+  // Explicit env vars still win; the flag is stripped from argv so positional
+  // args don't shift. (2P is n=1 real game, so its 0.3 is tentative.)
   if (process.argv.includes('--human')) {
     process.argv = process.argv.filter((a) => a !== '--human');
-    if (process.env.OVERBID === undefined) setOverbid(0.2);
-    if (process.env.RECALL_RELUCTANCE === undefined) setRecallReluctance(1.0);
+    if (process.env.COST_AVERSION === undefined) setCostAversion(0);
+    if (process.env.OVERBID === undefined) setOverbidByCount({ 2: 0.3, 3: 0, 4: 0 });
   }
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
