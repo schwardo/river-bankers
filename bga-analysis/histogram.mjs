@@ -30,7 +30,7 @@ const METRICS = [
 const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
 const std = (a) => { const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
 
-// Sim distribution uses the --human preset (OVERBID=0.5, RECALL_RELUCTANCE=1.0),
+// Sim distribution uses the --human preset (COST_AVERSION=0 + per-count OVERBID),
 // the profile calibrated to real BGA play; set RB_SIM_DEFAULT=1 for the old AI.
 const SIM_HUMAN = process.env.RB_SIM_DEFAULT !== '1';
 function simDistribution(numP) {
@@ -180,7 +180,7 @@ const realColor=(i)=>PALETTE[i%PALETTE.length];
 
 document.getElementById("lede").textContent =
   \`Teal bars bin \${DATA.simN.toLocaleString()} simulated games per player-count \`
-  + \`(\${DATA.profile==="human"?"--human profile: OVERBID=0.5, RECALL_RELUCTANCE=1.0":"default AI"}); each amber line marks one of \`
+  + \`(\${DATA.profile==="human"?"--human profile: COST_AVERSION=0, per-count OVERBID {2:0.3, 3:0, 4:0}":"default AI"}); each amber line marks one of \`
   + \`\${totalReal} completed BGA game\${totalReal===1?"":"s"}. Where a line sits off the bulk of the bars, real play and the model disagree.\`;
 const chips=document.getElementById("chips");
 [["Simulated / config",DATA.simN.toLocaleString()],["Actual games",String(totalReal)],
