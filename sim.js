@@ -3974,25 +3974,9 @@ function sweepConfluence(numGamesArg, numPArg, workersArg) {
   const CARD = 'Confluence';
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   // variant: { mode: 'off'|'min'|'max' }. Returns aggregate stats.
@@ -4078,25 +4062,9 @@ function sweepConfluencePairing(numGamesArg, numPArg, workersArg) {
   const CARD = 'Confluence';
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   // variant: 'off' | 'same' | 'any'
@@ -4181,25 +4149,9 @@ function sweepConfluenceStarter(numGamesArg, numPArg, workersArg) {
   configureMaterials(6);
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   // variant: 'control' (no bonus) | 'same' | 'any'
@@ -4273,25 +4225,9 @@ function sweepConfluenceTrigger(numGamesArg, numPArg, workersArg, pairingArg) {
   const CARD = 'Confluence';
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   // variant: 'off' | 'sum' | 'min' | 'max'
@@ -4370,25 +4306,9 @@ function sweepGameLength(numGamesArg, numPArg, workersArg) {
   configureMaterials(6);
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   // variant: 'baseline' | 'confluence' | 'double-vision'
@@ -4465,25 +4385,9 @@ function sweepMillWheel(numGamesArg, numPArg, workersArg) {
   configureMaterials(6);
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   function collect(label) {
@@ -4563,25 +4467,9 @@ function sweepBalance(numGamesArg, numPArg, workersArg) {
   configureMaterials(6);
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
   function costEquivVP(tmpl) {
     let mats = 0;
@@ -4723,25 +4611,9 @@ function sweepConfluenceMatrix(numGamesArg, numPArg, workersArg) {
   configureMaterials(6);
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   function resetGlobals() {
@@ -4882,25 +4754,9 @@ function sweepEffectUse(numGamesArg, numPArg, workersArg, pairingArg) {
   const ALL = [].concat(...Object.values(COHORT));
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   const uses = {}, builders = {};
@@ -4963,27 +4819,9 @@ function sweepSpeciesWinRate(numGamesArg, numPArg, workersArg) {
   configureMaterials(6);
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
-        const passed = action.type === 'pass';
-        if (reachedEnd || passed) p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   const tally = {};
@@ -5059,27 +4897,9 @@ function sweepFairness(numGamesArg, numPArg, workersArg) {
   configureMaterials(6);
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
-        const passed = action.type === 'pass';
-        if (reachedEnd || passed) p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   // seat[k] = stats for the player who started k-th in turn order (k=0 first).
@@ -5165,27 +4985,9 @@ function sweepSpeciesStarters(numGamesArg, numPArg, workersArg) {
   configureMaterials(6);
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
-        const passed = action.type === 'pass';
-        if (reachedEnd || passed) p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   const starters = STRUCTURE_TEMPLATES.filter(s => s.species);
@@ -5536,27 +5338,9 @@ function sweepVpRework(numGamesArg, numPArg, workersArg) {
   }
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
-        const passed = action.type === 'pass';
-        if (reachedEnd || passed) p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   function runVariant(card, variant) {
@@ -5658,27 +5442,9 @@ function sweepVineLadder(numGamesArg, numPArg, workersArg) {
   ];
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
-        const passed = action.type === 'pass';
-        if (reachedEnd || passed) p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   function runVariant(v) {
@@ -7259,25 +7025,9 @@ function sweepDeviant(numGamesArg, numPArg, workersArg) {
   configureMaterials(6);
 
   function runOneGame(state) {
-    for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-    while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-      if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-      state.metrics.turns++;
-      const cur = pickNextPlayer(state);
-      if (cur === -1) break;
-      state.currentPlayer = cur;
-      const p = state.players[cur];
-      aiStartOfTurnAbilities(state, p.idx);
-      const action = aiChooseAction(state, p.idx);
-      executeAction(state, p.idx, action);
-      cleanupShoreline(state);
-      if (state.endgame && !p.out) {
-        if (p.timePos >= ENDGAME_TRACK_END || action.type === 'pass') p.out = true;
-      }
-      maybeFireSlipstream(state, p.idx);
-      if (state.endgame && state.players.every(pp => pp.out)) break;
-      if (checkGameEnd(state)) break;
-    }
+    // Rules-accurate fish-line endgame (was deck-exhaustion): match runGame so
+    // balance sweeps measure cards under the live 90-fish endgame + one-build coda.
+    egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
   }
 
   const baseline = 100 / numP;
