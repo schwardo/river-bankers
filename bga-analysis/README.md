@@ -36,6 +36,17 @@ node compare.mjs                     # prints a table, writes data/comparison.md
 node histogram.mjs                   # writes data/histograms.html — sim distribution + actual games overlaid
 ```
 
+**CPU throttling:** to run the (CPU-heavy) sim under a cap, set `SIM_CPULIMIT=<pct>`
+— `compare.mjs`/`histogram.mjs` then throttle each `sim.js emit` child through
+`cpulimit` individually. Do **not** wrap these scripts in an outer
+`cpulimit -m` yourself: cpulimit 3.0's fork-monitor segfaults ~40% of the time
+when it wraps a parent that spawns children (these scripts spawn one sim per
+player-count). Per-child throttling avoids the fork churn that crashes it.
+
+```bash
+SIM_CPULIMIT=50 NAIVE_BID=1 RECALL_RELUCTANCE=0.7 node compare.mjs   # ablation-safe
+```
+
 `histogram.mjs` builds a self-contained page: one section per player-count, teal
 bars = the simulated distribution, amber line = each actual BGA game, `z` = how
 many sim standard deviations the real value sits from the sim mean. Open

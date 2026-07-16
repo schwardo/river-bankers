@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { runSimEmit } from './sim-runner.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, 'data');
@@ -49,9 +49,7 @@ function std(a) {
 }
 
 function simDistribution(numP) {
-  const out = execFileSync('node', [SIM, 'emit', String(numP), '', String(SIM_GAMES)],
-    { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  return out.trim().split('\n').map((l) => JSON.parse(l));
+  return runSimEmit(SIM, numP, '', SIM_GAMES);
 }
 
 const pad = (s, n) => String(s).padEnd(n);
