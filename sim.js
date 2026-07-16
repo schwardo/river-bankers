@@ -7394,6 +7394,16 @@ if (require.main === module) {
     const cc = BASE_STRUCTURE_TEMPLATES.find(s => s.name === 'Channel Clearer');
     if (cc) cc.vp = parseInt(process.env.RB_CC_VP, 10) || 0;
   }
+  // --human preset: the human-play profile calibrated against real BGA games
+  // (bga-analysis) — over-bid contested cards (OVERBID=0.5) and never make a
+  // discretionary recall (RECALL_RELUCTANCE=1.0). Best fit found (scored
+  // mean|z| ~1.0 vs the default AI's ~2.7). Explicit env vars still win; the flag
+  // is stripped from argv so positional args (emit's numP/workers/games) don't shift.
+  if (process.argv.includes('--human')) {
+    process.argv = process.argv.filter((a) => a !== '--human');
+    if (process.env.OVERBID === undefined) setOverbid(0.5);
+    if (process.env.RECALL_RELUCTANCE === undefined) setRecallReluctance(1.0);
+  }
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
   else if (mode === 'bid-diag') sweepBidDiag(process.argv[3], process.argv[4]);
