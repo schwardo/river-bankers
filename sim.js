@@ -506,6 +506,26 @@ function setBidContentionK(k) { BID_CONTENTION_K = k; }
 let NAIVE_BID = process.env.NAIVE_BID === '1';
 function setNaiveBid(v) { NAIVE_BID = !!v; }
 
+// Recall reluctance (RECALL_RELUCTANCE, 0..1): models human loss aversion —
+// players dislike pulling workers they've already placed on the river, even when
+// recalling to fund a bigger bid would be the stronger play. On any bid that
+// would require a recall, with probability RECALL_RELUCTANCE the player refuses
+// and instead bids only what its current supply covers. It will still recall the
+// minimum forced by a trigger min-bid (an illegal under-bid isn't an option), so
+// reluctance only suppresses *discretionary* recall. 0 = always recall as needed
+// (the rational default); 1 = never recall for a discretionary bid. Sweep it to
+// fit the low workersRecalled seen in real BGA games. Applies to both the naive
+// and the normal bidder.
+let RECALL_RELUCTANCE = process.env.RECALL_RELUCTANCE !== undefined ? Number(process.env.RECALL_RELUCTANCE) : 0;
+function setRecallReluctance(x) { RECALL_RELUCTANCE = Math.max(0, Math.min(1, Number(x) || 0)); }
+// Cap a bid target when the player is (this time) unwilling to recall: keep the
+// bid to supply, but never below the forced trigger minimum.
+function reluctantRecallCap(target, supply, minBid) {
+  if (RECALL_RELUCTANCE <= 0 || target <= supply) return target;
+  if (Math.random() >= RECALL_RELUCTANCE) return target; // willing to recall this time
+  return Math.max(minBid, supply);
+}
+
 // Live rule: ANY plenty-to-go-around with leftover icons slides the card one
 // slot downstream (pre→R1, R1→R2, ..., R4→shore) instead of graduating it to
 // the shoreline directly. Cards only go to the shoreline when no icons remain
@@ -1778,6 +1798,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // the worker-rationing and opponent-modeling that follows.
   if (NAIVE_BID) {
     let t = Math.max(minBid, Math.min(need, open, totalPool));
+    t = reluctantRecallCap(t, p.supply, minBid);
     let nr = t - p.supply;
     if (nr > 0) {
       const tookSafe = aiRecallFromList(state, playerIdx, safe, nr);
@@ -1865,6 +1886,8 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // Cap at safe pool unless we need fallback to satisfy the trigger min-bid.
   target = Math.min(target, target > safePool && minBid > 0 ? totalPool : safePool);
   if (target < 0) target = 0;
+  // Recall reluctance (loss aversion): may refuse to fund via recall this bid.
+  target = reluctantRecallCap(target, p.supply, minBid);
   // Pre-auction recall: pull workers off the river/shoreline to fund the bid.
   // Use safe budget first, then fallback only as needed.
   let needRecall = target - p.supply;
