@@ -526,6 +526,30 @@ function reluctantRecallCap(target, supply, minBid) {
   return Math.max(minBid, supply);
 }
 
+// Over-bid aggression (OVERBID, 0..1): models human over-bidding — piling workers
+// toward the FULL number of open spots on a contested card (never beyond it — a
+// bid can't exceed the card's open icons). The normal bid paths cap the target at
+// need/clinchable/4, well under `open`; this lifts it back toward `open`. When
+// several players do this into the same card the bids SUM past `open`, so losers'
+// workers clinch nothing yet are still billed fish (billable = bid in
+// resolveAuction) — burning fish/tempo without winning icons, the real-4P dynamic
+// (many jams, few icons, game still races to the fish line). 0 = demand-capped
+// (default); 1 = staff every open spot you can marshal on every contested card.
+// The ceiling is min(open, marshalable pool), so it stays a legal bid. Applies to
+// both the naive and normal bidders.
+let OVERBID = process.env.OVERBID !== undefined ? Number(process.env.OVERBID) : 0;
+function setOverbid(x) { OVERBID = Math.max(0, Number(x) || 0); }
+// Lift a bid target toward `open` (capped by the marshalable pool) by the OVERBID
+// fraction. Only fires when the card is contestable for a jam — an auction the
+// player could clinch outright (pool covers all open icons alone) needs no flood.
+function applyOverbid(target, pool, open, minBid) {
+  if (OVERBID <= 0) return target;
+  const ceil = Math.min(open, pool);      // legal max: never bid past open spots
+  if (ceil <= target) return target;
+  const lifted = Math.round(target + OVERBID * (ceil - target));
+  return Math.max(target, Math.min(ceil, lifted), minBid);
+}
+
 // Live rule: ANY plenty-to-go-around with leftover icons slides the card one
 // slot downstream (pre→R1, R1→R2, ..., R4→shore) instead of graduating it to
 // the shoreline directly. Cards only go to the shoreline when no icons remain
@@ -1798,6 +1822,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // the worker-rationing and opponent-modeling that follows.
   if (NAIVE_BID) {
     let t = Math.max(minBid, Math.min(need, open, totalPool));
+    if (need > 0) t = applyOverbid(t, totalPool, open, minBid);
     t = reluctantRecallCap(t, p.supply, minBid);
     let nr = t - p.supply;
     if (nr > 0) {
@@ -1886,6 +1911,11 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // Cap at safe pool unless we need fallback to satisfy the trigger min-bid.
   target = Math.min(target, target > safePool && minBid > 0 ? totalPool : safePool);
   if (target < 0) target = 0;
+  // Over-bid aggression: flood a contested card's open spots (up to marshalable
+  // workers) so surplus workers burn fish in a jam. Uses totalPool so it may
+  // recall to staff spots; RECALL_RELUCTANCE below can still temper that. Only
+  // when the player genuinely wants this material (need > 0).
+  if (need > 0) target = applyOverbid(target, totalPool, open, minBid);
   // Recall reluctance (loss aversion): may refuse to fund via recall this bid.
   target = reluctantRecallCap(target, p.supply, minBid);
   // Pre-auction recall: pull workers off the river/shoreline to fund the bid.
