@@ -550,6 +550,31 @@ function applyOverbid(target, pool, open, minBid) {
   return Math.max(target, Math.min(ceil, lifted), minBid);
 }
 
+// Normal-bid worker cap (BID_CAP): the most workers the rational bidder will
+// marshal for a single normal bid, before OVERBID. Historically a hardcoded 4 —
+// well under the 5/7/8 icons a card can hold — which throttled fish spend and
+// kept games long. Now a knob; default 4 preserves the legacy AI (balance sweeps
+// etc.). --human lifts it so aggressive play can staff a whole card. A value <= 0
+// means "no cap" (bid up to open / marshalable pool).
+let BID_CAP = process.env.BID_CAP !== undefined ? Number(process.env.BID_CAP) : 4;
+function setBidCap(x) { BID_CAP = Number(x); }
+function bidCap() { return BID_CAP > 0 ? BID_CAP : Infinity; }
+
+// Cost aversion (COST_AVERSION, >= 0): how strongly the AI shrinks its bid on
+// high per-item (🐟/item) cards — the "don't overpay per item" reflex. The legacy
+// rule trimmed the bid by 1 worker at myCost >= 3 and another at myCost >= 4
+// (i.e. by clamp(myCost-2, 0, 2)); this scales that trim. 1.0 = legacy behavior,
+// 0 = pay any per-item price (never pull back on pricey downriver cards — spends
+// fish fast, shortening the game), > 1 = even more price-shy. Sweep it to fit the
+// short real 4P games, where humans clearly overpay per item.
+let COST_AVERSION = process.env.COST_AVERSION !== undefined ? Number(process.env.COST_AVERSION) : 1;
+function setCostAversion(x) { COST_AVERSION = Math.max(0, Number(x) || 0); }
+// Worker reduction for a given per-item cost, scaled by COST_AVERSION.
+function costAversionTrim(myCost) {
+  const base = Math.min(Math.max(myCost - 2, 0), 2); // legacy: 1 at >=3, 2 at >=4
+  return Math.round(COST_AVERSION * base);
+}
+
 // Live rule: ANY plenty-to-go-around with leftover icons slides the card one
 // slot downstream (pre→R1, R1→R2, ..., R4→shore) instead of graduating it to
 // the shoreline directly. Cards only go to the shoreline when no icons remain
@@ -1834,7 +1859,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   }
 
   let target = Math.round((need + maxNeed) / 2);
-  target = Math.min(target, safePool, open, 4);
+  target = Math.min(target, safePool, open, bidCap());
   // Use the player-specific per-item cost so Reed Bed makes reed auctions more attractive.
   let myCost = playerCardCost(state, card, playerIdx);
   // Old Growth at River 3/4: each worker yields 2x material, halving the
@@ -1850,8 +1875,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
     );
     if (!opponentPresent) myCost = Math.max(1, myCost - 1);
   }
-  if (myCost >= 3 && target > 1) target = Math.max(1, target - 1);
-  if (myCost >= 4 && target > 1) target = Math.max(1, target - 1);
+  if (target > 1) target = Math.max(1, target - costAversionTrim(myCost));
   // Most-workers race (Mud Wallow, Cattail Cluster): if winning by 1 worker
   // is reachable within budget and the bonus pays for the extra fish, push
   // the target to (opponent's max + 1).
