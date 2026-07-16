@@ -7381,13 +7381,15 @@ if (require.main === module) {
     if (cc) cc.vp = parseInt(process.env.RB_CC_VP, 10) || 0;
   }
   // --human preset: the human-play profile calibrated against real BGA games
-  // (bga-analysis) — over-bid contested cards (OVERBID=0.5) and never make a
-  // discretionary recall (RECALL_RELUCTANCE=1.0). Best fit found (scored
-  // mean|z| ~1.0 vs the default AI's ~2.7). Explicit env vars still win; the flag
-  // is stripped from argv so positional args (emit's numP/workers/games) don't shift.
+  // (bga-analysis), re-fit after the fish-line endgame fix — mildly over-bid
+  // contested cards (OVERBID=0.2) and never make a discretionary recall
+  // (RECALL_RELUCTANCE=1.0). Under the correct fish-line endgame this matches real
+  // game length at 3P/4P (turns z ~0) with scored mean|z| ~1.2 vs the default AI's
+  // ~2.4. Explicit env vars still win; the flag is stripped from argv so positional
+  // args (emit's numP/workers/games) don't shift.
   if (process.argv.includes('--human')) {
     process.argv = process.argv.filter((a) => a !== '--human');
-    if (process.env.OVERBID === undefined) setOverbid(0.5);
+    if (process.env.OVERBID === undefined) setOverbid(0.2);
     if (process.env.RECALL_RELUCTANCE === undefined) setRecallReluctance(1.0);
   }
   const mode = process.argv[2];
