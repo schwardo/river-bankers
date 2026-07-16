@@ -21,7 +21,7 @@ import { execFileSync } from 'node:child_process';
 
 // Run `node sim.js emit <numP> <workers|''> <games>` and return parsed JSONL.
 // Throttled per-child via cpulimit iff SIM_CPULIMIT (a percent) is set.
-export function runSimEmit(SIM, numP, workers, games, { maxBuffer = 256 * 1024 * 1024 } = {}) {
+export function runSimEmit(SIM, numP, workers, games, { maxBuffer = 256 * 1024 * 1024, env = null } = {}) {
   const emitArgs = [SIM, 'emit', String(numP), workers == null ? '' : String(workers), String(games)];
   const limit = process.env.SIM_CPULIMIT;
   let bin, args;
@@ -33,7 +33,7 @@ export function runSimEmit(SIM, numP, workers, games, { maxBuffer = 256 * 1024 *
     bin = 'node';
     args = emitArgs;
   }
-  const out = execFileSync(bin, args, { encoding: 'utf8', maxBuffer });
+  const out = execFileSync(bin, args, { encoding: 'utf8', maxBuffer, env: env ? { ...process.env, ...env } : process.env });
   // cpulimit prints diagnostics like "Process <pid> detected" onto stdout, which
   // mixes with the sim's JSONL — keep only the JSON object lines.
   return out.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('{')).map((l) => JSON.parse(l));
