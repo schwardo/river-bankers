@@ -21,8 +21,9 @@ import { execFileSync } from 'node:child_process';
 
 // Run `node sim.js emit <numP> <workers|''> <games>` and return parsed JSONL.
 // Throttled per-child via cpulimit iff SIM_CPULIMIT (a percent) is set.
-export function runSimEmit(SIM, numP, workers, games, { maxBuffer = 256 * 1024 * 1024, env = null } = {}) {
+export function runSimEmit(SIM, numP, workers, games, { maxBuffer = 256 * 1024 * 1024, env = null, human = false } = {}) {
   const emitArgs = [SIM, 'emit', String(numP), workers == null ? '' : String(workers), String(games)];
+  if (human) emitArgs.push('--human'); // sim.js strips the flag before positional parsing
   const limit = process.env.SIM_CPULIMIT;
   let bin, args;
   if (limit && Number(limit) > 0) {

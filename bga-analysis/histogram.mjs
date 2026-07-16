@@ -30,8 +30,11 @@ const METRICS = [
 const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
 const std = (a) => { const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
 
+// Sim distribution uses the --human preset (OVERBID=0.5, RECALL_RELUCTANCE=1.0),
+// the profile calibrated to real BGA play; set RB_SIM_DEFAULT=1 for the old AI.
+const SIM_HUMAN = process.env.RB_SIM_DEFAULT !== '1';
 function simDistribution(numP) {
-  return runSimEmit(SIM, numP, '', SIM_GAMES);
+  return runSimEmit(SIM, numP, '', SIM_GAMES, { human: SIM_HUMAN });
 }
 
 function computeGroup(numP, real, sim) {
@@ -67,7 +70,7 @@ function main() {
   }
   process.stderr.write(' '.repeat(44) + '\r');
 
-  const html = PAGE.replace('__DATA__', JSON.stringify({ simN: SIM_GAMES, groups }));
+  const html = PAGE.replace('__DATA__', JSON.stringify({ simN: SIM_GAMES, groups, profile: SIM_HUMAN ? 'human' : 'default' }));
   fs.mkdirSync(DATA, { recursive: true });
   fs.writeFileSync(path.join(DATA, 'histograms.html'), html);
   const flagged = groups.flatMap((g) => g.metrics.filter((m) => Math.abs(m.z) >= 2).map((m) => `${g.numP}P ${m.label}`));
@@ -176,7 +179,8 @@ const PALETTE=["#b9741c","#c0397b","#3b9e5b","#7b5cd6","#c0563a","#2f8f8f"];
 const realColor=(i)=>PALETTE[i%PALETTE.length];
 
 document.getElementById("lede").textContent =
-  \`Teal bars bin \${DATA.simN.toLocaleString()} simulated games per player-count; each amber line marks one of \`
+  \`Teal bars bin \${DATA.simN.toLocaleString()} simulated games per player-count \`
+  + \`(\${DATA.profile==="human"?"--human profile: OVERBID=0.5, RECALL_RELUCTANCE=1.0":"default AI"}); each amber line marks one of \`
   + \`\${totalReal} completed BGA game\${totalReal===1?"":"s"}. Where a line sits off the bulk of the bars, real play and the model disagree.\`;
 const chips=document.getElementById("chips");
 [["Simulated / config",DATA.simN.toLocaleString()],["Actual games",String(totalReal)],
