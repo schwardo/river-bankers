@@ -3429,51 +3429,13 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
   if (workersPerPlayer == null) workersPerPlayer = defaultWorkersPerPlayer(numPlayers);
   configureMaterials(numMats);
   const state = newGame(numPlayers, workersPerPlayer);
-  // initial spawned icons (3 upstream)
-  for (const c of state.prerivCards) if (c) state.metrics.iconsSpawned += c.totalIcons;
-  while (!state.gameOver && state.metrics.turns < MAX_TURNS) {
-    if (!state.endgame && state.matDeck.length === 0) triggerEndgame(state);
-    if (state.endgame && state.players.every(p => p.out)) break;
-
-    const cur = pickNextPlayer(state);
-    if (cur === -1) break;
-    state.currentPlayer = cur;
-    state.metrics.turns++;
-
-    const p = state.players[cur];
-    aiStartOfTurnAbilities(state, p.idx);
-    const action = aiChooseAction(state, p.idx);
-    const wasEndgame = state.endgame;
-    executeAction(state, p.idx, action);
-    cleanupShoreline(state);
-
-    if (wasEndgame) {
-      const m = state.metrics;
-      m.endgameTurns++;
-      if (action.type === 'browse') {
-        m.endgameBrowses++;
-        p.browseStreak = (p.browseStreak || 0) + 1;
-        if (p.browseStreak > m.maxBrowseStreak) m.maxBrowseStreak = p.browseStreak;
-      } else {
-        p.browseStreak = 0;
-        if (action.type === 'build') m.endgameBuilds++;
-        else if (action.type === 'pass') m.endgamePasses++;
-        else if (action.type === 'auction' || action.type === 'preriv' || action.type === 'flush') m.endgameAuctions++;
-      }
-    }
-
-    if (state.endgame && !p.out) {
-      const reachedEnd = p.timePos >= ENDGAME_TRACK_END;
-      const passed = action.type === 'pass';
-      if (reachedEnd || passed) {
-        if (PASS0_AT_ENDGAME_END) firePassZeroEffects(state, p.idx, 1);
-        p.out = true;
-      }
-    }
-    maybeFireSlipstream(state, p.idx);
-    if (state.endgame && state.players.every(pp => pp.out)) break;
-    if (checkGameEnd(state)) break;
-  }
+  // Rules-accurate endgame: the game ends when pawns cross the fish-track finish
+  // line (90), NOT on material-deck exhaustion. egPlayOut('fish') marks a player
+  // out when timePos >= the line, keeps auctioning the board once the deck is dry
+  // (with the +1 deck-empty drift), and runs the one-final-build coda ('d') after
+  // everyone retires — matching the rulebook and the live BGA game. (iconsSpawned
+  // for the 3 upstream cards is seeded inside egPlayOut.)
+  egPlayOut(state, 'fish', null, simFishLine(numPlayers), 'd');
   // Final per-player VP tally (includes effect bonuses; ablation toggles via STRUCTURE_EFFECT_DISABLED).
   const vpEntries = state.players.map(p => ({
     idx: p.idx,
@@ -6009,7 +5971,7 @@ function egPlayOut(state, trigger, vpLimit, fishLimit, proc) {
         // players keep auctioning the river/Headwaters cards already on the board
         // until their pawns pass the line. checkGameEnd (below) still ends the
         // game once the board is genuinely exhausted (nothing to auction/build).
-        for (const p of state.players) if (!p.out && p.timePos >= fishLimit) p.out = true;
+        for (const p of state.players) if (!p.out && p.timePos >= fishLimit) { p.out = true; state.metrics.endgameTriggered = true; }
         triggered = state.players.every(p => p.out);
       }
       if (triggered) break;
