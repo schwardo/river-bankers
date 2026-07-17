@@ -1057,6 +1057,7 @@ class Game extends \Bga\GameFramework\Table
         foreach ($aside as $id) {
             $this->DbQuery("UPDATE `card` SET `card_location` = 'flush_aside' WHERE `card_id` = $id");
         }
+        $filled = 0;
         for ($slot = 1; $slot <= 3; $slot++) {
             $top = $this->getUniqueValueFromDB(
                 "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck' ORDER BY `card_location_arg` LIMIT 1"
@@ -1067,11 +1068,27 @@ class Game extends \Bga\GameFramework\Table
             $this->DbQuery(
                 "UPDATE `card` SET `card_location` = 'headwaters', `card_location_arg` = $slot WHERE `card_id` = " . (int) $top
             );
+            $filled = $slot;
         }
+        // Return the flushed cards to the deck and reshuffle. Do this BEFORE
+        // finishing the deal so that, if the deck ran dry mid-flush, the flushed
+        // cards become available to fill the remaining Headwaters slots — a flush
+        // must always leave 3 cards whenever the game holds at least that many.
         foreach ($aside as $id) {
             $this->DbQuery("UPDATE `card` SET `card_location` = 'material_deck' WHERE `card_id` = $id");
         }
         $this->reshuffleMaterialDeck();
+        for ($slot = $filled + 1; $slot <= 3; $slot++) {
+            $top = $this->getUniqueValueFromDB(
+                "SELECT `card_id` FROM `card` WHERE `card_location` = 'material_deck' ORDER BY `card_location_arg` LIMIT 1"
+            );
+            if ($top === null) {
+                break;
+            }
+            $this->DbQuery(
+                "UPDATE `card` SET `card_location` = 'headwaters', `card_location_arg` = $slot WHERE `card_id` = " . (int) $top
+            );
+        }
     }
 
     // =====================================================================

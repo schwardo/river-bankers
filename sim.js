@@ -3390,6 +3390,17 @@ function executeAction(state, playerIdx, action) {
         const j = Math.floor(Math.random() * (i + 1));
         [d[i], d[j]] = [d[j], d[i]];
       }
+      // Continue dealing into any slots the (pre-reshuffle) deck couldn't fill,
+      // now that the flushed cards are back in the deck. Guarantees a full
+      // Headwaters (3 cards) whenever the game holds at least that many cards.
+      for (let i = 0; i < state.prerivCards.length; i++) {
+        if (state.prerivCards[i]) continue;
+        if (state.matDeck.length === 0) break;
+        const c = state.matDeck.pop();
+        c.slot = 'pre';
+        state.prerivCards[i] = c;
+        state.metrics.iconsSpawned += c.totalIcons;
+      }
     }
     const targetIdx = aiChooseFlushTarget(state, playerIdx);
     if (targetIdx === -1) return;

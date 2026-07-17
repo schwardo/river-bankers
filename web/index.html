@@ -6287,6 +6287,16 @@ async function humanFlushUpstream() {
     }
     state.matDeck = shuffle(state.matDeck);
     log(`🔀 ${flushed.length} flushed card${flushed.length === 1 ? '' : 's'} returned to the material deck (reshuffled).`);
+    // Continue dealing into any slots the (pre-reshuffle) deck couldn't fill,
+    // now that the flushed cards are back in the deck. Guarantees a full
+    // Headwaters whenever the game holds at least PRERIV_SLOTS cards.
+    for (let i = 0; i < PRERIV_SLOTS; i++) {
+      if (state.prerivCards[i]) continue;
+      if (state.matDeck.length === 0) break;
+      const c = state.matDeck.pop();
+      c.slot = 'pre';
+      state.prerivCards[i] = c;
+    }
   }
   // 4) Prompt human to pick one upstream card to auction (free trigger; bid normally).
   if (state.prerivCards.every(c => c === null)) {
@@ -7997,6 +8007,16 @@ async function executeAIAction(playerIdx, action) {
       }
       state.matDeck = shuffle(state.matDeck);
       log(`🔀 ${flushed.length} flushed card${flushed.length === 1 ? '' : 's'} returned to the material deck (reshuffled).`);
+      // Continue dealing into any slots the (pre-reshuffle) deck couldn't fill,
+      // now that the flushed cards are back in the deck. Guarantees a full
+      // Headwaters whenever the game holds at least that many cards.
+      for (let i = 0; i < state.prerivCards.length; i++) {
+        if (state.prerivCards[i]) continue;
+        if (state.matDeck.length === 0) break;
+        const c = state.matDeck.pop();
+        c.slot = 'pre';
+        state.prerivCards[i] = c;
+      }
     }
     render();
     await sleep(300);
