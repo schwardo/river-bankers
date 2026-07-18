@@ -267,7 +267,7 @@ for(const entry of charts){const {m,canvas,simN}=entry;
 const flagged=DATA.groups.flatMap(g=>g.metrics.filter(m=>Math.abs(m.z)>=2).map(m=>\`\${g.numP}P \${m.label}\`));
 document.getElementById("foot").innerHTML=
   (flagged.length?\`Diverging (|z| ≥ 2): <b style="color:var(--actual)">\${flagged.join(", ")}</b>. \`:"")
-  +\`Regenerate with <code>node fetch-games.mjs · parse-games.mjs · histogram.mjs</code>. A single game is one draw — overlap only means something once several stack up.\`;
+  +\`A single game is one draw — overlap only means something once several stack up.\`;
 
 const root=document.documentElement,tgl=document.getElementById("toggle");
 tgl.addEventListener("click",()=>{const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",cur==="dark"?"light":"dark");render();});
