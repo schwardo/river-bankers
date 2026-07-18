@@ -208,6 +208,7 @@ function parseGame(tableId) {
     cardsBuilt: m(s.cardsBuilt),
     iconsWon: m(s.iconsWon),
     workersRecalled: m(s.workersRecalled),
+    invents: m(s.invents),
     fishSpent: null, // not reliably reconstructable from the public stream
     // Scoring (from finalScores packet, else tableinfos player scores)
     winnerVP: vps[0] ?? null,
@@ -227,7 +228,7 @@ function parseGame(tableId) {
 // --- CSV ------------------------------------------------------------------------
 
 const GAME_COLS = ['tableId', 'date', 'numP', 'workers', 'turns', 'auctions', 'jamAuctions',
-  'plentyAuctions', 'noBidAuctions', 'noWinnerAuctions', 'cardsBuilt', 'iconsWon', 'workersRecalled', 'fishSpent',
+  'plentyAuctions', 'noBidAuctions', 'noWinnerAuctions', 'cardsBuilt', 'iconsWon', 'workersRecalled', 'invents', 'fishSpent',
   'winnerVP', 'runnerUpVP', 'loserVP', 'vpSpread', 'winMargin', 'totalVP', 'hasLog'];
 const PLAYER_COLS = ['tableId', 'pid', 'name', 'rank', 'finalVP', 'auctionsTriggered',
   'auctionsWon', 'iconsWon', 'invents', 'flushes', 'abilitiesUsed', 'workersRecalled', 'fishSpent'];
