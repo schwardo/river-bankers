@@ -32,4 +32,22 @@ final class CardMovementTest extends TestCase
     {
         self::assertSame(['location' => 'shoreline', 'slot' => 0], CardMovement::destination('river', 4, 2));
     }
+
+    /**
+     * Shoreline invariant: a card only rests on the shoreline while it holds a
+     * worker. Zero workers -> discarded (out of the game), never left stranded.
+     * Guards the family of bugs where a fully-jammed River-4 graduation, an
+     * all-blanks cover, a workerless Spillway wash, or a last-worker recall left
+     * a workerless card sitting on the shoreline.
+     */
+    public function testShorelineRestingKeepsCardsWithWorkers(): void
+    {
+        self::assertSame('shoreline', CardMovement::shorelineResting(1));
+        self::assertSame('shoreline', CardMovement::shorelineResting(5));
+    }
+
+    public function testShorelineRestingDiscardsWorkerlessCards(): void
+    {
+        self::assertSame('discard', CardMovement::shorelineResting(0));
+    }
 }

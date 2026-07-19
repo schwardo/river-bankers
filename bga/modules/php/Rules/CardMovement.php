@@ -41,4 +41,18 @@ final class CardMovement
         }
         return ['location' => 'river', 'slot' => $slot + 1];
     }
+
+    /**
+     * Shoreline invariant: a card may sit on the shoreline only while it holds at
+     * least one worker. A card that arrives (auction graduation, all-blanks cover,
+     * Spillway wash) or is left (last worker recalled/spent) with none leaves the
+     * game entirely. Returns the card's resting location given its worker count.
+     *
+     * Mirrors sim.js cleanupShoreline(): the single rule every "card reaches /
+     * stays on the shoreline" path must honour. Callers persist the result.
+     */
+    public static function shorelineResting(int $workersOnCard): string
+    {
+        return $workersOnCard > 0 ? 'shoreline' : 'discard';
+    }
 }

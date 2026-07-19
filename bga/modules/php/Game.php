@@ -478,9 +478,20 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $playerId AND `card_id` = $cardId");
         $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $cardId AND `workers` <= 0");
         $this->DbQuery("UPDATE `player` SET `player_worker_supply` = `player_worker_supply` + 1 WHERE `player_id` = $playerId");
-        if ($dropBlank && $this->getCardRow($cardId)['card_location'] === 'river') {
+        $loc = $this->getCardRow($cardId)['card_location'];
+        if ($dropBlank && $loc === 'river') {
             $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + 1 WHERE `card_id` = $cardId");
             $this->graduateIfFullyCovered($cardId);
+        } elseif ($loc === 'shoreline') {
+            // Recalling the last worker off a shoreline card removes it from the
+            // game (rulebook: "Once the last worker leaves a shoreline card, the
+            // card is removed"). Shoreline recalls never drop a blank.
+            $left = (int) $this->getUniqueValueFromDB(
+                "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $cardId"
+            );
+            if (CardMovement::shorelineResting($left) === 'discard') {
+                $this->DbQuery("UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0 WHERE `card_id` = $cardId");
+            }
         }
     }
 
@@ -1035,7 +1046,7 @@ class Game extends \Bga\GameFramework\Table
                 $left = (int) $this->getUniqueValueFromDB(
                     "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $cardId"
                 );
-                if ($left === 0) {
+                if (CardMovement::shorelineResting($left) === 'discard') {
                     $this->DbQuery("UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0 WHERE `card_id` = $cardId");
                 }
             }
@@ -2750,6 +2761,17 @@ class Game extends \Bga\GameFramework\Table
         foreach ($this->getObjectListFromDB("SELECT `player_id`, `workers` FROM `worker` WHERE `card_id` = $cardId") as $w) {
             $workers[(int) $w['player_id']] = (int) $w['workers'];
         }
+        // Invariant: a shoreline card must always hold at least one worker. A card
+        // that reaches the shoreline with none (a fully-jammed River-4 graduation,
+        // an all-blanks cover, a workerless Spillway wash) leaves the game entirely
+        // rather than sitting stranded on the shoreline. Mirrors sim.js
+        // cleanupShoreline() and the workerless branch of graduateIfFullyCovered().
+        if (CardMovement::shorelineResting((int) array_sum($workers)) === 'discard') {
+            $this->DbQuery(
+                "UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0, `card_blanks` = 0 WHERE `card_id` = $cardId"
+            );
+            return [];
+        }
         $penalties = Effects::shorelinePenalty($name, $workers);
         foreach ($penalties as $pid => $spaces) {
             $this->moveBackFish((int) $pid, (int) $spaces);
@@ -2772,10 +2794,10 @@ class Game extends \Bga\GameFramework\Table
         if ($row['card_location'] !== 'river' || $this->uncoveredIcons($cardId) > 0) {
             return;
         }
-        $hasWorkers = (int) $this->getUniqueValueFromDB(
+        $onCard = (int) $this->getUniqueValueFromDB(
             "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $cardId"
-        ) > 0;
-        if ($hasWorkers) {
+        );
+        if (CardMovement::shorelineResting($onCard) === 'shoreline') {
             $this->DbQuery("UPDATE `card` SET `card_location` = 'shoreline', `card_location_arg` = 0, `card_blanks` = 0 WHERE `card_id` = $cardId");
             $this->applyShorelineArrival($cardId);
         } else {
