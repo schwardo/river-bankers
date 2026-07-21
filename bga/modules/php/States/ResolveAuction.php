@@ -48,13 +48,18 @@ class ResolveAuction extends GameState
         $bids = $this->game->getAuctionBids($auctionId);
         $this->notifyBids($open, $bids);
 
-        $clinched = AuctionRules::clinched($open, $bids);
+        $clinchedRaw = AuctionRules::clinched($open, $bids);
+        // Initiator consolation: on a total wipe (nobody clinched), the auction's
+        // trigger player is guaranteed 1 item (see Rules\Auction).
+        $trigger = (int) $auction['trigger_player'];
+        $clinched = AuctionRules::withInitiatorConsolation($open, $bids, $clinchedRaw, $trigger);
+        $consolationFired = ($clinched[$trigger] ?? 0) !== ($clinchedRaw[$trigger] ?? 0);
         // Pontoon: a jammed bidder who controls a built Pontoon pays for one fewer worker.
         $pontoon = [];
         foreach ($bids as $pid => $bid) {
             $pontoon[$pid] = in_array('Pontoon', $this->game->getBuiltNames($pid), true);
         }
-        $billable = AuctionRules::billableWorkers($open, $bids, $pontoon);
+        $billable = AuctionRules::billableWorkers($open, $bids, $pontoon, $clinched);
         $base = Cost::perItem((string) $cardRow['card_location'], (int) $cardRow['card_location_arg'], $forcedRate);
         $matDef = Material::$MATERIAL[(int) $cardRow['card_type_arg']] ?? [];
         $material = (string) ($matDef['material'] ?? '');               // primary, for the discount lookup
@@ -111,9 +116,13 @@ class ResolveAuction extends GameState
         $overbid = max(0, array_sum($bids) - $open);
         foreach ($bids as $pid => $bid) {
             $got = $clinched[$pid];
-            $msg = $got > 0
-                ? clienttranslate('${player_name} wins ${n}x ${material} (bid ${bid} - overbid ${overbid}), pays ${paid} 🐟.')
-                : clienttranslate('${player_name} wins nothing (bid ${bid} - overbid ${overbid}), but pays ${paid} 🐟.');
+            if ($consolationFired && $pid === $trigger) {
+                $msg = clienttranslate('No one won the auction, so ${player_name} (the initiator) claims 1x ${material}, pays ${paid} 🐟.');
+            } elseif ($got > 0) {
+                $msg = clienttranslate('${player_name} wins ${n}x ${material} (bid ${bid} - overbid ${overbid}), pays ${paid} 🐟.');
+            } else {
+                $msg = clienttranslate('${player_name} wins nothing (bid ${bid} - overbid ${overbid}), but pays ${paid} 🐟.');
+            }
             $this->notify->all('auctionResolved', $msg, [
                 'player_id' => $pid,
                 'player_name' => $this->game->getPlayerNameById($pid),

@@ -46,6 +46,48 @@ final class AuctionTest extends TestCase
         self::assertSame([7 => 1, 4 => 1], Auction::clinched(5, [7 => 4, 4 => 4]));
     }
 
+    public function testInitiatorConsolationOnWipe(): void
+    {
+        // 5 icons, three bids of 3 (overbid 4): got = max(0, 3 - 4) = 0 for all,
+        // so nobody wins. The initiator (player 20) is guaranteed 1 item.
+        $bids = [10 => 3, 20 => 3, 30 => 3];
+        $clinched = Auction::clinched(5, $bids);
+        self::assertSame([10 => 0, 20 => 0, 30 => 0], $clinched);
+        self::assertSame(
+            [10 => 0, 20 => 1, 30 => 0],
+            Auction::withInitiatorConsolation(5, $bids, $clinched, 20)
+        );
+    }
+
+    public function testNoConsolationWhenSomeoneWins(): void
+    {
+        // 5 icons, bids 1 and 5 (overbid 1): clinched 0 and 4 — someone won, so
+        // the consolation must not fire even though the initiator (10) got zero.
+        $bids = [10 => 1, 20 => 5];
+        $clinched = Auction::clinched(5, $bids);
+        self::assertSame($clinched, Auction::withInitiatorConsolation(5, $bids, $clinched, 10));
+    }
+
+    public function testNoConsolationWhenNoOpenIcons(): void
+    {
+        // Degenerate 0-icon card: nothing to award, initiator stays at 0.
+        $bids = [10 => 2, 20 => 2];
+        $clinched = Auction::clinched(0, $bids);
+        self::assertSame($clinched, Auction::withInitiatorConsolation(0, $bids, $clinched, 10));
+    }
+
+    public function testBillableUsesConsolationClinch(): void
+    {
+        // Wipe (5 icons, 3/3/3). Initiator 10 is bumped to 1 clinched; with a
+        // Pontoon and 1 < bid 3 it pays for one fewer (2); others pay full 3.
+        $bids = [10 => 3, 20 => 3, 30 => 3];
+        $clinched = Auction::withInitiatorConsolation(5, $bids, Auction::clinched(5, $bids), 10);
+        self::assertSame(
+            [10 => 2, 20 => 3, 30 => 3],
+            Auction::billableWorkers(5, $bids, [10 => true], $clinched)
+        );
+    }
+
     /** @dataProvider simVectors */
     public function testClinchedMatchesSim(int $open, array $bids, array $clinched, array $pontoon, array $billable): void
     {
