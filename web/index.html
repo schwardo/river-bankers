@@ -4409,7 +4409,7 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   render();
 }
 
-function resolveAuction(card, bids) {
+function resolveAuction(card, bids, triggerPlayerIdx) {
   const m = MATERIALS[card.material];
   const open = uncoveredIcons(card);
   const totalBid = Object.values(bids).reduce((s, n) => s + n, 0);
