@@ -539,6 +539,15 @@ function reluctantRecallCap(target, supply, minBid) {
 // both the naive and normal bidders.
 let OVERBID = process.env.OVERBID !== undefined ? Number(process.env.OVERBID) : 0;
 function setOverbid(x) { OVERBID = Math.max(0, Number(x) || 0); }
+// Initiator-consolation jam rule (RB_INIT_CONSOLATION=1). The player who paid to
+// trigger the auction must still bid >= 1; when the jam is a TOTAL WIPE (no one
+// clinches any item) they're guaranteed to win 1. Wipe test is pure overbid math:
+// got_j = max(0, bid_j - overbid), so nobody wins iff max(bid) <= overbid (i.e.
+// totalClinched === 0). Turns "I paid to blow up the board and got nothing" into a
+// floor: triggering a wipe always nets 1 item. See board-games.org "Sim the
+// initiator-consolation jam rule". Off (0) = legacy resolution.
+let INIT_CONSOLATION = process.env.RB_INIT_CONSOLATION === '1';
+function setInitConsolation(on) { INIT_CONSOLATION = !!on; }
 // Per-player-count OVERBID override (set by --human). Contention scales with the
 // player count, so the over-bid needed to match real jam rates differs sharply:
 // 2P must over-bid hard to jam at all, 4P barely. When set, runGame resolves the
@@ -1176,6 +1185,7 @@ function newGame(numPlayers, workersPerPlayer = null) {
       zeroClinchBidders: 0,       // of those, bidders that clinched 0 icons (only possible in jams)
       zeroClinchAuctions: 0,      // auctions where total bids > 0 but total clinched = 0
       zeroClinchFish: 0,          // total 🐟 advanced by bidders who clinched 0 icons (pure tempo waste)
+      initConsolations: 0,        // heavy jams where the initiator-consolation rule awarded the triggerer 1 item
       bidHist: [0, 0, 0, 0, 0],   // distribution of sealed bid sizes (index 0..4, clamped) over all bidders
       peakBlanks: 0,              // max total blanks across all river/preriv cards at any point
     },
@@ -1469,7 +1479,7 @@ function runAuction(state, card, triggerPlayerIdx, minBidTrigger) {
     trig.floodgateUsed = true;
   }
   const bids = collectAuctionBids(state, card, triggerPlayerIdx, minBidTrigger);
-  resolveAuction(state, card, bids);
+  resolveAuction(state, card, bids, triggerPlayerIdx);
 }
 // Collect every player's sealed bid for an auction over `card`, honouring
 // Spy Mound / Quick Strike deferral. Factored out of runAuction so the
@@ -1576,7 +1586,7 @@ function matcostRecord(card, perItemCost, itemsWon, fishPaid) {
 }
 let MATCOST_ACTIVE = false;
 // --------------------------------------------------------------------------
-function resolveAuction(state, card, bids) {
+function resolveAuction(state, card, bids, triggerPlayerIdx) {
   const open = uncoveredIcons(card);
   const totalBid = Object.values(bids).reduce((s, n) => s + n, 0);
   // Bid-size distribution over every player who placed a worker (bid > 0).
@@ -1627,11 +1637,31 @@ function resolveAuction(state, card, bids) {
     }
   } else {
     state.metrics.jamAuctions++;
+    // Per-player clinch, computed first so the initiator-consolation rule can
+    // adjust it before any supply/metric is applied.
+    const gotByIdx = {};
     let totalClinched = 0;
     for (const { idx, bid } of playerBidPairs) {
-      const p = state.players[idx];
       const others = totalBid - bid;
       const got = Math.max(0, Math.min(bid, open - others));
+      gotByIdx[idx] = got;
+      totalClinched += got;
+    }
+    // Initiator consolation: when the jam is a total wipe (no one clinched a
+    // single item), the triggering player is guaranteed to win 1. The wipe test
+    // is pure overbid math: got_j = max(0, bid_j - overbid), so nobody wins iff
+    // max(bid) <= overbid == totalClinched === 0. In that case every icon spot
+    // is still free (totalClinched 0 < open), so the initiator simply claims one
+    // — no stealing from a winner is ever needed.
+    if (INIT_CONSOLATION && triggerPlayerIdx != null &&
+        totalClinched === 0 && (bids[triggerPlayerIdx] || 0) >= 1) {
+      gotByIdx[triggerPlayerIdx] = 1;
+      state.metrics.initConsolations++;
+    }
+    totalClinched = 0;
+    for (const { idx, bid } of playerBidPairs) {
+      const p = state.players[idx];
+      const got = gotByIdx[idx];
       if (got > 0) {
         p.supply -= got;
         card.workers[idx] = (card.workers[idx] || 0) + got;
@@ -3510,11 +3540,11 @@ function sweep() {
   console.log(
     pad('numP', 5) + pad('wkrs', 5) +
     padL('turns', 7) + padL('t/p', 6) +
-    padL('aucs', 6) + padL('jam%', 7) + padL('nob%', 7) + padL('wst%', 7) +
+    padL('aucs', 6) + padL('jam%', 7) + padL('nob%', 7) + padL('wst%', 7) + padL('consol', 8) +
     padL('built/p', 8) + padL('endg%', 7) +
     padL('winVP', 7) + padL('lastVP', 8) + padL('spread', 8) + padL('margin', 8)
   );
-  console.log('-'.repeat(5+5+7+6+6+7+7+7+8+7+7+8+8+8));
+  console.log('-'.repeat(5+5+7+6+6+7+7+7+8+8+7+7+8+8+8));
 
   for (const numP of [2, 3, 4]) {
     for (const workers of [6, 8, 10]) {
@@ -3525,6 +3555,7 @@ function sweep() {
       const jamPct = avg(trials.map(m => pct(m.jamAuctions, m.auctions)));
       const nobPct = avg(trials.map(m => pct(m.noBidAuctions, m.auctions)));
       const wstPct = avg(trials.map(m => pct(m.iconsWastedToShore, m.iconsSpawned)));
+      const consol = avg(trials.map(m => m.initConsolations));
       const built = avg(trials.map(m => m.cardsBuilt));
       const endg = avg(trials.map(m => m.endgameTriggered ? 100 : 0));
       const winVP = avg(trials.map(m => m.winnerVP));
@@ -3537,6 +3568,7 @@ function sweep() {
         padL(auctions.toFixed(1), 6) +
         padL(jamPct.toFixed(1), 7) + padL(nobPct.toFixed(1), 7) +
         padL(wstPct.toFixed(1) + '%', 7) +
+        padL(consol.toFixed(2), 8) +
         padL((built / numP).toFixed(1), 8) +
         padL(endg.toFixed(0) + '%', 7) +
         padL(winVP.toFixed(1), 7) +
