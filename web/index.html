@@ -1595,6 +1595,9 @@
     <label title="When on, every player may pool any two cards into one auction (pay the pricier card's trigger; bill items at the pricier rate). Winners place each clinched worker on whichever of the two cards they need more; both cards then float downriver.">
       <input type="checkbox" id="opt-double-vision"> allow double-card auctions (experimental)
     </label>
+    <label title="When on, if a jammed auction ends with no one winning an item, the player who triggered it is guaranteed to claim 1 item as a consolation. Single-card auctions only.">
+      <input type="checkbox" id="opt-init-consolation"> initiator consolation on jams (experimental)
+    </label>
   </div>
   <div class="setup-row">
     <button class="primary" onclick="startGame()">Start</button>
@@ -2619,6 +2622,8 @@ function startGame() {
   // Optional Rules: Double Vision grants the combined two-card auction to ALL
   // players (any/max/max config). Read here, applied via DOUBLE_VISION_ACTIVE.
   DOUBLE_VISION_ACTIVE = document.getElementById('opt-double-vision').checked;
+  // Initiator consolation: on a no-one-wins jam, the trigger player claims 1 item.
+  INIT_CONSOLATION_ACTIVE = document.getElementById('opt-init-consolation').checked;
   const seats = SPECIES
     .map((sp, i) => ({ sp, role: picks[i] }))
     .filter(s => s.role !== 'off');
@@ -4001,8 +4006,12 @@ function renderActionPanel() {
         } else {
           fateLine = `<p>${result.leftover} icon${result.leftover === 1 ? '' : 's'} stay${result.leftover === 1 ? 's' : ''} uncovered. The card <b>slides to River ${result.cardNewSlot + 1}</b>, where its per-item cost is <b>${result.cardNewCost}🐟</b>.</p>`;
         }
+        const consolationLine = result.consolation != null
+          ? `<p>🎁 <b>No one clinched an icon</b>, so ${speciesLabel(state.players[result.consolation])} — who triggered the auction — claims <b>1 item</b> as the initiator's consolation.</p>`
+          : '';
         outcomeBox = `<div class="result-box jam">
           <p><b>🌊 River jams.</b> Total bid (${result.totalBid}) exceeded ${result.openBefore} open icons. Each bidder took <code>max(0, ${result.openBefore} − others' bids)</code>, capped at their own bid. <b>Every worker you bid still costs you fish</b> even if it didn't clinch an icon — workers that didn't win return to your supply.</p>
+          ${consolationLine}
           ${fateLine}
         </div>`;
       }
@@ -4382,7 +4391,7 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
     // The combined resolver shows the result, then runs board/in-turn placement.
     await resolveCombinedAuction(card, bids, triggerPlayerIdx);
   } else {
-    const result = resolveAuction(card, bids);
+    const result = resolveAuction(card, bids, triggerPlayerIdx);
     // Re-render so the modal can sit on top of an updated board state
     render();
     if (state.players.some(p => p.isHuman)) {
@@ -4416,6 +4425,7 @@ function resolveAuction(card, bids) {
     takings: {},               // playerIdx -> won
     timeAdvances: {},          // playerIdx -> +time
     outcome: 'no-bids',        // 'no-bids' | 'plenty' | 'jam'
+    consolation: null,         // playerIdx awarded the initiator consolation (jam, no-one-wins), else null
     leftover: 0,
     cardFate: 'stays',         // 'stays' | 'shoreline-from-plenty' | 'shoreline-graduated' | 'jammed' | 'plenty-slid'
     cardNewSlot: null,
@@ -4472,11 +4482,31 @@ function resolveAuction(card, bids) {
     }
   } else {
     result.outcome = 'jam';
+    // Per-player clinch first, so the initiator-consolation option can adjust it
+    // before any supply/time is applied (mirrors sim.js resolveAuction).
+    const gotByIdx = {};
     let totalTaken = 0;
     for (const { idx, bid } of playerBidPairs) {
-      const p = state.players[idx];
       const others = totalBid - bid;
       const got = Math.max(0, Math.min(bid, open - others));
+      gotByIdx[idx] = got;
+      totalTaken += got;
+    }
+    // Initiator consolation (optional rule): when the jam ends with no one
+    // clinching an item, the trigger player is guaranteed 1. A wipe leaves every
+    // icon free (totalTaken 0 < open), so the initiator just claims one — no one
+    // else loses a worker. Wipe iff max(bid) <= overbid, i.e. totalTaken === 0.
+    let consolationIdx = -1;
+    if (INIT_CONSOLATION_ACTIVE && totalTaken === 0 && open > 0 &&
+        triggerPlayerIdx != null && (bids[triggerPlayerIdx] || 0) >= 1) {
+      gotByIdx[triggerPlayerIdx] = 1;
+      totalTaken = 1;
+      consolationIdx = triggerPlayerIdx;
+      result.consolation = triggerPlayerIdx;
+    }
+    for (const { idx, bid } of playerBidPairs) {
+      const p = state.players[idx];
+      const got = gotByIdx[idx];
       if (got > 0) {
         p.supply -= got;
         card.workers[idx] = (card.workers[idx] || 0) + got;
@@ -4490,12 +4520,13 @@ function resolveAuction(card, bids) {
       advancePlayer(idx, timeAdvance);
       result.takings[idx] = got;
       result.timeAdvances[idx] = timeAdvance;
-      if (got > 0) {
+      if (idx === consolationIdx) {
+        log(`🎁 ${speciesLabel(p)} bid ${bid} — no one won, takes 1 as initiator (advance ${timeAdvance}🐟 = ${auctionRateNote(card, idx, billable)}).`);
+      } else if (got > 0) {
         log(`✅ ${speciesLabel(p)} bid ${bid}, took ${got} (advance ${timeAdvance}🐟 = ${auctionRateNote(card, idx, billable)}).`);
       } else {
         log(`✗ ${speciesLabel(p)} bid ${bid}, took 0 (advance ${timeAdvance}🐟 for the bid = ${auctionRateNote(card, idx, billable)}).`);
       }
-      totalTaken += got;
     }
     result.leftover = open - totalTaken;
     const wasOnLastSlot = card.slot === 3;
@@ -4530,6 +4561,7 @@ function resolveAuction(card, bids) {
 const COMBINED_AUCTION_PROFILES = { Confluence: { pairing: 'same', trigger: 'min', item: 'min' } };
 const DOUBLE_VISION = { name: 'Double Vision', type: 'Optional Rules', config: { pairing: 'any', trigger: 'max', item: 'max' } };
 let DOUBLE_VISION_ACTIVE = false; // set at setup from the Optional Rules checkbox
+let INIT_CONSOLATION_ACTIVE = false; // set at setup: initiator wins 1 on a no-one-wins jam
 function combinedConfig() {
   return DOUBLE_VISION_ACTIVE ? DOUBLE_VISION.config : COMBINED_AUCTION_PROFILES.Confluence;
 }
