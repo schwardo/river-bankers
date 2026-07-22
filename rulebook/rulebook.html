@@ -1505,7 +1505,7 @@
   <p><strong>Headwaters</strong> — the three slots above the river where cards wait to be pulled in.</p>
   <p><strong>Icon</strong> — a circle on a material card; a worker covers one to claim its item.</p>
   <p><strong>Item</strong> — one claimable unit on a card (what an icon shows); slot costs are charged "per item".</p>
-  <p><strong>Jam</strong> — an auction where total bids exceed the card's icons; the overbid claims nothing.</p>
+  <p><strong>Jam</strong> — an auction where total bids exceed the card's icons; the overbid claims nothing (though in a total wipe the initiator still claims one — first-mover advantage).</p>
   <p><strong>Material</strong> — the resource an item yields: logs, reeds, mud, clay, stones, or vines.</p>
   <p><strong>Pawn</strong> — your marker on the fish track; flip it to its "+60" side after a lap.</p>
   <p><strong>Recall</strong> — take your own workers back (free) just before an auction.</p>
@@ -1565,7 +1565,8 @@
       <strong>1. Pay first</strong> — every bidder advances <em>bid × per-item cost</em>, win or lose.<br>
       <strong>2. Then place</strong> —<br>
       &nbsp;&nbsp;<em>Bids fit</em> (total ≤ icons): everyone places their full bid.<br>
-      &nbsp;&nbsp;<em>Bids spill</em> (total &gt; icons): subtract the <em>overbid</em> (excess) from each bid — that's what they place. Smaller bids may take nothing.
+      &nbsp;&nbsp;<em>Bids spill</em> (total &gt; icons): subtract the <em>overbid</em> from each bid to get what they place.<br>
+      &nbsp;&nbsp;<strong>First-mover:</strong> if no one wins an item, the initiator still claims 1.
     </p>
   </div>
 
@@ -1596,7 +1597,7 @@
   <div class="keep">
     <h3>Endgame</h3>
     <p style="font-size: 9.5pt;">
-      Finish line (lap-2 side): <strong>90 fish</strong> (space 30), the same for <strong>all player counts</strong>. Deck running out doesn't end the game, but once it's empty the active player drifts <strong>+1 fish</strong> at the end of each turn. Cross the line → retire; once someone crosses, others may Retire to the lowest open spot ≥ the line. When all are out, each makes one final build, then score.
+      Finish line (lap-2 side): <strong>90 fish</strong> (space 30), same for <strong>all player counts</strong>. Deck running out doesn't end the game, but once empty the active player drifts <strong>+1 fish</strong> per turn. Cross the line → retire; once someone crosses, others may Retire to the lowest open spot ≥ the line. All out → each makes one final build, then score.
     </p>
   </div>
 
@@ -1636,7 +1637,7 @@
 
 <div class="keep">
   <h3>Material supply &amp; demand</h3>
-  <table class="tight" style="font-size: 9pt;">
+  <table class="tight" style="font-size: 8.3pt;">
     <thead>
       <tr>
         <th rowspan="2">Material</th>
