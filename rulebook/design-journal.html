@@ -538,6 +538,54 @@ tests a card's material must decide, explicitly, whether wilds are in or out</em
 which of a wild's two materials happens to be printed first. Channel Clearer now excludes them by name,
 in code and on the card.</p>
 
+<h2>Week of July 20 <span class="wk">— teaching the model to overbid, and a floor for the initiator</span></h2>
+
+<p>Two threads this week, and they turned out to depend on each other. The first was a nagging
+credibility problem with the simulator: its default AI is a cautious, worker-hoarding bidder that
+jams an auction only about <strong>13%</strong> of the time, while the humans playing on Board Game
+Arena jam roughly <strong>half</strong> their auctions. A model that never overbids can't be trusted
+to evaluate any rule whose whole purpose is to handle overbidding &mdash; so before touching the
+rules we spent the week making the sim bid more like a person.</p>
+
+<p>That meant two new behavioural knobs rather than a single &ldquo;play worse&rdquo; switch.
+<strong>OVERBID</strong> makes bidders speculatively pile on a contested card past what pure worker
+economy would justify; <strong>recall reluctance</strong> stops them from perfectly recalling and
+re-spending workers to dodge a jam the way the optimizer does. Bundled together as a
+<strong>&ldquo;human&rdquo; profile</strong> (OVERBID&nbsp;=&nbsp;0.5, recall-reluctance&nbsp;=&nbsp;1.0),
+they pull the simulated jam rate up out of the cautious-AI basement and into the neighbourhood of what
+the live telemetry actually shows. It's still a caricature of a real player, but it's a caricature that
+overbids &mdash; which is exactly the regime the next question lived in.</p>
+
+<p>That question: in a bad jam, the player who <em>paid to trigger the auction</em> can walk away with
+nothing. Because the initiator must always bid at least one worker, and because an auction can be
+overbid so heavily that <em>no one</em> clinches a single item, you could spend a worker (and its fish)
+to open a card and get precisely nothing for it. On the tabletop this reads as a feel-bad; in a 3- or
+4-player game it happens often enough to matter. The fix is small and, we think, intuitive: a
+<strong>first-mover advantage</strong>. When an auction would otherwise leave everyone empty-handed, the
+initiator still claims one item as a consolation prize. Triggering an auction is never wasted.</p>
+
+<p>With the human profile in place we could finally measure it honestly (off&nbsp;&rarr;&nbsp;on):</p>
+
+<table>
+  <thead><tr><th>Players</th><th>Jam rate</th><th>Builds / player</th><th>Turns</th></tr></thead>
+  <tbody>
+    <tr><td class="card">2P</td><td>20% &rarr; 20%</td><td>3.5 &rarr; 3.5</td><td>33 &rarr; 33</td></tr>
+    <tr><td class="card">3P</td><td>26% &rarr; 12%</td><td>2.7 &rarr; 3.5</td><td>46 &rarr; 55</td></tr>
+    <tr><td class="card">4P</td><td>24% &rarr; 10%</td><td>2.7 &rarr; 3.5</td><td>56 &rarr; 71</td></tr>
+  </tbody>
+</table>
+
+<p>The 2-player row is the tell: the rule is <em>inert</em> there. With only two capped bidders a total
+wipe essentially never happens, so the consolation never fires and nothing moves. At 3 and 4 players it's
+a genuine economic lever &mdash; it rescues one to two dead auctions per game, roughly a third more
+structures get built per player, and (a second-order surprise) the jam rate itself falls by half, because
+rescued initiators hold different materials and the whole downstream bidding cascade shifts. Games also
+run longer and score higher, which is the honest cost to weigh: at 45 seconds a turn the 4-player game
+grows from about 42 to 53 minutes. We shipped it as always-on in the BGA port and the printed rules, and
+&mdash; because the model was finally trustworthy on this exact axis &mdash; as an A/B toggle in the web
+prototype so it can keep being second-guessed. A separate fairness sweep (20k games per config) confirmed
+it introduces no first-player advantage.</p>
+
 <div class="footer">
   River Bankers — a design journal · a week-by-week look back at the game's development ·
   entries oldest-first, one heading per calendar week.

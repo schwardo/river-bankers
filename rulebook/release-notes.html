@@ -60,7 +60,9 @@
 
 <p class="lead">The first balance pass driven by <strong>Alpha playtesting on BoardGameArena</strong>.
 With the game live in private Alpha, real turns surfaced a starter card that was quietly far too
-strong — and a rule fix, confirmed in simulation, brings it back into line.</p>
+strong — and a rule fix, confirmed in simulation, brings it back into line. This version also adds
+a <strong>first-mover advantage</strong> to auction resolution so that triggering an auction is
+never wasted.</p>
 
 <div class="callout">
   <strong>Why:</strong> the BGA implementation let <strong>Channel Clearer</strong> be used
@@ -70,6 +72,19 @@ strong — and a rule fix, confirmed in simulation, brings it back into line.</p
   (31% at 4-player where 25% is even; 39% at 3-player where 33% is even) — well outside the
   &plusmn;5-point balance band.
 </div>
+
+<h3>Rule changes</h3>
+<ul>
+  <li><strong>First-mover advantage.</strong> When an auction is so heavily overbid that
+      <em>no one</em> would win a single item (no bid exceeds the overbid), the player who
+      <strong>initiated</strong> the auction now still claims one item as a consolation prize.
+      Since the initiator must always bid at least one worker, this guarantees that triggering an
+      auction is never wasted &mdash; you can no longer pay to open a card and walk away with nothing.
+      Simulation shows the rule is inert at 2 players (total wipe-outs essentially never happen with
+      two capped bidders) but a real economic lever at 3&ndash;4 players: it rescues 1&ndash;2 dead
+      auctions per game, sharply cuts wasted icons, and lifts builds per player. (Confirmed in
+      simulation and applied across the web prototype, the simulator, and the BGA port.)</li>
+</ul>
 
 <h3>Card changes <span class="tag">before &rarr; after</span></h3>
 <ul>
