@@ -33,8 +33,14 @@ const std = (a) => { const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + 
 // Sim distribution uses the --human preset (COST_AVERSION=0 + per-count OVERBID),
 // the profile calibrated to real BGA play; set RB_SIM_DEFAULT=1 for the old AI.
 const SIM_HUMAN = process.env.RB_SIM_DEFAULT !== '1';
+// Initiator-consolation ("first-mover advantage") rule, on by default to match
+// BGA's always-on behavior; set RB_NO_CONSOLATION=1 to model the legacy game.
+const SIM_CONSOLATION = process.env.RB_NO_CONSOLATION !== '1';
 function simDistribution(numP) {
-  return runSimEmit(SIM, numP, '', SIM_GAMES, { human: SIM_HUMAN });
+  return runSimEmit(SIM, numP, '', SIM_GAMES, {
+    human: SIM_HUMAN,
+    env: SIM_CONSOLATION ? { RB_INIT_CONSOLATION: '1' } : null,
+  });
 }
 
 function computeGroup(numP, real, sim) {
@@ -70,7 +76,7 @@ function main() {
   }
   process.stderr.write(' '.repeat(44) + '\r');
 
-  const html = PAGE.replace('__DATA__', JSON.stringify({ simN: SIM_GAMES, groups, profile: SIM_HUMAN ? 'human' : 'default' }));
+  const html = PAGE.replace('__DATA__', JSON.stringify({ simN: SIM_GAMES, groups, profile: SIM_HUMAN ? 'human' : 'default', consolation: SIM_CONSOLATION }));
   fs.mkdirSync(DATA, { recursive: true });
   fs.writeFileSync(path.join(DATA, 'histograms.html'), html);
   const flagged = groups.flatMap((g) => g.metrics.filter((m) => Math.abs(m.z) >= 2).map((m) => `${g.numP}P ${m.label}`));
@@ -180,7 +186,7 @@ const realColor=(i)=>PALETTE[i%PALETTE.length];
 
 document.getElementById("lede").textContent =
   \`Teal bars bin \${DATA.simN.toLocaleString()} simulated games per player-count \`
-  + \`(\${DATA.profile==="human"?"--human profile: COST_AVERSION=0, per-count OVERBID {2:0.3, 3:0, 4:0}":"default AI"}); each amber line marks one of \`
+  + \`(\${DATA.profile==="human"?"--human profile: COST_AVERSION=0, per-count OVERBID {2:0.3, 3:0, 4:0}":"default AI"}\${DATA.consolation?", first-mover advantage on":""}); each amber line marks one of \`
   + \`\${totalReal} completed BGA game\${totalReal===1?"":"s"}. Where a line sits off the bulk of the bars, real play and the model disagree.\`;
 const chips=document.getElementById("chips");
 [["Simulated / config",DATA.simN.toLocaleString()],["Actual games",String(totalReal)],
