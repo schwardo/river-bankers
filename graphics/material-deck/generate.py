@@ -65,7 +65,10 @@ EFFECT_TEXT_RIGHT = EFFECT_BLOCK_X + EFFECT_BLOCK_W - 2.4
 # fills the line cleanly without overrunning the right padding. The longest
 # card (Slipping Sandbar, 159 chars) still wraps in 3 lines.
 EFFECT_WRAP_CHARS = 56
-EFFECT_LINE_H = 10.0
+# 9pt leading for 6pt text (1.5×). At the old 10pt the 3-line max card
+# (Slipping Sandbar) packed too tall for the 27pt box and its first line's
+# ascenders breached the top border; 9pt centers all three lines inside.
+EFFECT_LINE_H = 9.0
 
 # Font-metric approximations for the centering formula (6pt italic DejaVu Sans).
 _FONT_ASCENDER = 5.0
