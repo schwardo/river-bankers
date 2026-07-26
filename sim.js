@@ -555,6 +555,13 @@ function setOverbid(x) { OVERBID = Math.max(0, Number(x) || 0); }
 // initiator-consolation jam rule".
 let INIT_CONSOLATION = process.env.RB_INIT_CONSOLATION !== '0';
 function setInitConsolation(on) { INIT_CONSOLATION = !!on; }
+// Measurement toggle for the Lodge Foundation build-cost floor. Live rule (0):
+// Log Flume applies first against its own floor of 1, then Lodge Foundation may
+// shave the last fish off, so a Logs build can reach 0. RB_LODGE_FLOOR=1 restores
+// the pre-[2026-07-26] behaviour (both reducers share a floor of 1) so the two
+// can be swept against each other. See board-games.org audit item C5/C6.
+let LODGE_FLOOR_1 = process.env.RB_LODGE_FLOOR === '1';
+function setLodgeFloor1(on) { LODGE_FLOOR_1 = !!on; }
 // Per-player-count OVERBID override (set by --human). Contention scales with the
 // player count, so the over-bid needed to match real jam rates differs sharply:
 // 2P must over-bid hard to jam at all, 4P barely. When set, runGame resolves the
@@ -2962,7 +2969,9 @@ function performBuild(state, playerIdx, handIdx) {
   const lodgeDiscount = (hasEffect(p, 'Lodge Foundation') && (struct.cost.logs || 0) > 0) ? 1 : 0;
   const timeCost = struct.time === 0
     ? 0
-    : Math.max(0, Math.max(1, struct.time - slideDiscount) - lodgeDiscount);
+    : (LODGE_FLOOR_1
+        ? Math.max(1, struct.time - slideDiscount - lodgeDiscount)
+        : Math.max(0, Math.max(1, struct.time - slideDiscount) - lodgeDiscount));
   advancePlayer(state, playerIdx, timeCost);
   p.hand.splice(handIdx, 1);
   p.built.push(struct);
