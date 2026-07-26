@@ -911,6 +911,15 @@ class Auction {
     showBid(isActive) {
         this.game.clearClickable();
         this.bga.statusBar.removeActionButtons();
+        // Rebuild these buttons whenever the board changes. performAction()'s
+        // promise resolves BEFORE the resulting boardUpdate notification is
+        // processed, so a .then(() => showBid()) after actRecall / actFloodgate
+        // reads a stale supply and re-renders the same bid range — the freed
+        // worker only appeared after a page reload. Re-rendering on the
+        // notification picks up the new supply. Skipped while the recall picker
+        // is open so an unrelated board update can't yank it away mid-choice.
+        this.game.onBoardUpdate = () => { if (!this.inRecallPicker) this.showBid(isActive); };
+        this.inRecallPicker = false;
         if (!isActive) {
             this.bga.statusBar.setTitle(_('Waiting for the other bidders…'));
             return;
@@ -961,6 +970,7 @@ class Auction {
     enterRecall() {
         this.game.clearClickable();
         this.bga.statusBar.removeActionButtons();
+        this.inRecallPicker = true;
         this.bga.statusBar.setTitle(_('Recall — pick a worker to pull back'));
         this.game.setHint(_('Click a river or shoreline card with your worker; it returns to supply (river recalls drop a blank).'));
         this.game.markClickable('recall', this.game.myRecallTargets(this.args.lotCardId), id =>
@@ -968,7 +978,11 @@ class Auction {
         this.bga.statusBar.addActionButton(_('Cancel'), () => this.showBid(true), { color: 'secondary' });
     }
 
-    onLeavingState() { this.game.clearClickable(); }
+    onLeavingState() {
+        this.game.onBoardUpdate = null;
+        this.inRecallPicker = false;
+        this.game.clearClickable();
+    }
 }
 
 class DeferBid {
@@ -1755,6 +1769,10 @@ export class Game {
         this.renderFishTrack();
         this.updateFishCounts();
         this.refreshHandReqs(); // my placed workers changed → repaint hand have/need pills
+        // Let the active state rebuild any UI derived from the state we just
+        // replaced (Auction's bid buttons read mySupply(), which only changes
+        // here). Set by Auction.showBid, cleared in its onLeavingState.
+        if (this.onBoardUpdate) this.onBoardUpdate();
     }
 
     // Fish-track total next to each player's VP score. Kept in sync with the
