@@ -1596,7 +1596,7 @@
       <input type="checkbox" id="opt-double-vision"> allow double-card auctions (experimental)
     </label>
     <label title="When on, if a jammed auction ends with no one winning an item, the player who triggered it is guaranteed to claim 1 item as a consolation. Single-card auctions only.">
-      <input type="checkbox" id="opt-init-consolation"> initiator consolation on jams (experimental)
+      <input type="checkbox" id="opt-init-consolation" checked> first-mover advantage (initiator consolation on full jams)
     </label>
   </div>
   <div class="setup-row">
@@ -4561,7 +4561,7 @@ function resolveAuction(card, bids, triggerPlayerIdx) {
 const COMBINED_AUCTION_PROFILES = { Confluence: { pairing: 'same', trigger: 'min', item: 'min' } };
 const DOUBLE_VISION = { name: 'Double Vision', type: 'Optional Rules', config: { pairing: 'any', trigger: 'max', item: 'max' } };
 let DOUBLE_VISION_ACTIVE = false; // set at setup from the Optional Rules checkbox
-let INIT_CONSOLATION_ACTIVE = false; // set at setup: initiator wins 1 on a no-one-wins jam
+let INIT_CONSOLATION_ACTIVE = true; // set at setup: initiator wins 1 on a full jam (rulebook default)
 function combinedConfig() {
   return DOUBLE_VISION_ACTIVE ? DOUBLE_VISION.config : COMBINED_AUCTION_PROFILES.Confluence;
 }

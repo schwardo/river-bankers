@@ -171,7 +171,7 @@ starters by printed VP</strong> (and a Stone Tool nerf) so no species opened ahe
 <ul>
   <li><strong>Eight effect-bearing material cards</strong> were folded into existing deck slots —
       wilds and small triggers — so the material half gained texture without inflating the deck.</li>
-  <li><strong>Four "novel-action" structures</strong> (Tribute Stone, Beaver Tow, Otter Trail, Salmon
+  <li><strong>Four "novel-action" structures</strong> (Tribute Stone, Tow Line, Portage, Salmon
       Run) added cards that <em>do</em> something on your turn rather than just scoring.</li>
   <li><strong>Vine Curtain</strong> — peek at the top two of a deck and rearrange — shipped for both
       AI and human, our first hidden-information lever.</li>
@@ -244,7 +244,7 @@ Trading Post) rounded out the deck, and effect text was standardized across ever
       players a way to <em>force</em> a big fight instead of waiting for supply to stack up
       naturally.</li>
   <li><strong>Double Vision</strong> shipped as an experimental optional rule (combined placement,
-      clockwise), and the AI was taught to reach the Beaver Tow / Salmon Run actions it had been
+      clockwise), and the AI was taught to reach the Tow Line / Salmon Run actions it had been
       ignoring — an AI blind spot that had been quietly skewing balance data.</li>
 </ul>
 
@@ -276,7 +276,7 @@ point. The overhaul landed the very next day.</p>
       <em>gutted</em> cards that could only fire "at 0 on the fish track" — they'd get one shot at the
       very end. We converted them to <strong>once-per-game abilities</strong>. Mill Wheel's old
       board-clamp would have actively <em>blocked</em> a player from finishing, so it was rebuilt as a
-      copy-your-neighbour card.</li>
+      copy-your-neighbor card.</li>
 </ul>
 
 <h3>Min-Invent, and other race-tuning</h3>
@@ -454,7 +454,7 @@ could do <em>with</em> it.</p>
 
 <p>Alongside the game we built a small <strong>telemetry pipeline</strong>: it downloads a finished
 BGA table's stats and its full move log, then lays that single real game on top of the distribution
-from <strong>four thousand</strong> AI-vs-AI games of the simulator. For two years the question about
+from <strong>four thousand</strong> AI-vs-AI games of the simulator. For two months the question about
 the sim was &ldquo;does it match the rules?&rdquo; Now it becomes a sharper one — <em>does real human
 play match the model we've been balancing against?</em></p>
 
@@ -547,12 +547,12 @@ Arena jam roughly <strong>half</strong> their auctions. A model that never overb
 to evaluate any rule whose whole purpose is to handle overbidding &mdash; so before touching the
 rules we spent the week making the sim bid more like a person.</p>
 
-<p>That meant two new behavioural knobs rather than a single &ldquo;play worse&rdquo; switch.
+<p>That meant two new behavioral knobs rather than a single &ldquo;play worse&rdquo; switch.
 <strong>OVERBID</strong> makes bidders speculatively pile on a contested card past what pure worker
 economy would justify; <strong>recall reluctance</strong> stops them from perfectly recalling and
 re-spending workers to dodge a jam the way the optimizer does. Bundled together as a
-<strong>&ldquo;human&rdquo; profile</strong> (OVERBID&nbsp;=&nbsp;0.5, recall-reluctance&nbsp;=&nbsp;1.0),
-they pull the simulated jam rate up out of the cautious-AI basement and into the neighbourhood of what
+<strong>&ldquo;human&rdquo; profile</strong>,
+they pull the simulated jam rate up out of the cautious-AI basement and into the neighborhood of what
 the live telemetry actually shows. It's still a caricature of a real player, but it's a caricature that
 overbids &mdash; which is exactly the regime the next question lived in.</p>
 

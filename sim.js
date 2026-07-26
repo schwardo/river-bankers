@@ -539,14 +539,16 @@ function reluctantRecallCap(target, supply, minBid) {
 // both the naive and normal bidders.
 let OVERBID = process.env.OVERBID !== undefined ? Number(process.env.OVERBID) : 0;
 function setOverbid(x) { OVERBID = Math.max(0, Number(x) || 0); }
-// Initiator-consolation jam rule (RB_INIT_CONSOLATION=1). The player who paid to
-// trigger the auction must still bid >= 1; when the jam is a TOTAL WIPE (no one
-// clinches any item) they're guaranteed to win 1. Wipe test is pure overbid math:
-// got_j = max(0, bid_j - overbid), so nobody wins iff max(bid) <= overbid (i.e.
-// totalClinched === 0). Turns "I paid to blow up the board and got nothing" into a
-// floor: triggering a wipe always nets 1 item. See board-games.org "Sim the
-// initiator-consolation jam rule". Off (0) = legacy resolution.
-let INIT_CONSOLATION = process.env.RB_INIT_CONSOLATION === '1';
+// Initiator-consolation jam rule — ON by default (RB_INIT_CONSOLATION=0 to
+// disable). The player who paid to trigger the auction must still bid >= 1; when
+// the jam is a FULL JAM (no one clinches any item) they're guaranteed to win 1.
+// Full-jam test is pure overbid math: got_j = max(0, bid_j - overbid), so nobody
+// wins iff max(bid) <= overbid (i.e. totalClinched === 0). Turns "I paid to blow
+// up the board and got nothing" into a floor: triggering a full jam always nets 1
+// item. This is a hard rule in the rulebook and is live on BGA, so the sim
+// defaults to it; set 0 for the legacy resolution. See board-games.org "Sim the
+// initiator-consolation jam rule".
+let INIT_CONSOLATION = process.env.RB_INIT_CONSOLATION !== '0';
 function setInitConsolation(on) { INIT_CONSOLATION = !!on; }
 // Per-player-count OVERBID override (set by --human). Contention scales with the
 // player count, so the over-bid needed to match real jam rates differs sharply:
