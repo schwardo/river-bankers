@@ -1148,14 +1148,16 @@ class Game extends \Bga\GameFramework\Table
     }
 
     /**
-     * Leftover workers split into fixed-material counts and wild pools (Old
-     * Growth at River 3/4 counts each worker as 2 Logs, matching build yield).
+     * Leftover workers for SCORING, split into fixed-material counts and wild
+     * pools. Old Growth's x2 is deliberately NOT applied here: the card scopes
+     * it to workers you retrieve, and these are workers still on the board at
+     * game end. The holdings view (getMaterialsAll) still applies it.
      *
      * @return array{fixed: array<string,int>, wild: list<array{materials:array{0:string,1:string}, count:int}>}
      */
     public function getLeftoverWorkers(int $playerId): array
     {
-        return $this->leftoverFromHoldings($this->getPlayerHoldings($playerId));
+        return $this->leftoverFromHoldings($this->getPlayerHoldings($playerId), false);
     }
 
     /**
@@ -1164,14 +1166,19 @@ class Game extends \Bga\GameFramework\Table
      *
      * @param list<array{material:string, wildAlt:?string, workers:int, yield:int}> $holdings
      */
-    private function leftoverFromHoldings(array $holdings): array
+    private function leftoverFromHoldings(array $holdings, bool $applyYield = true): array
     {
         $fixed = [];
         $wild = [];
         foreach ($holdings as $h) {
             if ($h['wildAlt'] === null) {
-                // Old Growth at River 3/4 counts each leftover worker as 2 Logs.
-                $fixed[$h['material']] = ($fixed[$h['material']] ?? 0) + $h['workers'] * $h['yield'];
+                // Old Growth's x2 is scoped to workers you RETRIEVE (pick up while
+                // paying a Build cost), so it applies to the holdings view — what
+                // you can spend — but NOT to end-game pair scoring, which counts
+                // workers you never retrieved. Scoring callers pass $applyYield
+                // = false. Matches sim.js playerWorkersByMaterial({rawYield}).
+                $mult = $applyYield ? $h['yield'] : 1;
+                $fixed[$h['material']] = ($fixed[$h['material']] ?? 0) + $h['workers'] * $mult;
             } else {
                 $wild[] = ['materials' => [$h['material'], $h['wildAlt']], 'count' => $h['workers']];
             }

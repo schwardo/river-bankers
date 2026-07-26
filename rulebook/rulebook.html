@@ -794,7 +794,8 @@
   </figure>
   <p style="margin:0;">
     Round chits from a shared pool. A blank is dropped onto any icon a worker leaves behind, marking it
-    as already-sold and removing it from future auctions.
+    as already-sold and removing it from future auctions. If you run out of blanks, substitute any
+    small object — the pool is a convenience, not a limit.
   </p>
 </div>
 
@@ -883,7 +884,8 @@
 <h4 style="margin-top: 10pt;">Effect timing</h4>
 <p>
   Structure-card effects fall into a small set of trigger types. The first phrase of the effect
-  text tells you when it fires:
+  text tells you when it fires. The card lists below give examples, not complete rosters —
+  <strong>where a card's printed text disagrees with these rules, the card wins.</strong>
 </p>
 <ul style="margin-top: -2pt;">
   <li><strong>When built</strong> — fires once, immediately, the moment the card hits your tableau.
@@ -895,12 +897,17 @@
     Log Flume.)</li>
   <li><strong>As an action</strong> — replaces your one turn-action (instead of Pull / Swim /
     Flush / Invent / Build). Pays the fish cost stated in the effect text. (Heron Roost, Driftwood
-    Snag, Salmon Run, Portage, Trading Post; <em>Mill Wheel</em> copies one such
+    Snag, Salmon Run, Portage, Confluence, Trading Post; <em>Mill Wheel</em> copies one such
     ability from a neighbor.)</li>
   <li><strong>Once per game</strong> — fires once on demand, then flip the card over to show it's
     spent. (Tribute Stone, Spy Mound, Slipstream, Granary, Floodgate, Tow Line, Snare Set, Wood Pile,
-    Hollowed-out Log, Pack Rat Burrow, Spring Cascade.) <em>Springwater Pool</em> resets all of
-    <em>your</em> spent once-per-game cards when built; <em>Spring Cascade</em> resets one.</li>
+    Hollowed-out Log, Pack Rat Burrow, Spring Cascade, and the <em>Stone Tool</em> and
+    <em>Rolling Float</em> species starters.) <em>Springwater Pool</em> resets all of
+    <em>your</em> spent once-per-game cards when built; <em>Spring Cascade</em> resets one. Both
+    reach species starters as well as structures.</li>
+  <li><strong>When a specific thing happens to you</strong> — a trigger tied to an event rather than
+    to your own build or action. (<em>Pontoon</em>: when a jammed auction makes you place fewer
+    workers than you bid.)</li>
   <li><strong>End of game</strong> — scores during final scoring based on the end-state of the
     table. These are the <span class="vp">?</span>-VP cards (Heron Watch, Pier, Hidden Cache,
     Cattail Patch, Trophy Lodge, Vine Ladder, and the five material engines listed above).</li>
@@ -1084,7 +1091,8 @@
   <div class="body">
     <h4>Invent structures (you choose N from 2–5)</h4>
     <p>
-      Draw N structure cards from the deck, then discard N cards from your hand (any mix of new
+      Choose N from 2 to 5 and <strong>pay N🐟</strong> — the fish cost is exactly the number you
+      draw. Draw N structure cards from the deck, then discard N cards from your hand (any mix of new
       draws and old). Discards go face-up onto the structure discard pile. If the deck runs out
       mid-draw, shuffle the discard pile to refill it.
     </p>
@@ -1218,8 +1226,10 @@
 <!-- ============================================================ -->
 <h2>Card movement</h2>
 <p>
-  Only the card being auctioned can move. Other cards in the river — even ones at the same space —
-  stay put. The river isn't a queue; it's a set of four spaces that can each hold any number of cards.
+  Only the card being auctioned can move <em>as a result of the auction</em>. Other cards in the
+  river — even ones at the same space — stay put. The river isn't a queue; it's a set of four spaces
+  that can each hold any number of cards. (A few card effects — <em>Spillway</em>, <em>Snag Pile</em>,
+  <em>Tow Line</em> — explicitly move other cards; those override this.)
 </p>
 <p>After <strong>any</strong> auction (plenty or jam) on a card:</p>
 <ul>
@@ -1321,9 +1331,11 @@
   more in fish-track order (lowest first): each player may make <strong>one last build</strong> using
   the workers they already hold. This build <em>still costs fish</em> and slides your pawn forward —
   which can matter for the tiebreaker. A player with no affordable build simply skips.
-  A final build <strong>does not trigger its &ldquo;when built&rdquo; effect</strong> (and sets off no
-  &ldquo;when you build&rdquo; reactions): you simply spend the materials and place the structure for
-  its victory points. With no effects to resolve, these last builds don&rsquo;t interact, so players
+  A final build <strong>does not trigger its &ldquo;when built&rdquo; effect</strong>, and no one's
+  &ldquo;when you build&rdquo; <em>reactions</em> fire: you simply spend the materials and place the
+  structure for its victory points. <strong>Cost reducers still apply</strong> — they set what the
+  build <em>costs</em> rather than reacting to it, so Cattail Marsh, Charcoal Pit, Treaty Stone and
+  Log Flume all work on a final build. With no effects to resolve, these last builds don&rsquo;t interact, so players
   may make them simultaneously.
 </p>
 <p>
@@ -1377,6 +1389,7 @@
 <p>
   Highest total wins; ties broken by the <strong>lower final fish total</strong> (the pawn farther
   back at the end — which rewards retiring efficiently to a low spot rather than overshooting).
+  If players are still tied on both, they <strong>share the victory</strong>.
 </p>
 
 <!-- ============================================================ -->
@@ -1579,7 +1592,7 @@
   <div class="keep">
     <h3>Card movement</h3>
     <ul style="font-size: 9.5pt;">
-      <li>Only the auctioned card moves.</li>
+      <li>Only the auctioned card moves — unless a card says otherwise.</li>
       <li>Icons still uncovered → slide one space downstream.</li>
       <li>All icons covered (workers or blanks) → leaves the river: shoreline if it has workers, else removed.</li>
       <li>From River 4 → shoreline.</li>

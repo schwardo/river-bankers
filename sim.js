@@ -312,6 +312,11 @@ const ONCE_PER_GAME_FLAGS = [
   ['Granary', 'granaryUsed'], ['Slipstream', 'slipstreamUsed'],
   ['Wood Pile', 'woodPileUsed'], ['Hollowed-out Log', 'hollowedLogUsed'],
   ['Pack Rat Burrow', 'packRatUsed'],
+  // Species starters are once-per-game cards too, and BGA's readyableSpentCards
+  // already offers them (it queries every built card with card_used = 1,
+  // starters included). Listed last so the priority order of the ten structures
+  // above is unchanged — these are only picked when nothing else is spent.
+  ['Stone Tool', 'stoneToolUsed'], ['Rolling Float', 'rollingFloatUsed'],
 ];
 function trySpringCascade(state, playerIdx) {
   const p = state.players[playerIdx];
@@ -693,7 +698,7 @@ function setPass0AtEndgameEnd(b) { PASS0_AT_ENDGAME_END = b; }
 // wild pools, each with a `count` and a 2-material option list. Returns the
 // VP and (optionally) the per-material breakdown for diagnostics.
 function endgamePairVP(state, playerIdx) {
-  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const wbm = playerWorkersByMaterial(state, playerIdx, { rawYield: true });
   const counts = {};
   for (const m of MAT_KEYS) counts[m] = wbm[m] || 0;
   // Assign each wild pool's units to maximize total pairs. Pools are
@@ -783,14 +788,20 @@ function cardYieldMultiplier(card) {
 // wbm._wildPools = [{materials: [primary, alt], count}] — each pool's units
 // may cover either of its two materials at build time. Tracked separately so
 // canBuild doesn't double-count.
-function playerWorkersByMaterial(state, playerIdx) {
+// opts.rawYield: count each worker as exactly 1 unit, ignoring Old Growth's x2.
+// Old Growth reads "each worker you RETRIEVE yields 2 Logs", i.e. the bonus is
+// scoped to picking workers up while paying a Build cost. End-game pair scoring
+// counts workers you never retrieved, so it passes rawYield. Every other caller
+// (build affordability, AI planning) wants the multiplier.
+function playerWorkersByMaterial(state, playerIdx, opts) {
+  const rawYield = !!(opts && opts.rawYield);
   const out = {};
   for (const m of MAT_KEYS) out[m] = 0;
   out._wildPools = [];
   const addCard = (c) => {
     const w = workersOnCard(c, playerIdx);
     if (w === 0) return;
-    const units = w * cardYieldMultiplier(c);
+    const units = rawYield ? w : w * cardYieldMultiplier(c);
     if (c.wildAlt) {
       out._wildPools.push({ materials: [c.material, c.wildAlt], count: units });
     } else {
