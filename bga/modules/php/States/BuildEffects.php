@@ -53,13 +53,12 @@ class BuildEffects extends \Bga\GameFramework\States\GameState
                 $this->globals->set('mudlevee_left', $key === 'mudlevee' ? 2 : 0);
                 return WhenBuilt::class;
             }
-            // Salt Lick is info-only: privately reveal opponents' hands, then continue.
+            // Salt Lick is info-only, but since [2026-07-26] it peeks at ONE
+            // opponent's hand rather than all of them, so the builder picks the
+            // target. SaltLick resolves itself immediately when there is only
+            // one opponent, and returns here either way.
             if ($key === 'saltlick') {
-                $playerId = (int) $this->game->getActivePlayerId();
-                $this->notify->player($playerId, 'peekHands', clienttranslate('Salt Lick: you peek at every opponent\'s hand.'), [
-                    'hands' => $this->game->getOpponentHands($playerId),
-                ]);
-                return BuildEffects::class;
+                return SaltLick::class;
             }
             // Stone Pool rearranges the top 5; Vine Curtain reuses it for the top 2.
             if ($key === 'stonepool' || $key === 'vinecurtain') {

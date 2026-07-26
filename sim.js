@@ -55,7 +55,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay: peek at the top of the structure deck; you may swap it with 1 card from your hand.\n\nEnd of game: +3 VP per built structure of yours that uses Clay (max +12).' },
   { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 3, vp: 0, effect: 'When you build a structure that uses Mud: move one of your workers to another river card with at least one of your workers (may replace a blank).\n\nEnd of game: +3 VP per built structure of yours that uses Mud (max +9).' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'As an action: pay 1🐟 to add a blank to any uncovered icon.' },
-  { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built: look at every opponent\'s hand of structure cards.' },
+  { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built: look at one opponent\'s hand of structure cards.' },
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 3, clay: 2 },  time: 3, vp: 0, effect: 'End of game: +3 VP per 2 distinct materials in your built structures (max +9).' },
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 4, vp: 3, effect: 'When you build: you may spend 2 of any one material as 1 of any other. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
@@ -2577,6 +2577,8 @@ function findOtterTrailTarget(state, playerIdx) {
 
 // Salmon Run: marginal fish cost for the 1st/2nd/3rd/4th/5th worker placed.
 const SALMON_RUN_COSTS = [1, 2, 3, 5, 8];
+// Measurement toggle — see RB_SALMON_DRIP note in findSalmonRunTarget.
+const SALMON_DRIP = process.env.RB_SALMON_DRIP === '1';
 function salmonRunCumulativeCost(n) {
   let total = 0;
   for (let i = 0; i < n && i < SALMON_RUN_COSTS.length; i++) total += SALMON_RUN_COSTS[i];
@@ -2605,7 +2607,11 @@ function findSalmonRunTarget(state, playerIdx, needs) {
     const need = needs[c.material] || 0;
     if (need === 0) continue;
     let bestN = 0, bestScore = 0;
-    const maxN = Math.min(p.supply, uncoveredIcons(c), need, SALMON_RUN_COSTS.length);
+    // RB_SALMON_DRIP=1 models the human exploit: Salmon Run is repeatable, so
+    // instead of paying the escalating 1/3/6/11/19 for N workers at once you
+    // take N separate 1-worker runs at 1 fish each. Caps the AI at n=1 to
+    // measure how much that is worth.
+    const maxN = SALMON_DRIP ? 1 : Math.min(p.supply, uncoveredIcons(c), need, SALMON_RUN_COSTS.length);
     for (let n = 1; n <= maxN; n++) {
       // Scored on the SAME need-weighted scale as a single-card auction
       // (need × workers − fish×0.4), but Salmon Run's escalating cost is
@@ -3382,7 +3388,10 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     return;
   }
   if (struct.name === 'Salt Lick') {
-    // No-op for sim — AI doesn't model opponent hand-knowledge.
+    // No-op for sim — AI doesn't model opponent hand-knowledge. (Since
+    // [2026-07-26] the card peeks at ONE opponent's hand rather than all of
+    // them; still a no-op here, but the ablation Δ for this card remains
+    // meaningless either way — see the sim-no-op note in sweepAblation.)
     return;
   }
 }
@@ -3988,7 +3997,14 @@ function sweepAblation(numGamesArg, numPArg, workersArg) {
   // Unique effect-card names — species starters reuse a few main-deck names
   // (e.g. Cache Burrow); STRUCTURE_EFFECT_DISABLED keys by name so we only
   // need to ablate each name once.
-  const effectCards = Array.from(new Set(STRUCTURE_TEMPLATES.filter(s => s.effect).map(s => s.name)));
+  let effectCards = Array.from(new Set(STRUCTURE_TEMPLATES.filter(s => s.effect).map(s => s.name)));
+  // RB_ABLATE_ONLY="Salmon Run,Pier" — measure just these cards. The full sweep
+  // is baseline + one run per effect card, so targeting one card turns a ~15
+  // minute job into ~40 seconds when you only care about a single result.
+  if (process.env.RB_ABLATE_ONLY) {
+    const want = process.env.RB_ABLATE_ONLY.split(',').map(x => x.trim());
+    effectCards = effectCards.filter(n => want.includes(n));
+  }
 
   console.log(`\nRiver Bankers per-card ablation`);
   console.log(`Setting: ${numP}P × ${workers} workers × ${numGames} games per variant.`);

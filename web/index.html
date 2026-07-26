@@ -1874,7 +1874,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay: peek at the top of the structure deck; you may swap it with 1 card from your hand.\n\nEnd of game: +3 VP per built structure of yours that uses Clay (max +12).' },
   { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 3, vp: 0, effect: 'When you build a structure that uses Mud: move one of your workers to another river card with at least one of your workers (may replace a blank).\n\nEnd of game: +3 VP per built structure of yours that uses Mud (max +9).' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'As an action: pay 1🐟 to add a blank to any uncovered icon.' },
-  { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built: look at every opponent\'s hand of structure cards.' },
+  { name: 'Salt Lick',      cost: { stones: 3, logs: 2, clay: 1 },   time: 3, vp: 6, effect: 'When built: look at one opponent\'s hand of structure cards.' },
   { name: 'Hidden Cache',   cost: { vines: 2, stones: 3, clay: 2 },  time: 3, vp: 0, effect: 'End of game: +3 VP per 2 distinct materials in your built structures (max +9).' },
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 4, vp: 3, effect: 'When you build: you may spend 2 of any one material as 1 of any other. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
@@ -7307,24 +7307,46 @@ async function fireOnBuildEffect(playerIdx, struct) {
     return;
   }
   if (struct.name === 'Salt Lick') {
+    // Peeks at ONE opponent's hand (changed from all opponents [2026-07-26]).
+    // The builder chooses; with a single opponent there is nothing to choose.
     const others = state.players.filter(o => o.idx !== playerIdx && !o.out);
-    const peeks = others.map(o => `${o.species.name}: ${o.hand.map(s => s.name).join(', ') || '(empty)'}`);
-    log(`🧂 Salt Lick: ${speciesLabel(p)} peeks at hands — ${peeks.join(' | ')}.`);
-    if (isHuman && others.length > 0) {
-      const html = others.map(o => `
-        <div style="margin-bottom:8px;">
-          <b>${o.species.emoji} ${o.species.name}</b>
-          ${o.hand.length === 0
-            ? ' <span class="small-note">(empty hand)</span>'
-            : '<ul style="margin:4px 0 0 18px;padding:0;">' + o.hand.map(s =>
-                `<li>${s.name} <span class="small-note">(${Object.entries(s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')} · ${s.time}🐟 · ${vpDisplay(s)}★)</span></li>`
-              ).join('') + '</ul>'}
-        </div>
-      `).join('');
+    if (others.length === 0) return;
+    const describe = (o) =>
+      `${o.species.name}: ${o.hand.map(s => s.name).join(', ') || '(empty)'}`;
+    const handHtml = (o) => `
+      <div style="margin-bottom:8px;">
+        <b>${o.species.emoji} ${o.species.name}</b>
+        ${o.hand.length === 0
+          ? ' <span class="small-note">(empty hand)</span>'
+          : '<ul style="margin:4px 0 0 18px;padding:0;">' + o.hand.map(s =>
+              `<li>${s.name} <span class="small-note">(${Object.entries(s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')} · ${s.time}🐟 · ${vpDisplay(s)}★)</span></li>`
+            ).join('') + '</ul>'}
+      </div>`;
+
+    let target;
+    if (others.length === 1 || !isHuman) {
+      // AI (and the trivial 1-opponent case): peek at the current leader, the
+      // most useful hand to know. Ties fall to the first in turn order.
+      target = others.reduce((a, b) => (totalVP(b, state) > totalVP(a, state) ? b : a), others[0]);
+    } else {
+      target = await new Promise(resolve => {
+        showModal({
+          title: '🧂 Salt Lick — whose hand do you want to see?',
+          body: () => '<div class="small-note">Choose one opponent.</div>',
+          actions: others.map(o => ({
+            label: `${o.species.emoji} ${o.species.name}`,
+            onClick: () => { closeModal(); resolve(o); },
+          })),
+        });
+      });
+    }
+
+    log(`🧂 Salt Lick: ${speciesLabel(p)} peeks at ${describe(target)}.`);
+    if (isHuman) {
       await new Promise(resolve => {
         showModal({
-          title: '🧂 Salt Lick — opponents\' hands',
-          body: () => html,
+          title: `🧂 Salt Lick — ${target.species.name}'s hand`,
+          body: () => handHtml(target),
           actions: [{ label: 'Close', primary: true, onClick: () => { closeModal(); resolve(); }}],
         });
       });

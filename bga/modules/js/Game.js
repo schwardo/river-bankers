@@ -749,6 +749,25 @@ class SpringCascade {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class SaltLick {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    // Salt Lick peeks at ONE opponent's hand (all of them, before 2026-07-26),
+    // so the builder picks a target. The server resolves the single-opponent
+    // case without entering this state, so args.opponents always has 2+ here.
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive
+            ? _('Salt Lick — whose hand do you want to see?')
+            : _('Salt Lick…'));
+        if (!isActive) return;
+        this.bga.statusBar.removeActionButtons();
+        this.game.setHint(_('Pick one opponent to peek at.'));
+        (args.opponents || []).forEach(o => this.bga.statusBar.addActionButton(
+            o.name, () => this.bga.actions.performAction('actPeek', { targetPlayerId: o.id }),
+            { color: 'secondary' }));
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
 class RollingFloat {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -1070,6 +1089,7 @@ export class Game {
         this.bga.states.register('FlushChannelBuild', new FlushChannelBuild(this, bga));
         this.bga.states.register('PackRat', new PackRat(this, bga));
         this.bga.states.register('SpringCascade', new SpringCascade(this, bga));
+        this.bga.states.register('SaltLick', new SaltLick(this, bga));
         this.bga.states.register('RollingFloat', new RollingFloat(this, bga));
         this.bga.states.register('SalmonRun', new SalmonRun(this, bga));
         this.bga.states.register('Portage', new Portage(this, bga));
@@ -1889,12 +1909,12 @@ export class Game {
         if (!Object.keys(this.peekHands).length || document.getElementById('rb-spy-btn')) return;
         (document.getElementById('rb-root') || this.bga.gameArea.getElement()).insertAdjacentHTML('beforeend',
             `<button id="rb-spy-btn" class="rb-peek-btn"` +
-            ` title="${_('Salt Lick: the opponent hands you saw when it was built')}">👁 ${_("Opponents' hands")}</button>`);
+            ` title="${_('Salt Lick: the hand you saw when it was built')}">👁 ${_("Peeked hand")}</button>`);
         document.getElementById('rb-spy-btn').addEventListener('click', () => this.showHandsDialog());
     }
     showHandsDialog() {
         if (!this.peekHands || document.querySelector('.rb-score-backdrop')) return;
-        let html = `<div class="rb-score-panel"><h2>${_("Opponents' hands")}</h2>` +
+        let html = `<div class="rb-score-panel"><h2>${_("Peeked hand")}</h2>` +
             `<div class="rb-spy-note">${_('Snapshot from when Salt Lick was built.')}</div>`;
         Object.entries(this.peekHands).forEach(([pid, cards]) => {
             const list = (cards && cards.length)

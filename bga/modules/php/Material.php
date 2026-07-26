@@ -99,7 +99,7 @@ End of game: +3 VP per built structure of yours that uses Clay (max +12).'],
 
 End of game: +3 VP per built structure of yours that uses Mud (max +9).'],
         33 => ['name' => 'Driftwood Snag', 'cost' => ['logs' => 2, 'reeds' => 2, 'mud' => 1], 'time' => 3, 'vp' => '6', 'effect' => 'As an action: pay 1🐟 to add a blank to any uncovered icon.'],
-        34 => ['name' => 'Salt Lick', 'cost' => ['stones' => 3, 'logs' => 2, 'clay' => 1], 'time' => 3, 'vp' => '6', 'effect' => 'When built: look at every opponent\'s hand of structure cards.'],
+        34 => ['name' => 'Salt Lick', 'cost' => ['stones' => 3, 'logs' => 2, 'clay' => 1], 'time' => 3, 'vp' => '6', 'effect' => 'When built: look at one opponent\'s hand of structure cards.'],
         35 => ['name' => 'Hidden Cache', 'cost' => ['vines' => 2, 'stones' => 3, 'clay' => 2], 'time' => 3, 'vp' => '0', 'effect' => 'End of game: +3 VP per 2 distinct materials in your built structures (max +9).'],
         36 => ['name' => 'Treaty Stone', 'cost' => ['stones' => 3, 'clay' => 2], 'time' => 4, 'vp' => '3', 'effect' => 'When you build: you may spend 2 of any one material as 1 of any other. Once per build.'],
         37 => ['name' => 'Cattail Patch', 'cost' => ['reeds' => 3, 'mud' => 2], 'time' => 3, 'vp' => '0', 'effect' => 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.'],
