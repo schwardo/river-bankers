@@ -59,7 +59,10 @@ class FinalBuild extends GameState
         $picks = $this->game->decodeBuildChoices($choices);
 
         try {
-            $built = $this->game->tryBuild($currentPlayerId, $cardId, $picks);
+            // $coda = true: a final build places the structure and pays its cost
+            // (discounts included) but fires no "when built" / "when you build"
+            // effects. Matches the rulebook and sim.js / web's state.coda gate.
+            $built = $this->game->tryBuild($currentPlayerId, $cardId, $picks, true);
         } catch (\InvalidArgumentException $e) {
             throw new UserException(clienttranslate('That combination of build-cost effects is not legal.'));
         }

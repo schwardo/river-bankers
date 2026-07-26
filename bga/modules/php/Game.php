@@ -1525,8 +1525,15 @@ class Game extends \Bga\GameFramework\Table
      * Build a structure if affordable: pay its fish (incl. the Lodge Foundation
      * discount) + materials, place it, and apply its on-build effects. Returns
      * false (no change) if the player can't pay the materials.
+     *
+     * $coda = true for the simultaneous final-build round. A final build does
+     * NOT fire "when built" effects or anyone's "when you build" reactions
+     * (rulebook Endgame; sim.js / web gate the same two calls on state.coda).
+     * Cost reducers are deliberately NOT gated — they set what the build costs
+     * rather than reacting to it, so Cattail Marsh / Charcoal Pit / Treaty Stone
+     * / Log Flume / Lodge Foundation all still apply on a final build.
      */
-    public function tryBuild(int $playerId, int $structureCardId, array $choices = []): bool
+    public function tryBuild(int $playerId, int $structureCardId, array $choices = [], bool $coda = false): bool
     {
         $def = Material::$STRUCTURE[(int) $this->getCardRow($structureCardId)['card_type_arg']];
         $holdings = $this->getPlayerHoldings($playerId);
@@ -1555,7 +1562,9 @@ class Game extends \Bga\GameFramework\Table
         // Vine Curtain: building with one of its workers lets you peek+rearrange
         // the top 2 material cards (queued as a build effect).
         $this->globals->set('vine_curtain_hit', $this->allocationUsesCard($alloc, 'Vine Curtain') ? 1 : 0);
-        $this->applyOnBuildEffects($playerId, $structureCardId);
+        if (!$coda) {
+            $this->applyOnBuildEffects($playerId, $structureCardId);
+        }
         return true;
     }
 

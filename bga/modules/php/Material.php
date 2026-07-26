@@ -59,7 +59,7 @@ class Material
         3 => ['name' => 'Heron Watch', 'cost' => ['stones' => 4, 'logs' => 2], 'time' => 4, 'vp' => '0', 'effect' => 'End of game: +1 VP per shoreline card on the table (max +6).'],
         4 => ['name' => 'Reed Bed', 'cost' => ['reeds' => 3, 'mud' => 1], 'time' => 2, 'vp' => '4', 'effect' => 'Reed icons cost you 1 less 🐟 per item (min 1).'],
         5 => ['name' => 'Mud Levee', 'cost' => ['mud' => 3, 'stones' => 2], 'time' => 3, 'vp' => '6', 'effect' => 'When built: drop 2 blanks on uncovered icons in the river.'],
-        6 => ['name' => 'Log Flume', 'cost' => ['mud' => 2, 'logs' => 1], 'time' => 1, 'vp' => '2', 'effect' => 'When you build: advance 3 fewer 🐟 (min 1).'],
+        6 => ['name' => 'Log Flume', 'cost' => ['mud' => 2, 'logs' => 1], 'time' => 1, 'vp' => '2', 'effect' => 'When you build: advance 3 fewer 🐟 (min 1; 0🐟 cards stay 0).'],
         7 => ['name' => 'Cache Burrow', 'cost' => ['mud' => 2, 'reeds' => 2], 'time' => 2, 'vp' => '4', 'effect' => '+1 to your hand size. When built, draw a structure card.'],
         8 => ['name' => 'Vine Lattice', 'cost' => ['vines' => 3, 'reeds' => 2], 'time' => 3, 'vp' => '5', 'effect' => 'When built: draw 3 structure cards, keep 1, discard 2.'],
         9 => ['name' => 'Charcoal Pit', 'cost' => ['clay' => 4, 'logs' => 2], 'time' => 3, 'vp' => '6', 'effect' => 'When you build: 1 of your Clay workers may substitute for any other material.'],
@@ -117,7 +117,7 @@ End of game: +3 VP per built structure of yours that uses Mud (max +9).'],
 
     // 12 species starter cards (3 per species).
     public static array $STARTER = [
-        0 => ['name' => 'Lodge Foundation', 'species' => 'beaver', 'vp' => 1, 'effect' => 'When you build a structure that uses Logs, advance 1 fewer fish (min 1).'],
+        0 => ['name' => 'Lodge Foundation', 'species' => 'beaver', 'vp' => 1, 'effect' => 'When you build a structure that uses Logs, advance 1 fewer fish.'],
         1 => ['name' => 'Tail Slap', 'species' => 'beaver', 'vp' => 2, 'effect' => 'At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card.'],
         2 => ['name' => 'Beaver Cache', 'species' => 'beaver', 'vp' => 1, 'effect' => '+1 to your hand size. When built, draw a structure card.'],
         3 => ['name' => 'Kelp Bed', 'species' => 'otter', 'vp' => 0, 'effect' => 'Reeds icons cost you 1 less fish per item (min 1).'],

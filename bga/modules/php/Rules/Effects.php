@@ -62,14 +62,12 @@ final class Effects
         if ($baseTime < 1) {
             return $baseTime; // a 0-fish build is never discounted up to 1
         }
-        $discount = 0;
-        if (($cost['logs'] ?? 0) > 0 && in_array('Lodge Foundation', $builtNames, true)) {
-            $discount += 1; // Lodge Foundation: Logs builds
-        }
-        if (in_array('Log Flume', $builtNames, true)) {
-            $discount += 3; // Log Flume: every build
-        }
-        return max(1, $baseTime - $discount);
+        // Log Flume is floored at 1; Lodge Foundation may take a build all the
+        // way to 0. Order matters: Log Flume applies first against its own
+        // floor, then Lodge Foundation shaves the last fish off.
+        $flume = in_array('Log Flume', $builtNames, true) ? 3 : 0;
+        $lodge = (($cost['logs'] ?? 0) > 0 && in_array('Lodge Foundation', $builtNames, true)) ? 1 : 0;
+        return max(0, max(1, $baseTime - $flume) - $lodge);
     }
 
     /** Whether building $name grants a +1 hand-size bonus. */

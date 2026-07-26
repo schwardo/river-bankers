@@ -27,7 +27,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End of game: +1 VP per shoreline card on the table (max +6).' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built: drop 2 blanks on uncovered icons in the river.' },
-  { name: 'Log Flume',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build: advance 3 fewer 🐟 (min 1).' },
+  { name: 'Log Flume',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build: advance 3 fewer 🐟 (min 1; 0🐟 cards stay 0).' },
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: '+1 to your hand size. When built, draw a structure card.' },
   { name: 'Vine Lattice',   cost: { vines: 3, reeds: 2 },            time: 3, vp: 5, effect: 'When built: draw 3 structure cards, keep 1, discard 2.' },
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 6, effect: 'When you build: 1 of your Clay workers may substitute for any other material.' },
@@ -75,7 +75,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   // drafts 1 of their 3 species cards at setup; picked card is pre-built in
   // their tableau. The `species` flag excludes these from the shared deck.
   // Beaver (Logs bias)
-  { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'When you build a structure that uses Logs, advance 1 fewer fish (min 1).' },
+  { name: 'Lodge Foundation', cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: 'When you build a structure that uses Logs, advance 1 fewer fish.' },
   { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 2, species: 'beaver', effect: 'At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card.' },
   { name: 'Beaver Cache',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: '+1 to your hand size. When built, draw a structure card.' },
   // River Otter (Reeds bias)
@@ -1864,7 +1864,7 @@ function finalizeCombinedCard(state, card, wasJam) {
 function aiDecideBid(state, playerIdx, card, minBid) {
   const p = state.players[playerIdx];
   const open = uncoveredIcons(card);
-  const { safe, fallback } = aiRecallBudget(state, playerIdx);
+  const { safe, fallback } = aiRecallBudget(state, playerIdx, card.id);
   const safeCount = totalCount(safe);
   const fallbackCount = totalCount(fallback);
   // For non-trigger bids: only consider supply + safe-recallable workers (don't
@@ -2245,12 +2245,17 @@ function aiChooseAction(state, playerIdx) {
   // recall before bidding. Pre-auction recall makes a worker on a card just as
   // good for triggering as one already in supply.
   const triggerPool = aiTriggerPool(state, playerIdx);
+  // Workers already on a card can't fund triggering an auction on THAT card —
+  // pre-auction recall can't touch the lot (see aiRecallBudget). Headwaters
+  // candidates need no adjustment: nobody has workers on them yet.
+  const poolFor = (c) => Math.max(0, triggerPool - workersOnCard(c, playerIdx));
   let bestCard = null, bestScore = -Infinity, bestKind = null, bestPrerivIdx = -1;
   for (const c of state.riverCards) {
     if (uncoveredIcons(c) === 0) continue;
     const need = needs[c.material];
     if (need === 0) continue;
-    const got = Math.min(uncoveredIcons(c), triggerPool, need);
+    const got = Math.min(uncoveredIcons(c), poolFor(c), need);
+    if (got === 0) continue;
     // playerCardCost picks up Reed Bed's per-item discount when scoring auction targets.
     const score = need * got - playerCardCost(state, c, playerIdx) * got * 0.4;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'river'; }
@@ -2772,7 +2777,11 @@ function aiStartOfTurnAbilities(state, playerIdx) {
 //   fallback — at-cap useful workers, river-side, highest per-item cost first.
 //              These risk delaying a planned build, so callers should only dip
 //              into them when supply is genuinely 0 or to satisfy a min-bid.
-function aiRecallBudget(state, playerIdx) {
+// excludeCardId: the card being auctioned. Pre-auction recall may not pull
+// workers off the lot itself — recalling blanks the icons you uncover, which
+// would shrink the very lot being bid on (and bids are capped by open icons).
+// Rulebook "Pre-auction recall" and BGA Auction::actRecall both forbid it.
+function aiRecallBudget(state, playerIdx, excludeCardId) {
   const p = state.players[playerIdx];
   const useful = new Set();
   for (const s of p.hand) for (const m in s.cost) useful.add(m);
@@ -2786,6 +2795,7 @@ function aiRecallBudget(state, playerIdx) {
     ...state.riverCards.slice().sort((a, b) => cardCost(b) - cardCost(a)).map(c => ({ c, river: true })),
   ];
   for (const { c, river } of cards) {
+    if (excludeCardId !== undefined && c.id === excludeCardId) continue;
     const w = workersOnCard(c, playerIdx);
     if (w === 0) continue;
     let safeRecall;
@@ -2943,12 +2953,16 @@ function performBuild(state, playerIdx, handIdx) {
   noteBlanks(state);
   p.supply += workersReturned;
   if (vineCurtainHit) aiVineCurtainRearrange(state, playerIdx);
-  // Log Flume: build advances 3 fewer fish (min 1). Cards with printed time 0 stay 0.
-  // Lodge Foundation (beaver species starter): build advances 1 fewer fish on
-  // Logs-using structures (stacks with Log Flume).
+  // Log Flume: build advances 3 fewer fish, floored at 1.
+  // Lodge Foundation (beaver species starter): 1 fewer fish on Logs-using
+  // structures, and unlike Log Flume it MAY take a build all the way to 0.
+  // Order matters: Log Flume applies first against its own floor of 1, then
+  // Lodge Foundation shaves the last fish off. A card printed at 0 stays 0.
   const slideDiscount = hasEffect(p, 'Log Flume') ? 3 : 0;
   const lodgeDiscount = (hasEffect(p, 'Lodge Foundation') && (struct.cost.logs || 0) > 0) ? 1 : 0;
-  const timeCost = struct.time === 0 ? 0 : Math.max(1, struct.time - slideDiscount - lodgeDiscount);
+  const timeCost = struct.time === 0
+    ? 0
+    : Math.max(0, Math.max(1, struct.time - slideDiscount) - lodgeDiscount);
   advancePlayer(state, playerIdx, timeCost);
   p.hand.splice(handIdx, 1);
   p.built.push(struct);

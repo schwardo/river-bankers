@@ -1,7 +1,7 @@
 {
   "_comment": "River Bankers species starter card data. 12 cards (3 per species × 4 species). Source: sim.js STRUCT_CARDS species block. Starters are pre-built in the tableau at setup — they have no fish or material cost, just a VP and (optionally) an effect.",
   "cards": [
-    { "name": "Lodge Foundation", "species": "beaver",  "vp": 1, "effect": "When you build a structure that uses Logs, advance 1 fewer fish (min 1)." },
+    { "name": "Lodge Foundation", "species": "beaver",  "vp": 1, "effect": "When you build a structure that uses Logs, advance 1 fewer fish." },
     { "name": "Tail Slap",        "species": "beaver",  "vp": 2, "effect": "At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card." },
     { "name": "Beaver Cache",     "species": "beaver",  "vp": 1, "effect": "+1 to your hand size. When built, draw a structure card." },
 

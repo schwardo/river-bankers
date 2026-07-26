@@ -39,8 +39,8 @@ final class EffectsTest extends TestCase
     public function testLodgeFoundationShavesLogsBuild(): void
     {
         self::assertSame(2, Effects::buildFishCost(3, ['logs' => 4], ['Lodge Foundation']));
-        // Never below 1.
-        self::assertSame(1, Effects::buildFishCost(1, ['logs' => 2], ['Lodge Foundation']));
+        // Unlike Log Flume, Lodge Foundation MAY take a build to 0.
+        self::assertSame(0, Effects::buildFishCost(1, ['logs' => 2], ['Lodge Foundation']));
         // Non-logs structure unaffected.
         self::assertSame(3, Effects::buildFishCost(3, ['reeds' => 4], ['Lodge Foundation']));
         // No Lodge Foundation -> unaffected.
