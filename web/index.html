@@ -4467,7 +4467,9 @@ function resolveAuction(card, bids, triggerPlayerIdx) {
       // Slipping Sandbar overrides: with workers placed, slide upstream instead.
       const m = MATERIALS[card.material];
       const wasOnLastSlot = card.slot === 3;
-      const sandbarDrift = card.effect === 'slipping-sandbar' && totalBid > 0 && typeof card.slot === 'number';
+      // Fires after ANY auction on the card, matching the printed text — the old
+      // `totalBid > 0` gate drifted it downstream on an uncontested auction.
+      const sandbarDrift = card.effect === 'slipping-sandbar' && typeof card.slot === 'number';
       if (sandbarDrift) {
         slidesSandbarUpstream(card);
       } else {

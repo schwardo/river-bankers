@@ -37,9 +37,9 @@ const PAWNS = [
 // gold-ish cost below.
 const ACTIONS = [
   { name: "PULL",    cost: "2 – 4🐟",   sub: "auction a Headwaters card" },
-  { name: "AUCTION", cost: "1🐟 flat",   sub: "auction a river card" },
+  { name: "SWIM",    cost: "1🐟 flat",   sub: "auction a river card" },
   { name: "FLUSH",   cost: "5🐟",        sub: "refresh the Headwaters" },
-  { name: "INVENT",  cost: "1 – 5🐟",   sub: "draw / discard structures" },
+  { name: "INVENT",  cost: "2 – 5🐟",   sub: "draw / discard structures" },
   { name: "BUILD",   cost: "printed",    sub: "build a structure" },
 ];
 

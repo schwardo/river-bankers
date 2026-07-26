@@ -422,9 +422,14 @@ class Game extends \Bga\GameFramework\Table
 
     /**
      * Slipping Sandbar movement: enters the river at River 4 (from Headwaters);
-     * after an auction with workers placed it slides one space UPSTREAM, retiring
-     * to the shoreline from River 1; with no workers placed it drifts downstream
-     * like a normal card. Fully-claimed cards graduate to the shoreline.
+     * after ANY auction on it, it slides one space UPSTREAM, retiring to the
+     * shoreline from River 1. Fully-claimed cards graduate to the shoreline.
+     *
+     * $placed is retained for signature compatibility but no longer gates the
+     * drift: the printed card says "After an auction on this card, slides one
+     * slot upstream", with no workers-placed qualifier, and the card is the
+     * source of truth. Previously an uncontested auction drifted it downstream
+     * like a normal card.
      *
      * @return array{location:string, slot:int}
      */
@@ -436,12 +441,9 @@ class Game extends \Bga\GameFramework\Table
         if ($location === 'headwaters') {
             return ['location' => 'river', 'slot' => 4]; // enters at River 4
         }
-        if ($placed > 0) {
-            return $slot <= 1
-                ? ['location' => 'shoreline', 'slot' => 0]    // at River 1 with leftovers -> retire
-                : ['location' => 'river', 'slot' => $slot - 1]; // slide upstream
-        }
-        return CardMovement::destination($location, $slot, $uncoveredAfter); // no workers -> normal drift
+        return $slot <= 1
+            ? ['location' => 'shoreline', 'slot' => 0]    // at River 1 with leftovers -> retire
+            : ['location' => 'river', 'slot' => $slot - 1]; // slide upstream
     }
 
     /**

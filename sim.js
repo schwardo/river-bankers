@@ -1645,9 +1645,12 @@ function resolveAuction(state, card, bids, triggerPlayerIdx) {
     if (slidesNow) {
       if (card.slot === 'pre') state.metrics.preToRiverFromPlenty++;
       else state.metrics.riverPlentySlides++;
-      // Slipping Sandbar: with workers placed (totalBid > 0) and leftover icons,
-      // drift upstream instead of downstream.
-      if (card.effect === 'slipping-sandbar' && totalBid > 0 && typeof card.slot === 'number') {
+      // Slipping Sandbar: with leftover icons, drift upstream instead of
+      // downstream. Fires after ANY auction on the card, matching the printed
+      // text ("After an auction on this card, slides one slot upstream"). The
+      // old `totalBid > 0` gate made an uncontested auction drift it downstream
+      // like a normal card, which the card never said.
+      if (card.effect === 'slipping-sandbar' && typeof card.slot === 'number') {
         slidesSandbarUpstream(state, card);
       } else {
         jamCardDownriver(state, card);
