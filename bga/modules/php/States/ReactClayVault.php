@@ -27,9 +27,22 @@ class ReactClayVault extends GameState
     function onEnteringState()
     {
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
-        if ($this->game->peekStructureTop() === null) {
+        $top = $this->game->peekStructureTop();
+        if ($top === null) {
             return BuildEffects::class;
         }
+        // The deck-top peek is PRIVATE to the builder — public state args would leak
+        // the next structure card. The framework's `_private` STATE ARGS (see
+        // getArgs) don't reliably reach the client on state entry; when they don't,
+        // the player is asked to swap for a nameless card and must decide blind. So
+        // push it over the reliable private-NOTIFICATION channel too (same mechanism
+        // as Stone Pool's materialPeek / Salt Lick's peekHands).
+        $this->notify->player(
+            (int) $this->game->getActivePlayerId(),
+            'structurePeek',
+            '',
+            ['topName' => $top['name']]
+        );
         return null;
     }
 
@@ -38,9 +51,8 @@ class ReactClayVault extends GameState
         $top = $this->game->peekStructureTop();
         return [
             "handStructureIds" => $this->game->getPlayerHand((int) $this->game->getActivePlayerId()),
-            // The deck-top peek is PRIVATE to the builder. Sent via _private (active
-            // player only) so it never reaches opponents, spectators, or replays —
-            // public state args would otherwise leak the next structure card.
+            // Kept as a best-effort fallback alongside the structurePeek notification
+            // (onEnteringState) — opponents, spectators, and replays never receive it.
             "_private" => ["active" => ["topName" => $top['name'] ?? '']],
         ];
     }

@@ -581,17 +581,24 @@ function privateArgs(bga, args) {
 class ReactClayVault {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
-        // topName is a private arg (active player only) — read from _private.
-        const topName = (privateArgs(this.bga, args)).topName || '';
-        this.bga.statusBar.setTitle(isActive
-            ? _('Clay Vault — deck top is ') + topName + _('; swap a hand card or skip')
-            : _('Clay Vault…'));
+        // The peek arrives via the structurePeek private notification (reliable);
+        // the _private state arg is a best-effort fallback. notif_structurePeek can
+        // also push the name in after entry.
+        this.isActive = isActive;
+        this.game.activeClayVault = this;
+        this.renderTitle(this.game.structurePeek || privateArgs(this.bga, args).topName || '');
         if (!isActive) return;
-        this.game.setHint(_('Click a hand card to swap it for ') + topName + _(', or skip.'));
         this.game.markClickable('hand', args.handStructureIds, id => this.bga.actions.performAction('actClaySwap', { cardId: id }));
         this.bga.statusBar.addActionButton(_('Skip'), () => this.bga.actions.performAction('actClaySkip'), { color: 'secondary' });
     }
-    onLeavingState() { this.game.clearClickable(); }
+    // Called by notif_structurePeek if the peek arrives after we've entered.
+    renderTitle(topName) {
+        this.bga.statusBar.setTitle(this.isActive
+            ? _('Clay Vault — deck top is ') + topName + _('; swap a hand card or skip')
+            : _('Clay Vault…'));
+        if (this.isActive) this.game.setHint(_('Click a hand card to swap it for ') + topName + _(', or skip.'));
+    }
+    onLeavingState() { this.game.clearClickable(); this.game.activeClayVault = null; this.game.structurePeek = null; }
 }
 
 class ReactBurrowNetwork {
@@ -1794,6 +1801,12 @@ export class Game {
     async notif_latticeOffer(args) {
         this.latticeOffer = args.offer || [];
         if (this.activeVineLattice) this.activeVineLattice.render(this.latticeOffer);
+    }
+
+    // Clay Vault's private structure-deck-top peek (see ReactClayVault state).
+    async notif_structurePeek(args) {
+        this.structurePeek = args.topName || '';
+        if (this.activeClayVault) this.activeClayVault.renderTitle(this.structurePeek);
     }
 
     async notif_boardUpdate(args) {
