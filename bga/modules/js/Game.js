@@ -673,12 +673,24 @@ class VineLattice {
         if (!isActive) return;
         this.bga.statusBar.removeActionButtons();
         this.game.setHint(_('Pick one card to keep; the others are discarded.'));
-        // offer is a private arg (active player only) — read from _private.
-        const offer = privateArgs(this.bga, args).offer || [];
+        // The offer arrives via the latticeOffer private notification (reliable);
+        // the _private state arg is a best-effort fallback. notif_latticeOffer can
+        // also push it in after entry.
+        this.game.activeVineLattice = this;
+        this.render(this.game.latticeOffer || privateArgs(this.bga, args).offer || []);
+    }
+    // Called by notif_latticeOffer if the offer arrives after we've entered.
+    render(offer) {
+        this.bga.statusBar.removeActionButtons();
         offer.forEach(c => this.bga.statusBar.addActionButton(
             _('Keep ') + c.name, () => this.bga.actions.performAction('actLatticeKeep', { cardId: c.id }), { color: 'secondary' }));
+        // Never strand the player if the private offer failed to load.
+        if (!offer.length) {
+            this.bga.statusBar.addActionButton(_('Keep a card'),
+                () => this.bga.actions.performAction('actLatticeKeepAny'), { color: 'secondary' });
+        }
     }
-    onLeavingState() { this.game.clearClickable(); }
+    onLeavingState() { this.game.clearClickable(); this.game.activeVineLattice = null; this.game.latticeOffer = null; }
 }
 
 class SnagPile {
@@ -1775,6 +1787,13 @@ export class Game {
     async notif_materialPeek(args) {
         this.materialPeek = { cards: args.cards || [], n: Number(args.n) || (args.cards || []).length };
         if (this.activeStonePool) this.activeStonePool.applyPeek(this.materialPeek);
+    }
+
+    // Vine Lattice's private 3-card draw (see VineLattice state). Arrives on state
+    // entry, but may land before or after onEnteringState — handle both.
+    async notif_latticeOffer(args) {
+        this.latticeOffer = args.offer || [];
+        if (this.activeVineLattice) this.activeVineLattice.render(this.latticeOffer);
     }
 
     async notif_boardUpdate(args) {

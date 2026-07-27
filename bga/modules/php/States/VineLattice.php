@@ -29,17 +29,25 @@ class VineLattice extends GameState
             $this->game->drawLatticeOffer($playerId, 3);
         }
         // Nothing to choose if the structure pool was empty.
-        if (count($this->game->getLatticeOffer($playerId)) === 0) {
+        $offer = $this->game->getLatticeOffer($playerId);
+        if (count($offer) === 0) {
             return BuildEffects::class;
         }
+        // The 3-card draw is PRIVATE to the drawer (the kept card stays hidden in
+        // hand; only the two discards become public later). The framework's
+        // `_private` STATE ARGS (see getArgs) don't reliably reach the client on
+        // state entry — when they don't, no "Keep" buttons render and the player is
+        // stuck. So push the offer over the reliable private-NOTIFICATION channel
+        // (same mechanism as Salt Lick's peekHands / Stone Pool's materialPeek),
+        // which the client prefers. Opponents and spectators never receive it.
+        $this->notify->player($playerId, 'latticeOffer', '', ['offer' => $offer]);
         return null;
     }
 
     public function getArgs(): array
     {
-        // The 3-card draw is PRIVATE to the drawer (the kept card stays hidden in
-        // hand; only the two discards become public later). Sent via _private so
-        // opponents, spectators, and replays never see the full draw.
+        // Kept as a best-effort fallback alongside the latticeOffer notification
+        // (onEnteringState) — opponents, spectators, and replays never receive it.
         return ["_private" => ["active" => ["offer" => $this->game->getLatticeOffer((int) $this->game->getActivePlayerId())]]];
     }
 
@@ -56,6 +64,22 @@ class VineLattice extends GameState
         }
         $this->game->latticeKeep($activePlayerId, $cardId);
         $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
+        return BuildEffects::class;
+    }
+
+    /**
+     * "Keep a random card" fallback — a dedicated no-arg action so the player can
+     * always leave this state even if the private offer never reached the client
+     * (mirrors Stone Pool's actKeepOrder). Keeps the first drawn card.
+     */
+    #[PossibleAction]
+    public function actLatticeKeepAny(int $activePlayerId)
+    {
+        $offer = $this->game->getLatticeOffer($activePlayerId);
+        if (count($offer) > 0) {
+            $this->game->latticeKeep($activePlayerId, $offer[0]['id']);
+            $this->notify->player($activePlayerId, 'handUpdate', '', ['hand' => $this->game->getHandView($activePlayerId)]);
+        }
         return BuildEffects::class;
     }
 
