@@ -124,16 +124,27 @@ final class EffectsTest extends TestCase
         self::assertSame(['key' => 'towline', 'cost' => 0], Effects::onceAbility('Tow Line'));
     }
 
-    public function testSalmonRunCumulativeCost(): void
+    public function testSalmonRunTotalCost(): void
     {
-        // Escalating 1/2/3/5/8 -> cumulative 1, 3, 6, 11, 19; capped at 5 workers.
+        // 1/2/3/5/8 are TOTALS for a 1..5-worker run, not a per-worker ladder
+        // (until 2026-07-26 these were marginal, summing to 1/3/6/11/19).
         self::assertSame(0, Effects::salmonRunCost(0));
         self::assertSame(1, Effects::salmonRunCost(1));
-        self::assertSame(3, Effects::salmonRunCost(2));
-        self::assertSame(6, Effects::salmonRunCost(3));
-        self::assertSame(11, Effects::salmonRunCost(4));
-        self::assertSame(19, Effects::salmonRunCost(5));
-        self::assertSame(19, Effects::salmonRunCost(7)); // capped at 5
+        self::assertSame(2, Effects::salmonRunCost(2));
+        self::assertSame(3, Effects::salmonRunCost(3));
+        self::assertSame(5, Effects::salmonRunCost(4));
+        self::assertSame(8, Effects::salmonRunCost(5));
+        self::assertSame(8, Effects::salmonRunCost(7)); // capped at 5
+    }
+
+    public function testSalmonRunIsOncePerGame(): void
+    {
+        // Moved out of ACTION_ABILITIES into ONCE_ABILITIES on 2026-07-26, so
+        // it now flips its card and can't be reused.
+        self::assertSame(['key' => 'salmonrun', 'cost' => 0], Effects::onceAbility('Salmon Run'));
+        self::assertArrayNotHasKey('Salmon Run', Effects::ACTION_ABILITIES);
+        // and Mill Wheel copies repeatable actions only, so it dropped out.
+        self::assertNotContains('salmonrun', Effects::MILL_WHEEL_COPYABLE);
     }
 
     public function testReactiveBuildEffectsGateOnMaterialAndOwnership(): void

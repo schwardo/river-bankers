@@ -63,7 +63,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back 3🐟 in compensation.' },
   { name: 'Tow Line',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'Once per game (flip card): move any river card to River 1, then run an auction on it (no flat 🐟).' },
   { name: 'Portage',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.' },
-  { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 6, effect: 'As an action: place 1-5 workers from your supply onto uncovered icons of one river card. 🐟 cost escalates 1/2/3/5/8 per successive worker.' },
+  { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 6, effect: 'Once per game (flip card): place 1-5 workers from your supply onto uncovered icons of one river card. Total 🐟 cost 1/2/3/5/8.' },
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track.' },
   { name: 'Trophy Lodge',   cost: { clay: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +3 VP per ?-VP structure you control, including this one (max +12).' },
   { name: 'Springwater Pool', cost: { vines: 3, mud: 2 },            time: 3, vp: 5, effect: 'When built: ready all of your spent once-per-game cards.' },
@@ -308,6 +308,7 @@ function tryPackRat(state, playerIdx) {
 const ONCE_PER_GAME_FLAGS = [
   ['Tribute Stone', 'tributeStoneUsed'], ['Snare Set', 'snareSetUsed'],
   ['Floodgate', 'floodgateUsed'], ['Tow Line', 'towLineUsed'],
+  ['Salmon Run', 'salmonRunUsed'],
   ['Spy Mound', 'spyMoundUsed'],
   ['Granary', 'granaryUsed'], ['Slipstream', 'slipstreamUsed'],
   ['Wood Pile', 'woodPileUsed'], ['Hollowed-out Log', 'hollowedLogUsed'],
@@ -360,9 +361,9 @@ function tryMillWheel(state, playerIdx) {
   for (const s of p.hand) for (const m in s.cost) needs[m] = Math.max(needs[m], Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0)));
   const myMats = new Set();
   for (const s of p.hand) for (const m in s.cost) myMats.add(m);
-  if (avail.has('Salmon Run') && p.supply > 0 && p.timePos + 2 < SIM_FINISH_LINE) {
+  if (avail.has('Salmon Run') && !p.salmonRunUsed && p.supply > 0 && p.timePos + 2 < SIM_FINISH_LINE) {
     const t = findSalmonRunTarget(state, playerIdx, needs);
-    if (t && p.timePos + salmonRunCumulativeCost(t.n) < SIM_FINISH_LINE) {
+    if (t && p.timePos + salmonRunCost(t.n) < SIM_FINISH_LINE) {
       doSalmonRun(state, playerIdx, t.card.id, t.n); noteEffectUse(state, 'Mill Wheel'); return;
     }
   }
@@ -1080,6 +1081,7 @@ function newGame(numPlayers, workersPerPlayer = null) {
       granaryUsed: false,
       floodgateUsed: false,
       towLineUsed: false,
+      salmonRunUsed: false,
       spyMoundUsed: false,
       tributeStoneUsed: false,
       slipstreamUsed: false,
@@ -2069,6 +2071,7 @@ function aiEffectValue(struct, p, state) {
   if (struct.name === 'Granary' && p.granaryUsed) return 0;
   if (struct.name === 'Floodgate' && p.floodgateUsed) return 0;
   if (struct.name === 'Tow Line' && p.towLineUsed) return 0;
+  if (struct.name === 'Salmon Run' && p.salmonRunUsed) return 0;
   if (struct.name === 'Spy Mound' && p.spyMoundUsed) return 0;
   if (struct.name === 'Tribute Stone' && p.tributeStoneUsed) return 0;
   if (struct.name === 'Wood Pile' && p.woodPileUsed) return 0;
@@ -2302,9 +2305,9 @@ function aiChooseAction(state, playerIdx) {
       candidates.push({ score: ct.score, needsTrigger: true, make: () => ({ type: 'combinedAuction', aId: ct.A.id, bId: ct.B.id }) });
     }
   }
-  if (hasEffect(p, 'Salmon Run') && p.supply > 0 && p.timePos + 2 < SIM_FINISH_LINE) {
+  if (hasEffect(p, 'Salmon Run') && !p.salmonRunUsed && p.supply > 0 && p.timePos + 2 < SIM_FINISH_LINE) {
     const t = findSalmonRunTarget(state, playerIdx, needs);
-    if (t && p.timePos + salmonRunCumulativeCost(t.n) < SIM_FINISH_LINE) {
+    if (t && p.timePos + salmonRunCost(t.n) < SIM_FINISH_LINE) {
       candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'salmonRun', cardId: t.card.id, workerCount: t.n }) });
     }
   }
@@ -2575,14 +2578,16 @@ function findOtterTrailTarget(state, playerIdx) {
   return { cardA: bestA, cardB: bestB, otherIdx: bestBOther };
 }
 
-// Salmon Run: marginal fish cost for the 1st/2nd/3rd/4th/5th worker placed.
+// Salmon Run: TOTAL fish cost for placing 1/2/3/4/5 workers (not marginal —
+// index n-1 is the whole price of an n-worker run). Was a successive
+// per-worker ladder (cumulative 1/3/6/11/19) until [2026-07-26], when the card
+// became once-per-game and the totals were lowered to these.
 const SALMON_RUN_COSTS = [1, 2, 3, 5, 8];
 // Measurement toggle — see RB_SALMON_DRIP note in findSalmonRunTarget.
 const SALMON_DRIP = process.env.RB_SALMON_DRIP === '1';
-function salmonRunCumulativeCost(n) {
-  let total = 0;
-  for (let i = 0; i < n && i < SALMON_RUN_COSTS.length; i++) total += SALMON_RUN_COSTS[i];
-  return total;
+function salmonRunCost(n) {
+  if (n <= 0) return 0;
+  return SALMON_RUN_COSTS[Math.min(n, SALMON_RUN_COSTS.length) - 1];
 }
 
 function doSalmonRun(state, playerIdx, cardId, workerCount) {
@@ -2591,10 +2596,11 @@ function doSalmonRun(state, playerIdx, cardId, workerCount) {
   if (!card || typeof card.slot !== 'number') return false;
   const maxPlaceable = Math.min(workerCount, p.supply, uncoveredIcons(card), SALMON_RUN_COSTS.length);
   if (maxPlaceable <= 0) return false;
-  const cost = salmonRunCumulativeCost(maxPlaceable);
+  const cost = salmonRunCost(maxPlaceable);
   card.workers[playerIdx] = (card.workers[playerIdx] || 0) + maxPlaceable;
   p.supply -= maxPlaceable;
   advancePlayer(state, playerIdx, cost);
+  p.salmonRunUsed = true;
   noteEffectUse(state, 'Salmon Run');
   return true;
 }
@@ -2614,9 +2620,9 @@ function findSalmonRunTarget(state, playerIdx, needs) {
     const maxN = SALMON_DRIP ? 1 : Math.min(p.supply, uncoveredIcons(c), need, SALMON_RUN_COSTS.length);
     for (let n = 1; n <= maxN; n++) {
       // Scored on the SAME need-weighted scale as a single-card auction
-      // (need × workers − fish×0.4), but Salmon Run's escalating cost is
+      // (need × workers − fish×0.4), but Salmon Run's total cost is
       // slot-independent — so it beats an auction on deep/expensive cards.
-      const score = need * n - salmonRunCumulativeCost(n) * 0.4;
+      const score = need * n - salmonRunCost(n) * 0.4;
       if (score > bestScore) { bestScore = score; bestN = n; }
     }
     if (bestN > 0 && (best === null || bestScore > best.score)) {
@@ -3245,6 +3251,7 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     p.granaryUsed = false;
     p.floodgateUsed = false;
     p.towLineUsed = false;
+    p.salmonRunUsed = false;
     p.spyMoundUsed = false;
     p.tributeStoneUsed = false;
     p.slipstreamUsed = false;

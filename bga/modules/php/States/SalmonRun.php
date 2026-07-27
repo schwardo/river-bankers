@@ -11,9 +11,13 @@ use Bga\GameFramework\UserException;
 use Bga\Games\RiverBankers\Game;
 
 /**
- * Salmon Run (as an action): place 1-5 workers from supply onto uncovered icons
- * of one river card; the fish cost escalates 1/2/3/5/8 per successive worker.
- * Two steps â pick the card, then the count â and consumes the turn.
+ * Salmon Run (once per game, flip card): place 1-5 workers from supply onto
+ * uncovered icons of one river card. The fish cost is the TOTAL for the run —
+ * 1/2/3/5/8 for 1..5 workers — not a per-worker escalation.
+ *
+ * Two steps (pick the card, then the count) and it consumes the turn, like
+ * Tow Line. Was a repeatable as-an-action ability with a steeper cumulative
+ * cost (1/3/6/11/19) until [2026-07-26].
  */
 class SalmonRun extends GameState
 {
@@ -71,7 +75,13 @@ class SalmonRun extends GameState
             throw new UserException(clienttranslate('Choose how many workers to place.'));
         }
         $this->game->salmonRunPlace($activePlayerId, (int) $args['card'], $n);
-        $this->globals->set('salmonrun_card', 0);
+        // Once per game: spend the card. PlayerTurn stashed its id when it
+        // matched Salmon Run in ONCE_ABILITIES.
+        $card = (int) $this->globals->get('pending_ability_card', 0);
+        if ($card > 0) {
+            $this->game->flipCardUsed($card);
+        }
+        $this->clearPending();
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         return NextPlayer::class;
     }
@@ -85,7 +95,16 @@ class SalmonRun extends GameState
 
     function zombie(int $playerId)
     {
-        $this->globals->set('salmonrun_card', 0);
+        // A quit player placed nothing, so the card is NOT spent.
+        $this->clearPending();
         return NextPlayer::class;
+    }
+
+    private function clearPending(): void
+    {
+        $this->globals->set('salmonrun_card', 0);
+        $this->globals->set('pending_ability', '');
+        $this->globals->set('pending_ability_free', 0);
+        $this->globals->set('pending_ability_card', 0);
     }
 }

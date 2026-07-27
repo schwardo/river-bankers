@@ -797,10 +797,10 @@ class SalmonRun {
             this.game.setHint(_('Click a river card with uncovered icons.'));
             this.game.markClickable('river', args.targets, id => this.bga.actions.performAction('actSalmonCard', { cardId: id }));
         } else {
-            let cum = 0;
+            // args.costs are TOTALS per run size, not marginal steps — index
+            // n-1 is the whole price of an n-worker run (changed 2026-07-26).
             for (let n = 1; n <= args.max; n++) {
-                cum += args.costs[n - 1];
-                this.bga.statusBar.addActionButton(n + ' (' + cum + '🐟)',
+                this.bga.statusBar.addActionButton(n + ' (' + args.costs[n - 1] + '🐟)',
                     () => this.bga.actions.performAction('actSalmonCount', { n }), { color: 'secondary' });
             }
         }

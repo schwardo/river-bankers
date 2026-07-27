@@ -105,7 +105,7 @@ final class Effects
         'Vine Lattice'  => 'vinelattice',  // draw 3 structures, keep 1
         'Snag Pile'     => 'snagpile',     // pull a Headwaters card to River 1, auction at 1/item
         'Flush Channel' => 'flushchannel', // remove a Headwaters card (out of game), refill, no auction
-        'Salt Lick'     => 'saltlick',     // peek every opponent's hand (info only)
+        'Salt Lick'     => 'saltlick',     // peek ONE opponent's hand (info only)
     ];
 
     /** The immediate self when-built effect key for $name, or null. */
@@ -153,16 +153,17 @@ final class Effects
     public const ACTION_ABILITIES = [
         'Driftwood Snag' => ['key' => 'driftwoodsnag', 'cost' => 1],
         'Heron Roost'    => ['key' => 'heronroost', 'cost' => 1],
-        'Salmon Run'     => ['key' => 'salmonrun', 'cost' => 0],  // escalating cost billed in state
         'Portage'        => ['key' => 'portage', 'cost' => 0],    // pays source per-item in state
         'Trading Post'   => ['key' => 'tradingpost', 'cost' => 1], // recall 3, place 2
     ];
 
     /**
      * Abilities Mill Wheel can copy from a neighbour (every as-an-action ability
-     * except Confluence's combined auction). Keyed by effect key.
+     * except Confluence's combined auction). Keyed by effect key. Salmon Run
+     * left this set on [2026-07-26] when it became once-per-game — Mill Wheel
+     * copies repeatable actions only, which is why Tow Line was never in it.
      */
-    public const MILL_WHEEL_COPYABLE = ['driftwoodsnag', 'heronroost', 'salmonrun', 'portage', 'tradingpost'];
+    public const MILL_WHEEL_COPYABLE = ['driftwoodsnag', 'heronroost', 'portage', 'tradingpost'];
 
     /**
      * Structure names whose "when built" effect Mill Wheel can copy from a
@@ -196,17 +197,21 @@ final class Effects
         return self::TURN_ABILITIES[$name] ?? null;
     }
 
-    /** Salmon Run: per-worker fish costs (1st..5th worker placed). */
+    /**
+     * Salmon Run: TOTAL fish cost of an n-worker run, indexed n-1 — NOT a
+     * per-worker ladder. Until [2026-07-26] these were marginal per-worker
+     * costs summing to 1/3/6/11/19; the card then became once-per-game and the
+     * totals were lowered to the values below.
+     */
     public const SALMON_RUN_COSTS = [1, 2, 3, 5, 8];
 
-    /** Cumulative fish cost of placing $workers via Salmon Run (capped at 5). */
+    /** Total fish cost of placing $workers via Salmon Run (capped at 5). */
     public static function salmonRunCost(int $workers): int
     {
-        $sum = 0;
-        for ($i = 0; $i < $workers && $i < count(self::SALMON_RUN_COSTS); $i++) {
-            $sum += self::SALMON_RUN_COSTS[$i];
+        if ($workers <= 0) {
+            return 0;
         }
-        return $sum;
+        return self::SALMON_RUN_COSTS[min($workers, count(self::SALMON_RUN_COSTS)) - 1];
     }
 
     /** Once-per-game abilities (flip the card when used): name => [key, fish cost]. */
@@ -216,6 +221,9 @@ final class Effects
         'Tribute Stone'    => ['key' => 'tributestone', 'cost' => 0],
         // Tow Line: move any river card to River 1, then auction it (no flat 🐟).
         'Tow Line'         => ['key' => 'towline', 'cost' => 0],
+        // Salmon Run: place 1-5 workers on one river card; total cost billed in
+        // its state. Was a repeatable as-an-action ability until [2026-07-26].
+        'Salmon Run'       => ['key' => 'salmonrun', 'cost' => 0],
         // Snare Set (mink starter) is mechanically identical to Tribute Stone.
         'Snare Set'        => ['key' => 'tributestone', 'cost' => 0],
         'Pack Rat Burrow'  => ['key' => 'packrat', 'cost' => 0],   // discard 1 hand, take 1 from discard
