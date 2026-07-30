@@ -21,9 +21,22 @@ import { execFileSync } from 'node:child_process';
 
 // Run `node sim.js emit <numP> <workers|''> <games>` and return parsed JSONL.
 // Throttled per-child via cpulimit iff SIM_CPULIMIT (a percent) is set.
-export function runSimEmit(SIM, numP, workers, games, { maxBuffer = 256 * 1024 * 1024, env = null, human = false } = {}) {
+// `profile` selects one of sim.js's two calibrated baseline models:
+//   'friendly' — leaves room for rivals; liquid workers (the old `--human`)
+//   'greedy'   — assumes rivals stay out; committed workers
+//   'default'  — the untuned AI, neither profile applied
+// `human: true` is the pre-2026-07-30 spelling of profile:'friendly'; kept so
+// older callers keep working.
+export const PROFILES = ['friendly', 'greedy', 'default'];
+export function runSimEmit(SIM, numP, workers, games, { maxBuffer = 256 * 1024 * 1024, env = null, human = false, profile = null } = {}) {
+  const prof = profile || (human ? 'friendly' : 'default');
+  if (!PROFILES.includes(prof)) {
+    throw new Error(`unknown sim profile "${prof}" — expected one of ${PROFILES.join(', ')}`);
+  }
   const emitArgs = [SIM, 'emit', String(numP), workers == null ? '' : String(workers), String(games)];
-  if (human) emitArgs.push('--human'); // sim.js strips the flag before positional parsing
+  // sim.js strips these flags before positional parsing.
+  if (prof === 'friendly') emitArgs.push('--friendly');
+  else if (prof === 'greedy') emitArgs.push('--greedy');
   const limit = process.env.SIM_CPULIMIT;
   let bin, args;
   if (limit && Number(limit) > 0) {

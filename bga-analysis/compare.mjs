@@ -48,8 +48,15 @@ function std(a) {
   return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1));
 }
 
+// Which calibrated baseline model to compare against — see sim.js "BASELINE
+// PROFILES". RB_PROFILE=friendly|greedy|default, or RB_SIM_DEFAULT=1 as the old
+// spelling of `default`. MUST stay in sync with histogram.mjs: until 2026-07-30
+// compare.mjs silently ran the untuned AI while histogram.mjs ran --human, so
+// the two tools fitted and plotted different bidders and their z-scores were not
+// comparable. Both now default to `friendly` and print the profile they used.
+const SIM_PROFILE = process.env.RB_PROFILE || (process.env.RB_SIM_DEFAULT === '1' ? 'default' : 'friendly');
 function simDistribution(numP) {
-  return runSimEmit(SIM, numP, '', SIM_GAMES);
+  return runSimEmit(SIM, numP, '', SIM_GAMES, { profile: SIM_PROFILE });
 }
 
 const pad = (s, n) => String(s).padEnd(n);
@@ -72,6 +79,7 @@ function main() {
 
   const md = ['# River Bankers — real BGA games vs. simulator', '',
     `Sim baseline: ${SIM_GAMES} games per player-count (default starting workers).`,
+    `Sim profile: ${SIM_PROFILE}.`,
     `Real games: ${games.length} total.`, ''];
   let report = md.slice();
 

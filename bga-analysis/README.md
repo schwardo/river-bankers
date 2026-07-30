@@ -52,6 +52,58 @@ bars = the simulated distribution, amber line = each actual BGA game, `z` = how
 many sim standard deviations the real value sits from the sim mean. Open
 `data/histograms.html` in any browser (or the console's file preview).
 
+## Baseline models
+
+The sim has **two** calibrated models of real play, defined in sim.js under
+"BASELINE PROFILES". Both are fitted to the same six BGA games and match them
+about equally well; they differ in which human behaviour they credit for the
+match, so a rules change that looks safe under only one has not really been
+tested.
+
+| | `--friendly` | `--greedy` |
+|---|---|---|
+| Opponent read | rivals take ~1 icon each | rivals probably stay out (10th pct) |
+| Workers | liquid — recall freely | committed — only building returns them |
+| Ingredients | `COST_AVERSION=0`, `OVERBID {2:0.3, 3:0, 4:0}` | `NO_RECALL`, `RANDOM_OPP`, `OPP_Q=0.1` |
+| Known gap | jams under-matched (2P, 3P); 4P runs long | 2P jams under-matched |
+
+They are **alternatives, not layers** — stacking `--greedy` onto `--friendly`
+over-fires at 4P. `--human` is the pre-2026-07-30 name for `--friendly` and
+still works.
+
+`histogram.mjs` generates every **model × first-mover-advantage** combination
+(4 variants, 12 sim runs) and puts two combo boxes on the page to switch between
+them; `RB_PROFILE` / `RB_NO_CONSOLATION` only choose which variant it opens on.
+`compare.mjs` runs one at a time and prints which:
+
+```bash
+node compare.mjs                      # friendly (default)
+RB_PROFILE=greedy node compare.mjs    # greedy
+RB_PROFILE=default node compare.mjs   # untuned AI
+```
+
+**Sample caveat:** n=2 real games per player-count, so treat every fit as
+provisional.
+
+**First-mover advantage matters more than it looks.** All six real games predate
+the initiator-consolation rule, while live BGA play uses it — so with the rule
+ON, part of any divergence is the rule change rather than model error, and with
+it OFF the sim reproduces a ruleset that no longer exists. Neither view is the
+"true" one, which is why the page carries both. Measured effect on the number of
+diverging metrics (|z| ≥ 2), 4000 sim games per variant:
+
+| | consolation ON (live) | consolation OFF (legacy) |
+|---|---|---|
+| `friendly` | 16 | 5 |
+| `greedy` | 4 | 2 |
+
+`friendly` degrades badly under the live rule (3P and 4P go from clean to every
+metric diverging); `greedy` barely moves. That robustness is the main practical
+argument for `greedy` as the model to trust going forward — but note the honest
+confound: these six games were played under the legacy rule, so the OFF column is
+the like-for-like comparison and the ON column mixes model error with rule
+change. This resolves once post-rule games are logged.
+
 The sim side is driven by a mode added to `../sim.js`:
 
 ```bash

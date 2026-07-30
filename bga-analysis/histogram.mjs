@@ -30,16 +30,28 @@ const METRICS = [
 const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
 const std = (a) => { const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
 
-// Sim distribution uses the --human preset (COST_AVERSION=0 + per-count OVERBID),
-// the profile calibrated to real BGA play; set RB_SIM_DEFAULT=1 for the old AI.
-const SIM_HUMAN = process.env.RB_SIM_DEFAULT !== '1';
-// Initiator-consolation ("first-mover advantage") rule, on by default to match
-// BGA's always-on behavior; set RB_NO_CONSOLATION=1 to model the legacy game.
+// Which calibrated baseline model to plot against — see sim.js "BASELINE
+// PROFILES". RB_PROFILE=friendly|greedy|default, or RB_SIM_DEFAULT=1 as the old
+// spelling of `default`. Kept in sync with compare.mjs.
+// The page is generated across BOTH axes and switched client-side, so a run
+// always produces all four variants; the env vars below only choose which one
+// the page opens on.
+//   • baseline model — friendly | greedy (see sim.js "BASELINE PROFILES")
+//   • initiator consolation ("first-mover advantage") — on | off
+// The second axis matters because all six real games predate the consolation
+// rule while live BGA play uses it: with it ON part of any divergence is the
+// rule change rather than model error, and with it OFF the sim reproduces a
+// ruleset that no longer exists. Neither view is the "true" one, so the page
+// shows both and lets the reader see how much the rule accounts for.
+const SIM_PROFILE = process.env.RB_PROFILE || (process.env.RB_SIM_DEFAULT === '1' ? 'default' : 'friendly');
 const SIM_CONSOLATION = process.env.RB_NO_CONSOLATION !== '1';
-function simDistribution(numP) {
+const MODELS = ['friendly', 'greedy'];
+const CONSOLS = [true, false];
+const variantKey = (profile, consolation) => `${profile}:${consolation ? 'on' : 'off'}`;
+function simDistribution(numP, profile, consolation) {
   return runSimEmit(SIM, numP, '', SIM_GAMES, {
-    human: SIM_HUMAN,
-    env: SIM_CONSOLATION ? { RB_INIT_CONSOLATION: '1' } : null,
+    profile,
+    env: { RB_INIT_CONSOLATION: consolation ? '1' : '0' },
   });
 }
 
@@ -69,19 +81,39 @@ function main() {
   const counts = Object.keys(byP).map(Number).sort();
   if (!counts.length) { console.error('No finished games with logs yet.'); process.exit(1); }
 
-  const groups = [];
-  for (const numP of counts) {
-    process.stderr.write(`Simulating ${SIM_GAMES} ${numP}P games…\r`);
-    groups.push(computeGroup(numP, byP[numP], simDistribution(numP)));
+  // Every (model × consolation) variant is generated so the page can switch
+  // without a regen. Cost is MODELS×CONSOLS×counts sim runs — 12 at the moment.
+  const variants = {};
+  for (const prof of MODELS) {
+    for (const consol of CONSOLS) {
+      const groups = [];
+      for (const numP of counts) {
+        process.stderr.write(`Simulating ${SIM_GAMES} ${numP}P games (${prof}, consolation ${consol ? 'on' : 'off'})…    \r`);
+        groups.push(computeGroup(numP, byP[numP], simDistribution(numP, prof, consol)));
+      }
+      variants[variantKey(prof, consol)] = groups;
+    }
   }
-  process.stderr.write(' '.repeat(44) + '\r');
+  process.stderr.write(' '.repeat(72) + '\r');
 
-  const html = PAGE.replace('__DATA__', JSON.stringify({ simN: SIM_GAMES, groups, profile: SIM_HUMAN ? 'human' : 'default', consolation: SIM_CONSOLATION }));
+  const activeProfile = MODELS.includes(SIM_PROFILE) ? SIM_PROFILE : MODELS[0];
+  const html = PAGE.replace('__DATA__', JSON.stringify({
+    simN: SIM_GAMES, variants, order: MODELS,
+    active: activeProfile, activeConsolation: SIM_CONSOLATION,
+  }));
   fs.mkdirSync(DATA, { recursive: true });
   fs.writeFileSync(path.join(DATA, 'histograms.html'), html);
-  const flagged = groups.flatMap((g) => g.metrics.filter((m) => Math.abs(m.z) >= 2).map((m) => `${g.numP}P ${m.label}`));
-  console.log(`Wrote data/histograms.html — ${groups.map((g) => `${g.numP}P: ${g.realN} real`).join(', ')}.`);
-  if (flagged.length) console.log(`Diverging (|z|>=2): ${flagged.join(', ')}`);
+  const anyGroups = variants[variantKey(activeProfile, SIM_CONSOLATION)];
+  console.log(`Wrote data/histograms.html — ${anyGroups.map((g) => `${g.numP}P: ${g.realN} real`).join(', ')}; `
+    + `${MODELS.length * CONSOLS.length} variants (opens on ${activeProfile}, consolation ${SIM_CONSOLATION ? 'on' : 'off'}).`);
+  for (const prof of MODELS) {
+    for (const consol of CONSOLS) {
+      const flagged = variants[variantKey(prof, consol)]
+        .flatMap((g) => g.metrics.filter((m) => Math.abs(m.z) >= 2).map((m) => `${g.numP}P ${m.label}`));
+      const tag = `${prof}, consolation ${consol ? 'on' : 'off'}`;
+      console.log(`  ${tag}: ${flagged.length ? `${flagged.length} diverging (|z|>=2): ${flagged.join(', ')}` : 'no metric diverges (|z|<2)'}`);
+    }
+  }
   console.log('Open it: any browser, or the console file preview.');
 }
 
@@ -124,6 +156,13 @@ const PAGE = `<!doctype html>
   .pcrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;}
   .card.empty{display:flex;align-items:center;justify-content:center;opacity:.6;}
   .card .nodata{color:var(--faint);font-size:12.5px;font-family:var(--mono);padding:26px 0;text-align:center;}
+  .modelpick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:22px 0 2px;font-size:13.5px;}
+  .modelpick label{color:var(--muted);font-weight:600;}
+  .modelpick select{font:inherit;font-family:var(--mono);font-size:13px;color:var(--ink);
+    background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 10px;
+    box-shadow:var(--shadow);cursor:pointer;}
+  .modelpick select:focus-visible{outline:2px solid var(--sim);outline-offset:2px;}
+  .modelnote{color:var(--faint);font-size:12.5px;}
   .gameslegend{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0 2px;font-size:12.5px;color:var(--muted);}
   .gameslegend .pcgroup{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
   .gameslegend .pcgroup b{color:var(--ink);font-family:var(--mono);}
@@ -156,6 +195,16 @@ const PAGE = `<!doctype html>
       <span class="item"><span class="sw-line"></span> Actual — from BGA (one color per game)</span>
       <span class="item" style="color:var(--faint)">z = distance from sim mean, in sim standard deviations</span>
     </div>
+    <div class="modelpick">
+      <label for="model">Baseline model</label>
+      <select id="model"></select>
+      <label for="consol">First-mover advantage</label>
+      <select id="consol">
+        <option value="on">on (live rule)</option>
+        <option value="off">off (legacy)</option>
+      </select>
+      <span class="modelnote" id="modelnote"></span>
+    </div>
     <div class="gameslegend" id="gameslegend"></div>
   </header>
   <div id="sections"></div>
@@ -179,29 +228,47 @@ const css=(n)=>{
 const fmt=(x,d=1)=>(x==null||Number.isNaN(x))?"—":Number(x).toFixed(d);
 const tt=document.getElementById("tt");
 const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
-const totalReal=DATA.groups.reduce((s,g)=>s+g.realN,0);
+// Active model; the real games are identical across models, so only the sim
+// distributions (bins/mean/sd/z) change when this switches.
+let ACTIVE=DATA.active, CONSOL=DATA.activeConsolation;
+const groupsOf=(p=ACTIVE,c=CONSOL)=>DATA.variants[\`\${p}:\${c?"on":"off"}\`];
+const totalReal=groupsOf().reduce((s,g)=>s+g.realN,0);
 // Distinct per-game colors (readable on both themes); cycles if >palette.
 const PALETTE=["#b9741c","#c0397b","#3b9e5b","#7b5cd6","#c0563a","#2f8f8f"];
 const realColor=(i)=>PALETTE[i%PALETTE.length];
+// One line per calibrated baseline model — see sim.js "BASELINE PROFILES".
+const PROFILE_NAME={friendly:"friendly",greedy:"greedy",default:"default AI"};
+// Plain-language, deliberately: this page is vendored to the public LFG site, so
+// it describes each model by behaviour rather than by internal knob names. The
+// mechanical definitions live in sim.js "BASELINE PROFILES" and the README.
+const PROFILE_BLURB={
+  friendly:"expects rivals to claim their share and bids around them, and pulls workers back off the river to fund a bid",
+  greedy:"bids as though rivals will stay out, and never pulls a worker back once placed \\u2014 only building returns them",
+  default:"the untuned AI, with neither calibrated model applied",
+};
 
-document.getElementById("lede").textContent =
-  \`Teal bars bin \${DATA.simN.toLocaleString()} simulated games per player-count \`
-  + \`(\${DATA.profile==="human"?"--human profile: COST_AVERSION=0, per-count OVERBID {2:0.3, 3:0, 4:0}":"default AI"}\${DATA.consolation?", first-mover advantage on":""}); each amber line marks one of \`
-  + \`\${totalReal} completed BGA game\${totalReal===1?"":"s"}. Where a line sits off the bulk of the bars, real play and the model disagree.\`;
+function updateHeader(){
+  document.getElementById("lede").textContent =
+    \`Teal bars bin \${DATA.simN.toLocaleString()} simulated games per player-count \`
+    + \`(\${PROFILE_NAME[ACTIVE]||ACTIVE} model: \${PROFILE_BLURB[ACTIVE]||""}\${CONSOL?"; first-mover advantage on":"; first-mover advantage off (legacy ruleset)"}); each amber line marks one of \`
+    + \`\${totalReal} completed BGA game\${totalReal===1?"":"s"}. Where a line sits off the bulk of the bars, real play and the model disagree.\`;
+  document.getElementById("modelnote").textContent=PROFILE_BLURB[ACTIVE]||"";
+}
 const chips=document.getElementById("chips");
 [["Simulated / config",DATA.simN.toLocaleString()],["Actual games",String(totalReal)],
- ["Player counts",DATA.groups.map(g=>g.numP+"P").join(" · ")]]
+ ["Player counts",groupsOf().map(g=>g.numP+"P").join(" · ")]]
  .forEach(([k,v])=>{const c=document.createElement("span");c.className="chip";c.innerHTML=\`\${k} <b>\${v}</b>\`;chips.appendChild(c);});
 
 // Assign every real game a globally-unique color, so a game keeps its color
 // across every metric chart. Colors are grouped by player-count for the legend.
 let __cc=0; const colorIdx={};
-for(const g of DATA.groups) colorIdx[g.numP]=g.realTables.map(()=>__cc++);
+for(const g of groupsOf()) colorIdx[g.numP]=g.realTables.map(()=>__cc++);
 const colorFor=(numP,i)=>realColor(colorIdx[numP][i]);
 
 // Per-player-count game legend (color ■ tableId), shown once under the header.
+// Real games don't change with the model, so this is built once.
 const gl=document.getElementById("gameslegend");
-for(const g of DATA.groups){
+for(const g of groupsOf()){
   const grp=document.createElement("span");grp.className="pcgroup";
   const games=g.realTables.map((t,i)=>\`<span class="g"><span style="color:\${colorFor(g.numP,i)}">■</span> \${t}</span>\`).join("&nbsp;&nbsp;");
   grp.innerHTML=\`<b>\${g.numP}P</b> \${games||'<span class="g" style="color:var(--faint)">none</span>'}\`;
@@ -209,27 +276,54 @@ for(const g of DATA.groups){
 }
 
 // Master metric order (union across player-counts, preserving first appearance).
+// Both models report the same metric set, so this is stable across a switch.
 const metricOrder=[]; const __seen=new Set();
-for(const g of DATA.groups) for(const m of g.metrics){ if(!__seen.has(m.key)){__seen.add(m.key);metricOrder.push({key:m.key,label:m.label});} }
+for(const g of groupsOf()) for(const m of g.metrics){ if(!__seen.has(m.key)){__seen.add(m.key);metricOrder.push({key:m.key,label:m.label});} }
 
-const charts=[];
-for(const mo of metricOrder){
-  const sec=document.createElement("section");sec.className="metric";
-  sec.innerHTML=\`<h2>\${mo.label}</h2>\`;
-  const row=document.createElement("div");row.className="pcrow";sec.appendChild(row);
-  for(const grp of DATA.groups){
-    const m=grp.metrics.find(x=>x.key===mo.key);
-    const card=document.createElement("div");card.className="card";
-    if(!m){card.classList.add("empty");card.innerHTML=\`<div class="nodata">\${grp.numP}P · no games</div>\`;row.appendChild(card);continue;}
-    const cols=m.real.map((_,i)=>colorFor(grp.numP,i));
-    const far=Math.abs(m.z)>=2, arrow=m.z>0?"▲":m.z<0?"▼":"·";
-    card.innerHTML=\`<div class="top"><span class="name">\${grp.numP}P</span><span class="zpill \${far?"far":""}">z \${m.z>0?"+":""}\${fmt(m.z,2)} \${arrow}</span></div><canvas></canvas>\`
-      +\`<div class="cap"><span><span class="k">actual</span> \${m.real.length?m.real.map((rv,i)=>\`<span style="color:\${cols[i]}">\${rv}</span>\`).join(", "):"—"}</span><span><span class="k">sim</span> \${fmt(m.simMean)} <span class="k">±</span> \${fmt(m.simSd)}</span></div>\`;
-    row.appendChild(card);
-    charts.push({m,canvas:card.querySelector("canvas"),simN:grp.simN,colors:cols});
+let charts=[];
+function buildSections(){
+  const host=document.getElementById("sections");
+  host.textContent="";
+  charts=[];
+  for(const mo of metricOrder){
+    const sec=document.createElement("section");sec.className="metric";
+    sec.innerHTML=\`<h2>\${mo.label}</h2>\`;
+    const row=document.createElement("div");row.className="pcrow";sec.appendChild(row);
+    for(const grp of groupsOf()){
+      const m=grp.metrics.find(x=>x.key===mo.key);
+      const card=document.createElement("div");card.className="card";
+      if(!m){card.classList.add("empty");card.innerHTML=\`<div class="nodata">\${grp.numP}P · no games</div>\`;row.appendChild(card);continue;}
+      const cols=m.real.map((_,i)=>colorFor(grp.numP,i));
+      const far=Math.abs(m.z)>=2, arrow=m.z>0?"▲":m.z<0?"▼":"·";
+      card.innerHTML=\`<div class="top"><span class="name">\${grp.numP}P</span><span class="zpill \${far?"far":""}">z \${m.z>0?"+":""}\${fmt(m.z,2)} \${arrow}</span></div><canvas></canvas>\`
+        +\`<div class="cap"><span><span class="k">actual</span> \${m.real.length?m.real.map((rv,i)=>\`<span style="color:\${cols[i]}">\${rv}</span>\`).join(", "):"—"}</span><span><span class="k">sim</span> \${fmt(m.simMean)} <span class="k">±</span> \${fmt(m.simSd)}</span></div>\`;
+      row.appendChild(card);
+      charts.push({m,canvas:card.querySelector("canvas"),simN:grp.simN,colors:cols});
+    }
+    host.appendChild(sec);
   }
-  document.getElementById("sections").appendChild(sec);
 }
+
+// Model selector — swaps which simulated distribution the real games are read
+// against. Rebuilds the cards (z-pills and captions change) and redraws.
+const sel=document.getElementById("model");
+for(const p of DATA.order){
+  const o=document.createElement("option");
+  o.value=p;o.textContent=PROFILE_NAME[p]||p;
+  if(p===ACTIVE) o.selected=true;
+  sel.appendChild(o);
+}
+const consolSel=document.getElementById("consol");
+consolSel.value=CONSOL?"on":"off";
+function switchVariant(){
+  updateHeader();
+  buildSections();
+  attachTooltips();
+  updateFooter();
+  animate();
+}
+sel.addEventListener("change",()=>{ACTIVE=sel.value;switchVariant();});
+consolSel.addEventListener("change",()=>{CONSOL=consolSel.value==="on";switchVariant();});
 
 function draw(entry,t=1){
   const {m,canvas}=entry;
@@ -256,24 +350,43 @@ function draw(entry,t=1){
   g.textAlign="right";g.fillText(String(Math.round(hi)),W-padR,H-3);
 }
 function render(){charts.forEach(e=>draw(e));}
-if(reduce)render();
-else{const t0=performance.now();(function anim(now){const p=Math.min(1,(now-t0)/520),e=1-Math.pow(1-p,3);charts.forEach(en=>draw(en,e));if(p<1)requestAnimationFrame(anim);})(t0);}
+function animate(){
+  if(reduce){render();return;}
+  const t0=performance.now();
+  (function anim(now){const p=Math.min(1,(now-t0)/520),e=1-Math.pow(1-p,3);charts.forEach(en=>draw(en,e));if(p<1)requestAnimationFrame(anim);})(t0);
+}
 addEventListener("resize",()=>{clearTimeout(window.__rz);window.__rz=setTimeout(render,120);});
 
-for(const entry of charts){const {m,canvas,simN}=entry;
-  canvas.addEventListener("mousemove",(ev)=>{
-    const r=canvas.getBoundingClientRect(),W=r.width,padL=6,padR=6,pw=W-padL-padR,span=(m.hi-m.lo)||1,px=ev.clientX-r.left;
-    const val=m.lo+(px-padL)/pw*span,bin=m.bins.find(b=>val>=b.x0&&val<b.x1)||m.bins[m.bins.length-1];
-    const pct=(100*bin.c/simN).toFixed(1);
-    const near=m.real.find(rv=>Math.abs(px-(padL+(rv-m.lo)/span*pw))<7);
-    tt.innerHTML=near!=null?\`<b>Actual: \${near}</b><br>z \${m.z>0?"+":""}\${m.z} vs sim\`:\`sim <b>\${Math.round(bin.x0)}–\${Math.round(bin.x1)}</b><br>\${bin.c} games · \${pct}%\`;
-    tt.style.opacity=1;tt.style.left=Math.min(ev.clientX+14,innerWidth-tt.offsetWidth-8)+"px";tt.style.top=(ev.clientY+14)+"px";});
-  canvas.addEventListener("mouseleave",()=>tt.style.opacity=0);}
+// Tooltips bind to canvases, which are recreated on every rebuild, so this runs
+// again after each model switch.
+function attachTooltips(){
+  for(const entry of charts){const {m,canvas,simN}=entry;
+    canvas.addEventListener("mousemove",(ev)=>{
+      const r=canvas.getBoundingClientRect(),W=r.width,padL=6,padR=6,pw=W-padL-padR,span=(m.hi-m.lo)||1,px=ev.clientX-r.left;
+      const val=m.lo+(px-padL)/pw*span,bin=m.bins.find(b=>val>=b.x0&&val<b.x1)||m.bins[m.bins.length-1];
+      const pct=(100*bin.c/simN).toFixed(1);
+      const near=m.real.find(rv=>Math.abs(px-(padL+(rv-m.lo)/span*pw))<7);
+      tt.innerHTML=near!=null?\`<b>Actual: \${near}</b><br>z \${m.z>0?"+":""}\${m.z} vs sim\`:\`sim <b>\${Math.round(bin.x0)}–\${Math.round(bin.x1)}</b><br>\${bin.c} games · \${pct}%\`;
+      tt.style.opacity=1;tt.style.left=Math.min(ev.clientX+14,innerWidth-tt.offsetWidth-8)+"px";tt.style.top=(ev.clientY+14)+"px";});
+    canvas.addEventListener("mouseleave",()=>tt.style.opacity=0);}
+}
 
-const flagged=DATA.groups.flatMap(g=>g.metrics.filter(m=>Math.abs(m.z)>=2).map(m=>\`\${g.numP}P \${m.label}\`));
-document.getElementById("foot").innerHTML=
-  (flagged.length?\`Diverging (|z| ≥ 2): <b style="color:var(--actual)">\${flagged.join(", ")}</b>. \`:"")
-  +\`A single game is one draw — overlap only means something once several stack up.\`;
+function updateFooter(){
+  const flagged=groupsOf().flatMap(g=>g.metrics.filter(m=>Math.abs(m.z)>=2).map(m=>\`\${g.numP}P \${m.label}\`));
+  const what=\`the \${PROFILE_NAME[ACTIVE]||ACTIVE} model with first-mover advantage \${CONSOL?"on":"off"}\`;
+  document.getElementById("foot").innerHTML=
+    (flagged.length?\`Diverging (|z| ≥ 2) under \${what}: <b style="color:var(--actual)">\${flagged.join(", ")}</b>. \`
+                   :\`No metric diverges (|z| ≥ 2) under \${what}. \`)
+    +(CONSOL?\`All six real games predate the first-mover rule, so part of any gap here is the rule change rather than model error. \`:"")
+    +\`A single game is one draw — overlap only means something once several stack up.\`;
+}
+
+// Initial paint (same path a model switch takes, so the two can't drift).
+updateHeader();
+buildSections();
+attachTooltips();
+updateFooter();
+animate();
 
 const root=document.documentElement,tgl=document.getElementById("toggle");
 tgl.addEventListener("click",()=>{const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");root.setAttribute("data-theme",cur==="dark"?"light":"dark");render();});

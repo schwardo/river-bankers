@@ -532,6 +532,86 @@ function reluctantRecallCap(target, supply, minBid) {
   return Math.max(minBid, supply);
 }
 
+// No-recall mode (NO_RECALL=1): the player never performs a VOLUNTARY pre-auction
+// recall, and — unlike RECALL_RELUCTANCE — knows it in advance, so the whole
+// decision layer plans around a supply-only worker pool.
+//
+// Why this is not just RECALL_RELUCTANCE=1: that knob caps a bid target at
+// `max(minBid, supply)` AFTER the target is chosen, and its floor at minBid means
+// a trigger min-bid still forces a recall. Because sim supply runs chronically
+// near zero, nearly every recall is min-bid-forced rather than discretionary, so
+// reluctance=1 only sheds ~5% of workersRecalled — far above the 2-5/game seen in
+// real BGA play. NO_RECALL instead empties the recall budget at its source
+// (aiRecallBudget), which propagates to BOTH decision sites automatically:
+//   - aiTriggerPool  → triggerPool = supply, so a player only triggers auctions
+//                      it can already fund. No unsatisfiable min-bid can arise,
+//                      so no forced recall is ever needed.
+//   - aiDecideBid    → safePool = totalPool = supply, so every bid path and
+//                      aiRecallFromList call is capped to supply and no-ops.
+//
+// Second-order effect this is meant to expose: with recall gone, BUILDING is the
+// only remaining way to refill supply (see doBuild's `p.supply += workersReturned`),
+// so a worker stranded on a card never built is permanently dead capital. That
+// should make players enter FEWER auctions but commit HARDER in the ones they do
+// enter (a bid that fails to clinch is unrecoverable, so partial/probing bids stop
+// being playable) — which is the hypothesised source of the real games' high jam
+// count, low icons-won, and low recall count at unchanged build pace.
+//
+// SCOPE: this suppresses voluntary pre-auction recall only. Card-granted recalls
+// (Hollowed-out Log, Tribute Stone, Trading Post, Snare Set, Channel Clearer) are
+// paid abilities, not the loss-averse choice being modelled, and still fire — so
+// workersRecalled stays > 0 under NO_RECALL rather than pinning to exactly 0.
+let NO_RECALL = process.env.NO_RECALL === '1';
+function setNoRecall(v) { NO_RECALL = !!v; }
+
+// Random-opponent model (RANDOM_OPP=1): the player still bids rationally, but
+// estimates CONTENTION by assuming each opponent bids uniformly at random from
+// 0..min(that opponent's free workers, open icons) — expected take cap_q/2 —
+// instead of the flat BID_CONTENTION_K icons/opponent. Replaces only the
+// estimator in the contention-restraint block; every other part of the bid
+// (need, cost aversion, most-workers race, overbid) is untouched.
+//
+// Motivation: the calibrated bidder under-produces jams by ~3σ vs real BGA play
+// at 3P/4P, and OVERBID can only close that gap by destroying the economy (build
+// pace and VP collapse). The suspected cause is that every sim player runs the
+// SAME contention model, so they implicitly coordinate on a shared estimate of
+// how many icons rivals will take. Real humans bidding blind don't converge like
+// that. Modelling opponents as unpredictable rather than as copies of oneself is
+// the minimal way to break that coordination without making anyone bid badly.
+//
+// Direction of the effect is NOT obvious a priori and is the point of the test:
+// vs the default K=1, cap_q/2 is LARGER when an opponent is worker-rich (more
+// restraint, fewer jams) but SMALLER when opponents are worker-poor (less
+// restraint, more jams). Under NO_RECALL supply runs chronically low, so the
+// second regime should dominate.
+//
+// Uses q.supply, which is public information in RB (workers in front of a player
+// are visible), so this grants the AI nothing it could not legitimately see. With
+// recall enabled it under-estimates an opponent's true marshalable pool, since
+// workers recallable from the river are not counted; under NO_RECALL — the
+// configuration this was built for — supply IS the whole pool, so it is exact.
+// OPP_Q (0..1) is the QUANTILE of that uniform opponent distribution the bidder
+// plans against, replacing the risk-neutral mean. The q-th quantile of
+// Uniform{0..cap} is q·cap, so expected opponent take becomes Σ q·cap_j:
+//   0.5 = risk-neutral (identical to planning against the mean, cap/2)
+//   <0.5 = optimistic — bid for the case where rivals stay out. LOWERS the
+//          contention estimate, so the bidder stays aggressive and collides more.
+//   0   = assume rivals bid nothing (maximum aggression).
+// Lowering the mean, not widening the spread, is what should raise jams: the
+// first RANDOM_OPP test failed precisely because a uniform draw over a healthy
+// worker supply has a mean ABOVE the old flat K=1, making everyone duck.
+//
+// Approximation: this takes the quantile per opponent and sums, which is not the
+// same as the quantile of the SUM (by CLT the joint low quantile sits nearer the
+// total mean). Summing per-opponent quantiles is therefore deliberately MORE
+// aggressive than a strict joint-quantile model — which is the intended
+// direction, and matches how a human reasons ("I'll assume each of them stays
+// out") rather than reasoning about the aggregate.
+let RANDOM_OPP = process.env.RANDOM_OPP === '1';
+function setRandomOpp(v) { RANDOM_OPP = !!v; }
+let OPP_Q = process.env.OPP_Q !== undefined ? Number(process.env.OPP_Q) : 0.5;
+function setOppQ(x) { OPP_Q = Math.max(0, Math.min(1, Number(x) || 0)); }
+
 // Over-bid aggression (OVERBID, 0..1): models human over-bidding — piling workers
 // toward the FULL number of open spots on a contested card (never beyond it — a
 // bid can't exceed the card's open icons). The normal bid paths cap the target at
@@ -563,7 +643,7 @@ function setInitConsolation(on) { INIT_CONSOLATION = !!on; }
 // can be swept against each other. See board-games.org audit item C5/C6.
 let LODGE_FLOOR_1 = process.env.RB_LODGE_FLOOR === '1';
 function setLodgeFloor1(on) { LODGE_FLOOR_1 = !!on; }
-// Per-player-count OVERBID override (set by --human). Contention scales with the
+// Per-player-count OVERBID override (set by --friendly). Contention scales with the
 // player count, so the over-bid needed to match real jam rates differs sharply:
 // 2P must over-bid hard to jam at all, 4P barely. When set, runGame resolves the
 // active OVERBID from this map by the game's player count. Null = use flat OVERBID.
@@ -584,7 +664,7 @@ function applyOverbid(target, pool, open, minBid) {
 // marshal for a single normal bid, before OVERBID. Historically a hardcoded 4 —
 // well under the 5/7/8 icons a card can hold — which throttled fish spend and
 // kept games long. Now a knob; default 4 preserves the legacy AI (balance sweeps
-// etc.). --human lifts it so aggressive play can staff a whole card. A value <= 0
+// etc.). --friendly lifts it so aggressive play can staff a whole card. A value <= 0
 // means "no cap" (bid up to open / marshalable pool).
 let BID_CAP = process.env.BID_CAP !== undefined ? Number(process.env.BID_CAP) : 4;
 function setBidCap(x) { BID_CAP = Number(x); }
@@ -1961,7 +2041,11 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // Speculative bid: non-trigger AI with no current need but a hand structure
   // that uses this material may bid 1 worker on a cheap slot to add contention.
   // Speculative bids should only spend supply, never trigger a recall.
+  // Under NO_RECALL a speculative worker can only come home by being built with,
+  // so seeding contention you don't need is a permanent loss of a worker rather
+  // than a cheap tempo trade. A recall-less player doesn't make probing bids.
   if (
+    !NO_RECALL &&
     target === 0 && minBid === 0 && SPECULATIVE_BID_PROB > 0 &&
     myCost <= 2 && p.supply > 0 &&
     p.hand.some(s => (s.cost[card.material] || 0) > 0) &&
@@ -1975,12 +2059,18 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // icon is plausibly still clinchable, a free (non-trigger) bidder declines
   // rather than feed a jam it can't win; a forced trigger bid is left to the
   // min-bid floor below. Otherwise the bid is capped at what it could clinch.
-  if (BID_CONTENTION_K > 0 && open > 0) {
-    let activeOpps = 0;
+  // RANDOM_OPP replaces the flat per-opponent constant with a uniform-bidder
+  // model: opponent q is assumed to bid ~Uniform{0..cap_q} for
+  // cap_q = min(q's free workers, open), so its expected take is cap_q/2.
+  if ((BID_CONTENTION_K > 0 || RANDOM_OPP) && open > 0) {
+    let expectedOppTake = 0;
     for (const q of state.players) {
-      if (q.idx !== playerIdx && !q.exhausted && !q.out) activeOpps++;
+      if (q.idx === playerIdx || q.exhausted || q.out) continue;
+      expectedOppTake += RANDOM_OPP
+        ? Math.min(q.supply, open) * OPP_Q
+        : BID_CONTENTION_K;
     }
-    const clinchable = open - BID_CONTENTION_K * activeOpps;
+    const clinchable = open - expectedOppTake;
     if (clinchable < 1) {
       if (minBid === 0) target = 0;
     } else {
@@ -2804,6 +2894,11 @@ function aiStartOfTurnAbilities(state, playerIdx) {
 // would shrink the very lot being bid on (and bids are capped by open icons).
 // Rulebook "Pre-auction recall" and BGA Auction::actRecall both forbid it.
 function aiRecallBudget(state, playerIdx, excludeCardId) {
+  // NO_RECALL: no worker is ever voluntarily recallable, so the pool the trigger
+  // and bid layers see is supply-only. Returning empty here (rather than blocking
+  // at the recall call sites) is what makes the AI *aware* of the constraint
+  // instead of merely subject to it.
+  if (NO_RECALL) return { safe: [], fallback: [] };
   const p = state.players[playerIdx];
   const useful = new Set();
   for (const s of p.hand) for (const m in s.cost) useful.add(m);
@@ -3531,7 +3626,7 @@ function runGame(numPlayers, numMats = ORIG_MATERIALS.length, workersPerPlayer =
   if (workersPerPlayer == null) workersPerPlayer = defaultWorkersPerPlayer(numPlayers);
   configureMaterials(numMats);
   const state = newGame(numPlayers, workersPerPlayer);
-  // Per-count OVERBID (from --human): resolve the active over-bid by player count.
+  // Per-count OVERBID (from --friendly): resolve the active over-bid by player count.
   if (OVERBID_BY_COUNT && OVERBID_BY_COUNT[numPlayers] !== undefined) setOverbid(OVERBID_BY_COUNT[numPlayers]);
   // Rules-accurate endgame: the game ends when pawns cross the fish-track finish
   // line (90), NOT on material-deck exhaustion. egPlayOut('fish') marks a player
@@ -7243,28 +7338,62 @@ if (require.main === module) {
     const cc = BASE_STRUCTURE_TEMPLATES.find(s => s.name === 'Channel Clearer');
     if (cc) cc.vp = parseInt(process.env.RB_CC_VP, 10) || 0;
   }
-  // --human preset: the human-play profile calibrated against real BGA games
-  // (bga-analysis) under the rules-accurate fish-line endgame. Two ingredients:
-  //   • COST_AVERSION=0 — humans bid their full material need on pricier downriver
-  //     cards instead of pulling back, winning more icons per auction (so they
-  //     reach the fish line in fewer, bigger auctions and still BUILD — this is
-  //     the efficient length lever; the older OVERBID-only profile matched length
-  //     by wasting fish and starved builds to a mode of 0).
-  //   • light per-count OVERBID {2:0.3, 3:0, 4:0} — only 2P needs contention
-  //     flooding (2 players rarely jam otherwise). 3P/4P get NONE on purpose:
-  //     over-bidding there matches jam rate/length only by wasting fish, which
-  //     collapses the build distribution to a mode of 0 (the pathology we're
-  //     avoiding). So we accept under-matched jams (sim ~7 vs real ~13) and a
-  //     long 4P (real players reach the fish line in ~34 turns while still
-  //     building 11 — the sim needs ~57, because it re-auctions each card ~2x
-  //     more than real; that CARD-RECIRCULATION gap, not bidding, is the true
-  //     remaining discrepancy). Builds/VP/icons match well; jams/length don't.
-  // Explicit env vars still win; the flag is stripped from argv so positional
-  // args don't shift. (2P is n=1 real game, so its 0.3 is tentative.)
-  if (process.argv.includes('--human')) {
-    process.argv = process.argv.filter((a) => a !== '--human');
+  // ==========================================================================
+  // BASELINE PROFILES — the two calibrated models of real play
+  // ==========================================================================
+  // Both are fitted against the same 6 real BGA games (bga-analysis) under the
+  // rules-accurate fish-line endgame, and both match them about equally well.
+  // They differ in WHICH human behaviour they attribute the match to, so keeping
+  // both is the point: a rules change that looks safe under only one of them has
+  // not really been tested. Select with --friendly / --greedy; explicit env vars
+  // still win, and the flag is stripped from argv so positional args don't shift.
+  //
+  // --friendly ("leaves room for the other players")
+  //   Assumes rivals will take their share and bids around them: the contention
+  //   model reserves BID_CONTENTION_K=1 icon per opponent, and workers are liquid
+  //   (recall freely to fund a bid). Ingredients:
+  //     • COST_AVERSION=0 — bids full material need on pricier downriver cards
+  //       instead of pulling back, so it reaches the fish line in fewer, bigger
+  //       auctions and still BUILDS. (The older OVERBID-only profile matched
+  //       length instead by wasting fish, starving builds to a mode of 0.)
+  //     • per-count OVERBID {2:0.3, 3:0, 4:0} — only 2P needs contention
+  //       flooding; 3P/4P get NONE on purpose, since over-bidding there matches
+  //       jams only by wasting fish and collapsing the build distribution.
+  //   Known gaps: jams under-matched (2P z≈2.5, 3P z≈2.1) and 4P runs long. The
+  //   suspected cause is CARD RECIRCULATION — the sim re-auctions each card ~2x
+  //   more than real play — not bidding.
+  //
+  // --greedy ("assumes the others will stay out")
+  //   Same table, opposite psychology. Rivals are modelled as unpredictable and
+  //   probably absent, so it grabs; and workers are committed rather than liquid.
+  //     • NO_RECALL — never voluntarily recalls, so supply refills ONLY by
+  //       building. Fixes auction count, icons won and recall count together
+  //       while holding build pace, which no aggression knob managed.
+  //     • RANDOM_OPP + OPP_Q=0.1 — plans against the 10th percentile of a uniform
+  //       opponent-bid model instead of a flat 1 icon each. Lowering the expected
+  //       contention keeps it aggressive, so bids genuinely collide and jams
+  //       appear without the economy collapse OVERBID causes.
+  //   Keeps default COST_AVERSION and no OVERBID — its aggression comes entirely
+  //   from the optimistic opponent read, so the two profiles stay independent
+  //   rather than being the same knob twice.
+  //   Known gaps: 2P jams still under-matched (z≈2.4); stacking it on --friendly
+  //   over-fires at 4P (Structures built z≈2.1), so the two are alternatives,
+  //   NOT layers.
+  //
+  // Caveat for both: n=2 real games per player count, all six predating the
+  // initiator-consolation rule. These are plausible calibrated models, not
+  // established fact — compare with RB_INIT_CONSOLATION=0 when fitting.
+  if (process.argv.includes('--friendly') || process.argv.includes('--human')) {
+    // --human is the pre-2026-07-30 name for --friendly; kept as an alias.
+    process.argv = process.argv.filter((a) => a !== '--friendly' && a !== '--human');
     if (process.env.COST_AVERSION === undefined) setCostAversion(0);
     if (process.env.OVERBID === undefined) setOverbidByCount({ 2: 0.3, 3: 0, 4: 0 });
+  }
+  if (process.argv.includes('--greedy')) {
+    process.argv = process.argv.filter((a) => a !== '--greedy');
+    if (process.env.NO_RECALL === undefined) setNoRecall(true);
+    if (process.env.RANDOM_OPP === undefined) setRandomOpp(true);
+    if (process.env.OPP_Q === undefined) setOppQ(0.1);
   }
   const mode = process.argv[2];
   if (mode === 'spec') sweepSpec();
