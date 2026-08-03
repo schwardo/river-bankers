@@ -486,9 +486,68 @@ function setSpeculativeBidProb(p) { SPECULATIVE_BID_PROB = p; }
 //   'max'   — always over-commits; bids the most workers it can (min of open
 //             icons and its safe pool) into every auction, ignoring need and
 //             contention (the pre-fix over-bidding pathology as a strategy).
+//   'bid1'  — always bids exactly 1 worker (raised to the min-bid when it is the
+//             triggerer, since an under-bid is illegal). The "token presence"
+//             player: contests everything, commits to nothing.
 let DEVIANT_IDX = -1;
 let DEVIANT_MODE = null;
 function setDeviant(idx, mode) { DEVIANT_IDX = idx; DEVIANT_MODE = mode || null; }
+
+// ---------------------------------------------------------------------------
+// Per-player strategy profiles
+// ---------------------------------------------------------------------------
+// The --friendly / --greedy baseline profiles below are whole-table switches:
+// they set globals, so every seat plays the same way. That can't express "one
+// seat plays X against a field of greedy", which is what the `strategy` sweep
+// needs. PLAYER_PROFILES optionally overrides the same knobs per seat.
+//
+// A null entry (or a null array) means "use the globals", so every existing
+// sweep is bit-for-bit unaffected. Recognized fields, each optional and each
+// falling back to its global when absent:
+//   costAversion, overbid, overbidByCount, noRecall, randomOpp, oppQ, deviant
+let PLAYER_PROFILES = null;
+function setPlayerProfiles(arr) { PLAYER_PROFILES = arr || null; }
+function playerProfile(idx) {
+  return (PLAYER_PROFILES && PLAYER_PROFILES[idx]) || null;
+}
+// Per-seat knob readers. Each returns the profile value when this seat has one,
+// otherwise the process-wide global.
+function pNoRecall(idx) {
+  const pr = playerProfile(idx);
+  return pr && pr.noRecall !== undefined ? !!pr.noRecall : NO_RECALL;
+}
+function pRandomOpp(idx) {
+  const pr = playerProfile(idx);
+  return pr && pr.randomOpp !== undefined ? !!pr.randomOpp : RANDOM_OPP;
+}
+function pOppQ(idx) {
+  const pr = playerProfile(idx);
+  return pr && pr.oppQ !== undefined ? pr.oppQ : OPP_Q;
+}
+function pCostAversionTrim(idx, myCost) {
+  const pr = playerProfile(idx);
+  if (!pr || pr.costAversion === undefined) return costAversionTrim(myCost);
+  const base = Math.min(Math.max(myCost - 2, 0), 2);
+  return Math.round(pr.costAversion * base);
+}
+// Resolved like the global OVERBID_BY_COUNT: a per-count map wins over a flat
+// value, and both are looked up at bid time rather than latched at game start.
+function pOverbid(idx, numPlayers) {
+  const pr = playerProfile(idx);
+  if (pr) {
+    if (pr.overbidByCount && pr.overbidByCount[numPlayers] !== undefined) {
+      return pr.overbidByCount[numPlayers];
+    }
+    if (pr.overbid !== undefined) return pr.overbid;
+  }
+  return OVERBID;
+}
+// The per-seat deviant mode subsumes the single-seat DEVIANT_IDX probe.
+function pDeviant(idx) {
+  const pr = playerProfile(idx);
+  if (pr && pr.deviant !== undefined) return pr.deviant;
+  return idx === DEVIANT_IDX ? DEVIANT_MODE : null;
+}
 
 // Contention-aware bid restraint. Sealed bidders can't see opponents' bids, but
 // a rational player discounts the open-icon pool by an estimate of how many
@@ -652,11 +711,12 @@ function setOverbidByCount(map) { OVERBID_BY_COUNT = map; }
 // Lift a bid target toward `open` (capped by the marshalable pool) by the OVERBID
 // fraction. Only fires when the card is contestable for a jam — an auction the
 // player could clinch outright (pool covers all open icons alone) needs no flood.
-function applyOverbid(target, pool, open, minBid) {
-  if (OVERBID <= 0) return target;
+function applyOverbid(target, pool, open, minBid, overbid) {
+  if (overbid === undefined) overbid = OVERBID;
+  if (overbid <= 0) return target;
   const ceil = Math.min(open, pool);      // legal max: never bid past open spots
   if (ceil <= target) return target;
-  const lifted = Math.round(target + OVERBID * (ceil - target));
+  const lifted = Math.round(target + overbid * (ceil - target));
   return Math.max(target, Math.min(ceil, lifted), minBid);
 }
 
@@ -2016,7 +2076,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
     );
     if (!opponentPresent) myCost = Math.max(1, myCost - 1);
   }
-  if (target > 1) target = Math.max(1, target - costAversionTrim(myCost));
+  if (target > 1) target = Math.max(1, target - pCostAversionTrim(playerIdx, myCost));
   // Most-workers race (Mud Wallow, Cattail Cluster): if winning by 1 worker
   // is reachable within budget and the bonus pays for the extra fish, push
   // the target to (opponent's max + 1).
@@ -2045,7 +2105,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // so seeding contention you don't need is a permanent loss of a worker rather
   // than a cheap tempo trade. A recall-less player doesn't make probing bids.
   if (
-    !NO_RECALL &&
+    !pNoRecall(playerIdx) &&
     target === 0 && minBid === 0 && SPECULATIVE_BID_PROB > 0 &&
     myCost <= 2 && p.supply > 0 &&
     p.hand.some(s => (s.cost[card.material] || 0) > 0) &&
@@ -2062,12 +2122,13 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // RANDOM_OPP replaces the flat per-opponent constant with a uniform-bidder
   // model: opponent q is assumed to bid ~Uniform{0..cap_q} for
   // cap_q = min(q's free workers, open), so its expected take is cap_q/2.
-  if ((BID_CONTENTION_K > 0 || RANDOM_OPP) && open > 0) {
+  const myRandomOpp = pRandomOpp(playerIdx), myOppQ = pOppQ(playerIdx);
+  if ((BID_CONTENTION_K > 0 || myRandomOpp) && open > 0) {
     let expectedOppTake = 0;
     for (const q of state.players) {
       if (q.idx === playerIdx || q.exhausted || q.out) continue;
-      expectedOppTake += RANDOM_OPP
-        ? Math.min(q.supply, open) * OPP_Q
+      expectedOppTake += myRandomOpp
+        ? Math.min(q.supply, open) * myOppQ
         : BID_CONTENTION_K;
     }
     const clinchable = open - expectedOppTake;
@@ -2078,9 +2139,11 @@ function aiDecideBid(state, playerIdx, card, minBid) {
     }
   }
   // Deviant-strategy probe: override the normal target with an extreme.
-  if (playerIdx === DEVIANT_IDX) {
-    if (DEVIANT_MODE === 'miser') target = minBid;                  // never contest
-    else if (DEVIANT_MODE === 'max') target = Math.min(open, safePool); // always over-commit
+  const myDeviant = pDeviant(playerIdx);
+  if (myDeviant) {
+    if (myDeviant === 'miser') target = minBid;                  // never contest
+    else if (myDeviant === 'max') target = Math.min(open, safePool); // always over-commit
+    else if (myDeviant === 'bid1') target = Math.max(1, minBid); // always exactly 1
   }
   target = Math.max(target, minBid);
   // Cap at safe pool unless we need fallback to satisfy the trigger min-bid.
@@ -2090,7 +2153,10 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // workers) so surplus workers burn fish in a jam. Uses totalPool so it may
   // recall to staff spots; RECALL_RELUCTANCE below can still temper that. Only
   // when the player genuinely wants this material (need > 0).
-  if (need > 0) target = applyOverbid(target, totalPool, open, minBid);
+  if (need > 0) {
+    target = applyOverbid(target, totalPool, open, minBid,
+                          pOverbid(playerIdx, state.players.length));
+  }
   // Recall reluctance (loss aversion): may refuse to fund via recall this bid.
   target = reluctantRecallCap(target, p.supply, minBid);
   // Pre-auction recall: pull workers off the river/shoreline to fund the bid.
@@ -2898,7 +2964,7 @@ function aiRecallBudget(state, playerIdx, excludeCardId) {
   // and bid layers see is supply-only. Returning empty here (rather than blocking
   // at the recall call sites) is what makes the AI *aware* of the constraint
   // instead of merely subject to it.
-  if (NO_RECALL) return { safe: [], fallback: [] };
+  if (pNoRecall(playerIdx)) return { safe: [], fallback: [] };
   const p = state.players[playerIdx];
   const useful = new Set();
   for (const s of p.hand) for (const m in s.cost) useful.add(m);
@@ -7218,6 +7284,115 @@ function sweepBidDiag(numGamesArg, ksArg) {
 //             auction): the pre-fix over-bidding pathology.
 // If neither's win rate exceeds the 1/numP baseline, the conservative K=1 AI is
 // not beaten by either extreme — i.e. the meta isn't a degenerate hoard-or-blast.
+// Strategy head-to-head: seat 0 plays one named strategy against a field of
+// N-1 GREEDY seats, for every player count. Unlike `deviant` (which pits one
+// extreme against the default K=1 AI) the field here is pinned to the calibrated
+// --greedy profile via per-seat PLAYER_PROFILES, so the globals stay untouched
+// and every strategy meets an identical opponent model.
+//
+//   node sim.js strategy [numGames] [playerCountsCsv]
+const STRATEGY_PROFILES = {
+  // The two calibrated baseline profiles, expressed per-seat (same knob values
+  // as the --friendly / --greedy flags set globally).
+  friendly: { costAversion: 0, overbidByCount: { 2: 0.3, 3: 0, 4: 0 } },
+  greedy:   { noRecall: true, randomOpp: true, oppQ: 0.1 },
+  // The fixed-bid extremes. These override the bid target outright, so they
+  // deliberately carry no profile knobs — the rest of their play is the default
+  // AI, and only the bid rule is extreme.
+  max:      { deviant: 'max' },
+  bid1:     { deviant: 'bid1' },
+  miser:    { deviant: 'miser' },
+};
+
+function sweepStrategy(numGamesArg, playerCountsArg) {
+  const numGames = parseInt(numGamesArg) || 3000;
+  const counts = (playerCountsArg || '2,3,4').split(',').map(s => parseInt(s.trim()))
+    .filter(n => n >= 2 && n <= 4);
+  const order = ['friendly', 'greedy', 'max', 'bid1', 'miser'];
+  configureMaterials(6);
+
+  console.log(`\nRiver Bankers — strategy head-to-head (seat 0 = strategy, seats 1..N-1 = greedy)`);
+  console.log(`Setting: ${numGames} games per (strategy × player count), 6 materials, fish-line endgame.`);
+  console.log(`Δbase compares seat 0's win% against the 1/N fair share. Positive ⇒ the strategy beats a greedy field.\n`);
+
+  const t0 = Date.now();
+  const results = [];
+  for (const numP of counts) {
+    const workers = defaultWorkersPerPlayer(numP);
+    const baseline = 100 / numP;
+    console.log(`=== ${numP}P (${workers} workers/player) — fair share ${baseline.toFixed(1)}% ===`);
+    console.log(pad('strategy', 12) + pad('role', 14) + padL('win%', 8) + padL('95%CI', 8) +
+                padL('Δbase', 8) + padL('avgVP', 8) + padL('built', 8) + padL('endFish', 8));
+    console.log('-'.repeat(12 + 14 + 8 * 6));
+
+    for (const name of order) {
+      // Seat 0 gets the strategy under test; every other seat is greedy.
+      const profiles = [STRATEGY_PROFILES[name]];
+      for (let i = 1; i < numP; i++) profiles.push(STRATEGY_PROFILES.greedy);
+      setPlayerProfiles(profiles);
+
+      const role = [
+        { name: `${name} (seat 0)`, games: 0, wins: 0, vp: 0, built: 0, fish: 0 },
+        { name: 'greedy field',     games: 0, wins: 0, vp: 0, built: 0, fish: 0 },
+      ];
+      for (let g = 0; g < numGames; g++) {
+        if ((g + 1) % 500 === 0) process.stderr.write(`\r${numP}P ${name} ${g + 1}/${numGames}`);
+        const state = newGame(numP, workers);
+        egPlayOut(state, 'fish', 0, simFishLine(numP), 'd');
+        const scored = state.players.map(p => ({
+          idx: p.idx, vp: totalVP(p, state), timePos: p.timePos, built: p.built.length,
+        }));
+        scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+        const winnerIdx = scored[0].idx;
+        for (const s of scored) {
+          const r = s.idx === 0 ? role[0] : role[1];
+          r.games += 1; r.vp += s.vp; r.built += s.built; r.fish += s.timePos;
+          if (s.idx === winnerIdx) r.wins += 1;
+        }
+      }
+      setPlayerProfiles(null);
+      process.stderr.write('\r' + ' '.repeat(70) + '\r');
+
+      role.forEach((r, i) => {
+        const winPct = 100 * r.wins / r.games;
+        const q = winPct / 100;
+        const ci = 100 * 1.96 * Math.sqrt(q * (1 - q) / r.games);
+        const delta = winPct - baseline;
+        if (i === 0) {
+          results.push({ numP, name, winPct, ci, delta,
+                         vp: r.vp / r.games, built: r.built / r.games });
+        }
+        console.log(
+          pad(i === 0 ? name : '', 12) + pad(r.name, 14) +
+          padL(winPct.toFixed(1) + '%', 8) + padL('±' + ci.toFixed(1), 8) +
+          padL((delta >= 0 ? '+' : '') + delta.toFixed(1), 8) +
+          padL((r.vp / r.games).toFixed(1), 8) + padL((r.built / r.games).toFixed(2), 8) +
+          padL((r.fish / r.games).toFixed(0), 8)
+        );
+      });
+      console.log('-'.repeat(12 + 14 + 8 * 6));
+    }
+    console.log('');
+  }
+
+  // Compact cross-count summary: seat-0 Δ vs fair share.
+  console.log('Summary — seat-0 win% (Δ vs fair share) against a greedy field:');
+  console.log(pad('strategy', 12) + counts.map(n => padL(`${n}P`, 16)).join(''));
+  console.log('-'.repeat(12 + 16 * counts.length));
+  for (const name of order) {
+    let line = pad(name, 12);
+    for (const numP of counts) {
+      const r = results.find(x => x.numP === numP && x.name === name);
+      line += padL(r ? `${r.winPct.toFixed(1)}% (${r.delta >= 0 ? '+' : ''}${r.delta.toFixed(1)})` : '-', 16);
+    }
+    console.log(line);
+  }
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.`);
+  console.log('Legend: friendly/greedy = the calibrated baseline profiles; max = always bid min(open, safe pool);');
+  console.log('  bid1 = always bid exactly 1 (min-bid when triggering); miser = never contest (bid the minimum).');
+  console.log('  The greedy row is the control: seat 0 plays the same profile as the field, so it should sit at fair share.\n');
+}
+
 function sweepDeviant(numGamesArg, numPArg, workersArg) {
   const numP = parseInt(numPArg) || 4;
   const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
@@ -7399,6 +7574,7 @@ if (require.main === module) {
   if (mode === 'spec') sweepSpec();
   else if (mode === 'bid-diag') sweepBidDiag(process.argv[3], process.argv[4]);
   else if (mode === 'deviant' || mode === 'miser') sweepDeviant(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'strategy') sweepStrategy(process.argv[3], process.argv[4]);
   else if (mode === 'workers') sweepWorkers(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'rule') sweepRule();
   else if (mode === 'deck') sweepDeck(process.argv[3]);

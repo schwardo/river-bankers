@@ -1396,12 +1396,36 @@
   }
   .species-picker {
     display: grid;
-    grid-template-columns: 32px 1fr auto;
+    grid-template-columns: 32px 1fr auto auto;
     gap: 10px;
     align-items: center;
     padding: 6px 8px;
     border-radius: 4px;
     transition: background 0.1s;
+  }
+  .ai-strategy-tag {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 1px 5px; border-radius: 3px;
+    background: var(--bank-light); color: var(--ink-soft);
+    vertical-align: middle; white-space: nowrap; cursor: help;
+  }
+  /* AI strategy picker: only meaningful on an AI row, so it reserves its column
+     but goes invisible (not display:none) for Off/You rows to keep rows aligned. */
+  .species-picker .ai-strategy {
+    font-size: 12px;
+    padding: 3px 6px;
+    border: 1px solid var(--bank-light);
+    border-radius: 5px;
+    background: #fff;
+    color: var(--ink);
+    min-width: 128px;
+  }
+  .species-picker:not(.ai) .ai-strategy { visibility: hidden; }
+  @media (max-width: 520px) {
+    .species-picker { grid-template-columns: 32px 1fr auto; }
+    .species-picker .ai-strategy { grid-column: 2 / -1; min-width: 0; width: 100%; }
+    .species-picker:not(.ai) .ai-strategy { display: none; }
   }
   .species-picker.you { background: rgba(74,128,86,0.10); }
   .species-picker .species-emoji { font-size: 22px; text-align: center; }
@@ -2600,6 +2624,21 @@ function readSpeciesPicks() {
   });
 }
 
+function aiStrategyTag(p) {
+  // In-game reminder of which profile an AI seat is playing, hover for the blurb.
+  const s = AI_STRATEGIES[p.aiStrategy];
+  if (!s) return '';
+  return ` <span class="ai-strategy-tag" title="${s.blurb}">${s.label}</span>`;
+}
+
+function readAiStrategy(speciesId) {
+  // The chosen AI bidding profile for one species row, defaulted if the select
+  // is missing or holds an unknown key.
+  const el = document.getElementById(`strategy-${speciesId}`);
+  const val = el ? el.value : DEFAULT_AI_STRATEGY;
+  return AI_STRATEGIES[val] ? val : DEFAULT_AI_STRATEGY;
+}
+
 function updateSetupHint() {
   // Re-paint per-row "off / you / dimmed" styling + Start button enablement.
   const picks = readSpeciesPicks();
@@ -2610,6 +2649,8 @@ function updateSetupHint() {
     if (!row) return;
     row.classList.toggle('off', picks[i] === 'off');
     row.classList.toggle('you', picks[i] === 'you');
+    // .ai gates the strategy dropdown's visibility (see .species-picker CSS).
+    row.classList.toggle('ai', picks[i] === 'ai');
   });
   const hint = document.getElementById('setup-hint');
   const btn = document.querySelector('#setup-screen button.primary');
@@ -2632,7 +2673,7 @@ function startGame() {
   // Initiator consolation: on a no-one-wins jam, the trigger player claims 1 item.
   INIT_CONSOLATION_ACTIVE = document.getElementById('opt-init-consolation').checked;
   const seats = SPECIES
-    .map((sp, i) => ({ sp, role: picks[i] }))
+    .map((sp, i) => ({ sp, role: picks[i], strategy: readAiStrategy(sp.id) }))
     .filter(s => s.role !== 'off');
   const humanCount = seats.filter(s => s.role === 'you').length;
   if (seats.length < 2 || seats.length > 4) {
@@ -2653,6 +2694,9 @@ function startGame() {
       idx: i,
       species: seats[i].sp,
       isHuman: seats[i].role === 'you',
+      // Which bidding profile this AI seat plays (see AI_STRATEGIES). Unused
+      // for the human seat.
+      aiStrategy: seats[i].role === 'ai' ? seats[i].strategy : null,
       supply: 8, // flat 8 workers at every player count (2026-06-22; see sim.js defaultWorkersPerPlayer)
       timePos: 0,
       hand: [],
@@ -3476,7 +3520,7 @@ function renderPlayers() {
       <div class="player-head">
         <div class="player-title">
           <span class="player-pawn-mini" style="background-color:${p.species.color}">${speciesIcon(p.species)}</span>
-          ${p.species.name}${p.isHuman ? ' (you)' : ''}
+          ${p.species.name}${p.isHuman ? ' (you)' : aiStrategyTag(p)}
         </div>
         <div class="player-mat-summary">${matSummary}</div>
         <div class="vp" style="color:var(--forest);font-weight:700;">${totalVPVal}★</div>
@@ -4878,6 +4922,95 @@ async function showAuctionResult(result) {
 // =============================================================================
 // AI: BIDDING
 // =============================================================================
+// =============================================================================
+// AI STRATEGY PROFILES
+// =============================================================================
+// Mirrors STRATEGY_PROFILES in sim.js. Each AI seat picks one of these at setup
+// and it drives that seat's bidding only — every other part of the AI (drafting,
+// building, effect use) is shared. Knobs, all optional:
+//   costAversion — scales how much the bid shrinks on pricey downriver cards.
+//                  1 = the historical web AI, 0 = pay any per-item price.
+//   overbidByCount / overbid — fraction of the way to flood a contested card's
+//                  open spots, so surplus workers burn fish in a jam.
+//   noRecall     — never voluntarily recalls; supply refills only by building.
+//   randomOpp / oppQ — model each rival as bidding ~Uniform{0..cap}, and plan
+//                  against the oppQ quantile, instead of a flat 1 icon each.
+//   deviant      — replace the computed bid target outright with a fixed rule.
+//
+// Measured head-to-head (3000 games/cell, seat 0 vs a greedy field, `node
+// sim.js strategy`): greedy and friendly play at roughly fair share, while
+// max/bid1/miser lose badly at 3P and 4P. They're offered as difficulty dials
+// and as a way to feel out the auction, not as balanced opponents.
+const AI_STRATEGIES = {
+  friendly: {
+    label: 'Friendly',
+    blurb: 'Leaves room for the others: pays full price for what it needs, floods a contested card only at 2P.',
+    costAversion: 0,
+    overbidByCount: { 2: 0.3, 3: 0, 4: 0 },
+  },
+  greedy: {
+    label: 'Greedy',
+    blurb: 'Assumes the others will stay out: grabs hard, and never pulls workers back off the river.',
+    noRecall: true,
+    randomOpp: true,
+    oppQ: 0.1,
+  },
+  max: {
+    label: 'Always bid max',
+    blurb: 'Dumps every worker it can into every auction. Self-destructs at 3–4 players.',
+    deviant: 'max',
+  },
+  bid1: {
+    label: 'Always bid 1',
+    blurb: 'Puts exactly one worker into everything (more when forced by a trigger). Contests all, wins little.',
+    deviant: 'bid1',
+  },
+  miser: {
+    label: 'Miser',
+    blurb: 'Never contests. Bids the legal minimum and waits to sweep what nobody else took.',
+    deviant: 'miser',
+  },
+};
+const DEFAULT_AI_STRATEGY = 'friendly';
+
+// Per-seat knob readers. A human seat (or an unrecognized strategy) falls back
+// to the defaults, which reproduce the pre-strategy web AI exactly.
+function aiProfile(playerIdx) {
+  const p = state.players[playerIdx];
+  return (p && !p.isHuman && AI_STRATEGIES[p.aiStrategy]) || null;
+}
+function aiNoRecall(playerIdx) {
+  const pr = aiProfile(playerIdx);
+  return pr && pr.noRecall !== undefined ? !!pr.noRecall : false;
+}
+function aiCostAversionTrim(playerIdx, effCost) {
+  const pr = aiProfile(playerIdx);
+  const aversion = pr && pr.costAversion !== undefined ? pr.costAversion : 1;
+  const base = Math.min(Math.max(effCost - 2, 0), 2); // 1 at >=3, 2 at >=4
+  return Math.round(aversion * base);
+}
+function aiOverbid(playerIdx) {
+  const pr = aiProfile(playerIdx);
+  if (!pr) return 0;
+  const n = state.players.length;
+  if (pr.overbidByCount && pr.overbidByCount[n] !== undefined) return pr.overbidByCount[n];
+  return pr.overbid !== undefined ? pr.overbid : 0;
+}
+function aiDeviant(playerIdx) {
+  const pr = aiProfile(playerIdx);
+  return pr && pr.deviant !== undefined ? pr.deviant : null;
+}
+// Lift a bid toward the open spots (capped by what the player can marshal).
+// Only fires when the card is contestable — an auction we could clinch outright
+// needs no flood.
+function aiApplyOverbid(target, pool, open, minBid, overbid) {
+  if (overbid <= 0) return target;
+  const ceil = Math.min(open, pool);   // legal max: never bid past open spots
+  if (ceil <= target) return target;
+  const lifted = Math.round(target + overbid * (ceil - target));
+  return Math.max(target, Math.min(ceil, lifted), minBid);
+}
+
 function aiDecideBid(playerIdx, card, minBid) {
   const p = state.players[playerIdx];
   const open = uncoveredIcons(card);
@@ -4928,8 +5061,7 @@ function aiDecideBid(playerIdx, card, minBid) {
     );
     if (!opponentPresent) effCost = Math.max(1, effCost - 1);
   }
-  if (effCost >= 3 && target > 1) target = Math.max(1, target - 1);
-  if (effCost >= 4 && target > 1) target = Math.max(1, target - 1);
+  if (target > 1) target = Math.max(1, target - aiCostAversionTrim(playerIdx, effCost));
 
   // Most-workers race (Mud Wallow, Cattail Cluster): chase opponent's max+1
   // when the bonus roughly covers the extra fish.
@@ -4958,13 +5090,22 @@ function aiDecideBid(playerIdx, card, minBid) {
   // a free (non-trigger) bidder declines rather than feed a jam it can't win
   // (a forced trigger bid is left to the min-bid floor below). This stops the AI
   // from piling onto contested staples it can't win — see the over-bidding fix.
+  // The `greedy` profile swaps the flat constant for a uniform-bidder model:
+  // rival q is assumed to bid ~Uniform{0..min(q.supply, open)} and we plan
+  // against the oppQ quantile of that, which reads the table as mostly absent.
   const BID_CONTENTION_K = 1;
+  const myProfile = aiProfile(playerIdx);
+  const useRandomOpp = !!(myProfile && myProfile.randomOpp);
+  const myOppQ = myProfile && myProfile.oppQ !== undefined ? myProfile.oppQ : 0.5;
   if (open > 0) {
-    let activeOpps = 0;
+    let expectedOppTake = 0;
     for (const q of state.players) {
-      if (q.idx !== playerIdx && !q.exhausted && !q.out) activeOpps++;
+      if (q.idx === playerIdx || q.exhausted || q.out) continue;
+      expectedOppTake += useRandomOpp
+        ? Math.min(q.supply, open) * myOppQ
+        : BID_CONTENTION_K;
     }
-    const clinchable = open - BID_CONTENTION_K * activeOpps;
+    const clinchable = open - expectedOppTake;
     if (clinchable < 1) {
       if (minBid === 0) target = 0;
     } else {
@@ -4972,12 +5113,22 @@ function aiDecideBid(playerIdx, card, minBid) {
     }
   }
 
+  // Fixed-bid strategies override the computed target outright.
+  const myDeviant = aiDeviant(playerIdx);
+  if (myDeviant === 'miser') target = minBid;                    // never contest
+  else if (myDeviant === 'max') target = Math.min(open, safePool); // always over-commit
+  else if (myDeviant === 'bid1') target = Math.max(1, minBid);   // always exactly 1
+
   // Respect minBid
   target = Math.max(target, minBid);
   // Allow fallback only when needed to meet a min-bid trigger requirement.
   target = Math.min(target, target > safePool && minBid > 0 ? totalPool : safePool);
 
   if (target < 0) target = 0;
+  // Over-bid aggression: flood a contested card's open spots (up to marshalable
+  // workers) so surplus workers burn fish in a jam. Only when this AI genuinely
+  // wants the material. Uses totalPool, so it may recall to staff the spots.
+  if (need > 0) target = aiApplyOverbid(target, totalPool, open, minBid, aiOverbid(playerIdx));
   // Pre-auction recall: pull workers off the river/shoreline to fund the bid.
   let needRecall = target - p.supply;
   if (needRecall > 0) {
@@ -5744,6 +5895,11 @@ function aiTryMillWheel(playerIdx) {
 // would shrink the very lot being bid on (and bids are capped by open icons).
 // Rulebook "Pre-auction recall" and BGA Auction::actRecall both forbid it.
 function aiRecallBudget(playerIdx, excludeCardId) {
+  // The `greedy` profile never voluntarily recalls, so the pool the trigger and
+  // bid layers see is supply-only. Returning empty here (rather than blocking at
+  // the recall call sites) is what makes the AI *aware* of the constraint rather
+  // than merely subject to it. Card-granted recalls are paid abilities and still fire.
+  if (aiNoRecall(playerIdx)) return { safe: [], fallback: [] };
   const p = state.players[playerIdx];
   const useful = new Set();
   for (const s of p.hand) for (const m in s.cost) useful.add(m);
@@ -8228,6 +8384,12 @@ function showGameOver() {
         ${roleInput('you', 'You')}
         ${roleInput('ai',  'AI')}
       </span>
+      <select class="ai-strategy" id="strategy-${sp.id}" name="strategy-${sp.id}"
+              aria-label="${sp.name} AI strategy">
+        ${Object.entries(AI_STRATEGIES).map(([key, s]) =>
+          `<option value="${key}" title="${s.blurb}"${key === DEFAULT_AI_STRATEGY ? ' selected' : ''}>${s.label}</option>`
+        ).join('')}
+      </select>
     </div>`;
   }).join('');
   wrap.addEventListener('change', updateSetupHint);
