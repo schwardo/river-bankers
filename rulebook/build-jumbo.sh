@@ -10,8 +10,9 @@
 #
 # The jumbo HTML is DERIVED from rulebook.html (single source of truth) by
 # swapping the @page rule and appending an 8x10 override stylesheet, so the
-# prose never has to be maintained twice. Content is inset 0.3" from the bleed
-# edge, which keeps every text box inside the 0.25" safe zone.
+# prose never has to be maintained twice. Content is inset 0.6" from the bleed
+# edge — well clear of the 0.25" safe zone, with a 7% content scale-down so the
+# roomier margins still land the booklet on exactly 16 pages.
 #
 # Layout tuned for a tight 12-PAGE booklet:
 #   - both boards (river + fish-track) share page 3 (shrunk to fit)
@@ -46,12 +47,21 @@ override = """
   <style id="jumbo-overrides">
     /* Page size only — a later @page rule cascades over the Letter's, keeping
        its @bottom-center page-number counter intact. */
-    @page { size: 8.25in 10.25in; margin: 0.3in; }
+    @page { size: 8.25in 10.25in; margin: 0.6in; }
+    /* The roomier 0.6in margin costs ~3 pages of text area; scale content down
+       7% to claw them back and land on exactly 16 pages (TGC needs a multiple
+       of 4). The cliff is just above: 0.94 still fits, 0.95+ spills to 19, so
+       there is only ~1pt of slack. Re-check the page count after ANY prose edit
+       or if either number changes. */
+    body { zoom: 0.93; }
     /* Cover full-bleed: the Letter already sets .cover{page:cover-page}; zero
        that page's margin so the gradient reaches the physical edge, and fill the
-       page with 0.3in padding to hold art inside the 0.25in safe zone. */
+       page with 0.6in padding to hold art well inside the 0.25in safe zone. */
     @page cover-page { size: 8.25in 10.25in; margin: 0; }
-    .cover { width: 8.25in; height: 10.25in; margin: 0; padding: 0.3in; box-sizing: border-box; }
+    /* Counter-zoom the cover back to 1.0 (nested zoom multiplies: 0.93 x 1.0753
+       = 1). Without this the body zoom shrinks the full-bleed page to 7.59x9.43in
+       and leaves white strips along the right and bottom edges. */
+    .cover { width: 8.25in; height: 10.25in; margin: 0; padding: 0.6in; box-sizing: border-box; zoom: 1.0752688; }
     .cover img.logo { width: 6.0in; max-height: 5.0in; }
   </style>
 """
