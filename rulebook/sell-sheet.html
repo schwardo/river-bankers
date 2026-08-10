@@ -31,9 +31,12 @@
   }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { margin: 0; padding: 0; }
-  html { height: 100%; }
+  /* Pin the body to exactly one letter page. `min-height: 100%` used to round
+     a hair over 11in and push the footer onto a second page — this sheet must
+     stay 1 page. */
+  html { height: 11in; }
   body {
-    min-height: 100%;
+    height: 11in;
     display: flex;
     flex-direction: column;
     font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
@@ -54,8 +57,8 @@
     align-items: center;
     gap: 0.35in;
     border-bottom: 2pt solid var(--water-mid);
-    padding-bottom: 11pt;
-    margin-bottom: 11pt;
+    padding-bottom: 9pt;
+    margin-bottom: 9pt;
   }
   .head img.logo { width: 2.75in; height: auto; filter: drop-shadow(0 2pt 5pt rgba(0,0,0,0.22)); }
   .head .pitch { flex: 1; }
@@ -75,22 +78,25 @@
     line-height: 1.3;
   }
   .head .pitch .tag b { color: var(--water-deep); font-style: normal; }
+  /* Kept on a single line — a wrapped spec row costs ~0.25in of header and is
+     what pushes this sheet onto a second page. */
   .specs {
     display: flex;
-    gap: 0.12in;
-    margin-top: 7pt;
-    flex-wrap: wrap;
+    gap: 0.09in;
+    margin-top: 6pt;
+    flex-wrap: nowrap;
   }
   .spec {
     background: var(--water-deep);
     color: #fff;
     border-radius: 4pt;
-    padding: 3pt 7pt;
-    font-size: 8pt;
-    letter-spacing: 0.4pt;
+    padding: 2.5pt 5.5pt;
+    font-size: 7.2pt;
+    letter-spacing: 0.3pt;
     text-transform: uppercase;
+    white-space: nowrap;
   }
-  .spec b { color: #fff; font-size: 10.5pt; }
+  .spec b { color: #fff; font-size: 9.6pt; }
 
   /* ============ BODY GRID ============ */
   .cols { display: flex; gap: 0.32in; }
@@ -111,12 +117,12 @@
     display: flex;
     gap: 7pt;
     align-items: flex-start;
-    margin-bottom: 6pt;
+    margin-bottom: 4.5pt;
     background: rgba(255,255,255,0.55);
     border: 1pt solid var(--bank-light);
     border-left: 3pt solid var(--water-mid);
     border-radius: 5pt;
-    padding: 6pt 9pt;
+    padding: 5pt 8pt;
   }
   .steps li:nth-child(2) { border-left-color: var(--otter); }
   .steps li:nth-child(3) { border-left-color: var(--bank-light); }
@@ -168,7 +174,7 @@
   h2.features { margin: 10pt 0 5pt; }
   .photo-wrap img {
     width: 100%;
-    height: 1.4in;
+    height: 1.3in;
     object-fit: cover;
     object-position: center 38%;
     border-radius: 6pt;
@@ -189,7 +195,7 @@
   h3.sec {
     font-size: 13pt;
     color: var(--water-deep);
-    margin: 14pt 0 5pt;
+    margin: 11pt 0 5pt;
     line-height: 1.1;
     font-weight: 700;
   }
@@ -208,7 +214,7 @@
   .components ul li { margin-bottom: 1pt; }
 
   .quote {
-    margin: 14pt 0 7pt;
+    margin: 10pt 0 4pt;
   }
   .quote p {
     margin: 0 0 3pt;
@@ -298,10 +304,12 @@
       <ol class="steps">
         <li><span class="s"><strong>Plenty to go around (overbid = 0)</strong> — everyone takes exactly what they bid for. Done.</span></li>
         <li><span class="s"><strong>River jam (overbid &gt; 0)</strong> — subtract the overbid from each player's bid to see what they won; the price ticks up and the card <strong>slides one step downriver</strong> to be fought over again.</span></li>
+        <li><span class="s"><strong>First-mover advantage</strong> — if the jam is total and <em>nobody's</em> bid survives, the player who started the auction still claims one item. Opening the bidding is never a whiff.</span></li>
       </ol>
       <p class="hero-lead" style="margin-bottom:2pt;">
-        Bids are capped by the workers in front of you, so <strong>overspending is impossible</strong>
-        — no change-making, no math. The river does the price discovery on its own.
+        And you feed <strong>every worker you bid — win or lose</strong>, so a jam bills the greedy.
+        Bids are capped by the workers in front of you: no money, no change-making, no math.
+        The river does the price discovery on its own.
       </p>
 
       <div class="howbox">
@@ -309,8 +317,9 @@
         <p>
           On your turn, <strong>bid workers</strong> on a material drifting down the river, or
           <strong>build a structure</strong> from your hand by paying its materials. Every action
-          moves you along the fish track; whoever sits furthest back goes again. When the fish run
-          out, the grandest builder on the bank wins.
+          moves you along the fish track; whoever sits furthest back goes again. Cross the
+          fish-track finish line and you retire — once the last builder is out, the grandest
+          bank wins.
         </p>
       </div>
 
@@ -325,13 +334,9 @@
         </ul>
       </div>
 
-      <div class="quote">
-        <p>&ldquo;An auction game with a charming theme and professional presentation.&rdquo;</p>
-        <div class="attr">— Chris Aylott, The Game Crafter Sanity Test</div>
-      </div>
     </div>
 
-    <!-- RIGHT: photo, features, components -->
+    <!-- RIGHT: photo, features, components, testimonial -->
     <div class="colR">
       <div class="photo-wrap">
         <img src="sell-sheet-photo.jpg" alt="River Bankers in play">
@@ -348,13 +353,13 @@
         <li>
           <span class="h"><span class="dot d4"></span>Asymmetry and a deck full of combos</span>
           An optional <strong>species draft</strong> gives each of the four mammals a distinct opening
-          power. A deck of <strong>~50 structure cards, each with its own effect</strong>, keeps every
-          game different.
+          power. A deck of <strong>49 structure cards, nearly all with an effect of their own</strong>,
+          keeps every game different.
         </li>
         <li>
           <span class="h"><span class="dot d5"></span>Charming and low-cost to produce</span>
-          Cards, wooden workers, two small boards, a warm nature theme — broad shelf appeal on a
-          friendly bill of materials.
+          Cards, punched worker tokens, two boards, a warm nature theme — broad shelf appeal on a
+          friendly bill of materials, with an obvious wood/miniature upgrade path.
         </li>
       </ul>
 
@@ -366,10 +371,15 @@
             <li>1 river board &amp; 1 fish-track board</li>
             <li>25 material cards · 49 structure cards</li>
             <li>12 species starter cards</li>
-            <li>32 wooden worker meeples (8 per species)</li>
+            <li>32 worker tokens (8 per species)</li>
             <li>4 fish-track pawns · 42 chits · rulebook</li>
           </ul>
         </div>
+      </div>
+
+      <div class="quote">
+        <p>&ldquo;An auction game with a charming theme and professional presentation.&rdquo;</p>
+        <div class="attr">— Chris Aylott, The Game Crafter Sanity Test</div>
       </div>
     </div>
   </div>
