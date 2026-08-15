@@ -587,6 +587,76 @@ grows from about 42 to 53 minutes. We shipped it as always-on in the BGA port an
 prototype so it can keep being second-guessed. A separate fairness sweep (20k games per config) confirmed
 it introduces no first-player advantage.</p>
 
+<div class="phase">Phase V &middot; The wait, and the verdict (August)</div>
+
+<h2>Week of July 27 <span class="wk">— the entry freezes, and two honest opponents</span></h2>
+
+<p>The contest deadline passed on <strong>[2026-07-27]</strong>, and with it the game froze: entries
+and their shop pages have to stay unchanged until finalists are announced. That turned the following
+fortnight into an unusual kind of design time &mdash; no shipping, only understanding. So we went back
+to the thing that had been bothering us since the first-mover work: the simulator's idea of a
+&ldquo;human&rdquo; was a single hand-tuned preset, and a single preset is an opinion, not a
+measurement.</p>
+
+<p>It became <strong>two</strong> named baseline models, both fitted to the same six real Board Game
+Arena games and both matching them about equally well &mdash; which is exactly the point. They disagree
+about <em>why</em> they match. <strong>Friendly</strong> expects rivals to claim their share and bids
+around them, treating workers as liquid and recalling freely to fund a bid. <strong>Greedy</strong>
+bids as though rivals will stay out, never voluntarily recalls, and refills its supply only by
+building. If a rule change looks safe under one and not the other, it hasn't really been tested.
+(A measurement bug fell out of this too: the comparison tool had been running the untuned AI while the
+histogram tool ran the tuned one, so the two had been quietly fitting different bidders.)</p>
+
+<p>The second step was per-seat profiles &mdash; one seat playing strategy X against a field of
+greedy &mdash; which finally let us ask what a <em>bad</em> strategy costs. Seat-0 win rate against a
+greedy field, 3,000 games a cell, versus fair share:</p>
+
+<table>
+  <thead><tr><th>Seat-0 strategy</th><th>2P</th><th>3P</th><th>4P</th></tr></thead>
+  <tbody>
+    <tr><td class="card">Friendly</td><td>44.5% <span class="before">(&minus;5.5)</span></td><td>32.3% <span class="before">(&minus;1.0)</span></td><td>31.6% <span class="before">(+6.6)</span></td></tr>
+    <tr><td class="card">Greedy <em>(control)</em></td><td>50.7% <span class="before">(+0.7)</span></td><td>34.6% <span class="before">(+1.3)</span></td><td>24.9% <span class="before">(&minus;0.1)</span></td></tr>
+    <tr><td class="card">Max <em>(always bid big)</em></td><td>49.6% <span class="before">(&minus;0.4)</span></td><td>5.0% <span class="before">(&minus;28.3)</span></td><td>0.3% <span class="before">(&minus;24.7)</span></td></tr>
+    <tr><td class="card">Bid&nbsp;1 <em>(always minimum)</em></td><td>14.9% <span class="before">(&minus;35.1)</span></td><td>9.8% <span class="before">(&minus;23.5)</span></td><td>12.1% <span class="before">(&minus;12.9)</span></td></tr>
+    <tr><td class="card">Miser <em>(hoard workers)</em></td><td>12.0% <span class="before">(&minus;38.0)</span></td><td>7.8% <span class="before">(&minus;25.5)</span></td><td>10.9% <span class="before">(&minus;14.1)</span></td></tr>
+  </tbody>
+</table>
+
+<p>Two findings we like. <strong>Over-committing is only punished once there are enough rivals to jam
+you</strong> &mdash; <em>max</em> is perfectly fine heads-up and near-unwinnable at four. And the
+passive strategies fail <em>hardest</em> heads-up, where refusing to contest simply hands the rival the
+whole river. That's the shape an auction game should have: no single dial that's always right, and
+every count punishing a different sin. The one genuine surprise is friendly beating a greedy field at
+4P &mdash; the grabbers collide with each other and burn fish it never spends. All of it was ported
+into the web prototype as a per-seat AI strategy picker, so the opponents you practice against can now
+be told what kind of player to be.</p>
+
+<h2>Week of August 11 <span class="wk">— Finalist</span></h2>
+
+<div class="callout">
+  <strong>Milestone — contest finalist.</strong> On [2026-08-14] River Bankers was named a
+  <strong>Finalist</strong> in The Game Crafter's <strong>&ldquo;Everything Has a Price&rdquo;</strong>
+  contest, on the strength of <strong>130 community votes</strong>. The contest runs community voting
+  to seat twenty semi-finalists, after which the judge picks a handful of finalists and, from those, a
+  single winner &mdash; scored on player-driven value, decision quality, player interaction, creativity,
+  rules clarity and fun. The winner has not been announced.
+</div>
+
+<p>It is worth naming what this does and doesn't say. The votes are a <em>presentation</em> result:
+they measure how the shop page, the cover, the promo video and the pitch read to people who have mostly
+not played the game. The finalist call is the first time the design itself is being weighed by someone
+whose job is to weigh designs &mdash; the same axis the sanity test scored 77/100 back in July, when
+<em>Shop Presentation</em> was the weak column at 11/20. Between then and the deadline that column got
+almost all of the attention, and the vote count is the honest read on whether that work landed.</p>
+
+<p>The design ledger going into judging is short and mostly known: the endgame is a single fish line at
+90🐟, the initiator can no longer be wiped out by a jam, and the simulator now disagrees with itself in
+two calibrated ways. The open questions haven't moved &mdash; whether the vine commitment needs a
+mid-tier structure with real printed VP, and whether Old&nbsp;Growth's doubler should reach the
+Shoreline. Neither can be touched while the entry is frozen, which is its own small mercy: for the
+first time since April the game is finished, and the only thing left to do is find out what someone
+else thinks of it.</p>
+
 <div class="footer">
   River Bankers — a design journal · a week-by-week look back at the game's development ·
   entries oldest-first, one heading per calendar week.
