@@ -25,3 +25,6 @@ scale artwork/logo.png                    logo.png              600
 scale material-deck/Logjam.png            material-card.png     360
 scale structure-deck/BurrowRun.png        structure-card.png    260
 scale starter-deck/LodgeFoundation.png    starter-card.png      260
+
+# Call-to-action buttons for the listing's "Try It First" section.
+python3 graphics/shop/_make_buttons.py "$out"
