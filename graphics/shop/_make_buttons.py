@@ -9,7 +9,9 @@ Colors match the rulebook palette (water for play, riverbank for the rules).
 import sys
 from PIL import Image, ImageDraw, ImageFont
 
-W, H, S = 360, 80, 4          # display size, supersample factor
+W, H = 360, 80                # design size
+OUT = 0.5                     # displayed at half the design size on the listing
+S = 4                         # supersample factor while drawing
 FONT = "/usr/share/fonts/opentype/urw-base35/P052-Bold.otf"   # Palatino clone
 PAPER = (250, 243, 227, 255)
 
@@ -74,8 +76,9 @@ def render(name, label, top, bottom, border, icon):
 
     out = sys.argv[1] if len(sys.argv) > 1 else "web"
     dst = f"{out}/{name}"
-    img.resize((W, H), Image.LANCZOS).save(dst, optimize=True)
-    print(f"{dst}  {W}x{H}")
+    ow, oh = round(W * OUT), round(H * OUT)
+    img.resize((ow, oh), Image.LANCZOS).save(dst, optimize=True)
+    print(f"{dst}  {ow}x{oh}")
 
 
 for b in BUTTONS:
