@@ -15,6 +15,6 @@
 
     { "name": "Clay Den",         "species": "mink",    "vp": 0, "effect": "Clay icons cost you 2 less fish per item (min 1)." },
     { "name": "Quick Strike",     "species": "mink",    "vp": 2, "effect": "When you trigger an auction, you may declare your bid last (after all other bids are revealed). You must still bid at least 1 worker, as the trigger always does." },
-    { "name": "Snare Set",        "species": "mink",    "vp": 1, "effect": "Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3 fish in compensation." }
+    { "name": "Snare Set",        "species": "mink",    "vp": 1, "effect": "Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back the card's per-item cost in fish as compensation." }
   ]
 }

@@ -56,6 +56,36 @@
   <span class="sub">Changelog · newest version first</span>
 </div>
 
+<h2>Version v0.4 (September 2026)</h2>
+
+<p class="lead">A small, focused pass on <strong>interaction compensation</strong>, prompted by a
+September playtest in which a Portage worker-steal was both the best play of the game and its one
+feels-bad moment. The attacks all remain legal and exactly as strong to make &mdash; but their
+victims are no longer left empty-handed. Confirmed balance-neutral in 15,000-game simulations at
+3 and 4 players.</p>
+
+<div class="callout">
+  <strong>Why:</strong> Portage's swap invalidated an opponent's two-turn plan with zero counterplay
+  and zero compensation &mdash; unlike Tribute Stone, whose forced recall at least pays its victim
+  3&#128031;. The fix extends Tribute Stone's compensation shape across the interaction suite,
+  scaled to how much each attack actually takes.
+</div>
+
+<h3>Card changes <span class="tag">before &rarr; after</span></h3>
+<ul>
+  <li><strong>Portage, compensated.</strong> Old: <em>&ldquo;&hellip;swap one of your workers on a
+      river card with another worker on a different river card. Pay the source card&rsquo;s per-item
+      cost in &#128031;.&rdquo;</em> New: the swap now names <em>&ldquo;another <strong>player&rsquo;s</strong>
+      worker&rdquo;</em> (swapping two of your own workers was always a no-op), and adds:
+      <em>&ldquo;They slide back <strong>2&#128031;</strong> in compensation.&rdquo;</em> A forced
+      exchange hurts less than Tribute Stone&rsquo;s removal, so it pays less than 3. Printed VP
+      stays 6&#9733;.</li>
+  <li><strong>Tribute Stone &amp; Snare Set, rescaled.</strong> Old: the recall victim slides back a
+      flat <strong>3&#128031;</strong>. New: they slide back <strong>the recalled card&rsquo;s current
+      per-item cost</strong> (2&#128031; at River&nbsp;1 up to 5&#128031; at River&nbsp;4) &mdash;
+      deeper steals pay their victims more, matching the refund to what was actually taken.</li>
+</ul>
+
 <h2>Version v0.3 (July 2026)</h2>
 
 <p class="lead">The first balance pass driven by <strong>Alpha playtesting on BoardGameArena</strong>.

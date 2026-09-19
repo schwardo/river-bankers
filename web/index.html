@@ -1903,9 +1903,9 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 4, vp: 3, effect: 'When you build: you may spend 2 of any one material as 1 of any other. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
   { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'Once per game (flip card): discard 1 structure from your hand and take one of your choice from the discard pile.' },
-  { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back 3🐟 in compensation.' },
+  { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back that card\'s per-item cost in 🐟 as compensation.' },
   { name: 'Tow Line',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'Once per game (flip card): move any river card to River 1, then run an auction on it (no flat 🐟).' },
-  { name: 'Portage',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.' },
+  { name: 'Portage',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another player\'s worker on a different river card. Pay the source card\'s per-item cost in 🐟. They slide back 2🐟 in compensation.' },
   { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 6, effect: 'Once per game (flip card): place 1-5 workers from your supply onto uncovered icons of one river card. Total 🐟 cost 1/2/3/5/8.' },
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track.' },
   { name: 'Trophy Lodge',   cost: { clay: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +3 VP per ?-VP structure you control, including this one (max +12).' },
@@ -1932,7 +1932,7 @@ const STRUCTURE_TEMPLATES = [
   // Mink (Clay bias)
   { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 2 less fish per item (min 1).' },
   { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 2, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed). You must still bid at least 1 worker, as the trigger always does.' },
-  { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 1, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3🐟 in compensation.' },
+  { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 1, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back the card\'s per-item cost in 🐟 as compensation.' },
 ];
 
 const SPECIES_KEYS = ['beaver', 'otter', 'muskrat', 'mink'];
@@ -5398,7 +5398,8 @@ function aiChooseAction(playerIdx) {
 }
 
 // Tribute Stone: once-per-game force-recall of an opponent's worker.
-// Drops a blank like a normal recall; the victim slides back 3🐟 in compensation.
+// Drops a blank like a normal recall; the victim slides back the recalled
+// card's per-item cost in 🐟 as compensation [2026-09-19, was flat 3].
 // Returns true if it fired.
 function doTributeStone(playerIdx, victimIdx, card) {
   const p = state.players[playerIdx];
@@ -5410,19 +5411,21 @@ function doTributeStone(playerIdx, victimIdx, card) {
   if (typeof card.slot === 'number') card.blanks += 1;
   victim.supply += 1;
   const before = victim.timePos;
-  victim.timePos = Math.max(0, victim.timePos - 3);
+  victim.timePos = Math.max(0, victim.timePos - cardCost(card));
   p.tributeStoneUsed = true;
   log(`${MATERIALS.stones.icon} Tribute Stone: ${speciesLabel(p)} forces ${speciesLabel(victim)} to recall a worker from ${MATERIALS[card.material].name}; ${speciesLabel(victim)} slides back ${before - victim.timePos}🐟.`);
   return true;
 }
 
-// Portage: swap a worker of yours on river card A with a worker (any player's)
-// on a different river card B. You pay A's per-item cost in fish. No blanks drop.
+// Portage: swap a worker of yours on river card A with ANOTHER PLAYER's worker
+// on a different river card B. You pay A's per-item cost in fish; the victim
+// slides back 2🐟 in compensation [2026-09-19]. No blanks drop.
 function doOtterTrail(playerIdx, cardAId, cardBId, otherPlayerIdx) {
   const p = state.players[playerIdx];
   const cardA = state.riverCards.find(c => c.id === cardAId);
   const cardB = state.riverCards.find(c => c.id === cardBId);
   if (!cardA || !cardB || cardA.id === cardB.id) return false;
+  if (otherPlayerIdx === playerIdx) return false; // card text: another PLAYER's worker
   if (typeof cardA.slot !== 'number' || typeof cardB.slot !== 'number') return false;
   if (workersOnCard(cardA, playerIdx) <= 0) return false;
   if (workersOnCard(cardB, otherPlayerIdx) <= 0) return false;
@@ -5432,9 +5435,11 @@ function doOtterTrail(playerIdx, cardAId, cardBId, otherPlayerIdx) {
   if (cardB.workers[otherPlayerIdx] === 0) delete cardB.workers[otherPlayerIdx];
   cardA.workers[otherPlayerIdx] = (cardA.workers[otherPlayerIdx] || 0) + 1;
   cardB.workers[playerIdx] = (cardB.workers[playerIdx] || 0) + 1;
-  advancePlayer(playerIdx, cardCost(cardA));
+  const cost = cardCost(cardA);
+  advancePlayer(playerIdx, cost);
   const other = state.players[otherPlayerIdx];
-  log(`🦦 Portage: ${speciesLabel(p)} pays ${cardCost(cardA)}🐟 and swaps a worker on ${MATERIALS[cardA.material].name} with ${speciesLabel(other)}'s worker on ${MATERIALS[cardB.material].name}.`);
+  other.timePos = Math.max(0, other.timePos - 2);
+  log(`🦦 Portage: ${speciesLabel(p)} pays ${cost}🐟 and swaps a worker on ${MATERIALS[cardA.material].name} with ${speciesLabel(other)}'s worker on ${MATERIALS[cardB.material].name} — ${speciesLabel(other)} slides back 2🐟 in compensation.`);
   return true;
 }
 
@@ -5705,9 +5710,10 @@ function aiStartOfTurnAbilities(playerIdx) {
       if (target.card.workers[target.victimIdx] === 0) delete target.card.workers[target.victimIdx];
       if (typeof target.card.slot === 'number') target.card.blanks += 1;
       victim.supply += 1;
-      victim.timePos = Math.max(0, victim.timePos - 3);
+      const snareBefore = victim.timePos;
+      victim.timePos = Math.max(0, victim.timePos - cardCost(target.card));
       p.snareSetUsed = true;
-      log(`🪤 Snare Set: ${speciesLabel(p)} forces ${speciesLabel(victim)} to recall 1 worker; ${speciesLabel(victim)} slides back 3🐟.`);
+      log(`🪤 Snare Set: ${speciesLabel(p)} forces ${speciesLabel(victim)} to recall 1 worker; ${speciesLabel(victim)} slides back ${snareBefore - victim.timePos}🐟.`);
     }
   }
   // Trading Post: pay 1🐟 to recall 1 worker each from 3 different-material
@@ -6147,6 +6153,7 @@ async function humanUseOtterTrail() {
     if (c.id === sourcePick.card.id) continue;
     if (typeof c.slot !== 'number') continue;
     for (const k in c.workers) {
+      if (parseInt(k) === human.idx) continue; // card text: another PLAYER's worker
       if (c.workers[k] <= 0) continue;
       targetCands.push({ card: c, otherIdx: parseInt(k) });
     }
@@ -6154,7 +6161,7 @@ async function humanUseOtterTrail() {
   if (targetCands.length === 0) return;
   const targetPick = await pickFromList(
     '🦦 Portage — pick the worker to swap IN',
-    `That worker will move to ${MATERIALS[sourcePick.card.material].name}; your worker takes its place.`,
+    `That worker will move to ${MATERIALS[sourcePick.card.material].name}; your worker takes its place. Its owner slides back 2🐟 in compensation.`,
     targetCands,
     x => `${speciesLabel(state.players[x.otherIdx])} on River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
   );
@@ -6178,7 +6185,7 @@ async function humanUseTributeStone() {
   if (cands.length === 0) return;
   const pick = await pickFromList(
     `${MATERIALS.stones.icon} Tribute Stone — force an opponent recall`,
-    `Pick an opponent's worker on a river card. That worker returns to their supply (blank dropped). The opponent slides back 3🐟 in compensation. Once per game.`,
+    `Pick an opponent's worker on a river card. That worker returns to their supply (blank dropped). The opponent slides back that card's per-item cost in 🐟 as compensation. Once per game.`,
     cands,
     x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
   );
@@ -6247,7 +6254,7 @@ async function humanUseSnareSet() {
   if (cands.length === 0) return;
   const pick = await pickFromList(
     '🪤 Snare Set — force an opponent recall',
-    `Pick an opponent's worker on a river card. That worker returns to their supply (blank dropped). The opponent slides back 3🐟 in compensation. Once per game.`,
+    `Pick an opponent's worker on a river card. That worker returns to their supply (blank dropped). The opponent slides back that card's per-item cost in 🐟 as compensation. Once per game.`,
     cands,
     x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
   );
@@ -6258,7 +6265,7 @@ async function humanUseSnareSet() {
   if (pick.card.workers[pick.victimIdx] === 0) delete pick.card.workers[pick.victimIdx];
   if (typeof pick.card.slot === 'number') pick.card.blanks += 1;
   victim.supply += 1;
-  victim.timePos = Math.max(0, victim.timePos - 3);
+  victim.timePos = Math.max(0, victim.timePos - cardCost(pick.card));
   human.snareSetUsed = true;
   log(`🪤 Snare Set: ${speciesLabel(human)} forces ${speciesLabel(victim)} to recall a worker from ${MATERIALS[pick.card.material].name}; ${speciesLabel(victim)} slides back ${before - victim.timePos}🐟.`);
   render();

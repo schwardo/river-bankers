@@ -2306,6 +2306,8 @@ class Game extends \Bga\GameFramework\Table
         $oid = (int) $opp[0]['player_id'];
         $srcSlot = (int) $this->getCardRow($srcId)['card_location_arg'];
         $this->advanceFish($playerId, Cost::perItem('river', $srcSlot));
+        // [2026-09-19] The victim slides back a flat 2 fish in compensation.
+        $this->moveBackFish($oid, 2);
         // your worker src -> dst
         $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $playerId AND `card_id` = $srcId");
         $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $srcId AND `workers` <= 0");
@@ -2320,7 +2322,7 @@ class Game extends \Bga\GameFramework\Table
         $srcName = (string) (Material::$MATERIAL[(int) $this->getCardRow($srcId)['card_type_arg']]['name'] ?? 'a river card');
         $dstName = (string) (Material::$MATERIAL[(int) $this->getCardRow($dstId)['card_type_arg']]['name'] ?? 'a river card');
         $this->notify->all('abilityUsed',
-            clienttranslate('${player_name} uses ${ability_name}: swaps their worker on ${src_card} for ${victim_name}\'s on ${dst_card}'),
+            clienttranslate('${player_name} uses ${ability_name}: swaps their worker on ${src_card} for ${victim_name}\'s on ${dst_card} — ${victim_name} slides back 2🐟 in compensation'),
             [
                 'player_id'    => $playerId,
                 'player_name'  => $this->getPlayerNameById($playerId),
@@ -2681,13 +2683,18 @@ class Game extends \Bga\GameFramework\Table
                 $oid = (int) $opp[0]['player_id'];
                 $def = Material::$MATERIAL[(int) $this->getCardRow($cardId)['card_type_arg']] ?? null;
                 $cardName = (string) ($def['name'] ?? 'a river card');
+                // [2026-09-19] Compensation is the recalled card's CURRENT per-item
+                // cost (was a flat 3) — deeper steals pay their victims more.
+                $slot = (int) $this->getCardRow($cardId)['card_location_arg'];
+                $comp = Cost::perItem('river', $slot);
                 $this->recallWorker($oid, $cardId, true);
-                $this->moveBackFish($oid, 3);
+                $this->moveBackFish($oid, $comp);
                 // Detailed log: Tribute Stone / Snare Set (same key) forces a recall
-                // AND slides the victim back 3🐟 — both were previously silent.
+                // AND slides the victim back in compensation.
                 $this->notify->all('abilityUsed',
-                    clienttranslate('${player_name} uses ${ability_name}: returns ${victim_name}\'s worker from ${card_name} and slides them back 3🐟'),
+                    clienttranslate('${player_name} uses ${ability_name}: returns ${victim_name}\'s worker from ${card_name} and slides them back ${comp}🐟 in compensation'),
                     [
+                        'comp'         => $comp,
                         'player_id'    => $playerId,
                         'player_name'  => $this->getPlayerNameById($playerId),
                         'ability_name' => (string) $this->globals->get('pending_ability_name', 'Tribute Stone'),

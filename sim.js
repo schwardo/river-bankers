@@ -60,9 +60,9 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Treaty Stone',   cost: { stones: 3, clay: 2 },            time: 4, vp: 3, effect: 'When you build: you may spend 2 of any one material as 1 of any other. Once per build.' },
   { name: 'Cattail Patch',  cost: { reeds: 3, mud: 2 },              time: 3, vp: 0, effect: 'End of game: VP equal to 1/1/2/3/5/8 for 1/2/3/4/5/6 distinct materials across your built structures.' },
   { name: 'Pack Rat Burrow', cost: { reeds: 2, mud: 2 },             time: 2, vp: 4, effect: 'Once per game (flip card): discard 1 structure from your hand and take one of your choice from the discard pile.' },
-  { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back 3🐟 in compensation.' },
+  { name: 'Tribute Stone',  cost: { clay: 2, stones: 2 },            time: 3, vp: 5, effect: 'Once per game (flip card): force an opponent to recall one of their workers from a river card (drops a blank). They slide back that card\'s per-item cost in 🐟 as compensation.' },
   { name: 'Tow Line',     cost: { mud: 4, clay: 2, vines: 1 },     time: 4, vp: 8, effect: 'Once per game (flip card): move any river card to River 1, then run an auction on it (no flat 🐟).' },
-  { name: 'Portage',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another worker on a different river card. Pay the source card\'s per-item cost in 🐟.' },
+  { name: 'Portage',    cost: { vines: 3, stones: 2 },           time: 3, vp: 6, effect: 'As an action: swap one of your workers on a river card with another player\'s worker on a different river card. Pay the source card\'s per-item cost in 🐟. They slide back 2🐟 in compensation.' },
   { name: 'Salmon Run',     cost: { logs: 4, vines: 2 },             time: 4, vp: 6, effect: 'Once per game (flip card): place 1-5 workers from your supply onto uncovered icons of one river card. Total 🐟 cost 1/2/3/5/8.' },
   { name: 'Slipstream',     cost: { mud: 2, vines: 2 },              time: 3, vp: 5, effect: 'Once per game (flip card): take a turn immediately after another player, even if you are not next on 🐟 track.' },
   { name: 'Trophy Lodge',   cost: { clay: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +3 VP per ?-VP structure you control, including this one (max +12).' },
@@ -89,7 +89,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   // Mink (Clay bias)
   { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 2 less fish per item (min 1).' },
   { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 2, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed). You must still bid at least 1 worker, as the trigger always does.' },
-  { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 1, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back 3 fish in compensation.' },
+  { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 1, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back the card\'s per-item cost in fish as compensation.' },
 ];
 
 const SPECIES_KEYS = ['beaver', 'otter', 'muskrat', 'mink'];
@@ -1350,6 +1350,8 @@ function newGame(numPlayers, workersPerPlayer = null) {
       initConsolations: 0,        // heavy jams where the initiator-consolation rule awarded the triggerer 1 item
       bidHist: [0, 0, 0, 0, 0],   // distribution of sealed bid sizes (index 0..4, clamped) over all bidders
       peakBlanks: 0,              // max total blanks across all river/preriv cards at any point
+      portageSwaps: [],           // per Portage swap: {victimIdx, cost, victimPos} (victimPos = victim timePos before any compensation)
+      tributeRecalls: [],         // per Tribute Stone / Snare Set recall: {victimIdx, cardCost, comp, victimPos}
     },
   };
 }
@@ -2502,7 +2504,24 @@ function aiChooseAction(state, playerIdx) {
 }
 
 // Tribute Stone: once-per-game force-recall of an opponent's worker.
-// Drops a blank like a normal recall; the victim slides back 3 fish.
+// Drops a blank like a normal recall; the victim slides back in compensation:
+// Tribute Stone / Snare Set victim compensation — LIVE RULE as of
+// [2026-09-19]: the recall victim slides back the recalled card's CURRENT
+// per-item cost (slot+2, so 2🐟 at River 1 up to 5🐟 at River 4 — scales
+// with what the victim lost, which the old flat 3 did not). The `tribute`
+// sweep (15k×3P/4P) and a forced-pick species-starters run showed the switch
+// is balance-neutral. RB_TRIBUTE_COMP overrides for measurement: integer N =
+// flat N (3 = pre-change rule), 'cost' = live rule.
+function parseTributeComp(v) {
+  if (v === undefined || v === 'cost') return 'cost'; // live rule
+  const n = parseInt(v, 10);
+  return isNaN(n) ? 'cost' : n;
+}
+let TRIBUTE_COMP = parseTributeComp(process.env.RB_TRIBUTE_COMP);
+function tributeCompAmount(card) {
+  return TRIBUTE_COMP === 'cost' ? cardCost(card) : TRIBUTE_COMP;
+}
+
 function doTributeStone(state, playerIdx, victimIdx, card) {
   const p = state.players[playerIdx];
   const victim = state.players[victimIdx];
@@ -2512,7 +2531,9 @@ function doTributeStone(state, playerIdx, victimIdx, card) {
   if (card.workers[victimIdx] === 0) delete card.workers[victimIdx];
   if (typeof card.slot === 'number') { card.blanks += 1; noteBlanks(state); }
   victim.supply += 1;
-  victim.timePos = Math.max(0, victim.timePos - 3);
+  const comp = tributeCompAmount(card);
+  state.metrics.tributeRecalls.push({ victimIdx, cardCost: cardCost(card), comp, victimPos: victim.timePos, src: 'tribute' });
+  victim.timePos = Math.max(0, victim.timePos - comp);
   p.tributeStoneUsed = true;
   noteRecall(state);
   return true;
@@ -2605,12 +2626,27 @@ function findTributeStoneTarget(state, playerIdx) {
   return best;
 }
 
-// Portage: swap your worker on river card A with another worker on card B.
-// Pay A's per-item cost.
+// Portage: swap your worker on river card A with ANOTHER PLAYER's worker on
+// card B. Pay A's per-item cost; the victim slides back per PORTAGE_COMP.
+// Portage victim compensation — LIVE RULE as of [2026-09-19]: flat 2🐟
+// slide-back to the player whose worker was swapped away. Adopted after the
+// 2026-09-07 3P web playtest flagged the uncompensated steal as the session's
+// one anti-fun moment; the `portage` sweep (15k×3P/4P) showed flat 2 costs
+// the attacker nothing measurable. RB_PORTAGE_COMP overrides for measurement:
+// 0/'none' = pre-change rule, 'cost' = refund the full fee, integer N = flat N.
+function parsePortageComp(v) {
+  if (v === undefined) return 2; // live rule: flat 2🐟
+  if (v === '0' || v === 'none') return 0;
+  if (v === 'cost') return 'cost';
+  const n = parseInt(v, 10);
+  return isNaN(n) ? 2 : n;
+}
+let PORTAGE_COMP = parsePortageComp(process.env.RB_PORTAGE_COMP);
 function doOtterTrail(state, playerIdx, cardAId, cardBId, otherPlayerIdx) {
   const cardA = state.riverCards.find(c => c.id === cardAId);
   const cardB = state.riverCards.find(c => c.id === cardBId);
   if (!cardA || !cardB || cardA.id === cardB.id) return false;
+  if (otherPlayerIdx === playerIdx) return false; // card text: another PLAYER's worker
   if (typeof cardA.slot !== 'number' || typeof cardB.slot !== 'number') return false;
   if (workersOnCard(cardA, playerIdx) <= 0) return false;
   if (workersOnCard(cardB, otherPlayerIdx) <= 0) return false;
@@ -2620,7 +2656,12 @@ function doOtterTrail(state, playerIdx, cardAId, cardBId, otherPlayerIdx) {
   if (cardB.workers[otherPlayerIdx] === 0) delete cardB.workers[otherPlayerIdx];
   cardA.workers[otherPlayerIdx] = (cardA.workers[otherPlayerIdx] || 0) + 1;
   cardB.workers[playerIdx] = (cardB.workers[playerIdx] || 0) + 1;
-  advancePlayer(state, playerIdx, cardCost(cardA));
+  const cost = cardCost(cardA);
+  const victim = state.players[otherPlayerIdx];
+  state.metrics.portageSwaps.push({ victimIdx: otherPlayerIdx, cost, victimPos: victim.timePos });
+  const comp = PORTAGE_COMP === 'cost' ? cost : PORTAGE_COMP;
+  if (comp > 0) victim.timePos = Math.max(0, victim.timePos - comp);
+  advancePlayer(state, playerIdx, cost);
   noteEffectUse(state, 'Portage');
   return true;
 }
@@ -2636,7 +2677,9 @@ function doSnareSet(state, playerIdx, victimIdx, card) {
   if (card.workers[victimIdx] === 0) delete card.workers[victimIdx];
   if (typeof card.slot === 'number') { card.blanks += 1; noteBlanks(state); }
   victim.supply += 1;
-  victim.timePos = Math.max(0, victim.timePos - 3);
+  const comp = tributeCompAmount(card);
+  state.metrics.tributeRecalls.push({ victimIdx, cardCost: cardCost(card), comp, victimPos: victim.timePos, src: 'snare' });
+  victim.timePos = Math.max(0, victim.timePos - comp);
   p.snareSetUsed = true;
   noteRecall(state);
   return true;
@@ -4723,6 +4766,304 @@ function sweepMillWheel(numGamesArg, numPArg, workersArg) {
   console.log(`  builder win-rate:  ${(100*(full.winRate - wbOff.winRate) >= 0 ? '+' : '')}${(100*(full.winRate - wbOff.winRate)).toFixed(1)} pts`);
   console.log(`  builder avg VP:    ${((full.avgVP - wbOff.avgVP) >= 0 ? '+' : '')}${(full.avgVP - wbOff.avgVP).toFixed(2)} VP`);
   console.log(`  builder VP edge:   ${((full.avgVP - full.fieldVP) - (wbOff.avgVP - wbOff.fieldVP) >= 0 ? '+' : '')}${(((full.avgVP - full.fieldVP) - (wbOff.avgVP - wbOff.fieldVP))).toFixed(2)} VP vs field`);
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
+// Portage compensated-swap sweep: current (uncompensated) Portage vs the
+// variant where the victim slides back the fish the attacker paid (see
+// PORTAGE_COMP at doOtterTrail), with a fully-disabled control. Reports
+// builder win-rate / VP edge, swap usage, and victim outcomes — including how
+// late in the game victims get hit, since late-game compensation can invert
+// into a tempo gift. Run with `cpulimit -l 50 -f -m --` per the sim-ablations
+// rule. Usage: node sim.js portage [numGames] [numP] [workers]
+function sweepPortage(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 3;
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+  const CARD = 'Portage';
+  const fishLine = simFishLine(numP);
+  const lateCut = fishLine - 15; // victim already this deep = "late" hit
+
+  function runOneGame(state) {
+    // Rules-accurate fish-line endgame — match runGame (see other sweeps).
+    egPlayOut(state, 'fish', 0, fishLine, 'd');
+  }
+
+  function collect(label, mode) {
+    PORTAGE_COMP = mode;
+    let builders = 0, builderWins = 0, builderVP = 0;
+    let nonBuilders = 0, nonBuilderVP = 0;
+    let swaps = 0, swapCompSum = 0, lateSwaps = 0, victimPosSum = 0;
+    let victims = 0, victimWins = 0, victimVP = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      const sw = state.metrics.portageSwaps;
+      swaps += sw.length;
+      const victimSet = new Set();
+      for (const s of sw) {
+        swapCompSum += mode === 'cost' ? s.cost : mode;
+        victimPosSum += s.victimPos;
+        if (s.victimPos >= lateCut) lateSwaps++;
+        victimSet.add(s.victimIdx);
+      }
+      const scored = state.players.map(p => ({
+        idx: p.idx, vp: totalVP(p, state), timePos: p.timePos,
+        hasCard: p.built.some(s => s.name === CARD),
+      }));
+      scored.sort((a, b) => b.vp - a.vp || a.timePos - b.timePos);
+      const winnerIdx = scored[0].idx;
+      for (const s of scored) {
+        if (s.hasCard) {
+          builders++; builderVP += s.vp;
+          if (s.idx === winnerIdx) builderWins++;
+        } else { nonBuilders++; nonBuilderVP += s.vp; }
+        if (victimSet.has(s.idx)) {
+          victims++; victimVP += s.vp;
+          if (s.idx === winnerIdx) victimWins++;
+        }
+      }
+    }
+    return {
+      label, builders,
+      buildRate: builders / (numGames * numP),
+      winRate: builders ? builderWins / builders : NaN,
+      avgVP: builders ? builderVP / builders : NaN,
+      fieldVP: nonBuilders ? nonBuilderVP / nonBuilders : NaN,
+      swapsPerBuilder: builders ? swaps / builders : NaN,
+      avgComp: swaps ? swapCompSum / swaps : NaN,
+      avgVictimPos: swaps ? victimPosSum / swaps : NaN,
+      latePct: swaps ? lateSwaps / swaps : NaN,
+      victimWinRate: victims ? victimWins / victims : NaN,
+      victimVP: victims ? victimVP / victims : NaN,
+    };
+  }
+
+  const t0 = Date.now();
+  Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+  STRUCTURE_EFFECT_DISABLED[CARD] = true;
+  process.stderr.write('\rportage: effect disabled ...       ');
+  const off = collect('disabled (control)', 0);
+  delete STRUCTURE_EFFECT_DISABLED[CARD];
+  process.stderr.write('\rportage: current (no comp) ...     ');
+  const cur = collect('no comp (pre-2026-09-19)', 0);
+  process.stderr.write('\rportage: flat 1 ...                ');
+  const f1 = collect('flat 1\u{1F41F} to victim', 1);
+  process.stderr.write('\rportage: flat 2 ...                ');
+  const f2 = collect('flat 2\u{1F41F} (live rule)', 2);
+  process.stderr.write('\rportage: full cost ...             ');
+  const cmp = collect('full fee to victim (-cost)', 'cost');
+  PORTAGE_COMP = parsePortageComp(process.env.RB_PORTAGE_COMP);
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  const expWin = 100 / numP;
+  console.log(`\nRiver Bankers — Portage compensation sweep  (${numP}P × ${workers} workers × ${numGames} games/condition)`);
+  console.log(`Fair-share win-rate = ${expWin.toFixed(1)}%.  fish line = ${fishLine}, 'late' victim = pos ≥ ${lateCut}.\n`);
+  console.log(pad('Condition', 28) + padL('build%', 8) + padL('winRate', 9) + padL('Δfair', 8) + padL('bldVP', 8) + padL('VPedge', 8) + padL('swp/bld', 9) + padL('comp🐟', 8) + padL('vPos', 7) + padL('late%', 8) + padL('vWin%', 8) + padL('vVP', 7));
+  console.log('-'.repeat(28 + 8 + 9 + 8 + 8 + 8 + 9 + 8 + 7 + 8 + 8 + 7));
+  for (const r of [off, cur, f1, f2, cmp]) {
+    const f = (x, d = 1) => isNaN(x) ? '-' : x.toFixed(d);
+    console.log(
+      pad(r.label, 28) + padL((100 * r.buildRate).toFixed(1), 8) +
+      padL(f(100 * r.winRate), 9) +
+      padL(isNaN(r.winRate) ? '-' : ((100 * r.winRate) - expWin >= 0 ? '+' : '') + ((100 * r.winRate) - expWin).toFixed(1), 8) +
+      padL(f(r.avgVP, 2), 8) +
+      padL(isNaN(r.avgVP) ? '-' : (r.avgVP - r.fieldVP >= 0 ? '+' : '') + (r.avgVP - r.fieldVP).toFixed(2), 8) +
+      padL(f(r.swapsPerBuilder, 2), 9) + padL(f(r.avgComp, 2), 8) +
+      padL(f(r.avgVictimPos), 7) + padL(isNaN(r.latePct) ? '-' : (100 * r.latePct).toFixed(1), 8) +
+      padL(f(100 * r.victimWinRate), 8) + padL(f(r.victimVP, 2), 7));
+  }
+  console.log(`\nDeltas vs no-comp (pre-change):`);
+  const sgn = x => (x >= 0 ? '+' : '') + x.toFixed(1);
+  for (const r of [f1, f2, cmp]) {
+    console.log(`  ${pad(r.label, 28)} bldWin ${sgn(100 * (r.winRate - cur.winRate))} pts` +
+      `   bldVPedge ${((r.avgVP - r.fieldVP) - (cur.avgVP - cur.fieldVP) >= 0 ? '+' : '')}${((r.avgVP - r.fieldVP) - (cur.avgVP - cur.fieldVP)).toFixed(2)}` +
+      `   vWin ${sgn(100 * (r.victimWinRate - cur.victimWinRate))} pts` +
+      `   vVP ${((r.victimVP - cur.victimVP) >= 0 ? '+' : '')}${(r.victimVP - cur.victimVP).toFixed(2)}`);
+  }
+  console.log(`\nLegend:`);
+  console.log(`  swp/bld = opponent-targeted Portage swaps per builder per game (the sim AI`);
+  console.log(`            never self-swaps: swapping two of your own workers is a no-op).`);
+  console.log(`  comp🐟  = avg fish actually refunded to the victim per swap under that mode.`);
+  console.log(`  vPos    = victim's avg fish-track position when hit; late% = share ≥ ${lateCut}.`);
+  console.log(`  vWin%/vVP = win-rate / avg VP of players hit at least once in the game.`);
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
+// Tribute Stone compensation sweep: live flat-3🐟 slide-back vs paying the
+// recalled card's CURRENT per-item cost (see TRIBUTE_COMP at doTributeStone),
+// with a disabled control. Snare Set (the mink mirror) follows the same rule
+// in every condition; its recalls are counted separately in the printout.
+// Run with `cpulimit -l 50 -f -m --`. Usage: node sim.js tribute [numGames] [numP] [workers]
+function sweepTribute(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 3;
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+  const CARD = 'Tribute Stone';
+  const fishLine = simFishLine(numP);
+  const lateCut = fishLine - 15;
+
+  function runOneGame(state) {
+    egPlayOut(state, 'fish', 0, fishLine, 'd');
+  }
+
+  function collect(label, mode, disabled) {
+    TRIBUTE_COMP = mode;
+    if (disabled) { STRUCTURE_EFFECT_DISABLED[CARD] = true; STRUCTURE_EFFECT_DISABLED['Snare Set'] = true; }
+    let builders = 0, builderWins = 0, builderVP = 0;
+    let nonBuilders = 0, nonBuilderVP = 0;
+    let recalls = 0, snareRecalls = 0, compSum = 0, costSum = 0, lateRecalls = 0, victimPosSum = 0;
+    let victims = 0, victimWins = 0, victimVP = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      runOneGame(state);
+      const rc = state.metrics.tributeRecalls;
+      recalls += rc.length;
+      const victimSet = new Set();
+      for (const r of rc) {
+        if (r.src === 'snare') snareRecalls++;
+        compSum += r.comp;
+        costSum += r.cardCost;
+        victimPosSum += r.victimPos;
+        if (r.victimPos >= lateCut) lateRecalls++;
+        victimSet.add(r.victimIdx);
+      }
+      const scored = state.players.map(p => ({ p, vp: totalVP(p, state) }));
+      scored.sort((a, b) => b.vp - a.vp || a.p.timePos - b.p.timePos);
+      const winner = scored[0].p;
+      for (const { p, vp } of scored) {
+        if (p.built.some(s => s.name === CARD)) {
+          builders++; builderVP += vp;
+          if (p === winner) builderWins++;
+        } else { nonBuilders++; nonBuilderVP += vp; }
+        if (victimSet.has(p.idx)) {
+          victims++; victimVP += vp;
+          if (p === winner) victimWins++;
+        }
+      }
+    }
+    delete STRUCTURE_EFFECT_DISABLED[CARD];
+    delete STRUCTURE_EFFECT_DISABLED['Snare Set'];
+    return {
+      label, builders,
+      buildRate: builders / (numGames * numP),
+      winRate: builders ? builderWins / builders : NaN,
+      avgVP: builders ? builderVP / builders : NaN,
+      fieldVP: nonBuilders ? nonBuilderVP / nonBuilders : NaN,
+      recallsPerGame: recalls / numGames,
+      snareShare: recalls ? snareRecalls / recalls : NaN,
+      avgComp: recalls ? compSum / recalls : NaN,
+      avgTargetCost: recalls ? costSum / recalls : NaN,
+      avgVictimPos: recalls ? victimPosSum / recalls : NaN,
+      latePct: recalls ? lateRecalls / recalls : NaN,
+      victimWinRate: victims ? victimWins / victims : NaN,
+      victimVP: victims ? victimVP / victims : NaN,
+    };
+  }
+
+  const t0 = Date.now();
+  Object.keys(STRUCTURE_EFFECT_DISABLED).forEach(k => delete STRUCTURE_EFFECT_DISABLED[k]);
+  process.stderr.write('\rtribute: disabled ...              ');
+  const off = collect('disabled (control)', 3, true);
+  process.stderr.write('\rtribute: flat 3 (live) ...         ');
+  const f3 = collect('flat 3\u{1F41F} (pre-2026-09-19)', 3, false);
+  process.stderr.write('\rtribute: card cost ...             ');
+  const cc = collect('card cost (live rule)', 'cost', false);
+  TRIBUTE_COMP = parseTributeComp(process.env.RB_TRIBUTE_COMP);
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  const expWin = 100 / numP;
+  console.log(`\nRiver Bankers — Tribute Stone compensation sweep  (${numP}P × ${workers} workers × ${numGames} games/condition)`);
+  console.log(`Fair-share win-rate = ${expWin.toFixed(1)}%.  fish line = ${fishLine}, 'late' victim = pos ≥ ${lateCut}.`);
+  console.log(`Snare Set (mink starter) follows the same comp rule; rcl/game counts both, snare% is its share.\n`);
+  console.log(pad('Condition', 24) + padL('build%', 8) + padL('winRate', 9) + padL('Δfair', 8) + padL('VPedge', 8) + padL('rcl/game', 10) + padL('snare%', 8) + padL('tgtCost', 9) + padL('comp🐟', 8) + padL('vPos', 7) + padL('late%', 8) + padL('vWin%', 8) + padL('vVP', 7));
+  console.log('-'.repeat(24 + 8 + 9 + 8 + 8 + 10 + 8 + 9 + 8 + 7 + 8 + 8 + 7));
+  for (const r of [off, f3, cc]) {
+    const f = (x, d = 1) => isNaN(x) ? '-' : x.toFixed(d);
+    console.log(
+      pad(r.label, 24) + padL((100 * r.buildRate).toFixed(1), 8) +
+      padL(f(100 * r.winRate), 9) +
+      padL(isNaN(r.winRate) ? '-' : ((100 * r.winRate) - expWin >= 0 ? '+' : '') + ((100 * r.winRate) - expWin).toFixed(1), 8) +
+      padL(isNaN(r.avgVP) ? '-' : (r.avgVP - r.fieldVP >= 0 ? '+' : '') + (r.avgVP - r.fieldVP).toFixed(2), 8) +
+      padL(f(r.recallsPerGame, 2), 10) + padL(isNaN(r.snareShare) ? '-' : (100 * r.snareShare).toFixed(0), 8) +
+      padL(f(r.avgTargetCost, 2), 9) + padL(f(r.avgComp, 2), 8) +
+      padL(f(r.avgVictimPos), 7) + padL(isNaN(r.latePct) ? '-' : (100 * r.latePct).toFixed(1), 8) +
+      padL(f(100 * r.victimWinRate), 8) + padL(f(r.victimVP, 2), 7));
+  }
+  console.log(`\nDelta (card-cost − flat 3):`);
+  console.log(`  builder win-rate:  ${(100 * (cc.winRate - f3.winRate) >= 0 ? '+' : '')}${(100 * (cc.winRate - f3.winRate)).toFixed(1)} pts`);
+  console.log(`  builder VP edge:   ${((cc.avgVP - cc.fieldVP) - (f3.avgVP - f3.fieldVP) >= 0 ? '+' : '')}${((cc.avgVP - cc.fieldVP) - (f3.avgVP - f3.fieldVP)).toFixed(2)} VP vs field`);
+  console.log(`  victim win-rate:   ${(100 * (cc.victimWinRate - f3.victimWinRate) >= 0 ? '+' : '')}${(100 * (cc.victimWinRate - f3.victimWinRate)).toFixed(1)} pts`);
+  console.log(`  avg compensation:  ${f3.avgComp.toFixed(2)} → ${cc.avgComp.toFixed(2)}🐟 per recall`);
+  console.log(`\nLegend:`);
+  console.log(`  tgtCost = avg per-item cost (slot+2) of the recalled card — what 'cost' mode pays.`);
+  console.log(`  comp🐟  = avg fish actually refunded to the victim under that condition's rule.`);
+  console.log(`  vPos/late%/vWin%/vVP = victim fish-track position at recall / share ≥ ${lateCut} /`);
+  console.log(`  win-rate and avg VP of players recalled at least once (Tribute Stone or Snare Set).`);
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
+// Deck-wide build-rate sweep: for every card in the structure deck, how often
+// is it actually built (builders / player-seats), and how do its builders do
+// (win rate, avg VP)? Answers "is card X built in band with the rest of the
+// deck" — pair with `effect-use` for the usage side. All effects on, live
+// defaults. Run with `cpulimit -l 50 -f -m --` per the sim-ablations rule.
+// Usage: node sim.js build-rate [numGames] [numP] [workers]
+function sweepBuildRate(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 3;
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+  const fishLine = simFishLine(numP);
+
+  const stats = {};
+  for (const t of BASE_STRUCTURE_TEMPLATES) stats[t.name] = { builders: 0, wins: 0, vpSum: 0, vp: t.vp };
+  const t0 = Date.now();
+  for (let g = 0; g < numGames; g++) {
+    if (g % 500 === 0) process.stderr.write(`\rbuild-rate: game ${g}/${numGames} `);
+    const state = newGame(numP, workers);
+    egPlayOut(state, 'fish', 0, fishLine, 'd');
+    const scored = state.players.map(p => ({ p, vp: totalVP(p, state) }));
+    scored.sort((a, b) => b.vp - a.vp || a.p.timePos - b.p.timePos);
+    const winner = scored[0].p;
+    for (const { p, vp } of scored) {
+      for (const name of new Set(p.built.map(s => s.name))) {
+        const s = stats[name];
+        if (!s) continue; // species starters etc. — not deck cards
+        s.builders++; s.vpSum += vp;
+        if (p === winner) s.wins++;
+      }
+    }
+  }
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  const seats = numGames * numP;
+  const rows = Object.entries(stats)
+    .map(([name, s]) => ({
+      name, vp: s.vp, builders: s.builders,
+      rate: s.builders / seats,
+      winRate: s.builders ? s.wins / s.builders : NaN,
+      avgVP: s.builders ? s.vpSum / s.builders : NaN,
+    }))
+    .sort((a, b) => b.rate - a.rate);
+  const rates = rows.map(r => r.rate).sort((a, b) => a - b);
+  const med = rates[Math.floor(rates.length / 2)];
+  const expWin = 100 / numP;
+
+  console.log(`\nRiver Bankers — structure build rates  (${numP}P × ${workers} workers × ${numGames} games)`);
+  console.log(`build% = builders / ${seats} player-seats.  Median build% = ${(100 * med).toFixed(1)}.  Fair-share win = ${expWin.toFixed(1)}%.\n`);
+  console.log(pad('Card', 20) + padL('printVP', 8) + padL('builds', 8) + padL('build%', 8) + padL('xMed', 7) + padL('win%', 7) + padL('Δfair', 8) + padL('avgVP', 8));
+  console.log('-'.repeat(20 + 8 + 8 + 8 + 7 + 7 + 8 + 8));
+  for (const r of rows) {
+    console.log(
+      pad(r.name, 20) + padL(r.vp, 8) + padL(r.builders, 8) +
+      padL((100 * r.rate).toFixed(1), 8) + padL((r.rate / med).toFixed(2), 7) +
+      padL(isNaN(r.winRate) ? '-' : (100 * r.winRate).toFixed(1), 7) +
+      padL(isNaN(r.winRate) ? '-' : ((100 * r.winRate) - expWin >= 0 ? '+' : '') + ((100 * r.winRate) - expWin).toFixed(1), 8) +
+      padL(isNaN(r.avgVP) ? '-' : r.avgVP.toFixed(2), 8));
+  }
   console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
 }
 
@@ -7513,6 +7854,12 @@ if (require.main === module) {
     const cc = BASE_STRUCTURE_TEMPLATES.find(s => s.name === 'Channel Clearer');
     if (cc) cc.vp = parseInt(process.env.RB_CC_VP, 10) || 0;
   }
+  // RB_PORTAGE_VP overrides Portage's printed VP (measurement hook — e.g.
+  // RB_PORTAGE_VP=6 RB_PORTAGE_COMP=0 restores the pre-2026-09-19 card).
+  if (process.env.RB_PORTAGE_VP !== undefined) {
+    const pt = BASE_STRUCTURE_TEMPLATES.find(s => s.name === 'Portage');
+    if (pt) pt.vp = parseInt(process.env.RB_PORTAGE_VP, 10) || 0;
+  }
   // ==========================================================================
   // BASELINE PROFILES — the two calibrated models of real play
   // ==========================================================================
@@ -7588,6 +7935,9 @@ if (require.main === module) {
   else if (mode === 'confluence-matrix') sweepConfluenceMatrix(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'balance') sweepBalance(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'millwheel') sweepMillWheel(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'portage') sweepPortage(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'build-rate') sweepBuildRate(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'tribute') sweepTribute(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'game-length') sweepGameLength(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-winrate') sweepSpeciesWinRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'fairness') sweepFairness(process.argv[3], process.argv[4], process.argv[5]);
