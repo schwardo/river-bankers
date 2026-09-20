@@ -31,7 +31,7 @@ class Material
         9 => ['name' => 'Reed Stand', 'material' => 'reeds', 'icons' => 5],
         10 => ['name' => 'Marsh Edge', 'material' => 'reeds', 'icons' => 7],
         11 => ['name' => 'Cattail Cluster', 'material' => 'reeds', 'icons' => 8, 'effect' => 'When this card reaches shoreline, the player with the most workers moves back 3 spaces on the fish track. Ties: nobody.'],
-        12 => ['name' => 'Mud Wallow', 'material' => 'mud', 'icons' => 4, 'effect' => 'When this card reaches shoreline, the player with the most workers moves back 2 spaces on the fish track. Ties: nobody.'],
+        12 => ['name' => 'Mud Wallow', 'material' => 'mud', 'icons' => 4, 'effect' => 'When this card reaches shoreline, the player with the most workers moves back 2 spaces on the fish track. Ties: everyone tied.'],
         13 => ['name' => 'Mud Flat', 'material' => 'mud', 'icons' => 5],
         14 => ['name' => 'Silt Bank', 'material' => 'mud', 'icons' => 7],
         15 => ['name' => 'Floodplain', 'material' => 'mud', 'icons' => 8],

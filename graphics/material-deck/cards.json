@@ -129,7 +129,7 @@
       "material": "mud",
       "icons": 4,
       "effect_name": "Mud Wallow",
-      "effect_text": "When this card reaches shoreline, the player with the most workers moves back 2 spaces on the fish track. Ties: nobody."
+      "effect_text": "When this card reaches shoreline, the player with the most workers moves back 2 spaces on the fish track. Ties: everyone tied."
     },
     {
       "name": "Mud Flat",

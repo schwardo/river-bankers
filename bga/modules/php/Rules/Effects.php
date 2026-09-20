@@ -241,8 +241,11 @@ final class Effects
     /**
      * Fish-track penalty when a material card reaches the shoreline:
      *   - Hidden Inlet: if exactly one player has workers, back 1 per worker;
-     *   - Mud Wallow / Cattail Cluster: the sole player with the most workers
-     *     moves back 2 / 3 (ties → nobody).
+     *   - Mud Wallow: the player with the most workers moves back 2; on a tie
+     *     EVERY tied leader moves back 2 (friendly ties, [2026-09-20]).
+     *   - Cattail Cluster: the sole player with the most workers moves back 3
+     *     (ties → nobody). 4P-only, where friendly ties would pay ~2 winners
+     *     per card and dissolve the race — see board-games.org tie-rule sweep.
      *
      * @param array<int,int> $workersByPlayer player_id => workers on the card
      * @return array<int,int> player_id => spaces to move back (empty = none)
@@ -261,12 +264,18 @@ final class Effects
             return [];
         }
         if ($cardName === 'Mud Wallow' || $cardName === 'Cattail Cluster') {
+            $friendlyTies = ($cardName === 'Mud Wallow');
+            $spaces = $friendlyTies ? 2 : 3;
             $max = max($withWorkers);
             $leaders = array_keys($withWorkers, $max, true);
-            if (count($leaders) !== 1) {
-                return []; // ties → nobody
+            if (count($leaders) !== 1 && !$friendlyTies) {
+                return []; // ties → nobody (Cattail Cluster)
             }
-            return [$leaders[0] => ($cardName === 'Mud Wallow' ? 2 : 3)];
+            $out = [];
+            foreach ($leaders as $pid) {
+                $out[$pid] = $spaces;
+            }
+            return $out;
         }
         return [];
     }

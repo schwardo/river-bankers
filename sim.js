@@ -1124,10 +1124,12 @@ const SV_WILD_CARD = { material: 'stones', icons: 5, effect: 'wild', wildAlt: 'v
 // the sim baseline includes it. RB_STAGING=off restores the pre-raft deck
 // for measurement.
 let STAGING_MODE = process.env.RB_STAGING || 'credit';
-// Most-workers tie rule (Mud Wallow, Cattail Cluster). 'nobody' (live rule:
-// a tied top spot pays no one) | 'friendly' (RB_TIES=friendly: every tied
-// leader gets the full bonus). `node sim.js ties` sweeps the two.
-let MW_TIES = process.env.RB_TIES || 'nobody';
+// Most-workers tie rule. LIVE RULE as of [2026-09-20] is 'card': each card
+// carries its own clause (Mud Wallow friendlyTies:true pays every tied
+// leader; Cattail Cluster pays nobody). RB_TIES forces one rule across both
+// for measurement — 'nobody' (the pre-2026-09-20 rule) | 'friendly' (all
+// cards friendly). `node sim.js ties` sweeps all three.
+let MW_TIES = process.env.RB_TIES || 'card';
 // First-game "plain river" variant (RB_PLAIN=1, and the `plain` sweep):
 // ignore all material-card effect text EXCEPT the wildcards, and remove
 // Flotsam Raft from the deck. Mirrors the rulebook's first-game default.
@@ -1188,7 +1190,11 @@ const EFFECT_CARDS = [
   // 3+ tier
   { material: 'reeds',  icons: 4, effect: 'solo-bonus',   bonusPerWorker: 1, name: 'Hidden Inlet' },
   { material: 'vines',  icons: 4, effect: 'peek-rearrange', name: 'Vine Curtain' },
-  { material: 'mud',    icons: 4, effect: 'most-workers', flatBonus: 2,     name: 'Mud Wallow' },
+  // friendlyTies [2026-09-20]: Mud Wallow pays EVERY tied leader; Cattail
+  // Cluster (4P-only) still pays nobody on a tie. See board-games.org
+  // "Tie-rule sweep" — at 4P ties are 44% of resolutions, so friendly there
+  // would pay ~2 winners per card and dissolve the race.
+  { material: 'mud',    icons: 4, effect: 'most-workers', flatBonus: 2, friendlyTies: true, name: 'Mud Wallow' },
   // 4+ tier
   { material: 'reeds',  icons: 8, effect: 'most-workers', flatBonus: 3,     name: 'Cattail Cluster' },
   { material: 'clay',   icons: 8, effect: 'slipping-sandbar', name: 'Slipping Sandbar' },
@@ -1723,8 +1729,12 @@ function fireOnShoreline(state, card) {
     const tied = entries.length > 1 && entries[0][1] === entries[1][1];
     if (tied) state.metrics.mwTies += 1;
     const bonus = card.effectSpec.flatBonus || 0;
-    if (tied && MW_TIES === 'friendly') {
-      // Variant (RB_TIES=friendly): every tied leader gets the bonus.
+    // Tie rule is PER CARD (live: Mud Wallow friendly, Cattail Cluster not).
+    // RB_TIES forces one rule across both cards for the sweep's control arms.
+    const friendly = MW_TIES === 'card' ? !!card.effectSpec.friendlyTies
+      : MW_TIES === 'friendly';
+    if (tied && friendly) {
+      // Every tied leader gets the full bonus.
       for (const [idxStr, n] of entries) {
         if (n !== entries[0][1]) break;
         moveBackward(state, parseInt(idxStr), bonus);
@@ -1732,7 +1742,7 @@ function fireOnShoreline(state, card) {
       }
       return;
     }
-    if (tied) return; // live rule: tie → no bonus
+    if (tied) return; // tie → no bonus
     const idx = parseInt(entries[0][0]);
     moveBackward(state, idx, bonus);
     state.metrics.mwAwards.push({ playerIdx: idx, bonus });
@@ -2420,7 +2430,12 @@ function aiDecideBid(state, playerIdx, card, minBid) {
     const oppMax = Math.max(0, ...Object.entries(card.workers)
       .filter(([idx]) => parseInt(idx) !== playerIdx)
       .map(([, n]) => n));
-    const toWin = Math.max(0, oppMax + 1 - myHere);
+    // Under friendly ties (Mud Wallow) MATCHING the leader already pays, so
+    // the target is max, not max+1. RB_TIES forces the rule for sweeps.
+    const friendlyTies = MW_TIES === 'card'
+      ? !!(card.effectSpec && card.effectSpec.friendlyTies)
+      : MW_TIES === 'friendly';
+    const toWin = Math.max(0, oppMax + (friendlyTies ? 0 : 1) - myHere);
     const bonusFish = (card.effectSpec && card.effectSpec.flatBonus) || 0;
     // Extra workers above our base target each cost ~myCost fish; only chase
     // the race when the bonus roughly covers it.
@@ -5704,11 +5719,13 @@ function sweepTies(numGamesArg, numPArg, workersArg) {
   }
 
   const t0 = Date.now();
-  process.stderr.write('\rties: nobody (live rule) ...       ');
-  const off = collect('tie → nobody (live rule)', 'nobody');
-  process.stderr.write('\rties: friendly ...                 ');
-  const fr = collect('tie → all leaders (friendly)', 'friendly');
-  MW_TIES = process.env.RB_TIES || 'nobody';
+  process.stderr.write('\rties: nobody (pre-2026-09-20) ...  ');
+  const off = collect('tie → nobody (old rule)', 'nobody');
+  process.stderr.write('\rties: friendly (both cards) ...    ');
+  const fr = collect('tie → all leaders (both cards)', 'friendly');
+  process.stderr.write('\rties: per-card (live rule) ...     ');
+  const pc = collect('per-card: Wallow friendly (LIVE)', 'card');
+  MW_TIES = process.env.RB_TIES || 'card';
   process.stderr.write('\r' + ' '.repeat(40) + '\r');
 
   const expWin = 100 / numP;
@@ -5716,7 +5733,7 @@ function sweepTies(numGamesArg, numPArg, workersArg) {
   console.log(`Fair-share win-rate = ${expWin.toFixed(1)}%.  'Awardee' = received ≥1 most-workers bonus that game.\n`);
   console.log(pad('Condition', 30) + padL('rslv/g', 8) + padL('tie%', 7) + padL('awd/g', 8) + padL('🐟bk/g', 9) + padL('aWin%', 8) + padL('Δfair', 8) + padL('aVP', 7) + padL('nWin%', 8) + padL('nVP', 7) + padL('jam%', 7) + padL('turns', 8));
   console.log('-'.repeat(30 + 8 + 7 + 8 + 9 + 8 + 8 + 7 + 8 + 7 + 7 + 8));
-  for (const r of [off, fr]) {
+  for (const r of [off, fr, pc]) {
     const f = (x, d = 1) => isNaN(x) ? '-' : x.toFixed(d);
     console.log(
       pad(r.label, 30) + padL(f(r.resolvedPerGame, 2), 8) + padL(f(100 * r.tiePct), 7) +

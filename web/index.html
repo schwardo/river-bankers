@@ -1808,7 +1808,10 @@ const EFFECT_CARDS = [
   // 3+ tier
   { material: 'reeds',  icons: 4, effect: 'solo-bonus',   bonusPerWorker: 1, name: 'Hidden Inlet' },
   { material: 'vines',  icons: 4, effect: 'peek-rearrange', name: 'Vine Curtain' },
-  { material: 'mud',    icons: 4, effect: 'most-workers', flatBonus: 2,     name: 'Mud Wallow' },
+  // friendlyTies [2026-09-20]: Mud Wallow pays EVERY tied leader; Cattail
+  // Cluster (4P-only) still pays nobody on a tie — at 4P ties are 44% of
+  // resolutions, so friendly there would dissolve the race.
+  { material: 'mud',    icons: 4, effect: 'most-workers', flatBonus: 2, friendlyTies: true, name: 'Mud Wallow' },
   // 4+ tier
   { material: 'reeds',  icons: 8, effect: 'most-workers', flatBonus: 3,     name: 'Cattail Cluster' },
   { material: 'clay',   icons: 8, effect: 'slipping-sandbar', name: 'Slipping Sandbar' },
@@ -3339,7 +3342,7 @@ function effectDescription(card) {
     case 'solo-bonus':
       return `If exactly one player has workers on this card when it reaches shoreline, that player moves back 1 space on the fish track per worker.`;
     case 'most-workers':
-      return `When this card reaches shoreline, the player with the most workers moves back ${card.effectSpec.flatBonus} spaces on the fish track. Ties: nobody.`;
+      return `When this card reaches shoreline, the player with the most workers moves back ${card.effectSpec.flatBonus} spaces on the fish track. ${card.effectSpec.friendlyTies ? 'Ties: everyone tied.' : 'Ties: nobody.'}`;
     case 'peek-rearrange':
       return `When you build using workers from this card, peek at the top 2 material cards and rearrange them.`;
     case 'slipping-sandbar':
@@ -4222,14 +4225,22 @@ function fireOnShoreline(card) {
   }
   if (card.effect === 'most-workers') {
     entries.sort((a, b) => b[1] - a[1]);
+    const spaces = spec.flatBonus || 0;
     if (entries.length > 1 && entries[0][1] === entries[1][1]) {
-      log(`🐟 ${spec.name}: most-workers tie — no bonus.`);
+      // Tie rule is per card: Mud Wallow pays every tied leader (friendlyTies),
+      // Cattail Cluster pays nobody.
+      if (!spec.friendlyTies) {
+        log(`🐟 ${spec.name}: most-workers tie — no bonus.`);
+        return;
+      }
+      const leaders = entries.filter(([, n]) => n === entries[0][1]);
+      for (const [idxStr] of leaders) moveBackward(state, parseInt(idxStr), spaces);
+      log(`🐟 ${spec.name}: most-workers tie — all ${leaders.length} tied players move back ${spaces} on the fish track.`);
       return;
     }
     const idx = parseInt(entries[0][0]);
-    const spaces = spec.flatBonus || 0;
     moveBackward(state, idx, spaces);
-    log(`🐟 ${spec.name}: P${idx + 1} most-workers bonus — back ${spaces} on fish track.`);
+    log(`🐟 ${spec.name}: ${speciesLabel(state.players[idx])} most-workers bonus — back ${spaces} on fish track.`);
     return;
   }
 }
@@ -5190,13 +5201,15 @@ function aiDecideBid(playerIdx, card, minBid) {
   if (target > 1) target = Math.max(1, target - aiCostAversionTrim(playerIdx, effCost));
 
   // Most-workers race (Mud Wallow, Cattail Cluster): chase opponent's max+1
-  // when the bonus roughly covers the extra fish.
+  // when the bonus roughly covers the extra fish. Under friendly ties (Mud
+  // Wallow) MATCHING the leader already pays, so the target is max, not max+1.
   if (card.effect === 'most-workers') {
     const myHere = workersOnCard(card, playerIdx);
     const oppMax = Math.max(0, ...Object.entries(card.workers)
       .filter(([idx]) => parseInt(idx) !== playerIdx)
       .map(([, n]) => n));
-    const toWin = Math.max(0, oppMax + 1 - myHere);
+    const friendlyTies = !!(card.effectSpec && card.effectSpec.friendlyTies);
+    const toWin = Math.max(0, oppMax + (friendlyTies ? 0 : 1) - myHere);
     const bonusFish = (card.effectSpec && card.effectSpec.flatBonus) || 0;
     const extra = Math.max(0, toWin - target);
     if (extra > 0 && extra * effCost <= bonusFish + 1
