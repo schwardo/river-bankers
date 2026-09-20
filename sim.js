@@ -2084,7 +2084,7 @@ function findStagingMove(state, playerIdx, needs) {
         : 1;
       const gain = (remNeed[d.material] || 0) - fee * 0.4;
       if (gain <= 0) break;
-      moves.push({ toId: d.id, fee });
+      moves.push({ toId: d.id, fee, destCost: playerCardCost(state, d, playerIdx) });
       score += gain;
       if ((remNeed[d.material] || 0) > 0) remNeed[d.material] -= 1;
       avail -= 1; open -= 1;
@@ -2117,7 +2117,14 @@ function doStagingMove(state, playerIdx, moves) {
     if (src.workers[playerIdx] === 0) delete src.workers[playerIdx];
     if (typeof src.slot === 'number') { src.blanks += 1; noteBlanks(state); }
     dest.workers[playerIdx] = (dest.workers[playerIdx] || 0) + 1;
-    totalFee += mv.fee;
+    if (STAGING_MODE === 'credit') {
+      // Printed rule: slide back this card's current cost, THEN advance the
+      // destination's — the track does the arithmetic (clamps at 0 mid-way).
+      moveBackward(state, playerIdx, cardCost(src));
+      advancePlayer(state, playerIdx, mv.destCost);
+    } else {
+      totalFee += mv.fee;
+    }
     moved += 1;
   }
   if (moved === 0) return false;
