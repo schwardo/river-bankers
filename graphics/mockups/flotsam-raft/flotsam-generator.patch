@@ -1,5 +1,5 @@
 diff --git a/graphics/material-deck/cards.json b/graphics/material-deck/cards.json
-index 16409e5..41b2472 100644
+index 16409e5..49a34a0 100644
 --- a/graphics/material-deck/cards.json
 +++ b/graphics/material-deck/cards.json
 @@ -1,61 +1,202 @@
@@ -246,7 +246,7 @@ index 16409e5..41b2472 100644
 +      "material": "flotsam",
 +      "icons": 6,
 +      "effect_name": "Flotsam Raft",
-+      "effect_text": "No material here. As an action: move workers to open river icons. Each drops a blank: slide back this card's current per-item cost, then advance the destination's."
++      "effect_text": "No material here. As an action: move workers to open river icons (drop a blank). Slide back this card's current per-item cost, then advance the destination's."
 +    }
    ]
 -}
