@@ -6134,7 +6134,19 @@ function sweepBalance(numGamesArg, numPArg, workersArg) {
   process.stderr.write('\rbalance: structure baseline ...');
   const base = collectStruct(null);
   const structRows = [];
-  const names = Array.from(new Set(templates.map(s => s.name)));
+  let names = Array.from(new Set(templates.map(s => s.name)));
+  // RB_ABLATE_ONLY="Portage,Treaty Stone" — measure just these cards against a
+  // full-strength baseline, same knob the `ablation` sweep uses. The standing
+  // practice after a 3k sweep is to re-run the big movers at 15k, because the
+  // auction-heavy cards are Monte-Carlo noisy at 3k (2026-07-23: Treaty Stone
+  // swung -1.03 -> +0.47 at 3k and barely moved at 15k). Targeting turns that
+  // re-check from a ~40 minute job into ~2 minutes.
+  // NOTE: the starter table below always runs in full; add RB_SKIP_STARTERS=1
+  // to skip it when you only want the targeted structure rows.
+  if (process.env.RB_ABLATE_ONLY) {
+    const want = process.env.RB_ABLATE_ONLY.split(',').map(x => x.trim());
+    names = names.filter(n => want.includes(n));
+  }
   for (let i = 0; i < names.length; i++) {
     const name = names[i];
     process.stderr.write(`\rbalance: structure [${i + 1}/${names.length}] ${name.padEnd(20)}`);
@@ -6176,10 +6188,11 @@ function sweepBalance(numGamesArg, numPArg, workersArg) {
     INJECT_STARTER_NAME = null; INJECT_STARTER_PLAYER = -1; DECK_EXCLUDE = null;
     return { winPct: 100 * wins / numGames, avgVP0: vp0 / numGames, fires: fires / numGames };
   }
-  process.stderr.write('\rbalance: starter control ...      ');
-  const sctrl = collectStarter(null);
+  const skipStarters = process.env.RB_SKIP_STARTERS === '1';
+  if (!skipStarters) process.stderr.write('\rbalance: starter control ...      ');
+  const sctrl = skipStarters ? null : collectStarter(null);
   const starterRows = [];
-  for (let i = 0; i < STARTERS.length; i++) {
+  for (let i = 0; !skipStarters && i < STARTERS.length; i++) {
     process.stderr.write(`\rbalance: starter [${i + 1}/${STARTERS.length}] ${STARTERS[i].padEnd(18)}`);
     const r = collectStarter(STARTERS[i]);
     starterRows.push({ name: STARTERS[i], printed: byName[STARTERS[i]] ? byName[STARTERS[i]].vp : 0,
@@ -6203,10 +6216,20 @@ function sweepBalance(numGamesArg, numPArg, workersArg) {
       padL(r.fires === null ? '-' : r.fires.toFixed(2), 11));
   }
   const inBand = structRows.filter(r => Math.abs(r.net) <= 1).length;
-  console.log(`\n${inBand}/${structRows.length} cards within the ±1 net-VP band.`);
+  // Under RB_ABLATE_ONLY the row set is hand-picked (normally BECAUSE those
+  // cards are outliers), so the ratio is not the deck's band membership and
+  // must not be read as one.
+  console.log(process.env.RB_ABLATE_ONLY
+    ? `\n${inBand}/${structRows.length} of the TARGETED cards within the ±1 net-VP band` +
+      ` (targeted subset — not deck-wide band membership).`
+    : `\n${inBand}/${structRows.length} cards within the ±1 net-VP band.`);
 
   // ---- print starter table ----
   const fair = 100 / numP;
+  if (skipStarters) {
+    console.log(`\n(starter table skipped — RB_SKIP_STARTERS=1)`);
+    return;
+  }
   console.log(`\n== Starter cards — effect isolated (each injected free at printed VP 0) ==`);
   console.log(`Control: P0 win% ${sctrl.winPct.toFixed(1)}% (fair ${fair.toFixed(1)}%), P0 avgVP ${sctrl.avgVP0.toFixed(2)}.\n`);
   console.log(pad('Starter', 20) + padL('printed', 9) + padL('effectVP', 10) + padL('Δwin%', 9) + padL('fires/game', 12));
