@@ -937,6 +937,7 @@ function workersOnCard(card, playerIdx) { return card.workers[playerIdx] || 0; }
 // pair scoring passes rawYield (workers never retrieved don't double).
 let OLDGROWTH_SHORE = process.env.RB_OLDGROWTH_SHORE !== '0';
 function cardYieldMultiplier(card) {
+  if (PLAIN_RIVER) return 1;
   if (card.effect !== 'old-growth') return 1;
   if (typeof card.slot === 'number' && card.slot >= 2) return 2;
   if (card.slot === 'shore' && OLDGROWTH_SHORE) return 2;
@@ -963,7 +964,7 @@ function playerWorkersByMaterial(state, playerIdx, opts) {
     // Crowd bonus: the first worker spent per turn is worth crowdCount(c)
     // units, so this player's spendable total is w + (N - 1). Pair scoring
     // (rawYield) is untouched — the bonus exists only at spend time.
-    if (!rawYield && c.effect === 'crowd-bonus' && !CROWD_DISABLED) {
+    if (!rawYield && c.effect === 'crowd-bonus' && !CROWD_DISABLED && !PLAIN_RIVER) {
       units = w + Math.max(0, crowdCount(c) - 1);
     }
     if (c.wildAlt) {
@@ -1123,6 +1124,10 @@ const SV_WILD_CARD = { material: 'stones', icons: 5, effect: 'wild', wildAlt: 'v
 // the sim baseline includes it. RB_STAGING=off restores the pre-raft deck
 // for measurement.
 let STAGING_MODE = process.env.RB_STAGING || 'credit';
+// First-game "plain river" variant (RB_PLAIN=1, and the `plain` sweep):
+// ignore all material-card effect text EXCEPT the wildcards, and remove
+// Flotsam Raft from the deck. Mirrors the rulebook's first-game default.
+let PLAIN_RIVER = process.env.RB_PLAIN === '1';
 let STAGING_ICONS = parseInt(process.env.RB_STAGING_ICONS || '6', 10);
 const STAGING_CARD = { material: 'staging', effect: 'staging', name: 'Flotsam Raft' };
 
@@ -1160,7 +1165,7 @@ function makeCardSpecs(numPlayers) {
     if (numPlayers >= 4) for (const icons of TIER_4PLUS_ICONS) specs.push({ material: m, icons });
   }
   if (svWild) specs.push({ material: 'stones', icons: 5, svWild: true });
-  if (STAGING_MODE !== 'off' && numPlayers >= 3) specs.push({ material: 'staging', icons: STAGING_ICONS, staging: true });
+  if (STAGING_MODE !== 'off' && !PLAIN_RIVER && numPlayers >= 3) specs.push({ material: 'staging', icons: STAGING_ICONS, staging: true });
   if (numPlayers >= 4) for (const p of PREMIUM_4P) specs.push({ material: p.material, icons: p.icons });
   return specs;
 }
@@ -1672,7 +1677,7 @@ function moveCardToShoreline(state, card) {
 //   most-workers  → player with strictly most workers moves backward N spaces;
 //                   ties grant no bonus (Mud Wallow, Cattail Cluster).
 function fireOnShoreline(state, card) {
-  if (!card.effect) return;
+  if (!card.effect || PLAIN_RIVER) return;
   const entries = Object.entries(card.workers).filter(([, n]) => n > 0);
   if (entries.length === 0) return;
   if (card.effect === 'solo-bonus') {
@@ -1696,7 +1701,7 @@ function jamCardDownriver(state, card) {
     const idx = prerivIndexOf(state, card);
     // Slipping Sandbar enters at River 4 instead of River 1 (see design spec
     // in board-games.org, "Material effect-card spec").
-    card.slot = (card.effect === 'slipping-sandbar') ? (RIVER_SLOTS - 1) : 0;
+    card.slot = (card.effect === 'slipping-sandbar' && !PLAIN_RIVER) ? (RIVER_SLOTS - 1) : 0;
     state.riverCards.push(card);
     if (idx !== -1) refillPreriv(state, idx);
     return;
@@ -1959,7 +1964,7 @@ function resolveAuction(state, card, bids, triggerPlayerIdx) {
       // text ("After an auction on this card, slides one slot upstream"). The
       // old `totalBid > 0` gate made an uncontested auction drift it downstream
       // like a normal card, which the card never said.
-      if (card.effect === 'slipping-sandbar' && typeof card.slot === 'number') {
+      if (card.effect === 'slipping-sandbar' && !PLAIN_RIVER && typeof card.slot === 'number') {
         slidesSandbarUpstream(state, card);
       } else {
         jamCardDownriver(state, card);
@@ -2015,7 +2020,7 @@ function resolveAuction(state, card, bids, triggerPlayerIdx) {
     if (totalClinched === 0) state.metrics.zeroClinchAuctions++;
     // Slipping Sandbar: if any workers actually landed on the card this auction,
     // drift upstream instead of the normal downstream jam.
-    if (card.effect === 'slipping-sandbar' && totalClinched > 0 && typeof card.slot === 'number') {
+    if (card.effect === 'slipping-sandbar' && !PLAIN_RIVER && totalClinched > 0 && typeof card.slot === 'number') {
       slidesSandbarUpstream(state, card);
     } else {
       jamCardDownriver(state, card);
@@ -2322,7 +2327,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   let myCost = playerCardCost(state, card, playerIdx);
   // Old Growth at River 3/4: each worker yields 2x material, halving the
   // effective per-item cost in fish-per-material terms.
-  if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) {
+  if (card.effect === 'old-growth' && !PLAIN_RIVER && typeof card.slot === 'number' && card.slot >= 2) {
     myCost = Math.max(1, Math.ceil(myCost / 2));
   }
   // Staging (Flotsam Raft): staged workers pay a ferry fee later and only
@@ -2331,7 +2336,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // Crowd bonus: with company aboard the first spent worker is worth N —
   // treat the effective per-item cost as cheaper (mirrors Old Growth's
   // shape; the AI does not model courting opponents onto the card).
-  if (card.effect === 'crowd-bonus' && !CROWD_DISABLED) {
+  if (card.effect === 'crowd-bonus' && !CROWD_DISABLED && !PLAIN_RIVER) {
     const n = crowdCount(card) + (workersOnCard(card, playerIdx) > 0 ? 0 : 1);
     if (n >= 2) myCost = Math.max(1, Math.ceil(myCost / 2));
   }
@@ -3408,7 +3413,7 @@ function performBuild(state, playerIdx, handIdx) {
     if (have === 0 || need === 0) return { take: 0, yielded: 0 };
     // Crowd bonus: the FIRST worker taken this build yields N (distinct
     // players aboard, spender included, counted before removal); the rest 1.
-    if (c.effect === 'crowd-bonus' && !CROWD_DISABLED) {
+    if (c.effect === 'crowd-bonus' && !CROWD_DISABLED && !PLAIN_RIVER) {
       const N = crowdCount(c);
       let take = 0, yielded = 0, left = have;
       while (left > 0 && yielded < need) {
@@ -3481,7 +3486,7 @@ function performBuild(state, playerIdx, handIdx) {
 
   noteBlanks(state);
   p.supply += workersReturned;
-  if (vineCurtainHit) aiVineCurtainRearrange(state, playerIdx);
+  if (vineCurtainHit && !PLAIN_RIVER) aiVineCurtainRearrange(state, playerIdx);
   // Log Flume: build advances 3 fewer fish, floored at 1.
   // Lodge Foundation (beaver species starter): 1 fewer fish on Logs-using
   // structures, and unlike Log Flume it MAY take a build all the way to 0.
@@ -5310,6 +5315,82 @@ function sweepTribute(numGamesArg, numPArg, workersArg) {
   console.log(`  vPos/late%/vWin%/vVP = victim fish-track position at recall / share ≥ ${lateCut} /`);
   console.log(`  win-rate and avg VP of players recalled at least once (Tribute Stone or Snare Set).`);
   console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
+// Plain-river sweep: the rulebook's first-game default (all material-card
+// effects ignored except wildcards; Flotsam Raft removed from the deck) vs
+// the full live game. Measures pacing and scoring shape so the rulebook's
+// "simpler" claim is backed by numbers. Run with `cpulimit -l 50 -f -m --`.
+// Usage: node sim.js plain [numGames] [numP]
+function sweepPlain(numGamesArg, numPArg) {
+  const numP = parseInt(numPArg) || 3;
+  const workers = defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+  const fishLine = simFishLine(numP);
+
+  function collect(label, plain) {
+    PLAIN_RIVER = plain;
+    let turns = 0, auctions = 0, jam = 0, builds = 0, invents = 0;
+    let vpSum = 0, spreadSum = 0, winVP = 0, lastVP = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      egPlayOut(state, 'fish', 0, fishLine, 'd');
+      turns += state.metrics.turns;
+      auctions += state.metrics.auctions;
+      jam += state.metrics.jamAuctions;
+      builds += state.metrics.cardsBuilt;
+      invents += state.metrics.invents;
+      const vps = state.players.map(p => totalVP(p, state)).sort((a, b) => b - a);
+      vpSum += vps.reduce((a, b) => a + b, 0);
+      winVP += vps[0];
+      lastVP += vps[vps.length - 1];
+      spreadSum += vps[0] - vps[vps.length - 1];
+    }
+    return {
+      label,
+      turns: turns / numGames,
+      auctions: auctions / numGames,
+      jamPct: auctions ? jam / auctions : NaN,
+      buildsPerPlayer: builds / numGames / numP,
+      inventsPerGame: invents / numGames,
+      avgVP: vpSum / numGames / numP,
+      winVP: winVP / numGames,
+      lastVP: lastVP / numGames,
+      spread: spreadSum / numGames,
+    };
+  }
+
+  const t0 = Date.now();
+  process.stderr.write('\rplain: full game ...               ');
+  const full = collect('full game (live effects)', false);
+  process.stderr.write('\rplain: plain river ...             ');
+  const plain = collect('plain river (first-game)', true);
+  PLAIN_RIVER = process.env.RB_PLAIN === '1';
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  console.log(`
+River Bankers — plain-river (first-game default) sweep  (${numP}P × ${workers} workers × ${numGames} games/condition)`);
+  console.log(`Plain: material-card effects ignored except wildcards; Flotsam Raft out of the deck.
+`);
+  console.log(pad('Condition', 28) + padL('turns', 8) + padL('auc/g', 8) + padL('jam%', 7) + padL('build/p', 9) + padL('inv/g', 8) + padL('avgVP', 8) + padL('winVP', 8) + padL('lastVP', 8) + padL('spread', 8));
+  console.log('-'.repeat(28 + 8 + 8 + 7 + 9 + 8 + 8 + 8 + 8 + 8));
+  for (const r of [full, plain]) {
+    console.log(
+      pad(r.label, 28) + padL(r.turns.toFixed(1), 8) + padL(r.auctions.toFixed(1), 8) +
+      padL((100 * r.jamPct).toFixed(1), 7) + padL(r.buildsPerPlayer.toFixed(2), 9) +
+      padL(r.inventsPerGame.toFixed(1), 8) + padL(r.avgVP.toFixed(2), 8) +
+      padL(r.winVP.toFixed(1), 8) + padL(r.lastVP.toFixed(1), 8) + padL(r.spread.toFixed(2), 8));
+  }
+  console.log(`
+Deltas (plain − full): turns ${(plain.turns - full.turns >= 0 ? '+' : '')}${(plain.turns - full.turns).toFixed(1)},` +
+    ` jam ${(100 * (plain.jamPct - full.jamPct) >= 0 ? '+' : '')}${(100 * (plain.jamPct - full.jamPct)).toFixed(1)} pts,` +
+    ` builds/p ${(plain.buildsPerPlayer - full.buildsPerPlayer >= 0 ? '+' : '')}${(plain.buildsPerPlayer - full.buildsPerPlayer).toFixed(2)},` +
+    ` avgVP ${(plain.avgVP - full.avgVP >= 0 ? '+' : '')}${(plain.avgVP - full.avgVP).toFixed(2)},` +
+    ` spread ${(plain.spread - full.spread >= 0 ? '+' : '')}${(plain.spread - full.spread).toFixed(2)}`);
+  console.log(`
+Elapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.
+`);
 }
 
 // Crowd-bonus sweep: vanilla slot (control) vs the same slot carrying the
@@ -8516,6 +8597,7 @@ if (require.main === module) {
   else if (mode === 'oldgrowth') sweepOldGrowth(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'staging') sweepStaging(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'crowd') sweepCrowd(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'plain') sweepPlain(process.argv[3], process.argv[4]);
   else if (mode === 'game-length') sweepGameLength(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-winrate') sweepSpeciesWinRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'fairness') sweepFairness(process.argv[3], process.argv[4], process.argv[5]);
