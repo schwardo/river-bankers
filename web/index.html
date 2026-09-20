@@ -1622,6 +1622,9 @@
     <label title="When on, if a jammed auction ends with no one winning an item, the player who triggered it is guaranteed to claim 1 item as a consolation. Single-card auctions only.">
       <input type="checkbox" id="opt-init-consolation" checked> first-mover advantage (initiator consolation on full jams)
     </label>
+    <label title="The rulebook's first-game default: material-card effect text is ignored (except the wildcards, whose either/or yield is the card) and Flotsam Raft is removed from the deck. Structure cards play unchanged. Simmed: ~30% fewer jams at 3-4P.">
+      <input type="checkbox" id="opt-plain-river"> plain river (first-game mode: ignore material-card effects)
+    </label>
   </div>
   <div class="setup-row">
     <button class="primary" onclick="startGame()">Start</button>
@@ -1877,7 +1880,7 @@ function buildMaterialDeck(numPlayers) {
     }
   }
   if (svWild) pushCard('stones', 5, SV_WILD_CARD);
-  if (numPlayers >= 3) pushCard('staging', 6, STAGING_CARD_SPEC);
+  if (numPlayers >= 3 && !PLAIN_RIVER_ACTIVE) pushCard('staging', 6, STAGING_CARD_SPEC);
   return shuffle(deck);
 }
 
@@ -2258,6 +2261,7 @@ function crowdCount(card) {
 // unaffected: it passes rawYield, so workers never retrieved don't double.
 // R1 / R2 / pre-river → 1x. All other cards always yield 1x.
 function cardYieldMultiplier(card) {
+  if (PLAIN_RIVER_ACTIVE) return 1;
   if (card.effect === 'old-growth' &&
       ((typeof card.slot === 'number' && card.slot >= 2) || card.slot === 'shore')) return 2;
   return 1;
@@ -2369,7 +2373,7 @@ function playerWorkersByMaterial(state, playerIdx, opts) {
     // Basking Rocks: the first worker spent per turn is worth crowdCount(c),
     // so the spendable total is w + (N - 1). Pair scoring (rawYield) is
     // untouched — the bonus exists only at spend time.
-    if (!rawYield && c.effect === 'crowd-bonus') {
+    if (!rawYield && c.effect === 'crowd-bonus' && !PLAIN_RIVER_ACTIVE) {
       units = w + Math.max(0, crowdCount(c) - 1);
     }
     if (c.wildAlt) {
@@ -2716,6 +2720,7 @@ function startGame() {
   DOUBLE_VISION_ACTIVE = document.getElementById('opt-double-vision').checked;
   // Initiator consolation: on a no-one-wins jam, the trigger player claims 1 item.
   INIT_CONSOLATION_ACTIVE = document.getElementById('opt-init-consolation').checked;
+  PLAIN_RIVER_ACTIVE = document.getElementById('opt-plain-river').checked;
   const seats = SPECIES
     .map((sp, i) => ({ sp, role: picks[i], strategy: readAiStrategy(sp.id) }))
     .filter(s => s.role !== 'off');
@@ -3276,8 +3281,11 @@ function renderMatCard(card, opts = {}) {
     ? `<span class="mat-material" style="color:${m.color}">${matIcons} ${matNames}${wildPill}</span>`
     : `<span class="mat-material" style="color:${m.color}">${matIcons} ${matNames}${wildPill} <span class="mat-remaining">(${open}/${card.totalIcons})</span></span>`;
   // Effect rules text printed full-width across the bottom of the card.
+  const plainIgnored = PLAIN_RIVER_ACTIVE && card.effect && card.effect !== 'wild';
   const effectBox = card.effectSpec
-    ? `<div class="mat-effect-box"><b>${card.effectSpec.name}.</b> ${effectDescription(card)}</div>`
+    ? (plainIgnored
+        ? `<div class="mat-effect-box" style="opacity:.55"><b>${card.effectSpec.name}.</b> <i>Effect ignored — plain-river game.</i></div>`
+        : `<div class="mat-effect-box"><b>${card.effectSpec.name}.</b> ${effectDescription(card)}</div>`)
     : '';
   const foot = !isShore && opts.note ? opts.note : '';
   // Background image: material-deck/<Slug>.png (slug matches generate.py).
@@ -4171,7 +4179,7 @@ function moveCardToShoreline(card) {
 //   most-workers  → player with strictly most workers moves backward N spaces;
 //                   ties grant no bonus (Mud Wallow, Cattail Cluster).
 function fireOnShoreline(card) {
-  if (!card.effect) return;
+  if (!card.effect || PLAIN_RIVER_ACTIVE) return;
   const entries = Object.entries(card.workers).filter(([, n]) => n > 0);
   if (entries.length === 0) return;
   const spec = card.effectSpec;
@@ -4216,7 +4224,7 @@ function jamCardDownriver(card) {
     // Slipping Sandbar enters at River 4 instead (see design spec in
     // board-games.org, "Material effect-card spec").
     const idx = prerivIndexOf(card);
-    card.slot = (card.effect === 'slipping-sandbar') ? 3 : 0;
+    card.slot = (card.effect === 'slipping-sandbar' && !PLAIN_RIVER_ACTIVE) ? 3 : 0;
     state.riverCards.push(card);
     if (idx !== -1) refillPreriv(idx);
     log(`💨 ${MATERIALS[card.material].icon} ${card.name} drifts from the Headwaters into River ${card.slot + 1} (${riverSlotCost(card.slot)}🐟/item).`);
@@ -4573,7 +4581,7 @@ function resolveAuction(card, bids, triggerPlayerIdx) {
       const wasOnLastSlot = card.slot === 3;
       // Fires after ANY auction on the card, matching the printed text — the old
       // `totalBid > 0` gate drifted it downstream on an uncontested auction.
-      const sandbarDrift = card.effect === 'slipping-sandbar' && typeof card.slot === 'number';
+      const sandbarDrift = card.effect === 'slipping-sandbar' && !PLAIN_RIVER_ACTIVE && typeof card.slot === 'number';
       if (sandbarDrift) {
         slidesSandbarUpstream(card);
       } else {
@@ -4644,7 +4652,7 @@ function resolveAuction(card, bids, triggerPlayerIdx) {
     const wasOnLastSlot = card.slot === 3;
     // Slipping Sandbar: if any workers landed this auction, drift upstream
     // instead of the normal downstream jam.
-    const sandbarDrift = card.effect === 'slipping-sandbar' && totalTaken > 0 && typeof card.slot === 'number';
+    const sandbarDrift = card.effect === 'slipping-sandbar' && !PLAIN_RIVER_ACTIVE && totalTaken > 0 && typeof card.slot === 'number';
     if (sandbarDrift) {
       slidesSandbarUpstream(card);
     } else {
@@ -4673,6 +4681,9 @@ function resolveAuction(card, bids, triggerPlayerIdx) {
 const COMBINED_AUCTION_PROFILES = { Confluence: { pairing: 'same', trigger: 'min', item: 'min' } };
 const DOUBLE_VISION = { name: 'Double Vision', type: 'Optional Rules', config: { pairing: 'any', trigger: 'max', item: 'max' } };
 let DOUBLE_VISION_ACTIVE = false; // set at setup from the Optional Rules checkbox
+// Plain-river first-game mode [2026-09-20]: material-card effects ignored
+// except wildcards; Flotsam Raft removed from the deck. Set at setup.
+let PLAIN_RIVER_ACTIVE = false;
 let INIT_CONSOLATION_ACTIVE = true; // set at setup: initiator wins 1 on a full jam (rulebook default)
 function combinedConfig() {
   return DOUBLE_VISION_ACTIVE ? DOUBLE_VISION.config : COMBINED_AUCTION_PROFILES.Confluence;
@@ -5113,7 +5124,7 @@ function aiDecideBid(playerIdx, card, minBid) {
   //  - Hidden Inlet solo bonus: if no opponent here, expect +1 fish-track refund
   //    per worker placed → effective cost -1.
   let effCost = cardCost(card);
-  if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) {
+  if (card.effect === 'old-growth' && !PLAIN_RIVER_ACTIVE && typeof card.slot === 'number' && card.slot >= 2) {
     effCost = Math.max(1, Math.ceil(effCost / 2));
   }
   // Staging (Flotsam Raft): the two-step ferry fee usually nets small, but
@@ -5128,7 +5139,7 @@ function aiDecideBid(playerIdx, card, minBid) {
   // Basking Rocks: with company aboard the first spent worker is worth N —
   // treat the effective per-item cost as cheaper (the AI does not model
   // courting opponents onto the card).
-  if (card.effect === 'crowd-bonus') {
+  if (card.effect === 'crowd-bonus' && !PLAIN_RIVER_ACTIVE) {
     const n = crowdCount(card) + (workersOnCard(card, playerIdx) > 0 ? 0 : 1);
     if (n >= 2) effCost = Math.max(1, Math.ceil(effCost / 2));
   }
@@ -7021,7 +7032,7 @@ async function performBuild(playerIdx, handIdx) {
     // Basking Rocks: the FIRST worker taken this build yields crowdCount(c)
     // items (distinct players aboard, spender included, counted before
     // removal); the rest yield 1.
-    if (c.effect === 'crowd-bonus') {
+    if (c.effect === 'crowd-bonus' && !PLAIN_RIVER_ACTIVE) {
       const N = crowdCount(c);
       let take = 0, yielded = 0, left = have;
       while (left > 0 && yielded < need) {
@@ -7095,7 +7106,7 @@ async function performBuild(playerIdx, handIdx) {
   // Vine Curtain (Vines-4 effect card): when a worker is retrieved from it
   // during this build, the building player gets to peek + rearrange the top 2
   // of the material deck. Human gets a modal; AI rearranges greedily.
-  if (vineCurtainHit && !state.coda) {
+  if (vineCurtainHit && !state.coda && !PLAIN_RIVER_ACTIVE) {
     if (p.isHuman) await humanVineCurtainRearrange(playerIdx);
     else aiVineCurtainRearrange(playerIdx);
   }
