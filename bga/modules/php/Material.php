@@ -56,8 +56,8 @@ class Material
     // "Cards not present in the BGA port" section in games/board-games.org.
     public static array $STRUCTURE = [
         0 => ['name' => 'Spillway', 'cost' => ['logs' => 4, 'mud' => 2], 'time' => 0, 'vp' => '6', 'effect' => 'When built: wash one card from River 1 to the shoreline (workers carry along).'],
-        1 => ['name' => 'Hollowed-out Log', 'cost' => ['logs' => 3, 'reeds' => 1], 'time' => 2, 'vp' => '5', 'effect' => 'Once per game (flip card): recall one worker from a river card (no blank).'],
-        2 => ['name' => 'Snag Pile', 'cost' => ['reeds' => 2, 'stones' => 1], 'time' => 2, 'vp' => '3', 'effect' => 'When built: pull a Headwaters card to River 1; run an auction on it at 1🐟/item.'],
+        1 => ['name' => 'Hollowed-out Log', 'cost' => ['logs' => 3, 'reeds' => 1], 'time' => 2, 'vp' => '5', 'effect' => 'Once per game (flip card): recall one of your workers from a river card (no blank).'],
+        2 => ['name' => 'Snag Pile', 'cost' => ['reeds' => 2, 'stones' => 1], 'time' => 2, 'vp' => '3', 'effect' => 'When built: auction a Headwaters card in place at 1🐟/item, free. It then flows to River 1.'],
         3 => ['name' => 'Heron Watch', 'cost' => ['stones' => 4, 'logs' => 2], 'time' => 4, 'vp' => '0', 'effect' => 'End of game: +1 VP per shoreline card on the table (max +6).'],
         4 => ['name' => 'Reed Bed', 'cost' => ['reeds' => 3, 'mud' => 1], 'time' => 2, 'vp' => '4', 'effect' => 'Reed icons cost you 1 less 🐟 per item (min 1).'],
         5 => ['name' => 'Mud Levee', 'cost' => ['mud' => 3, 'stones' => 2], 'time' => 3, 'vp' => '6', 'effect' => 'When built: drop 2 blanks on uncovered icons in the river.'],

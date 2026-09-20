@@ -1903,8 +1903,8 @@ function buildMaterialDeck(numPlayers) {
 //   <material> <icons>" indicator) that's visible whenever the human has Lookout Tree built.
 const STRUCTURE_TEMPLATES = [
   { name: 'Spillway',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built: wash one card from River 1 to the shoreline (workers carry along).' },
-  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'Once per game (flip card): recall one worker from a river card (no blank).' },
-  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built: pull a Headwaters card to River 1; run an auction on it at 1🐟/item.' },
+  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'Once per game (flip card): recall one of your workers from a river card (no blank).' },
+  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built: auction a Headwaters card in place at 1🐟/item, free. It then flows to River 1.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End of game: +1 VP per shoreline card on the table (max +6).' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built: drop 2 blanks on uncovered icons in the river.' },
@@ -3350,7 +3350,7 @@ function effectDescription(card) {
     case 'crowd-bonus':
       return `The first worker you spend from this card each turn is worth 1 item per player with workers on this card.`;
     case 'staging':
-      return `Cannot be spent. Move workers to open river icons as an action (drop a blank), or when it leaves the river: slide back this card's cost, advance the destination's. Workers left aboard at the last call return to your supply; the card is then discarded.`;
+      return `Cannot be spent. Move workers to open river icons as an action (drop a blank), or when it leaves the river: slide back this card's cost, advance the destination's.`;
     case 'old-growth':
       return `If this card is at River 3 or 4 or on the Shoreline, each worker you retrieve yields 2 ${card.material} instead of 1.`;
     default:

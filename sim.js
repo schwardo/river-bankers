@@ -22,8 +22,8 @@ let MAT_KEYS = ORIG_MATERIALS.slice();
 // Disable a single card's effect for ablation via setStructureEffectDisabled.
 const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Spillway',     cost: { logs: 4, mud: 2 },               time: 0, vp: 6, effect: 'When built: wash one card from River 1 to the shoreline (workers carry along).' },
-  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'Once per game (flip card): recall one worker from a river card (no blank).' },
-  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built: pull a Headwaters card to River 1; run an auction on it at 1🐟/item.' },
+  { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'Once per game (flip card): recall one of your workers from a river card (no blank).' },
+  { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built: auction a Headwaters card in place at 1🐟/item, free. It then flows to River 1.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End of game: +1 VP per shoreline card on the table (max +6).' },
   { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built: drop 2 blanks on uncovered icons in the river.' },
@@ -1086,8 +1086,9 @@ function effectiveBuildCost(struct, p, wbm) {
 //   "always"  → in deck for any player count   (2 cards/mat: [5,7] icons)
 //   "3+"      → only included when numPlayers >= 3 (1 card/mat: [4] icons)
 //   "4+"      → only included when numPlayers >= 4 (1 card/mat: [8] icons)
-// Counts: 2P=11, 3P=18, 4P=24 cards. (2P is net -1: the stones-5 and vines-5
-// vanilla cards are merged into a single shared wild-5 — see SV_WILD_CARD.)
+// Counts: 2P=11, 3P=19, 4P=25 cards. (2P is net -1: the stones-5 and vines-5
+// vanilla cards are merged into a single shared wild-5 — see SV_WILD_CARD.
+// 3P/4P each include the material-less Flotsam Raft — see STAGING_CARD.)
 let ALWAYS_ICONS = [5, 7];
 let TIER_3PLUS_ICONS = [4];
 let TIER_4PLUS_ICONS = [8];

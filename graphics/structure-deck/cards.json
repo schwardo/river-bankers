@@ -1,5 +1,5 @@
 {
-  "_comment": "River Bankers structure-deck card data. 48 main-deck cards (excludes species starter cards). Source: sim.js STRUCT_CARDS table. Effect prose uses standardized prefixes: 'End of game:', 'When built:', 'When you build:', 'Once per game (flip card):', 'At 0 on 🐟 track:', 'As an action:'. Cards without a matching prefix (continuous passives, reactive triggers) state the rule plainly. The 🐟 glyph is rendered inline by generate.py.",
+  "_comment": "River Bankers structure-deck card data. 49 main-deck cards (excludes species starter cards). Source: sim.js STRUCT_CARDS table. Effect prose uses standardized prefixes: 'End of game:', 'When built:', 'When you build:', 'Once per game (flip card):', 'At 0 on 🐟 track:', 'As an action:'. Cards without a matching prefix (continuous passives, reactive triggers) state the rule plainly. The 🐟 glyph is rendered inline by generate.py.",
   "materials": {
     "logs":   { "name": "Logs",   "color": "#8b5a2b", "ink": "#5a3a18" },
     "stones": { "name": "Stones", "color": "#6e6e6e", "ink": "#3f3f3f" },
@@ -10,8 +10,8 @@
   },
   "cards": [
     { "name": "Spillway",       "cost": {"logs": 4, "mud": 2},               "time": 0, "vp": 6,  "effect": "When built: wash one card from River 1 to the shoreline (workers carry along)." },
-    { "name": "Hollowed-out Log", "cost": {"logs": 3, "reeds": 1},             "time": 2, "vp": 5,  "effect": "Once per game (flip card): recall one worker from a river card (no blank)." },
-    { "name": "Snag Pile",        "cost": {"reeds": 2, "stones": 1},           "time": 2, "vp": 3,  "effect": "When built: pull a Headwaters card to River 1; run an auction on it at 1🐟/item." },
+    { "name": "Hollowed-out Log", "cost": {"logs": 3, "reeds": 1},             "time": 2, "vp": 5,  "effect": "Once per game (flip card): recall one of your workers from a river card (no blank)." },
+    { "name": "Snag Pile",        "cost": {"reeds": 2, "stones": 1},           "time": 2, "vp": 3,  "effect": "When built: auction a Headwaters card in place at 1🐟/item, free. It then flows to River 1." },
     { "name": "Heron Watch",      "cost": {"stones": 4, "logs": 2},            "time": 4, "vp": 0,  "effect": "End of game: +1 VP per shoreline card on the table (max +6)." },
     { "name": "Reed Bed",         "cost": {"reeds": 3, "mud": 1},              "time": 2, "vp": 4,  "effect": "Reed icons cost you 1 less 🐟 per item (min 1)." },
     { "name": "Mud Levee",        "cost": {"mud": 3, "stones": 2},             "time": 3, "vp": 6,  "effect": "When built: drop 2 blanks on uncovered icons in the river." },
