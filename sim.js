@@ -2739,6 +2739,151 @@ function findCombinedAuctionTargetAny(state, playerIdx, needs, triggerPool) {
   const trig = combinedTriggerCost(state, A, B, combinedConfig(state.players[playerIdx]).trigger);
   return { A, B, score: combined - trig * 0.6 };
 }
+// Late-game conversion bias [2026-09-20].
+//
+// The acquisition target is `needs[m]` = the deficit the AI shops against. The
+// long-standing rule is max-over-hand: needs[m] = the LARGEST deficit in m
+// across every card in hand. That is the right shape early (it keeps every
+// plan alive) but it is precisely backwards late, because the max is set by
+// the card FURTHEST from completion — so an AI holding a nearly-done card and
+// an expensive one shops for the expensive one and finishes neither. The
+// 2026-09-20 web playtest logged the symptom on the friendly seat: 3
+// structures, 0 pairs, "huge worker piles left unconverted" (and the same in
+// the 2026-09-07 game).
+//
+// Past the threshold the AI shops against its CLOSEST card instead — the hand
+// card with the smallest total remaining deficit — which is the cheapest
+// remaining path to an actual build. Only the shopping list changes; the
+// build branch above is already unconditional (it builds whatever is legal),
+// so this adds no new build behaviour, it just stops buying for the wrong card.
+//
+// Threshold: the playtest suggested "as the fish track passes ~60", i.e. two
+// thirds of the 90-fish line; expressed as a fraction so it tracks the
+// per-count line (89/109/119) rather than a magic 60.
+// RB_LATE_CONVERT: fraction of the finish line at which the switch happens
+// (default 0.67); '0' or 'off' restores the pre-2026-09-20 max-over-hand rule
+// for the whole game.
+let LATE_CONVERT = (() => {
+  const v = process.env.RB_LATE_CONVERT;
+  if (v === undefined) return 0.67;
+  if (v === 'off') return 0;
+  const f = parseFloat(v);
+  return isNaN(f) ? 0.67 : f;
+})();
+function setLateConvert(v) { LATE_CONVERT = v; }
+function aiNeeds(state, playerIdx, wbm) {
+  const p = state.players[playerIdx];
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  if (p.hand.length === 0) return needs;
+
+  const deficitOf = (s) => {
+    const d = {};
+    let total = 0;
+    for (const m in s.cost) {
+      const x = Math.max(0, s.cost[m] - (wbm[m] || 0));
+      if (x > 0) { d[m] = x; total += x; }
+    }
+    return { d, total };
+  };
+
+  const late = LATE_CONVERT > 0 && p.timePos >= LATE_CONVERT * SIM_FINISH_LINE;
+  if (late) {
+    // Closest-to-completion: shop for the single cheapest card to finish.
+    let best = null;
+    for (const s of p.hand) {
+      const { d, total } = deficitOf(s);
+      if (total === 0) continue;   // already buildable — the build branch has it
+      if (!best || total < best.total) best = { d, total };
+    }
+    if (best) { for (const m in best.d) needs[m] = best.d[m]; return needs; }
+    // Every card is buildable (or hand is all zero-deficit): fall through to
+    // the max-over-hand shape, which returns all-zero here anyway.
+  }
+  for (const s of p.hand) {
+    const { d } = deficitOf(s);
+    for (const m in d) needs[m] = Math.max(needs[m], d[m]);
+  }
+  return needs;
+}
+
+// Flush as a scored option [2026-09-20].
+//
+// Flush was reachable but only as a FALLBACK, below the `candidates` loop: it
+// fired solely when the AI found no auction/pull/ferry worth taking at all AND
+// no Headwaters card matched its needs. Any river card offering even one
+// needed icon outranked it by construction, so the AI could never spend 5🐟 to
+// trade a bad board for a fresh one — the exact move the human called "the
+// game's hinge" in the 2026-09-20 web playtest, where neither AI flushed in
+// two full games.
+//
+// MEASURED AND REJECTED [2026-09-20] — kept as a toggle so the result is
+// reproducible, but DEFAULT OFF. Scoring Flush against the same need-weighted
+// scale as every other action makes the AI flush far too much and costs real
+// VP, monotonically in how optimistic the draw estimate is (3P, 1500-2000
+// games, seats default/friendly/greedy, thaw on + late-convert on):
+//
+//   estimator                 flush/g   avgVP (default seat / friendly)
+//   fallback (LIVE)              0.63        20.78 / 20.72
+//   score, deck top quartile     1.55        19.93 / 19.91
+//   score, deck top half         1.20        20.26 / 20.01
+//   score, deck mean             0.91        20.54 / 20.61
+//
+// Even the most pessimistic estimator loses to not scoring it at all, and the
+// trend has no interior optimum — less flushing is simply better. 5🐟 plus a
+// turn is a genuinely steep price, and the human's winning flush in the
+// playtest was a rare board state (whole river off-need, deck known-rich in
+// the needed materials), not an average-case play. The fallback gate already
+// fires in roughly that state. The playtest's "neither AI Flushed in two
+// games" is consistent with the live base rate of ~0.6 flushes/game/seat —
+// about 1 expected flush per 3P game table-wide — rather than a missing
+// capability.
+//
+// The estimate below is over the remaining material deck, which is legitimate
+// information: every material card's face is printed in the rulebook and the
+// deck is a closed pool, so a real player can card-count it the same way.
+// RB_AI_FLUSH: 'fallback' (default, live) | 'score' (the rejected candidate).
+let AI_FLUSH = process.env.RB_AI_FLUSH || 'fallback';
+function setAiFlush(v) { AI_FLUSH = v || 'score'; }
+function aiFlushScore(state, playerIdx, needs, triggerPool) {
+  if (state.matDeck.length === 0) return null;
+  if (triggerPool <= 0) return null;
+  if (!state.prerivCards.some(c => c !== null)) return null;
+  // Per-card value of a fresh Headwaters draw, at the Headwaters price of 1🐟
+  // per item (same shape as the preriv scorer above, minus the pull trigger).
+  const scores = [];
+  for (const c of state.matDeck) {
+    const need = c.effect === 'staging'
+      ? Math.max(0, Math.max(...MAT_KEYS.map(m => needs[m])) - 1)
+      : (needs[c.material] || 0);
+    if (need === 0) { scores.push(0); continue; }
+    const got = Math.min(c.totalIcons, triggerPool, need);
+    scores.push(need * got - 1 * got * 0.4);
+  }
+  if (scores.length === 0) return null;
+  scores.sort((a, b) => b - a);
+  const topN = Math.max(1, Math.ceil(scores.length * 0.25));
+  const expBest = scores.slice(0, topN).reduce((s, x) => s + x, 0) / topN;
+  // Flush is a REPLACEMENT, so only the margin over the Headwaters we already
+  // have is new value. Scoring the fresh deal gross (without this term) had
+  // the AI flushing 2.3x/game and losing ~1.3 VP a seat — it was paying 5🐟 to
+  // swap a good upstream for an average one.
+  let curBest = 0;
+  for (const c of state.prerivCards) {
+    if (!c) continue;
+    const need = c.effect === 'staging'
+      ? Math.max(0, Math.max(...MAT_KEYS.map(m => needs[m])) - 1)
+      : (needs[c.material] || 0);
+    if (need === 0) continue;
+    const got = Math.min(uncoveredIcons(c), triggerPool, need);
+    if (got === 0) continue;
+    curBest = Math.max(curBest, need * got - 1 * got * 0.4);
+  }
+  // 5🐟 for the flush itself, weighted like the other fish costs in this
+  // comparison (0.6/fish); the 1🐟 min bid is already inside expBest.
+  return expBest - curBest - 5 * 0.6;
+}
+
 function aiChooseAction(state, playerIdx) {
   const p = state.players[playerIdx];
   const wbm = playerWorkersByMaterial(state, playerIdx);
@@ -2752,14 +2897,7 @@ function aiChooseAction(state, playerIdx) {
     .sort((a, b) => b.vp - a.vp);
   if (buildables.length > 0) return { type: 'build', handIdx: buildables[0].i };
 
-  const needs = {};
-  for (const m of MAT_KEYS) needs[m] = 0;
-  for (const s of p.hand) {
-    for (const m in s.cost) {
-      const deficit = Math.max(0, s.cost[m] - (wbm[m] || 0));
-      needs[m] = Math.max(needs[m], deficit);
-    }
-  }
+  const needs = aiNeeds(state, playerIdx, wbm);
   const totalNeed = MAT_KEYS.reduce((sum, m) => sum + needs[m], 0);
 
   // Effective worker pool for triggering an auction = supply + workers we could
@@ -2837,6 +2975,10 @@ function aiChooseAction(state, playerIdx) {
     if (t && p.timePos + t.moves.reduce((sum, m) => sum + m.fee, 0) < SIM_FINISH_LINE) {
       candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'stagingMove', moves: t.moves }) });
     }
+  }
+  if (AI_FLUSH === 'score') {
+    const fs = aiFlushScore(state, playerIdx, needs, triggerPool);
+    if (fs !== null) candidates.push({ score: fs, needsTrigger: true, make: () => ({ type: 'flush' }) });
   }
   candidates.sort((a, b) => b.score - a.score);
   for (const cand of candidates) {
@@ -3363,6 +3505,55 @@ function aiStartOfTurnAbilities(state, playerIdx) {
 //   fallback — at-cap useful workers, river-side, highest per-item cost first.
 //              These risk delaying a planned build, so callers should only dip
 //              into them when supply is genuinely 0 or to satisfy a min-bid.
+// Supply-0 thaw for no-recall (greedy) seats [2026-09-20].
+//
+// The 2026-09-20 3P web playtest found the no-recall profile's supply-0 state
+// to be a hard LOCK-OUT, not a tendency: greedy refills supply only by
+// building, so whenever it hits 0 workers it cannot bid at all — and a human
+// can COUNT it into those windows and buy uncontested. Measured at baseline
+// (3P, 1500 games, seats default/friendly/greedy): the greedy seat entered
+// 26.2% of the auctions whose material it still needed with a zero pool,
+// against 2.3-2.7% for the other two profiles. That is a ~10x exploitable gap,
+// and it is the mechanism behind the playtest's "1🐟 vine / 3🐟 clay"
+// uncontested windows.
+//
+// The thaw is deliberately the narrowest one that closes the lock-out while
+// keeping the profile's character (greedy still never recalls to *trigger* an
+// auction, and never recalls while it holds any supply at all):
+//   - supply must be exactly 0 — nothing else is available to bid,
+//   - an auction must actually be on the table (excludeCardId is passed only
+//     from aiDecideBid; aiTriggerPool calls with none, so the trigger path
+//     stays frozen), and
+//   - the lot must carry a material this seat's hand still has a deficit in
+//     (wildcards count either face).
+// RB_GREEDY_THAW: 'safe' (default — no-regret recalls only: shoreline and
+// irrelevant-material river workers) | 'full' (also allows dipping into
+// at-cap useful workers) | 'off' (restores the pre-2026-09-20 hard freeze,
+// for before/after measurement).
+let GREEDY_THAW = process.env.RB_GREEDY_THAW || 'safe';
+function setGreedyThaw(v) { GREEDY_THAW = v || 'safe'; }
+function noRecallThawed(state, playerIdx, excludeCardId) {
+  if (GREEDY_THAW === 'off') return false;
+  if (excludeCardId === undefined) return false;   // trigger path stays frozen
+  const p = state.players[playerIdx];
+  if (p.supply !== 0) return false;
+  // The lot may be a river card or a Headwaters card (Pull / Flush auctions).
+  const card = state.riverCards.find(c => c.id === excludeCardId)
+            || state.prerivCards.find(c => c && c.id === excludeCardId);
+  if (!card) return false;
+  // A staged raft worker is an option on a future material, not the material
+  // itself, so a staging lot never justifies breaking the freeze.
+  if (card.effect === 'staging') return false;
+  const mats = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  for (const s of p.hand) {
+    for (const m of mats) {
+      if ((s.cost[m] || 0) > (wbm[m] || 0)) return true;
+    }
+  }
+  return false;
+}
+
 // excludeCardId: the card being auctioned. Pre-auction recall may not pull
 // workers off the lot itself — recalling blanks the icons you uncover, which
 // would shrink the very lot being bid on (and bids are capped by open icons).
@@ -3372,7 +3563,9 @@ function aiRecallBudget(state, playerIdx, excludeCardId) {
   // and bid layers see is supply-only. Returning empty here (rather than blocking
   // at the recall call sites) is what makes the AI *aware* of the constraint
   // instead of merely subject to it.
-  if (pNoRecall(playerIdx)) return { safe: [], fallback: [] };
+  if (pNoRecall(playerIdx) && !noRecallThawed(state, playerIdx, excludeCardId)) {
+    return { safe: [], fallback: [] };
+  }
   const p = state.players[playerIdx];
   const useful = new Set();
   for (const s of p.hand) for (const m in s.cost) useful.add(m);
@@ -3404,6 +3597,10 @@ function aiRecallBudget(state, playerIdx, excludeCardId) {
     const remaining = w - safeRecall;
     if (remaining > 0 && river) fallback.push({ cardId: c.id, count: remaining });
   }
+  // A thawed no-recall seat (see noRecallThawed) gets only the no-regret half
+  // of the budget under the default 'safe' mode — it is unfreezing to answer
+  // one auction, not abandoning the profile's build-plan discipline.
+  if (GREEDY_THAW === 'safe' && pNoRecall(playerIdx)) return { safe, fallback: [] };
   return { safe, fallback };
 }
 

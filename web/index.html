@@ -5410,6 +5410,70 @@ function aiEffectValue(struct, p, state) {
 // =============================================================================
 // AI: TURN DECISIONS
 // =============================================================================
+// Late-game conversion bias [2026-09-20].
+//
+// `needs[m]` is the deficit the AI shops against. The long-standing rule is
+// max-over-hand: needs[m] = the LARGEST deficit in m across every card in
+// hand. That is right early (it keeps every plan alive) but backwards late,
+// because the max is set by the card FURTHEST from completion — so an AI
+// holding a nearly-done card and an expensive one shops for the expensive one
+// and finishes neither. The 2026-09-20 playtest logged the symptom on the
+// friendly seat: 3 structures, 0 pairs, "huge worker piles left unconverted"
+// (and the same in the 2026-09-07 game).
+//
+// Past ~two thirds of the fish line (the playtest's "as the fish track passes
+// ~60"; the line is a flat 90), and for the whole endgame, the AI shops
+// against its CLOSEST card instead — the hand card with the smallest total
+// remaining deficit — which is the cheapest remaining path to an actual
+// build. Only the shopping list changes; the build branch above is already
+// unconditional, so this adds no new build behaviour, it just stops buying
+// for the wrong card.
+//
+// Measured in sim.js (3P, 1500 games, seats default/friendly/greedy):
+// unconverted workers at game end 5.3 -> 4.1 per seat, structures built
+// 4.57 -> 4.93, avg VP 19.65 -> 20.93 on the friendly seat. It also narrows
+// greedy's edge over the other profiles (43.2% -> 37.8% win rate), because
+// the weaker seats gain more from it. Mirrors sim.js aiNeeds
+// (RB_LATE_CONVERT=0.67).
+const LATE_CONVERT_FRAC = 0.67;
+function aiNeeds(playerIdx, wbm) {
+  const p = state.players[playerIdx];
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  if (p.hand.length === 0) return needs;
+
+  const deficitOf = (s) => {
+    const d = {};
+    let total = 0;
+    for (const m in s.cost) {
+      const x = Math.max(0, s.cost[m] - (wbm[m] || 0));
+      if (x > 0) { d[m] = x; total += x; }
+    }
+    return { d, total };
+  };
+
+  // Endgame counts as late regardless of timePos: pawns reset to spaces 1..N
+  // when the endgame starts, so the raw threshold would switch back off at
+  // exactly the point conversion matters most.
+  const late = state.endgame || p.timePos >= LATE_CONVERT_FRAC * fishFinishLine();
+  if (late) {
+    let best = null;
+    for (const s of p.hand) {
+      const { d, total } = deficitOf(s);
+      if (total === 0) continue;   // already buildable — the build branch has it
+      if (!best || total < best.total) best = { d, total };
+    }
+    if (best) { for (const m in best.d) needs[m] = best.d[m]; return needs; }
+    // Every card buildable (or all-zero deficit): fall through — max-over-hand
+    // returns all-zero here anyway.
+  }
+  for (const s of p.hand) {
+    const { d } = deficitOf(s);
+    for (const m in d) needs[m] = Math.max(needs[m], d[m]);
+  }
+  return needs;
+}
+
 function aiChooseAction(playerIdx) {
   const p = state.players[playerIdx];
   const wbm = playerWorkersByMaterial(state, playerIdx);
@@ -5426,15 +5490,9 @@ function aiChooseAction(playerIdx) {
     return { type: 'build', handIdx: buildables[0].i };
   }
 
-  // Compute material needs across hand
-  const needs = {};
-  for (const m of MAT_KEYS) needs[m] = 0;
-  for (const s of p.hand) {
-    for (const m in s.cost) {
-      const deficit = Math.max(0, s.cost[m] - (wbm[m] || 0));
-      needs[m] = Math.max(needs[m], deficit);
-    }
-  }
+  // Compute material needs across hand (late-game: closest card only — see
+  // aiNeeds).
+  const needs = aiNeeds(playerIdx, wbm);
   const totalNeed = MAT_KEYS.reduce((sum, m) => sum + needs[m], 0);
 
   // 2) Score river + pre-river auction candidates jointly. Pick whatever
@@ -6052,6 +6110,51 @@ function aiTryMillWheel(playerIdx) {
 //              river workers, then surplus useful workers (placed > hand-build cap).
 //   fallback — at-cap useful workers, river-side, highest per-item cost first.
 //              Dipped into only when supply is 0 / a min-bid forces it.
+// Supply-0 thaw for the greedy (no-recall) profile [2026-09-20].
+//
+// The 2026-09-20 3P playtest found greedy's supply-0 state to be a hard
+// LOCK-OUT, not a tendency: it refills supply only by building, so at 0
+// workers it cannot bid at all — and a human can COUNT it into those windows
+// and buy uncontested (the playtest's 1🐟 vine and 3🐟 clay). Measured in
+// sim.js at 3P over 1500 games, the greedy seat entered 26.2% of the auctions
+// whose material it still needed with a zero pool, vs 2.3-2.7% for the other
+// profiles.
+//
+// The thaw is the narrowest fix that closes the lock-out while keeping the
+// profile's character — greedy still never recalls to TRIGGER an auction, and
+// never recalls while it holds any supply at all:
+//   - supply must be exactly 0,
+//   - an auction must be on the table (excludeCardId is passed only from
+//     aiDecideBid; the aiTriggerPool path passes none and stays frozen), and
+//   - the lot must carry a material this hand still has a deficit in.
+// Only the no-regret half of the recall budget is unlocked (see the tail of
+// aiRecallBudget). Mirrors sim.js noRecallThawed (RB_GREEDY_THAW=safe).
+//
+// Side benefit, measured via bga-analysis/compare.mjs: this IMPROVES greedy's
+// fit to the six real BGA games. The frozen model under-produced recalls
+// badly — real 5.0/game vs sim 1.1 at 4P (z=2.34, flagged); thawed it reads
+// 5.6 (z=-0.16), and jam/turn error drops at 3P and 4P too.
+function noRecallThawed(playerIdx, excludeCardId) {
+  if (excludeCardId === undefined) return false;   // trigger path stays frozen
+  const p = state.players[playerIdx];
+  if (p.supply !== 0) return false;
+  // The lot may be a river card or a Headwaters card (Pull / Flush auctions).
+  const card = state.riverCards.find(c => c.id === excludeCardId)
+            || state.prerivCards.find(c => c && c.id === excludeCardId);
+  if (!card) return false;
+  // A staged raft worker is an option on a future material, not the material
+  // itself, so a staging lot never justifies breaking the freeze.
+  if (card.effect === 'staging') return false;
+  const mats = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  for (const s of p.hand) {
+    for (const m of mats) {
+      if ((s.cost[m] || 0) > (wbm[m] || 0)) return true;
+    }
+  }
+  return false;
+}
+
 // excludeCardId: the card being auctioned. Pre-auction recall may not pull
 // workers off the lot itself — recalling blanks the icons you uncover, which
 // would shrink the very lot being bid on (and bids are capped by open icons).
@@ -6061,7 +6164,9 @@ function aiRecallBudget(playerIdx, excludeCardId) {
   // bid layers see is supply-only. Returning empty here (rather than blocking at
   // the recall call sites) is what makes the AI *aware* of the constraint rather
   // than merely subject to it. Card-granted recalls are paid abilities and still fire.
-  if (aiNoRecall(playerIdx)) return { safe: [], fallback: [] };
+  if (aiNoRecall(playerIdx) && !noRecallThawed(playerIdx, excludeCardId)) {
+    return { safe: [], fallback: [] };
+  }
   const p = state.players[playerIdx];
   const useful = new Set();
   for (const s of p.hand) for (const m in s.cost) useful.add(m);
@@ -6094,6 +6199,10 @@ function aiRecallBudget(playerIdx, excludeCardId) {
     const remaining = w - safeRecall;
     if (remaining > 0 && river) fallback.push({ cardId: c.id, count: remaining });
   }
+  // A thawed no-recall seat (see noRecallThawed) gets only the no-regret half
+  // of the budget — it is unfreezing to answer one auction, not abandoning the
+  // profile's build-plan discipline. Mirrors sim.js RB_GREEDY_THAW=safe.
+  if (aiNoRecall(playerIdx)) return { safe, fallback: [] };
   return { safe, fallback };
 }
 
