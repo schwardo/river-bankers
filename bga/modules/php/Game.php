@@ -878,6 +878,20 @@ class Game extends \Bga\GameFramework\Table
 
     // --- build ---
 
+
+    /**
+     * Basking Rocks: distinct players with workers on the card — the first
+     * worker spent from it each turn is worth this many items (spender
+     * included; solo = 1 = vanilla). "Each turn" is modeled as per build,
+     * matching sim.js and the web prototype.
+     */
+    public function crowdCount(int $cardId): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT COUNT(DISTINCT `player_id`) FROM `worker` WHERE `card_id` = $cardId AND `workers` > 0"
+        );
+    }
+
     /**
      * A player's worker holdings shaped for Rules\Build::allocate(). Old Growth
      * yields 2 Logs per worker while it sits at River 3 or 4 or on the Shoreline (yield = 2).
@@ -905,6 +919,23 @@ class Game extends \Bga\GameFramework\Table
             // they never enter the holdings view.
             if (($def['material'] ?? '') === 'staging') {
                 continue;
+            }
+            // Basking Rocks (crowd bonus): the first worker spent per turn is
+            // worth N = distinct players aboard. Represent as a spendFirst row
+            // (1 worker, yield N) + the rest at yield 1 — Build::plan merges
+            // pulls by cardId, and its sort consumes the spendFirst row first.
+            if ($def['name'] === 'Basking Rocks') {
+                $n = $this->crowdCount((int) $r['card_id']);
+                $w = (int) $r['workers'];
+                if ($n >= 2) {
+                    $out[] = ['cardId' => (int) $r['card_id'], 'material' => (string) $def['material'],
+                              'wildAlt' => null, 'workers' => 1, 'yield' => $n, 'spendFirst' => true];
+                    if ($w > 1) {
+                        $out[] = ['cardId' => (int) $r['card_id'], 'material' => (string) $def['material'],
+                                  'wildAlt' => null, 'workers' => $w - 1, 'yield' => 1];
+                    }
+                    continue;
+                }
             }
             // Old Growth at River 3/4 (slot >= 3) or on the Shoreline
             // [2026-09-19]: each worker yields 2 Logs. (End-game pair scoring
@@ -1541,6 +1572,23 @@ class Game extends \Bga\GameFramework\Table
             // Flotsam Raft: staged workers count as no material anywhere.
             if (($def['material'] ?? '') === 'staging') {
                 continue;
+            }
+            // Basking Rocks (crowd bonus): the first worker spent per turn is
+            // worth N = distinct players aboard. Represent as a spendFirst row
+            // (1 worker, yield N) + the rest at yield 1 — Build::plan merges
+            // pulls by cardId, and its sort consumes the spendFirst row first.
+            if ($def['name'] === 'Basking Rocks') {
+                $n = $this->crowdCount((int) $r['card_id']);
+                $w = (int) $r['workers'];
+                if ($n >= 2) {
+                    $out[(int) $r['player_id']][] = ['cardId' => (int) $r['card_id'], 'material' => (string) $def['material'],
+                              'wildAlt' => null, 'workers' => 1, 'yield' => $n, 'spendFirst' => true];
+                    if ($w > 1) {
+                        $out[(int) $r['player_id']][] = ['cardId' => (int) $r['card_id'], 'material' => (string) $def['material'],
+                                  'wildAlt' => null, 'workers' => $w - 1, 'yield' => 1];
+                    }
+                    continue;
+                }
             }
             // Old Growth ×2 at River 3/4 or Shoreline [2026-09-19].
             $yield = ($def['name'] === 'Old Growth'

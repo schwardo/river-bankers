@@ -963,7 +963,7 @@ function playerWorkersByMaterial(state, playerIdx, opts) {
     // Crowd bonus: the first worker spent per turn is worth crowdCount(c)
     // units, so this player's spendable total is w + (N - 1). Pair scoring
     // (rawYield) is untouched — the bonus exists only at spend time.
-    if (!rawYield && c.effect === 'crowd-bonus') {
+    if (!rawYield && c.effect === 'crowd-bonus' && !CROWD_DISABLED) {
       units = w + Math.max(0, crowdCount(c) - 1);
     }
     if (c.wildAlt) {
@@ -1126,17 +1126,22 @@ let STAGING_MODE = process.env.RB_STAGING || 'credit';
 let STAGING_ICONS = parseInt(process.env.RB_STAGING_ICONS || '6', 10);
 const STAGING_CARD = { material: 'staging', effect: 'staging', name: 'Flotsam Raft' };
 
-// Crowd-bonus material-card experiment (org backlog idea, Don [2026-09-19]):
-// "the first worker you spend from this card each turn is worth a number of
-// items equal to the number of distinct players with workers on this card."
-// N counts the spender too, so solo = 1 = vanilla; "each turn" is modeled as
-// per BUILD (the sim takes one build action per turn). RB_CROWD attaches the
-// effect to a deck slot, e.g. RB_CROWD=stones-7 (Boulder Field); default off.
+// Crowd bonus — LIVE CARD as of [2026-09-19]: *Basking Rocks* (stones-7,
+// always tier, replaces vanilla Boulder Field). "The first worker you spend
+// from this card each turn is worth 1 item per player with workers on this
+// card." N counts the spender too, so solo = 1 = vanilla; "each turn" is
+// modeled as per BUILD (the sim takes one build action per turn). 15k sweeps
+// at 2/3/4P: per-player minted bonus is count-invariant (0.69/0.70/0.71
+// units/player/game), jams +1 pt, user cohort undistorted.
+// Measurement hooks: RB_CROWD=<material>-<icons> attaches the effect to an
+// additional vanilla slot; the `crowd` sweep disables the live card for its
+// control condition via CROWD_DISABLED.
 let CROWD_SLOT = process.env.RB_CROWD || 'off';
+let CROWD_DISABLED = false;
 // Sweep-only: track spends from this vanilla slot in the control condition,
 // so the crowd sweep's user cohorts compare like-for-like.
 let CROWD_TRACK = null;
-const CROWD_CARD_NAME = 'Gathering Shoal';
+const CROWD_CARD_NAME = 'Basking Rocks';
 function crowdCount(card) {
   let n = 0;
   for (const k in card.workers) if (card.workers[k] > 0) n++;
@@ -1162,13 +1167,15 @@ function makeCardSpecs(numPlayers) {
 
 // =============================================================================
 // MATERIAL CARD EFFECTS (design spec in hobbies board-games.org, River
-// Bankers → "Material effect-card spec"). 8 of the 24 deck slots are
-// effect-bearing, keyed by (material, icons). Vanilla cards have effect = null.
+// Bankers → "Material effect-card spec"). 9 of the 24 per-material deck
+// slots are effect-bearing, keyed by (material, icons); vanilla cards have
+// effect = null. (Flotsam Raft and Bramble Shoal sit outside the grid.)
 // =============================================================================
 const EFFECT_CARDS = [
   // Always tier (2P+)
   { material: 'logs',   icons: 5, effect: 'wild',         wildAlt: 'reeds', name: 'Driftwood Tangle' },
   { material: 'clay',   icons: 7, effect: 'wild',         wildAlt: 'mud',   name: 'Mud Slick' },
+  { material: 'stones', icons: 7, effect: 'crowd-bonus',  name: 'Basking Rocks' }, // [2026-09-19] replaces vanilla Boulder Field
   // 3+ tier
   { material: 'reeds',  icons: 4, effect: 'solo-bonus',   bonusPerWorker: 1, name: 'Hidden Inlet' },
   { material: 'vines',  icons: 4, effect: 'peek-rearrange', name: 'Vine Curtain' },
@@ -2324,7 +2331,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // Crowd bonus: with company aboard the first spent worker is worth N —
   // treat the effective per-item cost as cheaper (mirrors Old Growth's
   // shape; the AI does not model courting opponents onto the card).
-  if (card.effect === 'crowd-bonus') {
+  if (card.effect === 'crowd-bonus' && !CROWD_DISABLED) {
     const n = crowdCount(card) + (workersOnCard(card, playerIdx) > 0 ? 0 : 1);
     if (n >= 2) myCost = Math.max(1, Math.ceil(myCost / 2));
   }
@@ -3401,7 +3408,7 @@ function performBuild(state, playerIdx, handIdx) {
     if (have === 0 || need === 0) return { take: 0, yielded: 0 };
     // Crowd bonus: the FIRST worker taken this build yields N (distinct
     // players aboard, spender included, counted before removal); the rest 1.
-    if (c.effect === 'crowd-bonus') {
+    if (c.effect === 'crowd-bonus' && !CROWD_DISABLED) {
       const N = crowdCount(c);
       let take = 0, yielded = 0, left = have;
       while (left > 0 && yielded < need) {
@@ -5320,7 +5327,14 @@ function sweepCrowd(numGamesArg, numPArg, slotArg) {
   const fishLine = simFishLine(numP);
 
   function collect(label, on) {
-    CROWD_SLOT = on ? slot : 'off';
+    // stones-7 is the LIVE Basking Rocks slot: toggle it via CROWD_DISABLED.
+    // Any other slot is attached experimentally via CROWD_SLOT.
+    if (slot === 'stones-7') {
+      CROWD_DISABLED = !on;
+      CROWD_SLOT = 'off';
+    } else {
+      CROWD_SLOT = on ? slot : 'off';
+    }
     CROWD_TRACK = on ? null : slot;
     let spends = 0, nSum = 0, bonusUnits = 0, jam = 0, auctions = 0, turns = 0;
     let users = 0, userWins = 0, userVP = 0, nonUsers = 0, nonUserWins = 0, nonUserVP = 0;
@@ -5363,6 +5377,7 @@ function sweepCrowd(numGamesArg, numPArg, slotArg) {
   process.stderr.write('\rcrowd: bonus on ...                ');
   const on = collect(`${slot} crowd bonus`, true);
   CROWD_SLOT = process.env.RB_CROWD || 'off';
+  CROWD_DISABLED = false;
   CROWD_TRACK = null;
   process.stderr.write('\r' + ' '.repeat(40) + '\r');
 

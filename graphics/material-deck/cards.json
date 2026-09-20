@@ -1,5 +1,5 @@
 {
-  "_comment": "River Bankers material-deck card data. 24 base cards = 6 materials × 4 icon-count tiers (4/5/7/8), plus Bramble Shoal (the 2P-only shared stones/vines wild-5 that replaces Rocky Shoal + Trailing Vine at 2 players) and Flotsam Raft (the 3P+ material-less 6-icon staging card, added 2026-09-19) = 26 cards. 10 of 26 are effect-bearing. Names mirror MATERIALS.md. Effect prose mirrors web/index.html effectDescription() verbatim.",
+  "_comment": "River Bankers material-deck card data. 24 base cards = 6 materials × 4 icon-count tiers (4/5/7/8), plus Bramble Shoal (the 2P-only shared stones/vines wild-5 that replaces Rocky Shoal + Trailing Vine at 2 players) and Flotsam Raft (the 3P+ material-less 6-icon staging card, added 2026-09-19) = 26 cards. 11 of 26 are effect-bearing; Basking Rocks (stones-7 crowd bonus) replaced vanilla Boulder Field 2026-09-19. Names mirror MATERIALS.md. Effect prose mirrors web/index.html effectDescription() verbatim.",
   "materials": {
     "logs": {
       "name": "Logs",
@@ -80,9 +80,11 @@
       "icons": 5
     },
     {
-      "name": "Boulder Field",
+      "name": "Basking Rocks",
       "material": "stones",
-      "icons": 7
+      "icons": 7,
+      "effect_name": "Basking Rocks",
+      "effect_text": "The first worker you spend from this card each turn is worth 1 item per player with workers on this card."
     },
     {
       "name": "Quarry Bank",

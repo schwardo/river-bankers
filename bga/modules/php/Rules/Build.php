@@ -58,8 +58,12 @@ final class Build
 
         // Pass 1 — spend fixed-material workers on their own material, lower-yield
         // cards first (PHP 8 usort is stable, so equal-yield order is preserved).
+        // Exception: a 'spendFirst' row (Basking Rocks' bonused first worker —
+        // the FIRST worker spent from that card is the one carrying the crowd
+        // multiplier by rule, not by choice) sorts ahead of everything.
         $fixed = array_values(array_filter($holdings, fn(array $h): bool => $h['wildAlt'] === null));
-        usort($fixed, fn(array $a, array $b): int => ($a['yield'] ?? 1) <=> ($b['yield'] ?? 1));
+        $key = fn(array $h): int => ($h['spendFirst'] ?? false) ? -1 : ($h['yield'] ?? 1);
+        usort($fixed, fn(array $a, array $b): int => $key($a) <=> $key($b));
         foreach ($fixed as $h) {
             $m = $h['material'];
             $remaining = $need[$m] ?? 0;

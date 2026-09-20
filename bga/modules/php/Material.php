@@ -25,7 +25,7 @@ class Material
         3 => ['name' => 'Old Growth', 'material' => 'logs', 'icons' => 8, 'effect' => 'If this card is at River 3 or 4 or on the Shoreline, each worker you retrieve yields 2 Logs instead of 1.'],
         4 => ['name' => 'Cairn', 'material' => 'stones', 'icons' => 4],
         5 => ['name' => 'Rocky Shoal', 'material' => 'stones', 'icons' => 5],
-        6 => ['name' => 'Boulder Field', 'material' => 'stones', 'icons' => 7],
+        6 => ['name' => 'Basking Rocks', 'material' => 'stones', 'icons' => 7, 'effect' => 'The first worker you spend from this card each turn is worth 1 item per player with workers on this card.'],
         7 => ['name' => 'Quarry Bank', 'material' => 'stones', 'icons' => 8],
         8 => ['name' => 'Hidden Inlet', 'material' => 'reeds', 'icons' => 4, 'effect' => 'If exactly one player has workers on this card when it reaches shoreline, that player moves back 1 space on the fish track per worker.'],
         9 => ['name' => 'Reed Stand', 'material' => 'reeds', 'icons' => 5],
