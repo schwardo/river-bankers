@@ -1107,7 +1107,8 @@ const SV_WILD_CARD = { material: 'stones', icons: 5, effect: 'wild', wildAlt: 'v
 // FERRY onto any open item icon on a river card. RB_STAGING: 'off' (default) |
 // 'flat1' (ferrying costs 1 fish per worker) | 'dest' (costs the destination
 // card's per-item cost) | 'diff' (costs max(0, dest cost − the staging card's
-// current cost) — you top up only when ferrying somewhere pricier). RB_STAGING_ICONS sets its size (default 6). Enters
+// current cost, floored at 0) | 'credit' (unfloored diff — ferrying downhill
+// REFUNDS the difference; pure-credit farming allowed). RB_STAGING_ICONS sets its size (default 6). Enters
 // the 3P+ tier as a 7th tier-3 card. A departing worker leaves a blank behind,
 // so each icon ferries exactly once; staged workers are spendable as NO
 // material and are worth nothing at end-game scoring (use them or lose them).
@@ -2060,23 +2061,33 @@ function findStagingMove(state, playerIdx, needs) {
   // 'diff' fee credits what the staging slot currently charges — ferry from
   // the deepest (priciest) staging card first; a shoreline source credits 0.
   const srcCredit = Math.max(...sources.map(c => cardCost(c)));
+  // 'credit': the diff is NOT floored — ferrying from a deep staging card to
+  // a cheaper destination REFUNDS the difference (park early, wait for the
+  // raft to drift, farm the credit). Pure-credit ferries onto icons the
+  // player doesn't need are considered too, to model the human exploit.
+  const pureCredit = STAGING_MODE === 'credit';
   const dests = state.riverCards
-    .filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0 && (needs[c.material] || 0) > 0)
-    .sort((a, b) => needs[b.material] - needs[a.material]);
+    .filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0 &&
+      ((needs[c.material] || 0) > 0 ||
+       (pureCredit && playerCardCost(state, c, playerIdx) < srcCredit)))
+    .sort((a, b) => (needs[b.material] || 0) - (needs[a.material] || 0));
   const remNeed = { ...needs };
   const moves = [];
   let score = 0;
   for (const d of dests) {
-    let open = Math.min(uncoveredIcons(d), remNeed[d.material] || 0, avail);
+    const needCap = (remNeed[d.material] || 0) > 0 ? remNeed[d.material] : (pureCredit ? avail : 0);
+    let open = Math.min(uncoveredIcons(d), needCap, avail);
     while (open > 0 && avail > 0) {
       const fee = STAGING_MODE === 'dest' ? playerCardCost(state, d, playerIdx)
         : STAGING_MODE === 'diff' ? Math.max(0, playerCardCost(state, d, playerIdx) - srcCredit)
+        : STAGING_MODE === 'credit' ? playerCardCost(state, d, playerIdx) - srcCredit
         : 1;
-      const gain = remNeed[d.material] - fee * 0.4;
+      const gain = (remNeed[d.material] || 0) - fee * 0.4;
       if (gain <= 0) break;
       moves.push({ toId: d.id, fee });
       score += gain;
-      remNeed[d.material] -= 1; avail -= 1; open -= 1;
+      if ((remNeed[d.material] || 0) > 0) remNeed[d.material] -= 1;
+      avail -= 1; open -= 1;
     }
   }
   if (moves.length === 0) return null;
@@ -2097,7 +2108,7 @@ function doStagingMove(state, playerIdx, moves) {
       // Under 'diff' the fee was planned against the priciest source — take
       // from it first; otherwise take from the fullest.
       const better = !src
-        || (STAGING_MODE === 'diff' ? cardCost(c) > cardCost(src)
+        || (STAGING_MODE === 'diff' || STAGING_MODE === 'credit' ? cardCost(c) > cardCost(src)
                                     : workersOnCard(c, playerIdx) > workersOnCard(src, playerIdx));
       if (better) src = c;
     }
@@ -2110,7 +2121,8 @@ function doStagingMove(state, playerIdx, moves) {
     moved += 1;
   }
   if (moved === 0) return false;
-  advancePlayer(state, playerIdx, totalFee);
+  if (totalFee > 0) advancePlayer(state, playerIdx, totalFee);
+  else if (totalFee < 0) moveBackward(state, playerIdx, -totalFee);
   state.metrics.stagingMoves += moved;
   state.metrics.stagingMovesBy[playerIdx] = (state.metrics.stagingMovesBy[playerIdx] || 0) + moved;
   sweepFullyCoveredRiver(state);
@@ -2180,7 +2192,7 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   }
   // Staging (Flotsam Raft): staged workers pay a ferry fee later and only
   // become material after a second action — tax the effective cost.
-  if (card.effect === 'staging') myCost += (STAGING_MODE === 'dest' ? 3 : STAGING_MODE === 'diff' ? 1 : 1.5);
+  if (card.effect === 'staging') myCost += (STAGING_MODE === 'dest' ? 3 : STAGING_MODE === 'diff' ? 1 : STAGING_MODE === 'credit' ? 0.5 : 1.5);
   // Hidden Inlet solo bonus: if no opponent has workers on this card, expect
   // +1 fish-track refund per worker placed (effective cost -1).
   if (card.effect === 'solo-bonus') {
@@ -5196,6 +5208,8 @@ function sweepStaging(numGamesArg, numPArg, workersArg) {
   const dc = collect('Flotsam Raft, dest-cost fee', 'dest');
   process.stderr.write('\rstaging: cost-diff fee ...         ');
   const df = collect('Flotsam Raft, cost-diff fee', 'diff');
+  process.stderr.write('\rstaging: diff w/ credit ...        ');
+  const cr = collect('Flotsam Raft, diff w/ credit', 'credit');
   STAGING_MODE = process.env.RB_STAGING || 'off';
   process.stderr.write('\r' + ' '.repeat(40) + '\r');
 
@@ -5204,7 +5218,7 @@ function sweepStaging(numGamesArg, numPArg, workersArg) {
   console.log(`Fair-share win-rate = ${expWin.toFixed(1)}%.  'User' = made ≥1 ferry move that game.\n`);
   console.log(pad('Condition', 28) + padL('ferry/g', 9) + padL('strand/g', 10) + padL('users/g', 9) + padL('uWin%', 8) + padL('Δfair', 8) + padL('uVP', 7) + padL('nWin%', 8) + padL('nVP', 7) + padL('jam%', 7) + padL('auc/g', 8) + padL('turns', 8));
   console.log('-'.repeat(28 + 9 + 10 + 9 + 8 + 8 + 7 + 8 + 7 + 7 + 8 + 8));
-  for (const r of [off, f1, dc, df]) {
+  for (const r of [off, f1, dc, df, cr]) {
     const f = (x, d = 1) => isNaN(x) ? '-' : x.toFixed(d);
     console.log(
       pad(r.label, 28) + padL(f(r.ferriesPerGame, 2), 9) + padL(f(r.strandedPerGame, 2), 10) +
