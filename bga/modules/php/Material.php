@@ -21,7 +21,7 @@ class Material
         0 => ['name' => 'Fallen Limb', 'material' => 'logs', 'icons' => 4],
         1 => ['name' => 'Driftwood Tangle', 'material' => 'logs', 'icons' => 5, 'wildAlt' => 'reeds', 'effect' => 'Wild: each claimed icon yields Logs OR Reeds (chosen at build time).'],
         2 => ['name' => 'Logjam', 'material' => 'logs', 'icons' => 7],
-        3 => ['name' => 'Old Growth', 'material' => 'logs', 'icons' => 8, 'effect' => 'If this card is at River 3 or 4, each worker you retrieve yields 2 Logs instead of 1.'],
+        3 => ['name' => 'Old Growth', 'material' => 'logs', 'icons' => 8, 'effect' => 'If this card is at River 3 or 4 or on the Shoreline, each worker you retrieve yields 2 Logs instead of 1.'],
         4 => ['name' => 'Cairn', 'material' => 'stones', 'icons' => 4],
         5 => ['name' => 'Rocky Shoal', 'material' => 'stones', 'icons' => 5],
         6 => ['name' => 'Boulder Field', 'material' => 'stones', 'icons' => 7],

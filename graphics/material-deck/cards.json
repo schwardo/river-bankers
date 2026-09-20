@@ -16,7 +16,7 @@
     { "name": "Logjam",            "material": "logs",   "icons": 7 },
     { "name": "Old Growth",        "material": "logs",   "icons": 8,
       "effect_name": "Old Growth",
-      "effect_text": "If this card is at River 3 or 4, each worker you retrieve yields 2 Logs instead of 1." },
+      "effect_text": "If this card is at River 3 or 4 or on the Shoreline, each worker you retrieve yields 2 Logs instead of 1." },
 
     { "name": "Cairn",             "material": "stones", "icons": 4 },
     { "name": "Rocky Shoal",       "material": "stones", "icons": 5 },

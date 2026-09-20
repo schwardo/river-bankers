@@ -925,11 +925,21 @@ function uncoveredIcons(card) {
   return card.totalIcons - workers - card.blanks;
 }
 function workersOnCard(card, playerIdx) { return card.workers[playerIdx] || 0; }
-// Material yield multiplier per worker on a card. Old Growth yields 2x while
-// at River 3 or River 4 (slots 2 and 3); shoreline / R1 / R2 → 1x. All other
-// cards always yield 1x.
+// Material yield multiplier per worker on a card. Old Growth yields 2x at
+// River 3/4 and on the Shoreline; R1 / R2 / pre-river → 1x. All other cards
+// always yield 1x.
+// LIVE RULE as of [2026-09-19]: the ×2 also applies on the Shoreline,
+// removing the trap where covering Old Growth's last icon retires it and
+// switches its own multiplier off (seen live in BGA table 885194439; the
+// `oldgrowth` sweep showed the trap fired in ~30% of 4P games and left the
+// card's investors 2 pts under fair share). RB_OLDGROWTH_SHORE=0 restores
+// the old rule for measurement. NO impact on end-game scoring either way —
+// pair scoring passes rawYield (workers never retrieved don't double).
+let OLDGROWTH_SHORE = process.env.RB_OLDGROWTH_SHORE !== '0';
 function cardYieldMultiplier(card) {
-  if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) return 2;
+  if (card.effect !== 'old-growth') return 1;
+  if (typeof card.slot === 'number' && card.slot >= 2) return 2;
+  if (card.slot === 'shore' && OLDGROWTH_SHORE) return 2;
   return 1;
 }
 // wbm[m] = vanilla-card material units this player can spend on material m.
@@ -1352,6 +1362,7 @@ function newGame(numPlayers, workersPerPlayer = null) {
       peakBlanks: 0,              // max total blanks across all river/preriv cards at any point
       portageSwaps: [],           // per Portage swap: {victimIdx, cost, victimPos} (victimPos = victim timePos before any compensation)
       tributeRecalls: [],         // per Tribute Stone / Snare Set recall: {victimIdx, cardCost, comp, victimPos}
+      ogTrap: [],                 // per player caught by Old Growth retiring from R3/R4 with their workers aboard: {playerIdx, workers, slot}
     },
   };
 }
@@ -1496,6 +1507,15 @@ function moveCardToShoreline(state, card) {
     // Card exited the river — record the slot it was on (0..3).
     state.metrics.riverExitSlots.push(card.slot);
     state.riverCards = state.riverCards.filter(c => c !== card);
+  }
+  // Old Growth trap tracking: players holding workers when the card leaves a
+  // ×2 slot (River 3/4) lose the multiplier under the live rule.
+  if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) {
+    for (const k in card.workers) {
+      if (card.workers[k] > 0) {
+        state.metrics.ogTrap.push({ playerIdx: parseInt(k), workers: card.workers[k], slot: card.slot });
+      }
+    }
   }
   card.slot = 'shore';
   state.shorelineCards.push(card);
@@ -5005,6 +5025,88 @@ function sweepTribute(numGamesArg, numPArg, workersArg) {
   console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
 }
 
+// Old Growth shoreline sweep: live rule (×2 dies when the card leaves River
+// 3/4, even by retiring to the Shoreline) vs RB_OLDGROWTH_SHORE (×2 persists
+// on the Shoreline). Measures the trap population — players holding workers
+// when Old Growth retires from a ×2 slot — under both rules, plus how often
+// the trap even occurs. Run with `cpulimit -l 50 -f -m --`.
+// Usage: node sim.js oldgrowth [numGames] [numP] [workers]
+function sweepOldGrowth(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 3;
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+  const fishLine = simFishLine(numP);
+
+  function collect(label, shore) {
+    OLDGROWTH_SHORE = shore;
+    let trapGames = 0, trapPlayers = 0, trapWorkers = 0, trapWins = 0, trapVP = 0;
+    let others = 0, otherVP = 0, otherWins = 0;
+    let gamesWithOG = 0, ogSeen = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      egPlayOut(state, 'fish', 0, fishLine, 'd');
+      const trap = state.metrics.ogTrap;
+      const trapIdx = new Set(trap.map(t => t.playerIdx));
+      if (trap.length > 0) trapGames++;
+      const sawOG = state.riverCards.concat(state.shorelineCards, state.prerivCards.filter(Boolean))
+        .some(c => c.effect === 'old-growth');
+      if (sawOG) gamesWithOG++;
+      const scored = state.players.map(p => ({ p, vp: totalVP(p, state) }));
+      scored.sort((a, b) => b.vp - a.vp || a.p.timePos - b.p.timePos);
+      const winner = scored[0].p;
+      for (const t of trap) trapWorkers += t.workers;
+      for (const { p, vp } of scored) {
+        if (trapIdx.has(p.idx)) {
+          trapPlayers++; trapVP += vp;
+          if (p === winner) trapWins++;
+        } else {
+          others++; otherVP += vp;
+          if (p === winner) otherWins++;
+        }
+      }
+      ogSeen += trap.length;
+    }
+    return {
+      label,
+      trapGames, trapRate: trapGames / numGames,
+      trapPlayers, avgTrapWorkers: trapPlayers ? trapWorkers / trapPlayers : NaN,
+      trapWin: trapPlayers ? trapWins / trapPlayers : NaN,
+      trapVP: trapPlayers ? trapVP / trapPlayers : NaN,
+      otherWin: others ? otherWins / others : NaN,
+      otherVP: others ? otherVP / others : NaN,
+    };
+  }
+
+  const t0 = Date.now();
+  process.stderr.write('\roldgrowth: live rule ...           ');
+  const off = collect('x2 dies on Shoreline (pre-9/19)', false);
+  process.stderr.write('\roldgrowth: shoreline x2 ...        ');
+  const on = collect('x2 persists on Shoreline (live)', true);
+  OLDGROWTH_SHORE = process.env.RB_OLDGROWTH_SHORE !== '0';
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  const expWin = 100 / numP;
+  console.log(`\nRiver Bankers — Old Growth shoreline-×2 sweep  (${numP}P × ${workers} workers × ${numGames} games/condition)`);
+  console.log(`Fair-share win-rate = ${expWin.toFixed(1)}%.  "Trapped" = held workers on Old Growth when it retired from River 3/4.\n`);
+  console.log(pad('Condition', 30) + padL('trap/game', 11) + padL('avgWkrs', 9) + padL('trapWin%', 10) + padL('Δfair', 8) + padL('trapVP', 8) + padL('restWin%', 10) + padL('restVP', 8));
+  console.log('-'.repeat(30 + 11 + 9 + 10 + 8 + 10 + 8 + 8));
+  for (const r of [off, on]) {
+    const f = (x, d = 1) => isNaN(x) ? '-' : x.toFixed(d);
+    console.log(
+      pad(r.label, 30) + padL((100 * r.trapRate).toFixed(1) + '%', 11) +
+      padL(f(r.avgTrapWorkers, 2), 9) + padL(f(100 * r.trapWin), 10) +
+      padL(isNaN(r.trapWin) ? '-' : ((100 * r.trapWin) - expWin >= 0 ? '+' : '') + ((100 * r.trapWin) - expWin).toFixed(1), 8) +
+      padL(f(r.trapVP, 2), 8) + padL(f(100 * r.otherWin), 10) + padL(f(r.otherVP, 2), 8));
+  }
+  console.log(`\nDelta (persists − dies): trapped win ${(100 * (on.trapWin - off.trapWin) >= 0 ? '+' : '')}${(100 * (on.trapWin - off.trapWin)).toFixed(1)} pts, trapped VP ${((on.trapVP - off.trapVP) >= 0 ? '+' : '')}${(on.trapVP - off.trapVP).toFixed(2)}`);
+  console.log(`\nLegend: trap/game = share of games where Old Growth retired from R3/R4 with`);
+  console.log(`  someone's workers aboard; avgWkrs = their avg stranded workers. restWin%/`);
+  console.log(`  restVP = everyone else in those same runs. The sim AI does not anticipate`);
+  console.log(`  the trap under either rule, so this measures the rule, not play skill.`);
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
 // Deck-wide build-rate sweep: for every card in the structure deck, how often
 // is it actually built (builders / player-seats), and how do its builders do
 // (win rate, avg VP)? Answers "is card X built in band with the rest of the
@@ -7938,6 +8040,7 @@ if (require.main === module) {
   else if (mode === 'portage') sweepPortage(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'build-rate') sweepBuildRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'tribute') sweepTribute(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'oldgrowth') sweepOldGrowth(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'game-length') sweepGameLength(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-winrate') sweepSpeciesWinRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'fairness') sweepFairness(process.argv[3], process.argv[4], process.argv[5]);

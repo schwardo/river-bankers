@@ -872,7 +872,7 @@ class Game extends \Bga\GameFramework\Table
 
     /**
      * A player's worker holdings shaped for Rules\Build::allocate(). Old Growth
-     * yields 2 Logs per worker while it sits at River 3 or 4 (yield = 2).
+     * yields 2 Logs per worker while it sits at River 3 or 4 or on the Shoreline (yield = 2).
      *
      * @return list<array{cardId:int, material:string, wildAlt:?string, workers:int, yield:int}>
      */
@@ -893,10 +893,13 @@ class Game extends \Bga\GameFramework\Table
             if ($def === null) {
                 continue;
             }
-            // Old Growth at River 3/4 (slot >= 3): each worker yields 2 Logs.
+            // Old Growth at River 3/4 (slot >= 3) or on the Shoreline
+            // [2026-09-19]: each worker yields 2 Logs. (End-game pair scoring
+            // is unaffected — getLeftoverWorkers stays raw, see below.)
             $yield = ($def['name'] === 'Old Growth'
-                && $r['card_location'] === 'river'
-                && (int) $r['card_location_arg'] >= 3) ? 2 : 1;
+                && ($r['card_location'] === 'shoreline'
+                    || ($r['card_location'] === 'river'
+                        && (int) $r['card_location_arg'] >= 3))) ? 2 : 1;
             $out[] = [
                 'cardId' => (int) $r['card_id'],
                 'material' => (string) $def['material'],
@@ -1369,9 +1372,11 @@ class Game extends \Bga\GameFramework\Table
             if ($def === null) {
                 continue;
             }
+            // Old Growth ×2 at River 3/4 or Shoreline [2026-09-19].
             $yield = ($def['name'] === 'Old Growth'
-                && $r['card_location'] === 'river'
-                && (int) $r['card_location_arg'] >= 3) ? 2 : 1;
+                && ($r['card_location'] === 'shoreline'
+                    || ($r['card_location'] === 'river'
+                        && (int) $r['card_location_arg'] >= 3))) ? 2 : 1;
             $out[(int) $r['player_id']][] = [
                 'cardId' => (int) $r['card_id'],
                 'material' => (string) $def['material'],

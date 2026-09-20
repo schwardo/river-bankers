@@ -2219,9 +2219,13 @@ function totalWorkersOf(card, playerIdx) {
 }
 
 // Material yield multiplier per worker on a card. Old Growth yields 2x while
-// at River 3 or River 4 (slots 2 and 3); shoreline / R1 / R2 → 1x.
+// at River 3/4 or on the Shoreline [2026-09-19; was R3/R4 only — retiring the
+// card no longer kills its own multiplier]. End-game pair scoring is
+// unaffected: it passes rawYield, so workers never retrieved don't double.
+// R1 / R2 / pre-river → 1x. All other cards always yield 1x.
 function cardYieldMultiplier(card) {
-  if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) return 2;
+  if (card.effect === 'old-growth' &&
+      ((typeof card.slot === 'number' && card.slot >= 2) || card.slot === 'shore')) return 2;
   return 1;
 }
 
@@ -3264,7 +3268,7 @@ function effectDescription(card) {
     case 'slipping-sandbar':
       return `Enters the river at River 4. After an auction on this card, slides one slot upstream instead of downstream. At River 1, retires to shoreline instead.`;
     case 'old-growth':
-      return `If this card is at River 3 or 4, each worker you retrieve yields 2 ${card.material} instead of 1.`;
+      return `If this card is at River 3 or 4 or on the Shoreline, each worker you retrieve yields 2 ${card.material} instead of 1.`;
     default:
       return '';
   }
