@@ -6215,9 +6215,10 @@ async function humanRaftLastCall(raft) {
       `The raft is leaving the river (from River ${raft.slot + 1}, ${cardCost(raft)}🐟/item). Move workers to open river icons now — slide back ${cardCost(raft)}🐟, then advance the destination's cost. Workers you leave aboard return to your supply.`,
       cands,
       x => {
-        const net = stagingFerryFee(raft, x.card, human.idx);
-        const netTxt = net > 0 ? `pay ${net}🐟` : net < 0 ? `refund ${-net}🐟` : 'free';
-        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open) — ${netTxt}`;
+        const back = cardCost(raft), fwd = playerCardCost(x.card, human.idx);
+        const net = fwd - back;
+        const netTxt = net > 0 ? `pay ${net}🐟` : net < 0 ? `gain ${-net}🐟` : 'even';
+        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open) — back ${back}🐟, forward ${fwd}🐟 (${netTxt})`;
       },
       { declineLabel: 'Done — leave the rest aboard', cancelable: false }
     );
@@ -6691,9 +6692,10 @@ async function humanStagingFerry() {
       `Pick a destination with an open icon. Per worker: slide back the raft's cost (${cardCost(raft)}🐟 at River ${raft.slot + 1}), then advance the destination's. Ferry as many as you like — this is your action for the turn.`,
       cands,
       x => {
-        const net = stagingFerryFee(raft, x.card, human.idx);
-        const netTxt = net > 0 ? `pay ${net}🐟 net` : net < 0 ? `refund ${-net}🐟 net` : 'free net';
-        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open) — ${netTxt}`;
+        const back = cardCost(raft), fwd = playerCardCost(x.card, human.idx);
+        const net = fwd - back;
+        const netTxt = net > 0 ? `pay ${net}🐟` : net < 0 ? `gain ${-net}🐟` : 'even';
+        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open) — back ${back}🐟, forward ${fwd}🐟 (${netTxt})`;
       },
       moved === 0
         ? { cancelLabel: 'Never mind' }
