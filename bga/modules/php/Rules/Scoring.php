@@ -28,7 +28,7 @@ final class Scoring
         'Vine Ladder'    => [4, 12, 'vines'],
         'Vine Trellis'   => [2, PHP_INT_MAX, 'vines'],
         'Stone Causeway' => [2, 8, 'stones'],
-        'Reed Walkway'   => [2, PHP_INT_MAX, 'reeds'],
+        'Reed Walkway'   => [2, 8, 'reeds'],  // capped +8 [2026-09-20], was uncapped
         'Clay Vault'     => [3, 12, 'clay'],
         'Burrow Network' => [3, 9, 'mud'],
     ];
