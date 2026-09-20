@@ -615,7 +615,7 @@
     <li><span class="t">Endgame</span><span class="dots"></span><span class="p">12</span></li>
     <li><span class="t">Material card effects reference</span><span class="dots"></span><span class="p">14</span></li>
     <li><span class="t">Glossary</span><span class="dots"></span><span class="p">15</span></li>
-    <li><span class="t">Quick reference</span><span class="dots"></span><span class="p">16</span></li>
+    <li><span class="t">Quick reference</span><span class="dots"></span><span class="p">17</span></li>
   </ul>
 </div>
 
@@ -624,7 +624,7 @@
   <ul>
     <li><strong>1 large river board</strong> — the Headwaters slots, the four river spaces, and the shoreline</li>
     <li><strong>1 small fish-track board</strong> — the 60-space fish-track loop, with slots for the structure deck and discard pile</li>
-    <li><strong>25 material cards</strong></li>
+    <li><strong>26 material cards</strong></li>
     <li><strong>49 structure cards</strong> — the shared main deck players draw from and build out of</li>
     <li><strong>12 species starter cards</strong> — 3 per species, private to that species (used for the optional asymmetric draft at setup)</li>
     <li><strong>32 worker tokens</strong> (8 per species) in four colors:
@@ -757,7 +757,8 @@
 </p>
 <p>
   <strong>Eight of the 24 base cards carry printed effects</strong> (wildcards, fish-track bonuses,
-  position-gated yield), plus the 2P-only <strong>Bramble Shoal</strong> wildcard.
+  position-gated yield), plus two effect cards outside the per-material grid: the 2P-only
+  <strong>Bramble Shoal</strong> wildcard and the 3P+ material-less <strong>Flotsam Raft</strong>.
   See the material card effects reference (p.&nbsp;14). Effects are gated by tier so
   2P games only see those that work without a crowded board.
 </p>
@@ -1400,10 +1401,11 @@
 <div class="page-break"></div>
 <h2>Material card effects reference</h2>
 <p>
-  Eight of the 24 material cards carry printed effects. Effects are gated by tier so 2P games only
-  see those that work without a crowded board. The remaining 16 cards are plain — they yield one
-  material per claimed icon, no extras. A ninth effect card, <strong>Bramble Shoal</strong>, appears
-  only at 2 players (see below).
+  Eight of the 24 per-material cards carry printed effects. Effects are gated by tier so 2P games
+  only see those that work without a crowded board. The remaining 16 cards are plain — they yield
+  one material per claimed icon, no extras. Two more effect cards sit <em>outside</em> the
+  per-material grid: <strong>Bramble Shoal</strong>, which appears only at 2 players, and
+  <strong>Flotsam Raft</strong>, which joins at 3+ players (both below).
 </p>
 <p>
   Every material is equally available. The deck carries the <strong>same card breakdown for all six
@@ -1414,6 +1416,8 @@
   players. The 5-icon cards are always in as well, except that Stones and Vines carry their separate
   5s — <strong>Rocky Shoal</strong> and <strong>Trailing Vine</strong> — only at 3+ players; at 2
   players those two are replaced by the single shared wildcard <strong>Bramble Shoal</strong>.
+  At 3+ players the deck also carries one extra card outside the six-material grid — the
+  material-less <strong>Flotsam Raft</strong> — which favors no material by design.
   How much a given material is worth to
   you comes only from what the structures in your hand happen to demand.
 </p>
@@ -1481,6 +1485,21 @@
       <p>When this card reaches shoreline, the player with the most workers on it moves back 2 spaces on the fish track. (Ties: nobody.)</p>
     </div>
   </div>
+  <div class="effect-card">
+    <img class="card" src="../graphics/material-deck/out/web/FlotsamRaft.png" alt="">
+    <div>
+      <div class="tier-label">Flotsam · 6 icons</div>
+      <h4>Flotsam Raft</h4>
+      <p>Its icons hold <strong>flotsam, not a material</strong>: workers here cannot be spent on
+      builds and score nothing at game end. Auction and claim its icons as normal. Later,
+      <strong>as your action</strong>, move any number of your workers from this card onto open
+      item icons on river cards; each mover leaves a blank behind, so each flotsam icon ferries
+      exactly once. For each worker moved, <strong>slide back this card's current per-item
+      cost</strong> in 🐟, <strong>then advance the destination card's per-item cost</strong> —
+      ferrying from a deep raft to a cheap card can pay you back. This works even after the raft
+      reaches the shoreline (its cost there is 0, so you pay the destination's full price).</p>
+    </div>
+  </div>
 </div>
 
 <h3>4+ tier (added at 4P only)</h3>
@@ -1506,7 +1525,7 @@
     <div>
       <div class="tier-label">Logs · 8 icons</div>
       <h4>Old Growth</h4>
-      <p>If this card is at River 3 or 4, each worker you retrieve (pick up while paying a Build cost) yields <strong>2 Logs</strong> instead of 1.</p>
+      <p>If this card is at River 3 or 4 <strong>or on the Shoreline</strong>, each worker you retrieve (pick up while paying a Build cost) yields <strong>2 Logs</strong> instead of 1. Retiring the card does not switch the bonus off &mdash; but it never applies at end-game scoring, where leftover workers always count singly.</p>
     </div>
   </div>
 </div>
@@ -1522,6 +1541,7 @@
   <p><strong>Finish line</strong> — 90 fish; crossing it retires you and starts the game's end.</p>
   <p><strong>Fish</strong> — the currency; you spend it by advancing your pawn on the fish track.</p>
   <p><strong>Fish track</strong> — the shared 0–59 loop; it sets turn order and pays for every action.</p>
+  <p><strong>Flotsam</strong> — the material-less icons on Flotsam Raft; workers there can only be ferried onward, never spent.</p>
   <p><strong>Graduate</strong> — when a card leaves the river for the shoreline (all icons claimed, or slid off River&nbsp;4).</p>
   <p><strong>Headwaters</strong> — the three slots above the river where cards wait to be pulled in.</p>
   <p><strong>Icon</strong> — a circle on a material card; a worker covers one to claim its item.</p>

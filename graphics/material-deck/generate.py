@@ -97,7 +97,7 @@ def _load_icon_body(material_key: str) -> str:
 
 
 MATERIAL_GLYPHS = {key: _load_icon_body(key)
-                   for key in ("logs", "stones", "reeds", "mud", "vines", "clay")}
+                   for key in ("logs", "stones", "reeds", "mud", "vines", "clay", "flotsam")}
 
 
 def safe_filename(name: str) -> str:
@@ -109,6 +109,8 @@ def layout_for(n: int):
     """Row-counts for an n-icon card. 4→[4], 5→[3,2], 7→[4,3], 8→[4,4]."""
     if n == 4:
         return [4]
+    if n == 6:
+        return [3, 3]
     if n == 5:
         return [3, 2]
     if n == 7:
@@ -310,6 +312,7 @@ def render_header_block(card, materials):
 # TIER_4PLUS_ICONS in web/index.html — keep the two in sync if the tier
 # split ever changes.
 TIER_BY_ICONS = {4: ("3+", "#c1701c"),  # orange  → 3P+ only
+                 6: ("3+", "#c1701c"),  # MOCK: Flotsam Raft joins at 3P+
                  8: ("4P", "#a52a2a")}  # red     → 4P only
 
 # The two 5-icon "always" vanilla cards on the wildcard-less materials get
