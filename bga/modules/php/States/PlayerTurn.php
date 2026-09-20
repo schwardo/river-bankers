@@ -42,6 +42,10 @@ class PlayerTurn extends GameState
             "abilities" => $this->game->getPlayerAbilities($playerId),
             // You can only trigger an auction with a worker available or recallable.
             "canTriggerAuction" => $this->game->canTriggerAuction($playerId),
+            // Flotsam Raft ferry: available to anyone with workers on the raft
+            // while open destination icons exist (no structure required).
+            "canRaftFerry" => $this->game->playerRaftId($playerId) > 0
+                && count($this->game->raftFerryTargets()) > 0,
         ];
     }
 
@@ -121,6 +125,23 @@ class PlayerTurn extends GameState
             'towline'       => TowLine::class,
             default         => AbilityTarget::class,
         };
+    }
+
+    /**
+     * Flotsam Raft ferry (as an action): move workers from the raft onto open
+     * river icons. Repeat picks happen in the RaftFerry state; backing out with
+     * no moves returns here without spending the turn.
+     *
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actRaftFerry(int $activePlayerId, array $args)
+    {
+        if (!($args['canRaftFerry'] ?? false)) {
+            throw new UserException(clienttranslate('You have no workers on the Flotsam Raft.'));
+        }
+        $this->globals->set('raft_ferry_moved', 0);
+        return RaftFerry::class;
     }
 
     /**

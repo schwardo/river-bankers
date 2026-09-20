@@ -129,6 +129,7 @@ function pngIconPositions(totalIcons, hasEffect) {
     let rows;
     if (totalIcons === 4) rows = [4];
     else if (totalIcons === 5) rows = [3, 2];
+    else if (totalIcons === 6) rows = [3, 3];   // Flotsam Raft — matches generate.py layout_for(6)
     else if (totalIcons === 7) rows = [4, 3];
     else if (totalIcons === 8) rows = [4, 4];
     else return [];
@@ -360,6 +361,10 @@ class PlayerTurn {
         }
         if (a.canRetire) {
             this.bga.statusBar.addActionButton(_('Retire'), () => this.bga.actions.performAction('actRetire'), { color: 'secondary' });
+        }
+        if (a.canRaftFerry) {
+            this.bga.statusBar.addActionButton(_('Flotsam Raft — ferry workers'),
+                () => this.bga.actions.performAction('actRaftFerry'), { color: 'secondary' });
         }
         (a.abilities || []).forEach(ab => {
             const label = ab.name + (ab.cost ? ' (' + ab.cost + '🐟)' : '') + (ab.once ? ' ⚡' : '');
@@ -844,6 +849,36 @@ class Portage {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+class RaftFerry {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive
+            ? _('Flotsam Raft — ferry workers (back ') + args.raftCost + '\u{1F41F}' + _(', then the destination\u2019s cost)')
+            : _('Flotsam Raft ferry\u2026'));
+        if (!isActive) return;
+        this.game.setHint(_('Click a river card with an open icon; repeat for each worker (') + args.aboard + _(' aboard). Done with no moves cancels.'));
+        this.game.markClickable('river', args.targets, id => this.bga.actions.performAction('actFerryTo', { cardId: id }));
+        this.bga.statusBar.addActionButton(args.moved > 0 ? _('Done ferrying') : _('Cancel'),
+            () => this.bga.actions.performAction('actFerryDone'), { color: 'secondary' });
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
+class RaftLastCall {
+    constructor(game, bga) { this.game = game; this.bga = bga; }
+    onEnteringState(args, isActive) {
+        this.bga.statusBar.setTitle(isActive
+            ? _('Flotsam Raft — last call! (back ') + args.raftCost + '\u{1F41F}' + _(', then the destination\u2019s cost)')
+            : _('Flotsam Raft — last call\u2026'));
+        if (!isActive) return;
+        this.game.setHint(_('The raft is leaving the river. Click destinations for your ') + args.aboard + _(' worker(s), or Done — workers left aboard return to your supply.'));
+        this.game.markClickable('river', args.targets, id => this.bga.actions.performAction('actCallFerry', { cardId: id }));
+        this.bga.statusBar.addActionButton(_('Done \u2014 leave the rest aboard'),
+            () => this.bga.actions.performAction('actCallDone'), { color: 'secondary' });
+    }
+    onLeavingState() { this.game.clearClickable(); }
+}
+
 class TradingPost {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -1112,6 +1147,8 @@ export class Game {
         this.bga.states.register('RollingFloat', new RollingFloat(this, bga));
         this.bga.states.register('SalmonRun', new SalmonRun(this, bga));
         this.bga.states.register('Portage', new Portage(this, bga));
+        this.bga.states.register('RaftFerry', new RaftFerry(this, bga));
+        this.bga.states.register('RaftLastCall', new RaftLastCall(this, bga));
         this.bga.states.register('TradingPost', new TradingPost(this, bga));
         this.bga.states.register('Confluence', new Confluence(this, bga));
         this.bga.states.register('MillWheel', new MillWheel(this, bga));

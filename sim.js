@@ -1112,7 +1112,11 @@ const SV_WILD_CARD = { material: 'stones', icons: 5, effect: 'wild', wildAlt: 'v
 // the 3P+ tier as a 7th tier-3 card. A departing worker leaves a blank behind,
 // so each icon ferries exactly once; staged workers are spendable as NO
 // material and are worth nothing at end-game scoring (use them or lose them).
-let STAGING_MODE = process.env.RB_STAGING || 'off';
+// LIVE RULE as of [2026-09-19]: 'credit' (the printed two-step) with the
+// last-call-and-discard departure — the card is in the web and BGA decks, so
+// the sim baseline includes it. RB_STAGING=off restores the pre-raft deck
+// for measurement.
+let STAGING_MODE = process.env.RB_STAGING || 'credit';
 let STAGING_ICONS = parseInt(process.env.RB_STAGING_ICONS || '6', 10);
 const STAGING_CARD = { material: 'staging', effect: 'staging', name: 'Flotsam Raft' };
 

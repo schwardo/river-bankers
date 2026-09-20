@@ -210,6 +210,8 @@ def main():
     # the cell, then let fit() downscale for crisp edges. Slug == material key.
     icons_dir = os.path.join(ROOT, "graphics", "icons")
     icon_entries = [(m, os.path.join(icons_dir, m + ".svg")) for m in MATERIALS]
+    # Flotsam Raft's staging "material" chip uses the flotsam glyph.
+    icon_entries += [("staging", os.path.join(icons_dir, "flotsam.svg"))]
     raster2x = lambda src: rasterize_svg(src, (ICON_CELL[0] * 2, ICON_CELL[1] * 2))
     manifest["sheets"]["icons"] = build_sheet(
         "icons", icon_entries, ICON_CELL, cols=6, loader=raster2x)

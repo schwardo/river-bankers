@@ -257,22 +257,23 @@
 .rb-p-mat-DriftwoodTangle{background-position:-308.0px -110.0px;}
 .rb-p-mat-FallenLimb{background-position:-462.0px -110.0px;}
 .rb-p-mat-Floodplain{background-position:-616.0px -110.0px;}
-.rb-p-mat-HiddenInlet{background-position:0.0px -220.0px;}
-.rb-p-mat-Logjam{background-position:-154.0px -220.0px;}
-.rb-p-mat-MarshEdge{background-position:-308.0px -220.0px;}
-.rb-p-mat-MudFlat{background-position:-462.0px -220.0px;}
-.rb-p-mat-MudSlick{background-position:-616.0px -220.0px;}
-.rb-p-mat-MudWallow{background-position:0.0px -330.0px;}
-.rb-p-mat-OldGrowth{background-position:-154.0px -330.0px;}
-.rb-p-mat-QuarryBank{background-position:-308.0px -330.0px;}
-.rb-p-mat-ReedStand{background-position:-462.0px -330.0px;}
-.rb-p-mat-RockyShoal{background-position:-616.0px -330.0px;}
-.rb-p-mat-SiltBank{background-position:0.0px -440.0px;}
-.rb-p-mat-SlippingSandbar{background-position:-154.0px -440.0px;}
-.rb-p-mat-StranglerKnot{background-position:-308.0px -440.0px;}
-.rb-p-mat-TrailingVine{background-position:-462.0px -440.0px;}
-.rb-p-mat-VineCurtain{background-position:-616.0px -440.0px;}
-.rb-p-mat-VineThicket{background-position:0.0px -550.0px;}
+.rb-p-mat-FlotsamRaft{background-position:0.0px -220.0px;}
+.rb-p-mat-HiddenInlet{background-position:-154.0px -220.0px;}
+.rb-p-mat-Logjam{background-position:-308.0px -220.0px;}
+.rb-p-mat-MarshEdge{background-position:-462.0px -220.0px;}
+.rb-p-mat-MudFlat{background-position:-616.0px -220.0px;}
+.rb-p-mat-MudSlick{background-position:0.0px -330.0px;}
+.rb-p-mat-MudWallow{background-position:-154.0px -330.0px;}
+.rb-p-mat-OldGrowth{background-position:-308.0px -330.0px;}
+.rb-p-mat-QuarryBank{background-position:-462.0px -330.0px;}
+.rb-p-mat-ReedStand{background-position:-616.0px -330.0px;}
+.rb-p-mat-RockyShoal{background-position:0.0px -440.0px;}
+.rb-p-mat-SiltBank{background-position:-154.0px -440.0px;}
+.rb-p-mat-SlippingSandbar{background-position:-308.0px -440.0px;}
+.rb-p-mat-StranglerKnot{background-position:-462.0px -440.0px;}
+.rb-p-mat-TrailingVine{background-position:-616.0px -440.0px;}
+.rb-p-mat-VineCurtain{background-position:0.0px -550.0px;}
+.rb-p-mat-VineThicket{background-position:-154.0px -550.0px;}
 .rb-art-str{background-image:url('img/cards-structure.png');background-size:880.0px 1078.0px;width:110.0px;height:154.0px;}
 .rb-p-str-_back{background-position:0.0px 0.0px;}
 .rb-p-str-BurrowNetwork{background-position:-110.0px 0.0px;}
@@ -361,13 +362,14 @@
 .rb-p-wchit-muskrat-back{background-position:-74.0px -37.0px;}
 .rb-p-wchit-otter-back{background-position:-111.0px -37.0px;}
 .rb-p-wchit-blank{background-position:0.0px -74.0px;}
-.rb-art-icon{background-image:url('img/icons.png');background-size:144.0px 24.0px;width:24.0px;height:24.0px;}
+.rb-art-icon{background-image:url('img/icons.png');background-size:144.0px 48.0px;width:24.0px;height:24.0px;}
 .rb-p-icon-logs{background-position:0.0px 0.0px;}
 .rb-p-icon-stones{background-position:-24.0px 0.0px;}
 .rb-p-icon-reeds{background-position:-48.0px 0.0px;}
 .rb-p-icon-mud{background-position:-72.0px 0.0px;}
 .rb-p-icon-vines{background-position:-96.0px 0.0px;}
 .rb-p-icon-clay{background-position:-120.0px 0.0px;}
+.rb-p-icon-staging{background-position:0.0px -24.0px;}
 /* === END GENERATED SPRITES === */
 
 /* End-of-game "Final scores" dialog + Salt Lick "Opponents' hands" dialog.

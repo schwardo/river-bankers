@@ -28,6 +28,12 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
 
     function onEnteringState()
     {
+        // Flotsam Raft last call: if the raft left the river during the action
+        // that just resolved, run the final ferry window before anything else
+        // (drift, retirement, and the next turn wait until it is settled).
+        if ((int) $this->globals->get('pending_raft_call', 0) > 0) {
+            return RaftLastCall::class;
+        }
         // Deck-empty drift: the player whose turn just ended drifts +1 fish once
         // the material deck is exhausted, so the endgame can't grind on forever.
         $turnPlayer = (int) $this->globals->get('turn_player', 0);

@@ -81,115 +81,122 @@
           "y": 250
         },
         {
-          "slug": "HiddenInlet",
+          "slug": "FlotsamRaft",
           "col": 0,
           "row": 2,
           "x": 0,
+          "y": 500
+        },
+        {
+          "slug": "HiddenInlet",
+          "col": 1,
+          "row": 2,
+          "x": 350,
           "y": 500
         },
         {
           "slug": "Logjam",
-          "col": 1,
+          "col": 2,
           "row": 2,
-          "x": 350,
+          "x": 700,
           "y": 500
         },
         {
           "slug": "MarshEdge",
-          "col": 2,
+          "col": 3,
           "row": 2,
-          "x": 700,
+          "x": 1050,
           "y": 500
         },
         {
           "slug": "MudFlat",
-          "col": 3,
+          "col": 4,
           "row": 2,
-          "x": 1050,
+          "x": 1400,
           "y": 500
         },
         {
           "slug": "MudSlick",
-          "col": 4,
-          "row": 2,
-          "x": 1400,
-          "y": 500
-        },
-        {
-          "slug": "MudWallow",
           "col": 0,
           "row": 3,
           "x": 0,
+          "y": 750
+        },
+        {
+          "slug": "MudWallow",
+          "col": 1,
+          "row": 3,
+          "x": 350,
           "y": 750
         },
         {
           "slug": "OldGrowth",
-          "col": 1,
+          "col": 2,
           "row": 3,
-          "x": 350,
+          "x": 700,
           "y": 750
         },
         {
           "slug": "QuarryBank",
-          "col": 2,
-          "row": 3,
-          "x": 700,
-          "y": 750
-        },
-        {
-          "slug": "ReedStand",
           "col": 3,
           "row": 3,
           "x": 1050,
           "y": 750
         },
         {
-          "slug": "RockyShoal",
+          "slug": "ReedStand",
           "col": 4,
           "row": 3,
           "x": 1400,
           "y": 750
         },
         {
-          "slug": "SiltBank",
+          "slug": "RockyShoal",
           "col": 0,
           "row": 4,
           "x": 0,
           "y": 1000
         },
         {
-          "slug": "SlippingSandbar",
+          "slug": "SiltBank",
           "col": 1,
           "row": 4,
           "x": 350,
           "y": 1000
         },
         {
-          "slug": "StranglerKnot",
+          "slug": "SlippingSandbar",
           "col": 2,
           "row": 4,
           "x": 700,
           "y": 1000
         },
         {
-          "slug": "TrailingVine",
+          "slug": "StranglerKnot",
           "col": 3,
           "row": 4,
           "x": 1050,
           "y": 1000
         },
         {
-          "slug": "VineCurtain",
+          "slug": "TrailingVine",
           "col": 4,
           "row": 4,
           "x": 1400,
           "y": 1000
         },
         {
-          "slug": "VineThicket",
+          "slug": "VineCurtain",
           "col": 0,
           "row": 5,
           "x": 0,
+          "y": 1250
+        },
+        {
+          "slug": "VineThicket",
+          "col": 1,
+          "row": 5,
+          "x": 350,
           "y": 1250
         }
       ]
@@ -759,7 +766,7 @@
         96
       ],
       "cols": 6,
-      "rows": 1,
+      "rows": 2,
       "items": [
         {
           "slug": "logs",
@@ -802,6 +809,13 @@
           "row": 0,
           "x": 480,
           "y": 0
+        },
+        {
+          "slug": "staging",
+          "col": 0,
+          "row": 1,
+          "x": 0,
+          "y": 96
         }
       ]
     }
