@@ -1102,6 +1102,19 @@ function setDeckTuning({ always, tier3, tier4, premium }) {
 // stay, the wild is absent. See board-games.org "SV-wild deck variant".
 const SV_WILD_CARD = { material: 'stones', icons: 5, effect: 'wild', wildAlt: 'vines', name: 'Bramble Shoal' };
 
+// Staging-card experiment (org TODO "Sim a worker-relocation material card"):
+// 'Flotsam Raft' — its icons hold no material; a worker placed there can later
+// FERRY onto any open item icon on a river card. RB_STAGING: 'off' (default) |
+// 'flat1' (ferrying costs 1 fish per worker) | 'dest' (costs the destination
+// card's per-item cost) | 'diff' (costs max(0, dest cost − the staging card's
+// current cost) — you top up only when ferrying somewhere pricier). RB_STAGING_ICONS sets its size (default 6). Enters
+// the 3P+ tier as a 7th tier-3 card. A departing worker leaves a blank behind,
+// so each icon ferries exactly once; staged workers are spendable as NO
+// material and are worth nothing at end-game scoring (use them or lose them).
+let STAGING_MODE = process.env.RB_STAGING || 'off';
+let STAGING_ICONS = parseInt(process.env.RB_STAGING_ICONS || '6', 10);
+const STAGING_CARD = { material: 'staging', effect: 'staging', name: 'Flotsam Raft' };
+
 function makeCardSpecs(numPlayers) {
   const specs = [];
   const svWild = numPlayers < 3;
@@ -1114,6 +1127,7 @@ function makeCardSpecs(numPlayers) {
     if (numPlayers >= 4) for (const icons of TIER_4PLUS_ICONS) specs.push({ material: m, icons });
   }
   if (svWild) specs.push({ material: 'stones', icons: 5, svWild: true });
+  if (STAGING_MODE !== 'off' && numPlayers >= 3) specs.push({ material: 'staging', icons: STAGING_ICONS, staging: true });
   if (numPlayers >= 4) for (const p of PREMIUM_4P) specs.push({ material: p.material, icons: p.icons });
   return specs;
 }
@@ -1171,7 +1185,7 @@ function aiVineCurtainRearrange(state, playerIdx) {
 
 function buildMaterialDeck(numPlayers) {
   const deck = makeCardSpecs(numPlayers).map((spec, id) => {
-    const eff = spec.svWild ? SV_WILD_CARD : effectSpecFor(spec.material, spec.icons);
+    const eff = spec.staging ? STAGING_CARD : spec.svWild ? SV_WILD_CARD : effectSpecFor(spec.material, spec.icons);
     return {
       id: 'm' + id,
       material: spec.material,
@@ -1363,6 +1377,8 @@ function newGame(numPlayers, workersPerPlayer = null) {
       portageSwaps: [],           // per Portage swap: {victimIdx, cost, victimPos} (victimPos = victim timePos before any compensation)
       tributeRecalls: [],         // per Tribute Stone / Snare Set recall: {victimIdx, cardCost, comp, victimPos}
       ogTrap: [],                 // per player caught by Old Growth retiring from R3/R4 with their workers aboard: {playerIdx, workers, slot}
+      stagingMoves: 0,            // staging-card (Flotsam Raft) ferry moves executed
+      stagingMovesBy: {},         // playerIdx → ferry moves (staging experiment)
     },
   };
 }
@@ -2032,6 +2048,75 @@ function finalizeCombinedCard(state, card, wasJam) {
   }
 }
 
+// Staging ferry (Flotsam Raft): plan moving my staged workers onto open icons
+// of needed materials, best need first. Fee per worker: 1 (flat1) or the
+// destination card's per-item cost (dest). Scored on the same need-weighted
+// scale as auction targets.
+function findStagingMove(state, playerIdx, needs) {
+  const sources = [...state.riverCards, ...state.shorelineCards]
+    .filter(c => c.effect === 'staging' && workersOnCard(c, playerIdx) > 0);
+  if (sources.length === 0) return null;
+  let avail = sources.reduce((n, c) => n + workersOnCard(c, playerIdx), 0);
+  // 'diff' fee credits what the staging slot currently charges — ferry from
+  // the deepest (priciest) staging card first; a shoreline source credits 0.
+  const srcCredit = Math.max(...sources.map(c => cardCost(c)));
+  const dests = state.riverCards
+    .filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0 && (needs[c.material] || 0) > 0)
+    .sort((a, b) => needs[b.material] - needs[a.material]);
+  const remNeed = { ...needs };
+  const moves = [];
+  let score = 0;
+  for (const d of dests) {
+    let open = Math.min(uncoveredIcons(d), remNeed[d.material] || 0, avail);
+    while (open > 0 && avail > 0) {
+      const fee = STAGING_MODE === 'dest' ? playerCardCost(state, d, playerIdx)
+        : STAGING_MODE === 'diff' ? Math.max(0, playerCardCost(state, d, playerIdx) - srcCredit)
+        : 1;
+      const gain = remNeed[d.material] - fee * 0.4;
+      if (gain <= 0) break;
+      moves.push({ toId: d.id, fee });
+      score += gain;
+      remNeed[d.material] -= 1; avail -= 1; open -= 1;
+    }
+  }
+  if (moves.length === 0) return null;
+  return { moves, score };
+}
+
+// Execute a planned ferry. Departing workers leave a blank on the staging card
+// (each icon ferries once); the freed worker covers a real icon at the
+// destination, which can retire a fully covered card exactly like an auction.
+function doStagingMove(state, playerIdx, moves) {
+  let totalFee = 0, moved = 0;
+  for (const mv of moves) {
+    const dest = state.riverCards.find(c => c.id === mv.toId);
+    if (!dest || uncoveredIcons(dest) <= 0) continue;
+    let src = null;
+    for (const c of [...state.riverCards, ...state.shorelineCards]) {
+      if (c.effect !== 'staging' || workersOnCard(c, playerIdx) <= 0) continue;
+      // Under 'diff' the fee was planned against the priciest source — take
+      // from it first; otherwise take from the fullest.
+      const better = !src
+        || (STAGING_MODE === 'diff' ? cardCost(c) > cardCost(src)
+                                    : workersOnCard(c, playerIdx) > workersOnCard(src, playerIdx));
+      if (better) src = c;
+    }
+    if (!src) break;
+    src.workers[playerIdx] -= 1;
+    if (src.workers[playerIdx] === 0) delete src.workers[playerIdx];
+    if (typeof src.slot === 'number') { src.blanks += 1; noteBlanks(state); }
+    dest.workers[playerIdx] = (dest.workers[playerIdx] || 0) + 1;
+    totalFee += mv.fee;
+    moved += 1;
+  }
+  if (moved === 0) return false;
+  advancePlayer(state, playerIdx, totalFee);
+  state.metrics.stagingMoves += moved;
+  state.metrics.stagingMovesBy[playerIdx] = (state.metrics.stagingMovesBy[playerIdx] || 0) + moved;
+  sweepFullyCoveredRiver(state);
+  return true;
+}
+
 // =============================================================================
 // AI: BIDDING
 // =============================================================================
@@ -2052,7 +2137,10 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   const wbm = playerWorkersByMaterial(state, playerIdx);
   // Wildcards (Driftwood Tangle, Mud Slick): include the alt material's
   // deficit when computing need, since a wild worker can fulfill either.
-  const matsForNeed = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+  // Staging card: a staged worker can later ferry to any material, so its
+  // need spans every material (the fee/delay tax lands on myCost below).
+  const matsForNeed = card.effect === 'staging' ? MAT_KEYS
+    : card.wildAlt ? [card.material, card.wildAlt] : [card.material];
   let need = 0;
   let maxNeed = 0;
   for (const s of p.hand) {
@@ -2090,6 +2178,9 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) {
     myCost = Math.max(1, Math.ceil(myCost / 2));
   }
+  // Staging (Flotsam Raft): staged workers pay a ferry fee later and only
+  // become material after a second action — tax the effective cost.
+  if (card.effect === 'staging') myCost += (STAGING_MODE === 'dest' ? 3 : STAGING_MODE === 'diff' ? 1 : 1.5);
   // Hidden Inlet solo bonus: if no opponent has workers on this card, expect
   // +1 fish-track refund per worker placed (effective cost -1).
   if (card.effect === 'solo-bonus') {
@@ -2443,7 +2534,13 @@ function aiChooseAction(state, playerIdx) {
   let bestCard = null, bestScore = -Infinity, bestKind = null, bestPrerivIdx = -1;
   for (const c of state.riverCards) {
     if (uncoveredIcons(c) === 0) continue;
-    const need = needs[c.material];
+    let need = needs[c.material] || 0;
+    // Staging card: worth close to the biggest single-material deficit
+    // (a staged worker ferries to whatever is needed most), minus a tick
+    // for the fee + delay.
+    if (c.effect === 'staging') {
+      need = Math.max(0, Math.max(...MAT_KEYS.map(m => needs[m])) - 1);
+    }
     if (need === 0) continue;
     const got = Math.min(uncoveredIcons(c), poolFor(c), need);
     if (got === 0) continue;
@@ -2454,7 +2551,10 @@ function aiChooseAction(state, playerIdx) {
   for (let i = 0; i < state.prerivCards.length; i++) {
     const c = state.prerivCards[i];
     if (!c) continue;
-    const need = needs[c.material];
+    let need = needs[c.material] || 0;
+    if (c.effect === 'staging') {
+      need = Math.max(0, Math.max(...MAT_KEYS.map(m => needs[m])) - 1);
+    }
     if (need === 0) continue;
     const got = Math.min(uncoveredIcons(c), triggerPool, need);
     if (got === 0) continue;
@@ -2492,6 +2592,12 @@ function aiChooseAction(state, playerIdx) {
   if (hasEffect(p, 'Tow Line') && !p.towLineUsed && p.timePos + 1 < SIM_FINISH_LINE) {
     const t = findTowLineTarget(state, playerIdx, needs, triggerPool);
     if (t) candidates.push({ score: t.score, needsTrigger: true, make: () => ({ type: 'towLine', cardId: t.card.id }) });
+  }
+  if (STAGING_MODE !== 'off') {
+    const t = findStagingMove(state, playerIdx, needs);
+    if (t && p.timePos + t.moves.reduce((sum, m) => sum + m.fee, 0) < SIM_FINISH_LINE) {
+      candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'stagingMove', moves: t.moves }) });
+    }
   }
   candidates.sort((a, b) => b.score - a.score);
   for (const cand of candidates) {
@@ -3639,6 +3745,10 @@ function executeAction(state, playerIdx, action) {
   }
   if (action.type === 'salmonRun') {
     doSalmonRun(state, playerIdx, action.cardId, action.workerCount);
+    return;
+  }
+  if (action.type === 'stagingMove') {
+    doStagingMove(state, playerIdx, action.moves);
     return;
   }
   if (action.type === 'build') {
@@ -5022,6 +5132,90 @@ function sweepTribute(numGamesArg, numPArg, workersArg) {
   console.log(`  comp🐟  = avg fish actually refunded to the victim under that condition's rule.`);
   console.log(`  vPos/late%/vWin%/vVP = victim fish-track position at recall / share ≥ ${lateCut} /`);
   console.log(`  win-rate and avg VP of players recalled at least once (Tribute Stone or Snare Set).`);
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
+// Staging-card sweep: no card (control) vs the Flotsam Raft experiment under
+// its two fee modes ('flat1': 1 fish per ferried worker; 'dest': destination
+// card's per-item cost). Reports ferry usage, who profits, stranded workers,
+// and whether the card relieves auction contention (jam share). Run with
+// `cpulimit -l 50 -f -m --`. Usage: node sim.js staging [numGames] [numP] [workers]
+function sweepStaging(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 4000;
+  configureMaterials(6);
+  const fishLine = simFishLine(numP);
+
+  function collect(label, mode) {
+    STAGING_MODE = mode;
+    let ferries = 0, stranded = 0, jam = 0, auctions = 0, turns = 0;
+    let users = 0, userWins = 0, userVP = 0, nonUsers = 0, nonUserWins = 0, nonUserVP = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      egPlayOut(state, 'fish', 0, fishLine, 'd');
+      ferries += state.metrics.stagingMoves;
+      jam += state.metrics.jamAuctions;
+      auctions += state.metrics.auctions;
+      turns += state.metrics.turns;
+      for (const c of [...state.riverCards, ...state.shorelineCards, ...state.prerivCards.filter(Boolean)]) {
+        if (c.effect === 'staging') {
+          for (const k in c.workers) stranded += c.workers[k];
+        }
+      }
+      const scored = state.players.map(p => ({ p, vp: totalVP(p, state) }));
+      scored.sort((a, b) => b.vp - a.vp || a.p.timePos - b.p.timePos);
+      const winner = scored[0].p;
+      for (const { p, vp } of scored) {
+        const used = (state.metrics.stagingMovesBy[p.idx] || 0) > 0;
+        if (used) { users++; userVP += vp; if (p === winner) userWins++; }
+        else { nonUsers++; nonUserVP += vp; if (p === winner) nonUserWins++; }
+      }
+    }
+    return {
+      label,
+      ferriesPerGame: ferries / numGames,
+      strandedPerGame: stranded / numGames,
+      jamPct: auctions ? jam / auctions : NaN,
+      auctionsPerGame: auctions / numGames,
+      turnsPerGame: turns / numGames,
+      usersPerGame: users / numGames,
+      userWin: users ? userWins / users : NaN,
+      userVP: users ? userVP / users : NaN,
+      nonUserWin: nonUsers ? nonUserWins / nonUsers : NaN,
+      nonUserVP: nonUsers ? nonUserVP / nonUsers : NaN,
+    };
+  }
+
+  const t0 = Date.now();
+  process.stderr.write('\rstaging: control (no card) ...     ');
+  const off = collect('no staging card (control)', 'off');
+  process.stderr.write('\rstaging: flat 1 fee ...            ');
+  const f1 = collect('Flotsam Raft, 1\u{1F41F}/ferry', 'flat1');
+  process.stderr.write('\rstaging: dest-cost fee ...         ');
+  const dc = collect('Flotsam Raft, dest-cost fee', 'dest');
+  process.stderr.write('\rstaging: cost-diff fee ...         ');
+  const df = collect('Flotsam Raft, cost-diff fee', 'diff');
+  STAGING_MODE = process.env.RB_STAGING || 'off';
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  const expWin = 100 / numP;
+  console.log(`\nRiver Bankers — staging-card (Flotsam Raft, ${STAGING_ICONS} icons, 3P+ tier) sweep  (${numP}P × ${workers} workers × ${numGames} games/condition)`);
+  console.log(`Fair-share win-rate = ${expWin.toFixed(1)}%.  'User' = made ≥1 ferry move that game.\n`);
+  console.log(pad('Condition', 28) + padL('ferry/g', 9) + padL('strand/g', 10) + padL('users/g', 9) + padL('uWin%', 8) + padL('Δfair', 8) + padL('uVP', 7) + padL('nWin%', 8) + padL('nVP', 7) + padL('jam%', 7) + padL('auc/g', 8) + padL('turns', 8));
+  console.log('-'.repeat(28 + 9 + 10 + 9 + 8 + 8 + 7 + 8 + 7 + 7 + 8 + 8));
+  for (const r of [off, f1, dc, df]) {
+    const f = (x, d = 1) => isNaN(x) ? '-' : x.toFixed(d);
+    console.log(
+      pad(r.label, 28) + padL(f(r.ferriesPerGame, 2), 9) + padL(f(r.strandedPerGame, 2), 10) +
+      padL(f(r.usersPerGame, 2), 9) + padL(f(100 * r.userWin), 8) +
+      padL(isNaN(r.userWin) ? '-' : ((100 * r.userWin) - expWin >= 0 ? '+' : '') + ((100 * r.userWin) - expWin).toFixed(1), 8) +
+      padL(f(r.userVP, 1), 7) + padL(f(100 * r.nonUserWin), 8) + padL(f(r.nonUserVP, 1), 7) +
+      padL((100 * r.jamPct).toFixed(1), 7) + padL(f(r.auctionsPerGame), 8) + padL(f(r.turnsPerGame), 8));
+  }
+  console.log(`\nLegend: strand/g = staged workers never ferried (worth nothing at game end);`);
+  console.log(`  uWin%/uVP vs nWin%/nVP = ferry users vs non-users (self-selected, not causal);`);
+  console.log(`  jam% = jammed share of all auctions — watch whether the card relieves contention.`);
   console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
 }
 
@@ -8041,6 +8235,7 @@ if (require.main === module) {
   else if (mode === 'build-rate') sweepBuildRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'tribute') sweepTribute(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'oldgrowth') sweepOldGrowth(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'staging') sweepStaging(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'game-length') sweepGameLength(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-winrate') sweepSpeciesWinRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'fairness') sweepFairness(process.argv[3], process.argv[4], process.argv[5]);
