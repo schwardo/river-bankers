@@ -959,7 +959,13 @@ function playerWorkersByMaterial(state, playerIdx, opts) {
   const addCard = (c) => {
     const w = workersOnCard(c, playerIdx);
     if (w === 0) return;
-    const units = rawYield ? w : w * cardYieldMultiplier(c);
+    let units = rawYield ? w : w * cardYieldMultiplier(c);
+    // Crowd bonus: the first worker spent per turn is worth crowdCount(c)
+    // units, so this player's spendable total is w + (N - 1). Pair scoring
+    // (rawYield) is untouched — the bonus exists only at spend time.
+    if (!rawYield && c.effect === 'crowd-bonus') {
+      units = w + Math.max(0, crowdCount(c) - 1);
+    }
     if (c.wildAlt) {
       out._wildPools.push({ materials: [c.material, c.wildAlt], count: units });
     } else {
@@ -1120,6 +1126,23 @@ let STAGING_MODE = process.env.RB_STAGING || 'credit';
 let STAGING_ICONS = parseInt(process.env.RB_STAGING_ICONS || '6', 10);
 const STAGING_CARD = { material: 'staging', effect: 'staging', name: 'Flotsam Raft' };
 
+// Crowd-bonus material-card experiment (org backlog idea, Don [2026-09-19]):
+// "the first worker you spend from this card each turn is worth a number of
+// items equal to the number of distinct players with workers on this card."
+// N counts the spender too, so solo = 1 = vanilla; "each turn" is modeled as
+// per BUILD (the sim takes one build action per turn). RB_CROWD attaches the
+// effect to a deck slot, e.g. RB_CROWD=stones-7 (Boulder Field); default off.
+let CROWD_SLOT = process.env.RB_CROWD || 'off';
+// Sweep-only: track spends from this vanilla slot in the control condition,
+// so the crowd sweep's user cohorts compare like-for-like.
+let CROWD_TRACK = null;
+const CROWD_CARD_NAME = 'Gathering Shoal';
+function crowdCount(card) {
+  let n = 0;
+  for (const k in card.workers) if (card.workers[k] > 0) n++;
+  return n;
+}
+
 function makeCardSpecs(numPlayers) {
   const specs = [];
   const svWild = numPlayers < 3;
@@ -1190,7 +1213,10 @@ function aiVineCurtainRearrange(state, playerIdx) {
 
 function buildMaterialDeck(numPlayers) {
   const deck = makeCardSpecs(numPlayers).map((spec, id) => {
-    const eff = spec.staging ? STAGING_CARD : spec.svWild ? SV_WILD_CARD : effectSpecFor(spec.material, spec.icons);
+    let eff = spec.staging ? STAGING_CARD : spec.svWild ? SV_WILD_CARD : effectSpecFor(spec.material, spec.icons);
+    if (!eff && CROWD_SLOT !== 'off' && CROWD_SLOT === `${spec.material}-${spec.icons}`) {
+      eff = { material: spec.material, icons: spec.icons, effect: 'crowd-bonus', name: CROWD_CARD_NAME };
+    }
     return {
       id: 'm' + id,
       material: spec.material,
@@ -1386,6 +1412,10 @@ function newGame(numPlayers, workersPerPlayer = null) {
       stagingMovesBy: {},         // playerIdx → ferry moves (staging experiment)
       stagingLastCallMoves: 0,    // subset of stagingMoves made in the leaves-the-river last call
       stagingReturned: 0,         // staged workers returned to supply when the raft was discarded
+      crowdSpends: 0,             // crowd-bonus card: builds that consumed from it (first-worker bonus applied once each)
+      crowdNSum: 0,               // sum of N (distinct players aboard) across those spends
+      crowdBonusUnits: 0,         // extra material units the bonus minted (N-1 per crowded spend)
+      crowdSpendsBy: {},          // playerIdx → crowd-bonus spends
     },
   };
 }
@@ -2291,6 +2321,13 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // Staging (Flotsam Raft): staged workers pay a ferry fee later and only
   // become material after a second action — tax the effective cost.
   if (card.effect === 'staging') myCost += (STAGING_MODE === 'dest' ? 3 : STAGING_MODE === 'diff' ? 1 : STAGING_MODE === 'credit' ? 0.5 : 1.5);
+  // Crowd bonus: with company aboard the first spent worker is worth N —
+  // treat the effective per-item cost as cheaper (mirrors Old Growth's
+  // shape; the AI does not model courting opponents onto the card).
+  if (card.effect === 'crowd-bonus') {
+    const n = crowdCount(card) + (workersOnCard(card, playerIdx) > 0 ? 0 : 1);
+    if (n >= 2) myCost = Math.max(1, Math.ceil(myCost / 2));
+  }
   // Hidden Inlet solo bonus: if no opponent has workers on this card, expect
   // +1 fish-track refund per worker placed (effective cost -1).
   if (card.effect === 'solo-bonus') {
@@ -3362,9 +3399,32 @@ function performBuild(state, playerIdx, handIdx) {
   const consume = (c, need) => {
     const have = workersOnCard(c, playerIdx);
     if (have === 0 || need === 0) return { take: 0, yielded: 0 };
+    // Crowd bonus: the FIRST worker taken this build yields N (distinct
+    // players aboard, spender included, counted before removal); the rest 1.
+    if (c.effect === 'crowd-bonus') {
+      const N = crowdCount(c);
+      let take = 0, yielded = 0, left = have;
+      while (left > 0 && yielded < need) {
+        yielded += (take === 0 ? N : 1);
+        take++; left--;
+      }
+      c.workers[playerIdx] = have - take;
+      if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
+      if (typeof c.slot === 'number') c.blanks += take;
+      state.metrics.crowdSpends += 1;
+      state.metrics.crowdNSum += N;
+      if (N >= 2) state.metrics.crowdBonusUnits += (N - 1);
+      state.metrics.crowdSpendsBy[playerIdx] = (state.metrics.crowdSpendsBy[playerIdx] || 0) + 1;
+      return { take, yielded };
+    }
     const mult = cardYieldMultiplier(c);
     const wantWorkers = Math.ceil(need / mult);
     const take = Math.min(have, wantWorkers);
+    if (CROWD_TRACK && !c.wildAlt && take > 0 && `${c.material}-${c.totalIcons}` === CROWD_TRACK) {
+      state.metrics.crowdSpends += 1;
+      state.metrics.crowdNSum += crowdCount(c);
+      state.metrics.crowdSpendsBy[playerIdx] = (state.metrics.crowdSpendsBy[playerIdx] || 0) + 1;
+    }
     c.workers[playerIdx] = have - take;
     if (c.workers[playerIdx] === 0) delete c.workers[playerIdx];
     if (typeof c.slot === 'number') c.blanks += take;
@@ -5242,6 +5302,91 @@ function sweepTribute(numGamesArg, numPArg, workersArg) {
   console.log(`  comp🐟  = avg fish actually refunded to the victim under that condition's rule.`);
   console.log(`  vPos/late%/vWin%/vVP = victim fish-track position at recall / share ≥ ${lateCut} /`);
   console.log(`  win-rate and avg VP of players recalled at least once (Tribute Stone or Snare Set).`);
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
+// Crowd-bonus sweep: vanilla slot (control) vs the same slot carrying the
+// crowd-bonus effect ("the first worker you spend from this card each turn is
+// worth N items, N = distinct players aboard"). Watches the card's users, how
+// crowded it actually runs, minted bonus units, and — the design worry — jam
+// share, since the card rewards pile-on. Run with `cpulimit -l 50 -f -m --`.
+// Usage: node sim.js crowd [numGames] [numP] [slot]   (slot e.g. stones-7)
+function sweepCrowd(numGamesArg, numPArg, slotArg) {
+  const numP = parseInt(numPArg) || 4;
+  const workers = defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 4000;
+  const slot = slotArg || 'stones-7';
+  configureMaterials(6);
+  const fishLine = simFishLine(numP);
+
+  function collect(label, on) {
+    CROWD_SLOT = on ? slot : 'off';
+    CROWD_TRACK = on ? null : slot;
+    let spends = 0, nSum = 0, bonusUnits = 0, jam = 0, auctions = 0, turns = 0;
+    let users = 0, userWins = 0, userVP = 0, nonUsers = 0, nonUserWins = 0, nonUserVP = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      egPlayOut(state, 'fish', 0, fishLine, 'd');
+      spends += state.metrics.crowdSpends;
+      nSum += state.metrics.crowdNSum;
+      bonusUnits += state.metrics.crowdBonusUnits;
+      jam += state.metrics.jamAuctions;
+      auctions += state.metrics.auctions;
+      turns += state.metrics.turns;
+      const scored = state.players.map(p => ({ p, vp: totalVP(p, state) }));
+      scored.sort((a, b) => b.vp - a.vp || a.p.timePos - b.p.timePos);
+      const winner = scored[0].p;
+      for (const { p, vp } of scored) {
+        const used = (state.metrics.crowdSpendsBy[p.idx] || 0) > 0;
+        if (used) { users++; userVP += vp; if (p === winner) userWins++; }
+        else { nonUsers++; nonUserVP += vp; if (p === winner) nonUserWins++; }
+      }
+    }
+    return {
+      label,
+      spendsPerGame: spends / numGames,
+      avgN: spends ? nSum / spends : NaN,
+      bonusPerGame: bonusUnits / numGames,
+      jamPct: auctions ? jam / auctions : NaN,
+      turnsPerGame: turns / numGames,
+      usersPerGame: users / numGames,
+      userWin: users ? userWins / users : NaN,
+      userVP: users ? userVP / users : NaN,
+      nonUserWin: nonUsers ? nonUserWins / nonUsers : NaN,
+      nonUserVP: nonUsers ? nonUserVP / nonUsers : NaN,
+    };
+  }
+
+  const t0 = Date.now();
+  process.stderr.write('\rcrowd: vanilla control ...         ');
+  const off = collect(`${slot} vanilla (control)`, false);
+  process.stderr.write('\rcrowd: bonus on ...                ');
+  const on = collect(`${slot} crowd bonus`, true);
+  CROWD_SLOT = process.env.RB_CROWD || 'off';
+  CROWD_TRACK = null;
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  const expWin = 100 / numP;
+  console.log(`\nRiver Bankers — crowd-bonus sweep on ${slot}  (${numP}P × ${workers} workers × ${numGames} games/condition)`);
+  console.log(`Fair-share win-rate = ${expWin.toFixed(1)}%.  'User' = spent ≥1 worker from the card that game.`);
+  console.log(`Bonus: first worker spent per build yields N (distinct players aboard, self included).\n`);
+  console.log(pad('Condition', 30) + padL('spend/g', 9) + padL('avgN', 7) + padL('bonus/g', 9) + padL('users/g', 9) + padL('uWin%', 8) + padL('Δfair', 8) + padL('uVP', 7) + padL('nWin%', 8) + padL('nVP', 7) + padL('jam%', 7) + padL('turns', 8));
+  console.log('-'.repeat(30 + 9 + 7 + 9 + 9 + 8 + 8 + 7 + 8 + 7 + 7 + 8));
+  for (const r of [off, on]) {
+    const f = (x, d = 1) => isNaN(x) ? '-' : x.toFixed(d);
+    console.log(
+      pad(r.label, 30) + padL(f(r.spendsPerGame, 2), 9) + padL(f(r.avgN, 2), 7) +
+      padL(f(r.bonusPerGame, 2), 9) + padL(f(r.usersPerGame, 2), 9) +
+      padL(f(100 * r.userWin), 8) +
+      padL(isNaN(r.userWin) ? '-' : ((100 * r.userWin) - expWin >= 0 ? '+' : '') + ((100 * r.userWin) - expWin).toFixed(1), 8) +
+      padL(f(r.userVP, 1), 7) + padL(f(100 * r.nonUserWin), 8) + padL(f(r.nonUserVP, 1), 7) +
+      padL((100 * r.jamPct).toFixed(1), 7) + padL(f(r.turnsPerGame), 8));
+  }
+  console.log(`\nLegend: spend/g = builds consuming from the card (bonus applies to the first`);
+  console.log(`  worker of each); avgN = distinct players aboard at spend; bonus/g = extra`);
+  console.log(`  units minted (N-1 per crowded spend). The control row's 'users' are spenders`);
+  console.log(`  from the same vanilla slot, for a like-for-like comparison. Note the sim AI`);
+  console.log(`  neither courts opponents onto the card nor times spends for peak N.`);
   console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
 }
 
@@ -8355,6 +8500,7 @@ if (require.main === module) {
   else if (mode === 'tribute') sweepTribute(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'oldgrowth') sweepOldGrowth(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'staging') sweepStaging(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'crowd') sweepCrowd(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'game-length') sweepGameLength(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'species-winrate') sweepSpeciesWinRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'fairness') sweepFairness(process.argv[3], process.argv[4], process.argv[5]);
