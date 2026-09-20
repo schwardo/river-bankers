@@ -1758,6 +1758,21 @@ const MATERIALS = {
   clay:   { name: 'Clay',   color: '#c97c4a', icon: MAT_ICON_SVG.clay },
 };
 const MAT_KEYS = Object.keys(MATERIALS);
+// Flotsam is NOT a material: added after MAT_KEYS is captured so display
+// lookups (MATERIALS[card.material]) work while every MAT_KEYS loop —
+// needs, build affordability, pair scoring — ignores it by construction.
+MATERIALS.staging = {
+  name: 'Flotsam', color: '#a6947a',
+  icon: '<svg class="mat-icon" viewBox="-15 -15 30 30">'
+    + '<g stroke="#5c5244" stroke-width="1.1">'
+    + '<rect x="-11" y="-7.5" width="22" height="4.6" rx="2.3" fill="#a6947a" transform="rotate(-3)"/>'
+    + '<rect x="-11.5" y="-2.3" width="23" height="4.6" rx="2.3" fill="#b8a68c"/>'
+    + '<rect x="-10.5" y="2.9" width="21" height="4.6" rx="2.3" fill="#998671" transform="rotate(2.5)"/></g>'
+    + '<g fill="none" stroke="#c9a227" stroke-width="1.6">'
+    + '<path d="M -6.5 -9 L -5.2 9.2"/><path d="M -5.2 -9.2 L -6.5 9"/>'
+    + '<path d="M 5.6 -9 L 6.9 9.2"/><path d="M 6.9 -9.2 L 5.6 9"/></g>'
+    + '</svg>',
+};
 
 // Per-material tiered deck (tuned via sim.js sweepDeck under rule c):
 //   "always"  — in deck for any player count   (2 cards/mat: [5,7] icons)
@@ -1798,6 +1813,14 @@ function effectSpecFor(material, icons) {
 // the market flattens, and completing the symmetric set of three wild pairs
 // (logs/reeds, clay/mud, stones/vines). At 3P+ the deck is untouched.
 const SV_WILD_CARD = { material: 'stones', icons: 5, effect: 'wild', wildAlt: 'vines', name: 'Bramble Shoal' };
+
+// Flotsam Raft [adopted 2026-09-19]: the 3P+ material-less staging card. Its
+// icons hold flotsam (cannot be spent, scores nothing); workers ferry to open
+// river icons as an action (drop a blank) or at the last call when the card
+// would leave the river — two-step fee: slide back this card's cost, advance
+// the destination's. The raft never reaches the shoreline: after the last
+// call, remaining workers return to supply and the card is discarded.
+const STAGING_CARD_SPEC = { material: 'staging', icons: 6, effect: 'staging', name: 'Flotsam Raft' };
 
 // Names for the 16 non-effect (material, icons) slots. Effect cards
 // (Driftwood Tangle, Old Growth, etc.) carry their own name on EFFECT_CARDS.
@@ -1853,6 +1876,7 @@ function buildMaterialDeck(numPlayers) {
     }
   }
   if (svWild) pushCard('stones', 5, SV_WILD_CARD);
+  if (numPlayers >= 3) pushCard('staging', 6, STAGING_CARD_SPEC);
   return shuffle(deck);
 }
 
@@ -3267,6 +3291,8 @@ function effectDescription(card) {
       return `When you build using workers from this card, peek at the top 2 material cards and rearrange them.`;
     case 'slipping-sandbar':
       return `Enters the river at River 4. After an auction on this card, slides one slot upstream instead of downstream. At River 1, retires to shoreline instead.`;
+    case 'staging':
+      return `Cannot be spent. Move workers to open river icons as an action (drop a blank), or when it leaves the river: slide back this card's cost, advance the destination's. Workers left aboard at the last call return to your supply; the card is then discarded.`;
     case 'old-growth':
       return `If this card is at River 3 or 4 or on the Shoreline, each worker you retrieve yields 2 ${card.material} instead of 1.`;
     default:
@@ -3815,6 +3841,8 @@ function renderActionPanel() {
       && cur.supply > 0
       && canAffordTimeCost(cur, 2)
       && state.riverCards.some(c => typeof c.slot === 'number' && uncoveredIcons(c) > 0);
+    const stagingFerryAvail = state.riverCards.some(c => c.effect === 'staging' && workersOnCard(c, cur.idx) > 0)
+      && state.riverCards.some(c => c.effect !== 'staging' && uncoveredIcons(c) > 0);
     const combinedAvail = hasCombinedAuctionAbility(cur)
       && triggerPool > 0
       && canAffordTimeCost(cur, 1)
@@ -3831,6 +3859,7 @@ function renderActionPanel() {
         <button class="primary" onclick="humanChooseAction('build')" ${cur.hand.some(s => canBuild(s, playerWorkersByMaterial(state, cur.idx), cur)) ? '' : 'disabled'}>5. Build a structure</button>
         ${towLineAvail ? `<button onclick="humanChooseAction('towLine')">6. Tow Line (once per game): yank a river card to River 1 &amp; auction it</button>` : ''}
         ${salmonRunAvail ? `<button onclick="humanChooseAction('salmonRun')">7. Salmon Run (1/2/3/5/8🐟): place workers on a single card</button>` : ''}
+        ${stagingFerryAvail ? `<button onclick="humanChooseAction('stagingFerry')">🛟 Flotsam Raft: ferry workers to open icons</button>` : ''}
         ${combinedAvail ? `<button onclick="humanChooseAction('confluence')">8. ${combinedLabel}</button>` : ''}
         ${state.retireUnlocked ? `<button class="ghost" onclick="humanRetire()">🏁 Retire (advance to space ${lowestFreeFinishSpot()}🐟)</button>` : ''}
       </div>
@@ -4097,6 +4126,12 @@ function renderLog() {
 // RIVER MANAGEMENT
 // =============================================================================
 function moveCardToShoreline(card) {
+  // Flotsam Raft never reaches the shoreline: queue its last call instead
+  // (processed at the next async point — see processRaftDepartures).
+  if (card.effect === 'staging') {
+    queueRaftDeparture(card);
+    return;
+  }
   // Fire end-of-river effects (solo / most-workers bonuses) before clearing slot.
   fireOnShoreline(card);
   card.blanks = 0;
@@ -5032,7 +5067,10 @@ function aiDecideBid(playerIdx, card, minBid) {
   // Wildcards (Driftwood Tangle, Mud Slick): include the alt material's deficit
   // since a wild worker can fulfill either.
   const wbm = playerWorkersByMaterial(state, playerIdx);
-  const matsForNeed = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+  // Staging card: a staged worker can ferry to any material later, so its
+  // need spans every material; the fee/delay tax lands on effCost below.
+  const matsForNeed = card.effect === 'staging' ? MAT_KEYS
+    : card.wildAlt ? [card.material, card.wildAlt] : [card.material];
   let need = 0;
   let maxNeed = 0;
   for (const s of p.hand) {
@@ -5059,6 +5097,9 @@ function aiDecideBid(playerIdx, card, minBid) {
   if (card.effect === 'old-growth' && typeof card.slot === 'number' && card.slot >= 2) {
     effCost = Math.max(1, Math.ceil(effCost / 2));
   }
+  // Staging (Flotsam Raft): the two-step ferry fee usually nets small, but
+  // the material arrives a whole action (or last call) later — tax the cost.
+  if (card.effect === 'staging') effCost += 1;
   if (card.effect === 'solo-bonus') {
     const opponentPresent = Object.entries(card.workers).some(
       ([idx, n]) => parseInt(idx) !== playerIdx && n > 0
@@ -5309,7 +5350,13 @@ function aiChooseAction(playerIdx) {
   // River cards: action cost 0t, per-item cost = riverSlotCost(slot).
   for (const c of state.riverCards) {
     if (uncoveredIcons(c) === 0) continue;
-    const need = needs[c.material];
+    let need = needs[c.material] || 0;
+    // Staging card: worth close to the biggest single-material deficit
+    // (a staged worker ferries to whatever is needed most), minus a tick
+    // for the fee + delay.
+    if (c.effect === 'staging') {
+      need = Math.max(0, Math.max(...MAT_KEYS.map(m => needs[m])) - 1);
+    }
     if (need === 0) continue;
     const got = Math.min(uncoveredIcons(c), triggerPool, need);
     // playerCardCost picks up Reed Bed's per-item discount.
@@ -5320,7 +5367,10 @@ function aiChooseAction(playerIdx) {
   for (let i = 0; i < state.prerivCards.length; i++) {
     const c = state.prerivCards[i];
     if (!c) continue;
-    const need = needs[c.material];
+    let need = needs[c.material] || 0;
+    if (c.effect === 'staging') {
+      need = Math.max(0, Math.max(...MAT_KEYS.map(m => needs[m])) - 1);
+    }
     if (need === 0) continue;
     const got = Math.min(uncoveredIcons(c), triggerPool, need);
     if (got === 0) continue;
@@ -5353,6 +5403,12 @@ function aiChooseAction(playerIdx) {
   if (hasEffect(p, 'Tow Line') && !p.towLineUsed && canAffordTimeCost(p, 1)) {
     const t = findTowLineTarget(playerIdx, needs, triggerPool);
     if (t) candidates.push({ score: t.score, needsTrigger: true, make: () => ({ type: 'towLine', cardId: t.card.id }) });
+  }
+  {
+    const t = findStagingMove(playerIdx, needs);
+    if (t && canAffordTimeCost(p, Math.max(0, t.netFee))) {
+      candidates.push({ score: t.score, needsTrigger: false, make: () => ({ type: 'stagingFerry', moves: t.moves }) });
+    }
   }
   candidates.sort((a, b) => b.score - a.score);
   for (const cand of candidates) {
@@ -5980,6 +6036,197 @@ function aiBrowseDiscardChoice(playerIdx, drawn) {
 }
 
 // =============================================================================
+// FLOTSAM RAFT (staging card) — ferry action + leaves-the-river last call
+// =============================================================================
+// Two-step fee per moved worker: slide back the raft's current per-item cost,
+// then advance the destination's. Net can be negative (a refund) when the
+// raft sits deeper than the destination.
+function stagingFerryFee(raft, dest, playerIdx) {
+  return playerCardCost(dest, playerIdx) - cardCost(raft);
+}
+
+// AI ferry planner: my staged workers → open icons of needed materials, best
+// need first, scored on the same need-weighted scale as auction targets.
+function findStagingMove(playerIdx, needs) {
+  const rafts = state.riverCards.filter(c => c.effect === 'staging' && workersOnCard(c, playerIdx) > 0);
+  if (rafts.length === 0) return null;
+  // Ferry from the deepest raft first (biggest slide-back credit).
+  rafts.sort((a, b) => cardCost(b) - cardCost(a));
+  const raft = rafts[0];
+  let avail = rafts.reduce((n, c) => n + workersOnCard(c, playerIdx), 0);
+  const dests = state.riverCards
+    .filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0 && (needs[c.material] || 0) > 0)
+    .sort((a, b) => needs[b.material] - needs[a.material]);
+  const remNeed = { ...needs };
+  const moves = [];
+  let score = 0, netFee = 0;
+  for (const d of dests) {
+    let open = Math.min(uncoveredIcons(d), remNeed[d.material] || 0, avail);
+    while (open > 0 && avail > 0) {
+      const fee = stagingFerryFee(raft, d, playerIdx);
+      if ((remNeed[d.material] || 0) - fee * 0.4 <= 0) break;
+      moves.push({ toId: d.id });
+      score += remNeed[d.material] - fee * 0.4;
+      netFee += fee;
+      remNeed[d.material] -= 1; avail -= 1; open -= 1;
+    }
+  }
+  if (moves.length === 0) return null;
+  return { moves, score, netFee };
+}
+
+// Execute ferry moves for a player (action or last call). Each departing
+// worker leaves a blank on the raft (each flotsam icon is used once); the
+// two-step payment runs per worker so the track does the arithmetic.
+function doStagingFerry(playerIdx, moves, opts = {}) {
+  const p = state.players[playerIdx];
+  let moved = 0;
+  for (const mv of moves) {
+    const dest = state.riverCards.find(c => c.id === mv.toId);
+    if (!dest || uncoveredIcons(dest) <= 0) continue;
+    let raft = null;
+    for (const c of state.riverCards) {
+      if (c.effect !== 'staging' || workersOnCard(c, playerIdx) <= 0) continue;
+      if (!raft || cardCost(c) > cardCost(raft)) raft = c;
+    }
+    // Last call: the departing raft is off the river already — use it directly.
+    if (!raft && opts.raft && workersOnCard(opts.raft, playerIdx) > 0) raft = opts.raft;
+    if (!raft) break;
+    const back = cardCost(raft);
+    const fwd = playerCardCost(dest, playerIdx);
+    raft.workers[playerIdx] -= 1;
+    if (raft.workers[playerIdx] === 0) delete raft.workers[playerIdx];
+    if (typeof raft.slot === 'number' || raft === opts.raft) raft.blanks += 1;
+    dest.workers[playerIdx] = (dest.workers[playerIdx] || 0) + 1;
+    moveBackward(state, playerIdx, back);
+    p.timePos += fwd;
+    moved += 1;
+    log(`🛟 Flotsam Raft: ${speciesLabel(p)} ferries a worker to ${MATERIALS[dest.material].icon} ${MATERIALS[dest.material].name} (back ${back}🐟, forward ${fwd}🐟).`);
+  }
+  if (moved > 0 && !opts.noSweep) sweepFullyCoveredRiver();
+  return moved;
+}
+
+// Last call: rafts queued here when they would leave the river. Processed at
+// the top of the next runOneTurn (an async context), so the human can get an
+// interactive picker; no other game action happens in between.
+function queueRaftDeparture(card) {
+  card.blanks = 0;
+  if (card.slot === 'pre') {
+    const idx = prerivIndexOf(card);
+    if (idx !== -1) refillPreriv(idx);
+  } else {
+    state.riverCards = state.riverCards.filter(c => c !== card);
+  }
+  // The raft's cost for last-call ferries is the slot it is leaving from.
+  card.lastSlot = card.slot;
+  card.slot = 'departing';
+  state.pendingRaftDepartures = state.pendingRaftDepartures || [];
+  state.pendingRaftDepartures.push(card);
+  log(`🛟 ${card.name} is about to leave the river — last call to move workers off it!`);
+}
+
+async function processRaftDepartures() {
+  const queue = state.pendingRaftDepartures || [];
+  if (queue.length === 0) return;
+  state.pendingRaftDepartures = [];
+  for (const raft of queue) {
+    // cardCost must see the departing slot during the last call.
+    raft.slot = raft.lastSlot;
+    const order = state.players.map(p => p.idx)
+      .sort((a, b) => state.players[a].timePos - state.players[b].timePos);
+    for (const idx of order) {
+      if (workersOnCard(raft, idx) <= 0) continue;
+      const pl = state.players[idx];
+      if (pl.isHuman) {
+        await humanRaftLastCall(raft);
+      } else {
+        const needs = aiHandNeeds(idx);
+        const t = planLastCallFromRaft(raft, idx, needs);
+        if (t) doStagingFerry(idx, t.moves, { raft, noSweep: true });
+      }
+    }
+    // Everyone left aboard wades home; the raft breaks up and is discarded.
+    for (const k in raft.workers) {
+      const idx = parseInt(k);
+      if (raft.workers[k] > 0) {
+        state.players[idx].supply += raft.workers[k];
+        log(`🛟 ${speciesLabel(state.players[idx])}'s ${raft.workers[k]} worker(s) return to supply as ${raft.name} breaks up.`);
+      }
+    }
+    raft.workers = {};
+    raft.slot = 'discarded';
+    log(`🛟 ${raft.name} breaks apart and is discarded.`);
+  }
+  sweepFullyCoveredRiver();
+  render();
+}
+
+// Needs helper for last-call AI (same shape aiChooseAction computes).
+function aiHandNeeds(playerIdx) {
+  const p = state.players[playerIdx];
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  for (const st of p.hand) {
+    for (const m in st.cost) {
+      needs[m] = Math.max(needs[m], Math.max(0, st.cost[m] - (wbm[m] || 0)));
+    }
+  }
+  return needs;
+}
+
+// Last-call planner when the raft is already off the river (findStagingMove
+// only scans riverCards): plan directly from the departing raft.
+function planLastCallFromRaft(raft, playerIdx, needs) {
+  let avail = workersOnCard(raft, playerIdx);
+  if (avail <= 0) return null;
+  const dests = state.riverCards
+    .filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0 && (needs[c.material] || 0) > 0)
+    .sort((a, b) => needs[b.material] - needs[a.material]);
+  const remNeed = { ...needs };
+  const moves = [];
+  for (const d of dests) {
+    let open = Math.min(uncoveredIcons(d), remNeed[d.material] || 0, avail);
+    while (open > 0 && avail > 0) {
+      const fee = stagingFerryFee(raft, d, playerIdx);
+      if ((remNeed[d.material] || 0) - fee * 0.4 <= 0) break;
+      moves.push({ toId: d.id });
+      remNeed[d.material] -= 1; avail -= 1; open -= 1;
+    }
+  }
+  return moves.length ? { moves } : null;
+}
+
+// Interactive last call for the human: repeat single-worker picks until Done
+// or no workers/destinations remain.
+async function humanRaftLastCall(raft) {
+  const human = state.players.find(p => p.isHuman);
+  if (!human) return;
+  while (workersOnCard(raft, human.idx) > 0) {
+    const cands = state.riverCards
+      .filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0)
+      .map(c => ({ card: c }));
+    if (cands.length === 0) break;
+    const aboard = workersOnCard(raft, human.idx);
+    const pick = await pickFromList(
+      `🛟 ${raft.name} — last call! (${aboard} of your worker${aboard === 1 ? '' : 's'} aboard)`,
+      `The raft is leaving the river (from River ${raft.slot + 1}, ${cardCost(raft)}🐟/item). Move workers to open river icons now — slide back ${cardCost(raft)}🐟, then advance the destination's cost. Workers you leave aboard return to your supply.`,
+      cands,
+      x => {
+        const net = stagingFerryFee(raft, x.card, human.idx);
+        const netTxt = net > 0 ? `pay ${net}🐟` : net < 0 ? `refund ${-net}🐟` : 'free';
+        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open) — ${netTxt}`;
+      },
+      { declineLabel: 'Done — leave the rest aboard', cancelable: false }
+    );
+    if (!pick || pick === PICKER_DECLINE) break;
+    doStagingFerry(human.idx, [{ toId: pick.card.id }], { raft, noSweep: true });
+    render();
+  }
+}
+
+// =============================================================================
 // HUMAN INTERACTION
 // =============================================================================
 let humanResolver = null;
@@ -6378,6 +6625,8 @@ function humanChooseAction(type) {
     humanTowLine().then(() => humanResolver && humanResolver());
   } else if (type === 'salmonRun') {
     humanSalmonRun().then(() => humanResolver && humanResolver());
+  } else if (type === 'stagingFerry') {
+    humanStagingFerry().then(() => humanResolver && humanResolver());
   } else if (type === 'confluence') {
     // Board-based selection: enter a pick phase; cards on the board become clickable.
     state.combinedPick = { first: null };
@@ -6418,6 +6667,42 @@ async function humanSalmonRun() {
   );
   if (!nPick) return;
   doSalmonRun(human.idx, cardPick.id, nPick.n);
+  render();
+}
+
+async function humanStagingFerry() {
+  const human = state.players.find(p => p.isHuman);
+  if (!human) return;
+  state.lastHumanActionType = 'stagingFerry';
+  let moved = 0;
+  for (;;) {
+    const rafts = state.riverCards.filter(c => c.effect === 'staging' && workersOnCard(c, human.idx) > 0);
+    if (rafts.length === 0) break;
+    rafts.sort((a, b) => cardCost(b) - cardCost(a));
+    const raft = rafts[0];
+    const cands = state.riverCards
+      .filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0)
+      .map(c => ({ card: c }));
+    if (cands.length === 0) break;
+    const aboard = rafts.reduce((n, c) => n + workersOnCard(c, human.idx), 0);
+    const pick = await pickFromList(
+      `🛟 Flotsam Raft — ferry a worker (${aboard} aboard)`,
+      `Pick a destination with an open icon. Per worker: slide back the raft's cost (${cardCost(raft)}🐟 at River ${raft.slot + 1}), then advance the destination's. Ferry as many as you like — this is your action for the turn.`,
+      cands,
+      x => {
+        const net = stagingFerryFee(raft, x.card, human.idx);
+        const netTxt = net > 0 ? `pay ${net}🐟 net` : net < 0 ? `refund ${-net}🐟 net` : 'free net';
+        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open) — ${netTxt}`;
+      },
+      moved === 0
+        ? { cancelLabel: 'Never mind' }
+        : { declineLabel: 'Done ferrying', cancelable: false }
+    );
+    if (!pick || pick === PICKER_DECLINE) break;
+    doStagingFerry(human.idx, [{ toId: pick.card.id }]);
+    moved += 1;
+    render();
+  }
   render();
 }
 
@@ -7933,6 +8218,9 @@ function humanUndoLastMove() {
 
 async function runOneTurn() {
   if (state.gameOver) return;
+  // Flotsam Raft last call: resolve any raft that left the river during the
+  // previous action before the next player moves.
+  await processRaftDepartures();
   // Coda: each player takes one final build (in fish-track order), then end.
   if (state.coda) { await runCodaTurn(); return; }
   const myEpoch = ++turnEpoch;
@@ -8098,6 +8386,7 @@ function beginCoda() {
 }
 
 async function enterCoda() {
+  await processRaftDepartures();
   beginCoda();
   render();
   await runCodaTurn();
@@ -8191,6 +8480,10 @@ async function executeAIAction(playerIdx, action) {
   if (action.type === 'towLine') {
     await doTowLine(playerIdx, action.cardId);
     render();
+    return;
+  }
+  if (action.type === 'stagingFerry') {
+    doStagingFerry(playerIdx, action.moves);
     return;
   }
   if (action.type === 'salmonRun') {
