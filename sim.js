@@ -1380,6 +1380,8 @@ function newGame(numPlayers, workersPerPlayer = null) {
       ogTrap: [],                 // per player caught by Old Growth retiring from R3/R4 with their workers aboard: {playerIdx, workers, slot}
       stagingMoves: 0,            // staging-card (Flotsam Raft) ferry moves executed
       stagingMovesBy: {},         // playerIdx → ferry moves (staging experiment)
+      stagingLastCallMoves: 0,    // subset of stagingMoves made in the leaves-the-river last call
+      stagingReturned: 0,         // staged workers returned to supply when the raft was discarded
     },
   };
 }
@@ -1507,10 +1509,95 @@ function advancePlayer(state, playerIdx, byTime) {
   }
 }
 
+// Hand-deficit needs for a player (the same shape aiChooseAction computes).
+function handNeeds(state, playerIdx) {
+  const wbm = playerWorkersByMaterial(state, playerIdx);
+  const p = state.players[playerIdx];
+  const needs = {};
+  for (const m of MAT_KEYS) needs[m] = 0;
+  for (const st of p.hand) {
+    for (const m in st.cost) {
+      needs[m] = Math.max(needs[m], Math.max(0, st.cost[m] - (wbm[m] || 0)));
+    }
+  }
+  return needs;
+}
+
+// Flotsam Raft last call [Don's rule, 2026-09-19]: when the card would move
+// to the shoreline, players in fish-track order may ferry their workers off
+// it, paying the same two-step as the action (this card's cost at the slot it
+// is leaving, then the destination's). Any workers still aboard return to
+// their owners' supplies and the card is DISCARDED — it never reaches the
+// shoreline, so there is no ashore state at all.
+function stagingLastCall(state, card) {
+  const srcCost = cardCost(card);
+  const order = state.players.map(p => p.idx)
+    .sort((a, b) => state.players[a].timePos - state.players[b].timePos);
+  for (const idx of order) {
+    if (workersOnCard(card, idx) <= 0) continue;
+    const p = state.players[idx];
+    const needs = handNeeds(state, idx);
+    const dests = state.riverCards
+      .filter(c => c !== card && c.effect !== 'staging' && typeof c.slot === 'number' &&
+        uncoveredIcons(c) > 0 && (needs[c.material] || 0) > 0)
+      .sort((a, b) => needs[b.material] - needs[a.material]);
+    for (const d of dests) {
+      while (workersOnCard(card, idx) > 0 && uncoveredIcons(d) > 0 && (needs[d.material] || 0) > 0) {
+        const destCost = playerCardCost(state, d, idx);
+        // Fee matches the condition's action fee mode; the adopted rule
+        // ('credit') is the printed two-step.
+        const fee = STAGING_MODE === 'dest' ? destCost
+          : STAGING_MODE === 'diff' ? Math.max(0, destCost - srcCost)
+          : STAGING_MODE === 'credit' ? destCost - srcCost
+          : 1;
+        if ((needs[d.material] || 0) - fee * 0.4 <= 0) break;
+        if (p.timePos + Math.max(0, fee) >= SIM_FINISH_LINE) break;
+        card.workers[idx] -= 1;
+        if (card.workers[idx] === 0) delete card.workers[idx];
+        d.workers[idx] = (d.workers[idx] || 0) + 1;
+        if (STAGING_MODE === 'credit') {
+          moveBackward(state, idx, srcCost);
+          advancePlayer(state, idx, destCost);
+        } else if (fee > 0) {
+          advancePlayer(state, idx, fee);
+        }
+        needs[d.material] -= 1;
+        state.metrics.stagingMoves += 1;
+        state.metrics.stagingLastCallMoves += 1;
+        state.metrics.stagingMovesBy[idx] = (state.metrics.stagingMovesBy[idx] || 0) + 1;
+      }
+    }
+  }
+  // Whoever remains wades home: workers return to supply, no compensation.
+  for (const k in card.workers) {
+    const idx = parseInt(k);
+    if (card.workers[k] > 0) {
+      state.metrics.stagingReturned += card.workers[k];
+      state.players[idx].supply += card.workers[k];
+    }
+  }
+  card.workers = {};
+}
+
 // =============================================================================
 // CARD MOVEMENT
 // =============================================================================
 function moveCardToShoreline(state, card) {
+  // Flotsam Raft: last-call ferry window, then discard — never reaches the
+  // shoreline (see stagingLastCall).
+  if (card.effect === 'staging') {
+    stagingLastCall(state, card);
+    state.metrics.iconsWastedToShore += uncoveredIcons(card);
+    if (card.slot === 'pre') {
+      const idx = prerivIndexOf(state, card);
+      if (idx !== -1) refillPreriv(state, idx);
+    } else {
+      state.metrics.riverExitSlots.push(card.slot);
+      state.riverCards = state.riverCards.filter(c => c !== card);
+    }
+    card.slot = 'discarded';
+    return;
+  }
   // Fire card-exit effects before counting wasted icons / changing slot.
   fireOnShoreline(state, card);
   // count leftover (uncovered) icons as wasted
@@ -2054,7 +2141,7 @@ function finalizeCombinedCard(state, card, wasJam) {
 // destination card's per-item cost (dest). Scored on the same need-weighted
 // scale as auction targets.
 function findStagingMove(state, playerIdx, needs) {
-  const sources = [...state.riverCards, ...state.shorelineCards]
+  const sources = state.riverCards
     .filter(c => c.effect === 'staging' && workersOnCard(c, playerIdx) > 0);
   if (sources.length === 0) return null;
   let avail = sources.reduce((n, c) => n + workersOnCard(c, playerIdx), 0);
@@ -2103,7 +2190,7 @@ function doStagingMove(state, playerIdx, moves) {
     const dest = state.riverCards.find(c => c.id === mv.toId);
     if (!dest || uncoveredIcons(dest) <= 0) continue;
     let src = null;
-    for (const c of [...state.riverCards, ...state.shorelineCards]) {
+    for (const c of state.riverCards) {
       if (c.effect !== 'staging' || workersOnCard(c, playerIdx) <= 0) continue;
       // Under 'diff' the fee was planned against the priciest source — take
       // from it first; otherwise take from the fullest.
@@ -5168,7 +5255,7 @@ function sweepStaging(numGamesArg, numPArg, workersArg) {
 
   function collect(label, mode) {
     STAGING_MODE = mode;
-    let ferries = 0, stranded = 0, jam = 0, auctions = 0, turns = 0;
+    let ferries = 0, stranded = 0, lastCall = 0, endAboard = 0, jam = 0, auctions = 0, turns = 0;
     let users = 0, userWins = 0, userVP = 0, nonUsers = 0, nonUserWins = 0, nonUserVP = 0;
     for (let g = 0; g < numGames; g++) {
       const state = newGame(numP, workers);
@@ -5177,9 +5264,12 @@ function sweepStaging(numGamesArg, numPArg, workersArg) {
       jam += state.metrics.jamAuctions;
       auctions += state.metrics.auctions;
       turns += state.metrics.turns;
-      for (const c of [...state.riverCards, ...state.shorelineCards, ...state.prerivCards.filter(Boolean)]) {
+      stranded += state.metrics.stagingReturned;
+      lastCall += state.metrics.stagingLastCallMoves;
+      // Raft still in play at game end: those workers are the true strand.
+      for (const c of [...state.riverCards, ...state.prerivCards.filter(Boolean)]) {
         if (c.effect === 'staging') {
-          for (const k in c.workers) stranded += c.workers[k];
+          for (const k in c.workers) endAboard += c.workers[k];
         }
       }
       const scored = state.players.map(p => ({ p, vp: totalVP(p, state) }));
@@ -5194,7 +5284,9 @@ function sweepStaging(numGamesArg, numPArg, workersArg) {
     return {
       label,
       ferriesPerGame: ferries / numGames,
+      lastCallPerGame: lastCall / numGames,
       strandedPerGame: stranded / numGames,
+      endAboardPerGame: endAboard / numGames,
       jamPct: auctions ? jam / auctions : NaN,
       auctionsPerGame: auctions / numGames,
       turnsPerGame: turns / numGames,
@@ -5223,18 +5315,20 @@ function sweepStaging(numGamesArg, numPArg, workersArg) {
   const expWin = 100 / numP;
   console.log(`\nRiver Bankers — staging-card (Flotsam Raft, ${STAGING_ICONS} icons, 3P+ tier) sweep  (${numP}P × ${workers} workers × ${numGames} games/condition)`);
   console.log(`Fair-share win-rate = ${expWin.toFixed(1)}%.  'User' = made ≥1 ferry move that game.\n`);
-  console.log(pad('Condition', 28) + padL('ferry/g', 9) + padL('strand/g', 10) + padL('users/g', 9) + padL('uWin%', 8) + padL('Δfair', 8) + padL('uVP', 7) + padL('nWin%', 8) + padL('nVP', 7) + padL('jam%', 7) + padL('auc/g', 8) + padL('turns', 8));
-  console.log('-'.repeat(28 + 9 + 10 + 9 + 8 + 8 + 7 + 8 + 7 + 7 + 8 + 8));
+  console.log(pad('Condition', 28) + padL('ferry/g', 9) + padL('lc/g', 7) + padL('rtn/g', 8) + padL('users/g', 9) + padL('uWin%', 8) + padL('Δfair', 8) + padL('uVP', 7) + padL('nWin%', 8) + padL('nVP', 7) + padL('jam%', 7) + padL('turns', 8));
+  console.log('-'.repeat(28 + 9 + 7 + 8 + 9 + 8 + 8 + 7 + 8 + 7 + 7 + 8));
   for (const r of [off, f1, dc, df, cr]) {
     const f = (x, d = 1) => isNaN(x) ? '-' : x.toFixed(d);
     console.log(
-      pad(r.label, 28) + padL(f(r.ferriesPerGame, 2), 9) + padL(f(r.strandedPerGame, 2), 10) +
+      pad(r.label, 28) + padL(f(r.ferriesPerGame, 2), 9) + padL(f(r.lastCallPerGame, 2), 7) +
+      padL(f(r.strandedPerGame, 2), 8) +
       padL(f(r.usersPerGame, 2), 9) + padL(f(100 * r.userWin), 8) +
       padL(isNaN(r.userWin) ? '-' : ((100 * r.userWin) - expWin >= 0 ? '+' : '') + ((100 * r.userWin) - expWin).toFixed(1), 8) +
       padL(f(r.userVP, 1), 7) + padL(f(100 * r.nonUserWin), 8) + padL(f(r.nonUserVP, 1), 7) +
-      padL((100 * r.jamPct).toFixed(1), 7) + padL(f(r.auctionsPerGame), 8) + padL(f(r.turnsPerGame), 8));
+      padL((100 * r.jamPct).toFixed(1), 7) + padL(f(r.turnsPerGame), 8));
   }
-  console.log(`\nLegend: strand/g = staged workers never ferried (worth nothing at game end);`);
+  console.log(`\nLegend: lc/g = ferries made in the leaves-the-river last call; rtn/g = workers`);
+  console.log(`  returned to supply when the raft was discarded (declined or unaffordable last call);`);
   console.log(`  uWin%/uVP vs nWin%/nVP = ferry users vs non-users (self-selected, not causal);`);
   console.log(`  jam% = jammed share of all auctions — watch whether the card relieves contention.`);
   console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);

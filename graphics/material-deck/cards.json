@@ -196,7 +196,7 @@
       "material": "flotsam",
       "icons": 6,
       "effect_name": "Flotsam Raft",
-      "effect_text": "Cannot be spent. As an action: move workers to open river icons (drop a blank). Slide back this card's current per-item cost, then advance the destination's."
+      "effect_text": "Cannot be spent. Move workers to open river icons as an action (drop a blank), or when it leaves the river: slide back this card's cost, advance the destination's."
     }
   ]
 }

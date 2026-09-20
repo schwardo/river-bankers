@@ -1,16 +1,17 @@
-# Flotsam Raft — card mockup (not adopted)
+# Flotsam Raft — design record
 
-Staging material card designed + simmed 2026-09-19 (see the
-"Sim a worker-relocation material card" DONE task in river-bankers.org
-for the full design, sim results, and canonical wording). 6 icons,
-3P+ tier, credit-variant ferry fee executed as the printed two-step.
+Staging material card designed, simmed, and ADOPTED 2026-09-19 (card data,
+art, and rulebook entry are live; web/BGA gameplay wiring tracked in the
+prototype TODO in river-bankers.org). Full design history, sim results, and
+the last-call-and-discard rule: see the "Sim a worker-relocation material
+card" DONE task in river-bankers.org.
 
-- `FlotsamRaft.png` — 300 DPI print render of the mock
-- `flotsam.svg` — the lashed-driftwood icon glyph (goes in graphics/icons/)
-- `flotsam-generator.patch` — `git apply` from the repo root: adds the
-  6-icon [3,3] layout, the 3+ badge mapping for 6 icons, the flotsam
-  material entry, and the card entry to the material-deck generator.
+- `FlotsamRaft.png` — final 300 DPI print render
+- `flotsam.svg` — copy of the icon glyph (canonical: graphics/icons/flotsam.svg)
 
-To adopt: `git apply graphics/mockups/flotsam-raft/flotsam-generator.patch`,
-copy `flotsam.svg` to `graphics/icons/`, regenerate, then wire the card
-into web/index.html and BGA (sim.js already has it behind RB_STAGING).
+Rule summary: icons hold flotsam (cannot be spent, scores nothing). Ferry
+workers to open river icons as an action, or at the last call when the card
+would leave the river (fish-track order); two-step fee = slide back this
+card's cost, advance the destination's. Action ferries drop a blank.
+Workers still aboard after last call return to supply; card is discarded —
+it never reaches the shoreline.
