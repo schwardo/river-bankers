@@ -33,7 +33,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 6, effect: 'When you build: 1 of your Clay workers may substitute for any other material.' },
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top of the material deck at any time.' },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +2 VP per shoreline card with at least one of your workers (max +6).' },
-  { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build: each Reed worker counts as 2 reeds.' },
+  { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build another structure: each Reed worker counts as 2 reeds.' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any non-wild river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck; shuffle the replaced card back into the deck.' },
   { name: 'Pontoon',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
@@ -51,7 +51,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End of game: +4 VP per built structure of yours that uses Vines (max +12).' },
   { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 0, effect: 'When you build a structure that uses Vines: slide back 1🐟.\n\nEnd of game: +2 VP per built structure of yours that uses Vines.' },
   { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 0, effect: 'When you build a structure that uses Stones: draw 1 structure card and discard 1.\n\nEnd of game: +2 VP per built structure of yours that uses Stones (max +8).' },
-  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds: place 1 free worker on a River 1 card.\n\nEnd of game: +2 VP per built structure of yours that uses Reeds.' },
+  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds: place 1 free worker on a River 1 card.\n\nEnd of game: +2 VP per built structure of yours that uses Reeds (max +8).' },
   { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay: peek at the top of the structure deck; you may swap it with 1 card from your hand.\n\nEnd of game: +3 VP per built structure of yours that uses Clay (max +12).' },
   { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 3, vp: 0, effect: 'When you build a structure that uses Mud: move one of your workers to another river card with at least one of your workers (may replace a blank).\n\nEnd of game: +3 VP per built structure of yours that uses Mud (max +9).' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'As an action: pay 1🐟 to add a blank to any uncovered icon.' },
@@ -190,7 +190,7 @@ function totalVP(p, state) {
   v += matEndGameVP(p, 'Vine Ladder',    4, 12, 'vines');
   v += matEndGameVP(p, 'Vine Trellis',   2, Infinity, 'vines');
   v += matEndGameVP(p, 'Stone Causeway', 2, 8,  'stones');
-  v += matEndGameVP(p, 'Reed Walkway',   2, Infinity, 'reeds');
+  v += matEndGameVP(p, 'Reed Walkway',   2, 8,  'reeds');  // capped +8 [2026-09-20], was uncapped
   v += matEndGameVP(p, 'Clay Vault',     3, 12, 'clay');
   v += matEndGameVP(p, 'Burrow Network', 3, 9,  'mud');
   if (hasEffect(p, 'Hidden Cache')) {
@@ -1124,6 +1124,10 @@ const SV_WILD_CARD = { material: 'stones', icons: 5, effect: 'wild', wildAlt: 'v
 // the sim baseline includes it. RB_STAGING=off restores the pre-raft deck
 // for measurement.
 let STAGING_MODE = process.env.RB_STAGING || 'credit';
+// Most-workers tie rule (Mud Wallow, Cattail Cluster). 'nobody' (live rule:
+// a tied top spot pays no one) | 'friendly' (RB_TIES=friendly: every tied
+// leader gets the full bonus). `node sim.js ties` sweeps the two.
+let MW_TIES = process.env.RB_TIES || 'nobody';
 // First-game "plain river" variant (RB_PLAIN=1, and the `plain` sweep):
 // ignore all material-card effect text EXCEPT the wildcards, and remove
 // Flotsam Raft from the deck. Mirrors the rulebook's first-game default.
@@ -1424,6 +1428,9 @@ function newGame(numPlayers, workersPerPlayer = null) {
       stagingMovesBy: {},         // playerIdx → ferry moves (staging experiment)
       stagingLastCallMoves: 0,    // subset of stagingMoves made in the leaves-the-river last call
       stagingReturned: 0,         // staged workers returned to supply when the raft was discarded
+      mwResolved: 0,              // most-workers cards (Mud Wallow, Cattail Cluster) reaching shoreline with workers aboard
+      mwTies: 0,                  // ...of those, top spot tied (live rule: bonus whiffs)
+      mwAwards: [],               // per bonus actually paid: {playerIdx, bonus} (friendly ties → one entry per tied leader)
       crowdSpends: 0,             // crowd-bonus card: builds that consumed from it (first-worker bonus applied once each)
       crowdNSum: 0,               // sum of N (distinct players aboard) across those spends
       crowdBonusUnits: 0,         // extra material units the bonus minted (N-1 per crowded spend)
@@ -1613,6 +1620,29 @@ function stagingLastCall(state, card) {
         state.metrics.stagingMovesBy[idx] = (state.metrics.stagingMovesBy[idx] || 0) + 1;
       }
     }
+    // Second pass — it's the LAST call: anything left aboard strands for
+    // zero. Take free-or-better parking on any open material icon (fee ≤ 0
+    // in credit mode), needed or not: a real material at worst pairs at
+    // end-game, a stranded slip never scores. Mirrors web planLastCallFromRaft.
+    if (STAGING_MODE === 'credit' && workersOnCard(card, idx) > 0) {
+      const parkDests = state.riverCards
+        .filter(c => c !== card && c.effect !== 'staging' && typeof c.slot === 'number' &&
+          uncoveredIcons(c) > 0 && playerCardCost(state, c, idx) - srcCost <= 0)
+        .sort((a, b) => playerCardCost(state, a, idx) - playerCardCost(state, b, idx));
+      for (const d of parkDests) {
+        while (workersOnCard(card, idx) > 0 && uncoveredIcons(d) > 0) {
+          const destCost = playerCardCost(state, d, idx);
+          card.workers[idx] -= 1;
+          if (card.workers[idx] === 0) delete card.workers[idx];
+          d.workers[idx] = (d.workers[idx] || 0) + 1;
+          moveBackward(state, idx, srcCost);
+          advancePlayer(state, idx, destCost);
+          state.metrics.stagingMoves += 1;
+          state.metrics.stagingLastCallMoves += 1;
+          state.metrics.stagingMovesBy[idx] = (state.metrics.stagingMovesBy[idx] || 0) + 1;
+        }
+      }
+    }
   }
   // Whoever remains wades home: workers return to supply, no compensation.
   for (const k in card.workers) {
@@ -1689,9 +1719,23 @@ function fireOnShoreline(state, card) {
   }
   if (card.effect === 'most-workers') {
     entries.sort((a, b) => b[1] - a[1]);
-    if (entries.length > 1 && entries[0][1] === entries[1][1]) return; // tie → no bonus
+    state.metrics.mwResolved += 1;
+    const tied = entries.length > 1 && entries[0][1] === entries[1][1];
+    if (tied) state.metrics.mwTies += 1;
+    const bonus = card.effectSpec.flatBonus || 0;
+    if (tied && MW_TIES === 'friendly') {
+      // Variant (RB_TIES=friendly): every tied leader gets the bonus.
+      for (const [idxStr, n] of entries) {
+        if (n !== entries[0][1]) break;
+        moveBackward(state, parseInt(idxStr), bonus);
+        state.metrics.mwAwards.push({ playerIdx: parseInt(idxStr), bonus });
+      }
+      return;
+    }
+    if (tied) return; // live rule: tie → no bonus
     const idx = parseInt(entries[0][0]);
-    moveBackward(state, idx, card.effectSpec.flatBonus || 0);
+    moveBackward(state, idx, bonus);
+    state.metrics.mwAwards.push({ playerIdx: idx, bonus });
     return;
   }
 }
@@ -2218,7 +2262,10 @@ function findStagingMove(state, playerIdx, needs) {
       const gain = (remNeed[d.material] || 0) - fee * 0.4;
       if (gain <= 0) break;
       moves.push({ toId: d.id, fee, destCost: playerCardCost(state, d, playerIdx) });
-      score += gain;
+      // +0.5 stranding-risk credit per move: a slip left aboard eventually
+      // strands for zero, so cashing one is worth a bit more than the same
+      // material from a fresh auction. Mirrors web findStagingMove.
+      score += gain + 0.5;
       if ((remNeed[d.material] || 0) > 0) remNeed[d.material] -= 1;
       avail -= 1; open -= 1;
     }
@@ -2289,21 +2336,34 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   const wbm = playerWorkersByMaterial(state, playerIdx);
   // Wildcards (Driftwood Tangle, Mud Slick): include the alt material's
   // deficit when computing need, since a wild worker can fulfill either.
-  // Staging card: a staged worker can later ferry to any material, so its
-  // need spans every material (the fee/delay tax lands on myCost below).
-  const matsForNeed = card.effect === 'staging' ? MAT_KEYS
-    : card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+  const matsForNeed = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
   let need = 0;
   let maxNeed = 0;
-  for (const s of p.hand) {
-    let cardNeed = 0;
-    for (const m of matsForNeed) {
-      const want = s.cost[m] || 0;
-      const have = wbm[m] || 0;
-      if (want > have) cardNeed += (want - have);
+  if (card.effect === 'staging') {
+    // Staging card: a staged worker is an OPTION on one future material,
+    // delivered a whole action (or last call) later — never material now.
+    // Valuing it as the summed deficit over every material made the AI flood
+    // the raft (web playtest 2026-09-20: 11 bids on 6 flotsam icons, zero
+    // ferries all game). Mirror the pull scorer: biggest single-material
+    // deficit minus a tick. Mirrors web aiDecideBid.
+    let bestDef = 0;
+    for (const m of MAT_KEYS) {
+      let def = 0;
+      for (const s of p.hand) def += Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0));
+      if (def > bestDef) bestDef = def;
     }
-    need += cardNeed;
-    if (cardNeed > maxNeed) maxNeed = cardNeed;
+    need = maxNeed = Math.max(0, bestDef - 1);
+  } else {
+    for (const s of p.hand) {
+      let cardNeed = 0;
+      for (const m of matsForNeed) {
+        const want = s.cost[m] || 0;
+        const have = wbm[m] || 0;
+        if (want > have) cardNeed += (want - have);
+      }
+      need += cardNeed;
+      if (cardNeed > maxNeed) maxNeed = cardNeed;
+    }
   }
   // Naive bidder: grab exactly the hand's deficit for this material, capped only
   // by open icons and workers we can physically marshal (recall freely). Skip all
@@ -2323,6 +2383,9 @@ function aiDecideBid(state, playerIdx, card, minBid) {
 
   let target = Math.round((need + maxNeed) / 2);
   target = Math.min(target, safePool, open, bidCap());
+  // Staged slips only pay if they actually get ferried; more than 2 at once
+  // rarely do. Cap the exposure. Mirrors web aiDecideBid.
+  if (card.effect === 'staging') target = Math.min(target, 2);
   // Use the player-specific per-item cost so Reed Bed makes reed auctions more attractive.
   let myCost = playerCardCost(state, card, playerIdx);
   // Old Growth at River 3/4: each worker yields 2x material, halving the
@@ -2424,8 +2487,10 @@ function aiDecideBid(state, playerIdx, card, minBid) {
   // Over-bid aggression: flood a contested card's open spots (up to marshalable
   // workers) so surplus workers burn fish in a jam. Uses totalPool so it may
   // recall to staff spots; RECALL_RELUCTANCE below can still temper that. Only
-  // when the player genuinely wants this material (need > 0).
-  if (need > 0) {
+  // when the player genuinely wants this material (need > 0). Never flood the
+  // raft: a jammed flotsam bid burns fish for an option that still needs a
+  // second action to become anything.
+  if (need > 0 && card.effect !== 'staging') {
     target = applyOverbid(target, totalPool, open, minBid,
                           pOverbid(playerIdx, state.players.length));
   }
@@ -2559,7 +2624,7 @@ function aiEffectValue(struct, p, state) {
   if (struct.name === 'Reed Walkway') {
     const o = VP_OVERRIDES['Reed Walkway'];
     const mult = (o && o.mult !== undefined) ? o.mult : 2;
-    const cap = (o && o.cap !== undefined) ? o.cap : Infinity;
+    const cap = (o && o.cap !== undefined) ? o.cap : 8;
     const builtReed = p.built.filter(b => (b.cost.reeds || 0) > 0).length;
     const handReed = p.hand.filter(s => (s.cost.reeds || 0) > 0).length;
     return Math.min(cap, mult * (builtReed + 1 + Math.min(handReed, 2))) + 2;
@@ -3307,6 +3372,11 @@ function aiRecallBudget(state, playerIdx, excludeCardId) {
   ];
   for (const { c, river } of cards) {
     if (excludeCardId !== undefined && c.id === excludeCardId) continue;
+    // Staged raft workers are sunk options: 'staging' never appears in a hand
+    // cost, so the "not useful" branch below used to mark them ALL safe —
+    // recalling one burns the slip (the icon blanks) for a plain supply
+    // worker. Never recall from the raft. Mirrors web aiRecallBudget.
+    if (c.effect === 'staging') continue;
     const w = workersOnCard(c, playerIdx);
     if (w === 0) continue;
     let safeRecall;
@@ -3842,10 +3912,12 @@ function fireOnBuildEffect(state, playerIdx, struct) {
   }
   if (struct.name === 'Sap Drip') {
     // Place 2 free workers on a river card whose material we actually need. Fall
-    // back to max-uncovered-icons if nothing is needed.
+    // back to max-uncovered-icons if nothing is needed. Never onto the raft:
+    // flotsam icons yield nothing unless ferried (a second action), and
+    // covering them hastens the break-up. Mirrors web performBuild.
     const wbm = playerWorkersByMaterial(state, playerIdx);
     const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
-    const candsAll = state.riverCards.filter(c => uncoveredIcons(c) > 0);
+    const candsAll = state.riverCards.filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0);
     if (candsAll.length === 0 || p.supply === 0) return;
     candsAll.sort((a, b) => {
       const aScore = Math.min(2, need(a.material), uncoveredIcons(a));
@@ -5576,6 +5648,88 @@ function sweepStaging(numGamesArg, numPArg, workersArg) {
   console.log(`  returned to supply when the raft was discarded (declined or unaffordable last call);`);
   console.log(`  uWin%/uVP vs nWin%/nVP = ferry users vs non-users (self-selected, not causal);`);
   console.log(`  jam% = jammed share of all auctions — watch whether the card relieves contention.`);
+  console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
+// Most-workers tie-rule sweep: live rule (tie → nobody; the Mud Wallow /
+// Cattail Cluster bonus whiffed on 2-2 ties in both 2026-09 web playtests)
+// vs RB_TIES=friendly (every tied leader gets the full bonus). Reports how
+// often the effect resolves at all, the tie share, bonuses paid, and the
+// awardee cohort's win rate vs fair share. Run with `cpulimit -l 50 -f -m --`.
+// Usage: node sim.js ties [numGames] [numP] [workers]
+function sweepTies(numGamesArg, numPArg, workersArg) {
+  const numP = parseInt(numPArg) || 3;
+  const workers = parseInt(workersArg) || defaultWorkersPerPlayer(numP);
+  const numGames = parseInt(numGamesArg) || 3000;
+  configureMaterials(6);
+  const fishLine = simFishLine(numP);
+
+  function collect(label, mode) {
+    MW_TIES = mode;
+    let resolved = 0, ties = 0, awards = 0, fishBack = 0, jam = 0, auctions = 0, turns = 0;
+    let users = 0, userWins = 0, userVP = 0, nonUsers = 0, nonUserWins = 0, nonUserVP = 0;
+    for (let g = 0; g < numGames; g++) {
+      const state = newGame(numP, workers);
+      egPlayOut(state, 'fish', 0, fishLine, 'd');
+      resolved += state.metrics.mwResolved;
+      ties += state.metrics.mwTies;
+      awards += state.metrics.mwAwards.length;
+      fishBack += state.metrics.mwAwards.reduce((s, a) => s + a.bonus, 0);
+      jam += state.metrics.jamAuctions;
+      auctions += state.metrics.auctions;
+      turns += state.metrics.turns;
+      const got = new Set(state.metrics.mwAwards.map(a => a.playerIdx));
+      const scored = state.players.map(p => ({ p, vp: totalVP(p, state) }));
+      scored.sort((a, b) => b.vp - a.vp || a.p.timePos - b.p.timePos);
+      const winner = scored[0].p;
+      for (const { p, vp } of scored) {
+        if (got.has(p.idx)) { users++; userVP += vp; if (p === winner) userWins++; }
+        else { nonUsers++; nonUserVP += vp; if (p === winner) nonUserWins++; }
+      }
+    }
+    return {
+      label,
+      resolvedPerGame: resolved / numGames,
+      tiePct: resolved ? ties / resolved : NaN,
+      awardsPerGame: awards / numGames,
+      fishBackPerGame: fishBack / numGames,
+      jamPct: auctions ? jam / auctions : NaN,
+      turnsPerGame: turns / numGames,
+      usersPerGame: users / numGames,
+      userWin: users ? userWins / users : NaN,
+      userVP: users ? userVP / users : NaN,
+      nonUserWin: nonUsers ? nonUserWins / nonUsers : NaN,
+      nonUserVP: nonUsers ? nonUserVP / nonUsers : NaN,
+    };
+  }
+
+  const t0 = Date.now();
+  process.stderr.write('\rties: nobody (live rule) ...       ');
+  const off = collect('tie → nobody (live rule)', 'nobody');
+  process.stderr.write('\rties: friendly ...                 ');
+  const fr = collect('tie → all leaders (friendly)', 'friendly');
+  MW_TIES = process.env.RB_TIES || 'nobody';
+  process.stderr.write('\r' + ' '.repeat(40) + '\r');
+
+  const expWin = 100 / numP;
+  console.log(`\nRiver Bankers — most-workers tie-rule sweep (Mud Wallow${numP >= 4 ? ' + Cattail Cluster' : ''})  (${numP}P × ${workers} workers × ${numGames} games/condition)`);
+  console.log(`Fair-share win-rate = ${expWin.toFixed(1)}%.  'Awardee' = received ≥1 most-workers bonus that game.\n`);
+  console.log(pad('Condition', 30) + padL('rslv/g', 8) + padL('tie%', 7) + padL('awd/g', 8) + padL('🐟bk/g', 9) + padL('aWin%', 8) + padL('Δfair', 8) + padL('aVP', 7) + padL('nWin%', 8) + padL('nVP', 7) + padL('jam%', 7) + padL('turns', 8));
+  console.log('-'.repeat(30 + 8 + 7 + 8 + 9 + 8 + 8 + 7 + 8 + 7 + 7 + 8));
+  for (const r of [off, fr]) {
+    const f = (x, d = 1) => isNaN(x) ? '-' : x.toFixed(d);
+    console.log(
+      pad(r.label, 30) + padL(f(r.resolvedPerGame, 2), 8) + padL(f(100 * r.tiePct), 7) +
+      padL(f(r.awardsPerGame, 2), 8) + padL(f(r.fishBackPerGame, 2), 9) +
+      padL(f(100 * r.userWin), 8) +
+      padL(isNaN(r.userWin) ? '-' : ((100 * r.userWin) - expWin >= 0 ? '+' : '') + ((100 * r.userWin) - expWin).toFixed(1), 8) +
+      padL(f(r.userVP, 1), 7) + padL(f(100 * r.nonUserWin), 8) + padL(f(r.nonUserVP, 1), 7) +
+      padL((100 * r.jamPct).toFixed(1), 7) + padL(f(r.turnsPerGame), 8));
+  }
+  console.log(`\nLegend: rslv/g = most-workers cards reaching shoreline with workers aboard;`);
+  console.log(`  tie% = share of those where the top spot tied (live rule pays nobody);`);
+  console.log(`  awd/g = bonuses paid; 🐟bk/g = fish of slide-back minted; aWin%/aVP vs`);
+  console.log(`  nWin%/nVP = awardees vs everyone else (self-selected, not causal).`);
   console.log(`\nElapsed: ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
 }
 
@@ -8595,6 +8749,7 @@ if (require.main === module) {
   else if (mode === 'build-rate') sweepBuildRate(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'tribute') sweepTribute(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'oldgrowth') sweepOldGrowth(process.argv[3], process.argv[4], process.argv[5]);
+  else if (mode === 'ties') sweepTies(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'staging') sweepStaging(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'crowd') sweepCrowd(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'plain') sweepPlain(process.argv[3], process.argv[4]);

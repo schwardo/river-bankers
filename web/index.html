@@ -1350,6 +1350,13 @@
   }
 
   /* ================= LOG ================= */
+  .log-download-btn {
+    font-size: 0.72em; font-weight: 500; vertical-align: middle;
+    margin-left: 8px; padding: 2px 8px; cursor: pointer;
+    background: transparent; color: inherit; opacity: 0.7;
+    border: 1px solid currentColor; border-radius: 6px;
+  }
+  .log-download-btn:hover { opacity: 1; }
   .log-area {
     background: var(--paper);
     border: 2px solid var(--bank);
@@ -1672,7 +1679,7 @@
   </div>
 
   <div>
-    <h3>Game log</h3>
+    <h3>Game log <button class="log-download-btn" onclick="downloadFullLog()" title="Download the complete game log as a text file (the panel below shows only the most recent lines)">⬇ full log</button></h3>
     <div id="log-area" class="log-area"></div>
   </div>
 </div>
@@ -1904,7 +1911,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Charcoal Pit',   cost: { clay: 4, logs: 2 },              time: 3, vp: 6, effect: 'When you build: 1 of your Clay workers may substitute for any other material.' },
   { name: 'Lookout Tree',   cost: { logs: 5, stones: 2 },            time: 4, vp: 8, effect: 'Peek at the top of the material deck at any time.' },
   { name: 'Pier',           cost: { logs: 3, stones: 2 },            time: 3, vp: 0, effect: 'End of game: +2 VP per shoreline card with at least one of your workers (max +6).' },
-  { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build: each Reed worker counts as 2 reeds.' },
+  { name: 'Cattail Marsh',  cost: { reeds: 4, mud: 2 },              time: 3, vp: 5, effect: 'When you build another structure: each Reed worker counts as 2 reeds.' },
   { name: 'Wood Pile',      cost: { logs: 4 },                       time: 2, vp: 4, effect: 'Once per game (flip card): claim 1 uncovered Log icon from any non-wild river card for 1🐟.' },
   { name: 'Heron Roost',    cost: { reeds: 3, vines: 2 },            time: 3, vp: 6, effect: 'As an action: pay 1🐟 to replace a Headwaters card with the top of the material deck; shuffle the replaced card back into the deck.' },
   { name: 'Pontoon',     cost: { logs: 4, reeds: 1 },             time: 3, vp: 4, effect: 'When a jammed auction makes you place fewer workers than your bid, pay 🐟 for one fewer worker.' },
@@ -1922,7 +1929,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Vine Ladder',    cost: { vines: 4, stones: 2 },           time: 4, vp: 0, effect: 'End of game: +4 VP per built structure of yours that uses Vines (max +12).' },
   { name: 'Vine Trellis',   cost: { vines: 3, stones: 1 },           time: 2, vp: 0, effect: 'When you build a structure that uses Vines: slide back 1🐟.\n\nEnd of game: +2 VP per built structure of yours that uses Vines.' },
   { name: 'Stone Causeway', cost: { stones: 3, logs: 2 },            time: 3, vp: 0, effect: 'When you build a structure that uses Stones: draw 1 structure card and discard 1.\n\nEnd of game: +2 VP per built structure of yours that uses Stones (max +8).' },
-  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds: place 1 free worker on a River 1 card.\n\nEnd of game: +2 VP per built structure of yours that uses Reeds.' },
+  { name: 'Reed Walkway',   cost: { reeds: 4, mud: 1 },              time: 3, vp: 0, effect: 'When you build a structure that uses Reeds: place 1 free worker on a River 1 card.\n\nEnd of game: +2 VP per built structure of yours that uses Reeds (max +8).' },
   { name: 'Clay Vault',     cost: { clay: 3, vines: 2 },             time: 3, vp: 0, effect: 'When you build a structure that uses Clay: peek at the top of the structure deck; you may swap it with 1 card from your hand.\n\nEnd of game: +3 VP per built structure of yours that uses Clay (max +12).' },
   { name: 'Burrow Network', cost: { mud: 3, reeds: 2 },              time: 3, vp: 0, effect: 'When you build a structure that uses Mud: move one of your workers to another river card with at least one of your workers (may replace a blank).\n\nEnd of game: +3 VP per built structure of yours that uses Mud (max +9).' },
   { name: 'Driftwood Snag', cost: { logs: 2, reeds: 2, mud: 1 },     time: 3, vp: 6, effect: 'As an action: pay 1🐟 to add a blank to any uncovered icon.' },
@@ -2045,7 +2052,8 @@ function vpBreakdown(p, state) {
   }
   if (hasEffect(p, 'Reed Walkway')) {
     const n = p.built.filter(b => (b.cost.reeds || 0) > 0).length;
-    bonuses.push({ name: 'Reed Walkway', vp: 2 * n, detail: `2★ × ${n} built structure${n === 1 ? '' : 's'} using reeds` });
+    const vp = Math.min(8, 2 * n);
+    bonuses.push({ name: 'Reed Walkway', vp, detail: `2★ × ${n} built structure${n === 1 ? '' : 's'} using reeds (max 8)` });
   }
   if (hasEffect(p, 'Clay Vault')) {
     const n = p.built.filter(b => (b.cost.clay || 0) > 0).length;
@@ -2275,7 +2283,9 @@ function cardMatIcons(card) {
   if (!card.wildAlt) return m.icon;
   // Slash between the two icons reads as "logs OR reeds" — same separator
   // we use on the printed PNG's header label and the wild-chip below.
-  return `${m.icon}/${MATERIALS[card.wildAlt].icon}`;
+  // data-strip: the SVGs contribute no plain text, so log()'s text form
+  // strips the bare slash too (it used to surface as a stray "/ Card Name").
+  return `${m.icon}<span data-strip>/</span>${MATERIALS[card.wildAlt].icon}`;
 }
 function cardMatLabel(card) {
   const m = MATERIALS[card.material];
@@ -3075,10 +3085,28 @@ function advancePlayer(playerIdx, byTime) {
 // transcripts, AI prompts) don't have to grovel through embedded SVG markup
 // from the material/species icons.
 function log(msg) {
-  const text = String(msg).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  const text = String(msg)
+    .replace(/<span data-strip>[^<]*<\/span>/g, '')  // wild-pair "/" separator
+    .replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
   state.log.push({ msg, text, t: Date.now() });
+  // Display ring stays capped; the plain-text history is kept whole for the
+  // "download full log" affordance (a few hundred short strings — cheap).
+  state.fullLog = state.fullLog || [];
+  state.fullLog.push(text);
   if (state.log.length > 200) state.log.shift();
   renderLog();
+}
+
+// Download the complete game log (uncapped plain text) — playtest reviews
+// kept losing the opening ~40 events to the 200-line display ring.
+function downloadFullLog() {
+  const lines = (state.fullLog || []).join('\n');
+  const blob = new Blob([lines], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `river-bankers-log-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function speciesLabel(p) {
@@ -5097,24 +5125,40 @@ function aiDecideBid(playerIdx, card, minBid) {
   // Wildcards (Driftwood Tangle, Mud Slick): include the alt material's deficit
   // since a wild worker can fulfill either.
   const wbm = playerWorkersByMaterial(state, playerIdx);
-  // Staging card: a staged worker can ferry to any material later, so its
-  // need spans every material; the fee/delay tax lands on effCost below.
-  const matsForNeed = card.effect === 'staging' ? MAT_KEYS
-    : card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+  const matsForNeed = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
   let need = 0;
   let maxNeed = 0;
-  for (const s of p.hand) {
-    let cardNeed = 0;
-    for (const m of matsForNeed) {
-      const want = s.cost[m] || 0;
-      const have = wbm[m] || 0;
-      if (want > have) cardNeed += (want - have);
+  if (card.effect === 'staging') {
+    // Staging card: a staged worker is an OPTION on one future material,
+    // delivered a whole action (or last call) later — never material now.
+    // Valuing it as the summed deficit over every material made both AI
+    // profiles flood the raft (2026-09-20 playtest: an 11-bids-on-6-icons
+    // full jam on flotsam, zero ferries all game). Mirror the pull scorer:
+    // biggest single-material deficit minus a tick.
+    let bestDef = 0;
+    for (const m of MAT_KEYS) {
+      let def = 0;
+      for (const s of p.hand) def += Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0));
+      if (def > bestDef) bestDef = def;
     }
-    need += cardNeed;
-    if (cardNeed > maxNeed) maxNeed = cardNeed;
+    need = maxNeed = Math.max(0, bestDef - 1);
+  } else {
+    for (const s of p.hand) {
+      let cardNeed = 0;
+      for (const m of matsForNeed) {
+        const want = s.cost[m] || 0;
+        const have = wbm[m] || 0;
+        if (want > have) cardNeed += (want - have);
+      }
+      need += cardNeed;
+      if (cardNeed > maxNeed) maxNeed = cardNeed;
+    }
   }
   // Blend of total-need and best-single-need
   let target = Math.round((need + maxNeed) / 2);
+  // Staged slips only pay if they actually get ferried; more than 2 at once
+  // rarely do. Cap the exposure.
+  if (card.effect === 'staging') target = Math.min(target, 2);
 
   // Cap by safe pool, open, and 4 — never auto-disrupt builds for marginal contention.
   target = Math.min(target, safePool, open, 4);
@@ -5210,7 +5254,9 @@ function aiDecideBid(playerIdx, card, minBid) {
   // Over-bid aggression: flood a contested card's open spots (up to marshalable
   // workers) so surplus workers burn fish in a jam. Only when this AI genuinely
   // wants the material. Uses totalPool, so it may recall to staff the spots.
-  if (need > 0) target = aiApplyOverbid(target, totalPool, open, minBid, aiOverbid(playerIdx));
+  // Never flood the raft: a jammed flotsam bid burns fish for an option that
+  // still needs a second action to become anything.
+  if (need > 0 && card.effect !== 'staging') target = aiApplyOverbid(target, totalPool, open, minBid, aiOverbid(playerIdx));
   // Pre-auction recall: pull workers off the river/shoreline to fund the bid.
   let needRecall = target - p.supply;
   if (needRecall > 0) {
@@ -5317,7 +5363,7 @@ function aiEffectValue(struct, p, state) {
   if (struct.name === 'Reed Walkway') {
     const builtReed = p.built.filter(b => (b.cost.reeds || 0) > 0).length;
     const handReed = p.hand.filter(s => (s.cost.reeds || 0) > 0).length;
-    return 2 * (builtReed + 1 + Math.min(handReed, 2)) + 2;
+    return Math.min(8, 2 * (builtReed + 1 + Math.min(handReed, 2))) + 2;
   }
   if (struct.name === 'Clay Vault') {
     const builtClay = p.built.filter(b => (b.cost.clay || 0) > 0).length;
@@ -6017,6 +6063,12 @@ function aiRecallBudget(playerIdx, excludeCardId) {
   ];
   for (const { c, river } of cards) {
     if (excludeCardId !== undefined && c.id === excludeCardId) continue;
+    // Staged raft workers are sunk options: 'staging' never appears in a hand
+    // cost, so the "not useful" branch below used to mark them ALL safe —
+    // recalling one burns the slip (the icon blanks) for a plain supply
+    // worker. Never recall from the raft (2026-09-20 playtest: the friendly
+    // AI recalled ~10🐟 of slips this way).
+    if (c.effect === 'staging') continue;
     const w = workersOnCard(c, playerIdx);
     if (w === 0) continue;
     let safeRecall;
@@ -6103,7 +6155,12 @@ function findStagingMove(playerIdx, needs) {
       const fee = stagingFerryFee(raft, d, playerIdx);
       if ((remNeed[d.material] || 0) - fee * 0.4 <= 0) break;
       moves.push({ toId: d.id });
-      score += remNeed[d.material] - fee * 0.4;
+      // +0.5 stranding-risk credit per move: a slip left aboard eventually
+      // strands for zero, so cashing one is worth a bit more than the same
+      // material from a fresh auction. Without it the ferry action kept
+      // losing the candidate comparison and slips rotted (2026-09-20: zero
+      // ferries all game across ~6 staged AI workers).
+      score += remNeed[d.material] - fee * 0.4 + 0.5;
       netFee += fee;
       remNeed[d.material] -= 1; avail -= 1; open -= 1;
     }
@@ -6230,6 +6287,23 @@ function planLastCallFromRaft(raft, playerIdx, needs) {
       if ((remNeed[d.material] || 0) - fee * 0.4 <= 0) break;
       moves.push({ toId: d.id });
       remNeed[d.material] -= 1; avail -= 1; open -= 1;
+    }
+  }
+  // Second pass — it's the LAST call: anything left aboard strands for zero.
+  // Take free-or-better parking on any open material icon (fee ≤ 0), needed
+  // or not: a real material at worst pairs at end-game, a stranded slip never
+  // scores.
+  if (avail > 0) {
+    const parkDests = state.riverCards
+      .filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0
+        && stagingFerryFee(raft, c, playerIdx) <= 0)
+      .sort((a, b) => stagingFerryFee(raft, a, playerIdx) - stagingFerryFee(raft, b, playerIdx));
+    for (const d of parkDests) {
+      let open = uncoveredIcons(d) - moves.filter(mv => mv.toId === d.id).length;
+      while (open > 0 && avail > 0) {
+        moves.push({ toId: d.id });
+        avail -= 1; open -= 1;
+      }
     }
   }
   return moves.length ? { moves } : null;
@@ -6888,6 +6962,10 @@ function humanRetire() {
 }
 
 function humanSelectAuctionCard(cardId) {
+  // Phase guard: this is a turn action. Without it, a programmatic call
+  // mid-flush (or any future UI path that leaves the handler reachable)
+  // would charge a second action's fish inside one turn.
+  if (state.phase !== 'choose-action' && state.phase !== 'select-auction-card') return;
   state.lastHumanActionType = 'auction';
   const card = state.riverCards.find(c => c.id === cardId);
   if (!card || uncoveredIcons(card) === 0) return;
@@ -6900,6 +6978,10 @@ function humanSelectAuctionCard(cardId) {
 }
 
 function humanSelectPrerivCard(slotIdx) {
+  // Phase guard — see humanSelectAuctionCard. In particular this handler used
+  // to be callable during flush-pick-card, running a full Pull (2–4🐟) on top
+  // of the 5🐟 flush in the same turn.
+  if (state.phase !== 'choose-action' && state.phase !== 'select-preriv-card') return;
   state.lastHumanActionType = 'preriv';
   const card = state.prerivCards[slotIdx];
   if (!card) return;
@@ -6964,6 +7046,8 @@ function humanConfirmBrowseKeep() {
 }
 
 async function humanSelectBuild(handIdx) {
+  // Phase guard — see humanSelectAuctionCard. coda-build is the one-final-build phase.
+  if (state.phase !== 'choose-action' && state.phase !== 'select-build' && state.phase !== 'coda-build') return;
   state.lastHumanActionType = 'build';
   const human = state.players.find(p => p.isHuman);
   const struct = human.hand[handIdx];
@@ -7711,14 +7795,23 @@ async function fireOnBuildEffect(playerIdx, struct) {
     } else {
       const wbm = playerWorkersByMaterial(state, playerIdx);
       const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
-      cands.sort((a, b) => {
-        const aScore = Math.min(2, need(a.material), uncoveredIcons(a));
-        const bScore = Math.min(2, need(b.material), uncoveredIcons(b));
-        if (aScore !== bScore) return bScore - aScore;
-        return uncoveredIcons(b) - uncoveredIcons(a);
-      });
-      target = cands[0];
+      // Never free-place onto the raft: flotsam icons yield nothing unless
+      // ferried (a second action), and covering them hastens the break-up.
+      // The 2026-09-20 playtest saw the greedy AI dump Sap Drip workers there
+      // and lose them minutes later. A real material card is always ≥ pairs.
+      const matCands = cands.filter(c => c.effect !== 'staging');
+      if (matCands.length === 0) { target = null; }
+      else {
+        matCands.sort((a, b) => {
+          const aScore = Math.min(2, need(a.material), uncoveredIcons(a));
+          const bScore = Math.min(2, need(b.material), uncoveredIcons(b));
+          if (aScore !== bScore) return bScore - aScore;
+          return uncoveredIcons(b) - uncoveredIcons(a);
+        });
+        target = matCands[0];
+      }
     }
+    if (!target) return;
     const place = Math.min(2, p.supply, uncoveredIcons(target));
     if (place > 0) {
       p.supply -= place;
@@ -8113,24 +8206,14 @@ async function humanBidForAuction(card, human, minBid, opts = {}) {
     // the player drags above supply.
     const sliderMax = Math.min(baseSupply + totalRecallable, open);
 
-    // Default recall plan: pre-fill just enough to satisfy minBid (trigger case).
+    // Default recall plan: NONE — even for a trigger bid that will need one.
+    // The picker used to pre-fill "just enough" preferring shoreline (no
+    // blank), but shoreline workers are claimed build materials; silently
+    // recalling one is a material-losing footgun (playtests 2026-09-07 and
+    // 2026-09-20 both hit it). With an empty plan the deficit warning shows
+    // and Submit stays disabled until the player picks the recalls
+    // themselves — same flow riders already get.
     const plan = {};
-    let needPrefill = Math.max(0, minBid - baseSupply);
-    if (needPrefill > 0) {
-      // Prefer shoreline (no blank), then river by highest cost.
-      const ordered = [
-        ...recallCards.filter(x => !x.river),
-        ...recallCards.filter(x => x.river).sort((a, b) => cardCost(b.c) - cardCost(a.c)),
-      ];
-      for (const { c } of ordered) {
-        if (needPrefill <= 0) break;
-        const take = Math.min(maxByCard[c.id], needPrefill);
-        if (take > 0) {
-          plan[c.id] = take;
-          needPrefill -= take;
-        }
-      }
-    }
 
     humanBidRecallState = { baseSupply, baseTime, cost, open, minBid, plan, maxByCard };
     const initRecall = humanBidRecallTotal();
@@ -8460,7 +8543,24 @@ async function runCodaTurn() {
     const wbm = playerWorkersByMaterial(state, idx);
     const canBuildAny = p.hand.some(s => canBuild(s, wbm, p));
     if (!canBuildAny) {
-      log(`— ${speciesLabel(p)} has no final build available.`);
+      // Say WHY for the human — the closest miss and what's short. (E.g. the
+      // recurring Cattail Marsh confusion: its reed discount never applies to
+      // its own build, so "needs 2 more Reeds" is genuinely news.)
+      let why = '';
+      if (p.isHuman && p.hand.length > 0) {
+        let best = null;
+        for (const s of p.hand) {
+          const missing = [];
+          let shortBy = 0;
+          for (const m in s.cost) {
+            const short = Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0));
+            if (short > 0) { missing.push(`${short} more ${MATERIALS[m].name}`); shortBy += short; }
+          }
+          if (shortBy > 0 && (!best || shortBy < best.shortBy)) best = { name: s.name, missing, shortBy };
+        }
+        if (best) why = ` (closest: ${best.name} — needs ${best.missing.join(' + ')})`;
+      }
+      log(`— ${speciesLabel(p)} has no final build available${why}.`);
       state.codaQueue.shift();
       render();
       continue;
