@@ -702,6 +702,46 @@ end-game scoring is untouched &mdash; leftover workers count singly, same as alw
 watch in Alpha stats: cheap River&nbsp;1/2 workers now inherit the &times;2 at retirement, a line the
 sim's AI doesn't deliberately play but humans will.</p>
 
+<p>Two new cards made the prototype deck this week, and the first of them spent three days being a
+different card every time the simulator looked at it. <strong>Flotsam Raft</strong> (6 icons,
+3&ndash;4 players) started as an old idea &mdash; pay to move your workers off one card and onto
+another &mdash; and became something stranger once the icons stopped carrying a material at all.
+What its auction sells is a <em>deposit</em>. Staged workers can't be spent and score nothing; what
+they can do is <em>ferry</em>, later, onto any open river icon, paying a two-step: slide back the
+raft's <em>current</em> per-item cost, then advance the destination's. That word <em>current</em>
+is the whole card. The raft drifts downstream after each auction on it, so a slip bought cheaply at
+River&nbsp;1 appreciates while you wait, and a ferry out of River&nbsp;3&ndash;4 can hand back more
+fish than the destination costs. Other players' auctions mature your deposit for free. The deposit
+also has a maturity date: the raft never reaches the shoreline, so when it would leave there is one
+last call in fish-track order, and anything still aboard comes home worth nothing.</p>
+
+<p>The fee formula decided whether the card existed at all, which is not a sentence one expects to
+write. Charging the destination's full price on top of the staging auction produced a card the AI
+ferried <strong>0.22 times per game</strong> &mdash; strictly dominated, dead on the table. A flat
+1&#128031; was alive. The difference between the two costs landed in between, with a texture worth
+having: deep staging makes cheap ferries, so the card pays patience. Don pushed it one step further
+&mdash; don't floor that difference at zero, let it pay out as a credit &mdash; and the card found
+its shape. Two-step wording keeps the fish track doing the arithmetic, so no card face has to say
+"subtract" or print a negative number.</p>
+
+<p>The instructive part was getting the verdict wrong first. The original pitch was that a card
+every material wants would <em>relieve</em> contention, and the sim flatly refuted it: jam share
+rose at every player count and under every fee mode. That finding stood for a day. Then the
+2026-09-20 web playtest showed the AI playing the raft badly &mdash; bidding on it with the sum of
+every material need, recalling staged slips as if they were ordinary workers, Sap-Dripping free
+workers onto flotsam, and then barely ferrying. With the bidder taught to treat a slip as worth one
+material's deficit and capped accordingly, the picture inverted: ferries went from roughly one a
+game to <strong>four</strong>, three-quarters of staged slips now convert, and <strong>the jam bump
+disappeared</strong> &mdash; 11.4% against an 11.3% control at three players. The bump had been the
+AI's bad play all along, not the card. Worth remembering the next time a sweep indicts a card: the
+measurement includes the opponent model.</p>
+
+<p>Two watch items go to the table with it, both of the family this month was spent removing.
+Ferrying can cover a card's last icon and retire it, which is a zero-counterplay snipe of exactly
+the Portage shape; and a deposit never ferried is pure tempo donated to the fish gods, a
+use-it-or-lose-it trap in the Old Growth mould. Neither was bad enough to hold the card back, but
+both are for human tables to render a verdict on rather than the simulator.</p>
+
 <p>And a second new card made the cut for the prototype deck: <strong>Basking Rocks</strong>
 (Stones&nbsp;&middot;&nbsp;7, replacing plain Boulder Field), from Don's "crowd bonus" idea — the
 first worker you spend from it each turn is worth one item per player with workers aboard. It
@@ -709,7 +749,10 @@ inverts Hidden Inlet's solo bonus into co-opetition: for the first time the game
 to <em>want</em> rivals on your card. The simulator's verdict was quietly remarkable — the minted
 bonus works out to &asymp;0.7 extra items per player per game at <em>every</em> player count (the
 multiplier's ceiling grows with the table, but so does how thinly workers spread, and the two cancel)
-— and the jam bump is half the raft's. Its real payoff is a table emotion the sim can't measure:
+— and its own jam cost is mild, <strong>+1.0 to 1.2 points</strong> of jam share. (That was
+originally written up as half the raft's bump; the raft's turned out to be an artefact of the AI
+misplaying it, so the comparison no longer means anything and the absolute figure is the honest
+one.) Its real payoff is a table emotion the sim can't measure:
 timing your spend for when the rocks are crowded, and the little diplomacy of inviting company.
 Two new cards in one prototype cycle is deliberate; the pare-down before the contest deck freezes
 is the point of printing early.</p>
