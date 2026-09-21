@@ -115,6 +115,7 @@ End of game: +3 VP per built structure of yours that uses Mud (max +9).'],
         46 => ['name' => 'Spring Cascade', 'cost' => ['logs' => 2, 'mud' => 1], 'time' => 1, 'vp' => '3', 'effect' => 'Once per game (flip card): ready one of your other spent once-per-game cards.'],
         47 => ['name' => 'Trading Post', 'cost' => ['clay' => 2, 'reeds' => 2], 'time' => 3, 'vp' => '5', 'effect' => 'As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.'],
         48 => ['name' => 'Confluence', 'cost' => ['reeds' => 2, 'stones' => 2], 'time' => 3, 'vp' => '5', 'effect' => 'As an action: pool two cards that share a material symbol into one combined auction, merging their uncovered icons. You pay the lower of the two trigger 🐟 costs to start it, and everyone bids at the lower of the two 🐟/item rates. Both cards then float downriver.'],
+        49 => ['name' => 'Twig Bridge', 'cost' => ['vines' => 4], 'time' => 3, 'vp' => '5', 'effect' => 'Headwaters auctions you trigger cost 2🐟, whatever the slot.'],
     ];
 
     // 12 species starter cards (3 per species).

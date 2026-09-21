@@ -321,10 +321,11 @@
 .rb-p-str-TreatyStone{background-position:-330.0px -770.0px;}
 .rb-p-str-TributeStone{background-position:-440.0px -770.0px;}
 .rb-p-str-TrophyLodge{background-position:-550.0px -770.0px;}
-.rb-p-str-VineLadder{background-position:-660.0px -770.0px;}
-.rb-p-str-VineLattice{background-position:-770.0px -770.0px;}
-.rb-p-str-VineTrellis{background-position:0.0px -924.0px;}
-.rb-p-str-WoodPile{background-position:-110.0px -924.0px;}
+.rb-p-str-TwigBridge{background-position:-660.0px -770.0px;}
+.rb-p-str-VineLadder{background-position:-770.0px -770.0px;}
+.rb-p-str-VineLattice{background-position:0.0px -924.0px;}
+.rb-p-str-VineTrellis{background-position:-110.0px -924.0px;}
+.rb-p-str-WoodPile{background-position:-220.0px -924.0px;}
 .rb-art-sta{background-image:url('img/cards-starter.png');background-size:550.0px 616.0px;width:110.0px;height:154.0px;}
 .rb-p-sta-_back_beaver{background-position:0.0px 0.0px;}
 .rb-p-sta-_back_mink{background-position:-110.0px 0.0px;}

@@ -10,3 +10,21 @@
 /node_modules/
 /package-lock.json
 /src/
+
+# Sprite sheets + manifest — REGENERATED build outputs of img/build_sprites.py
+# from art that is itself committed (material-deck/, starter-deck/,
+# structure-deck/, graphics/{worker-chits,blank-chit,river-board,icons}).
+# Never track these: three were LFS-tracked and LFS stores a complete new object
+# on every push with no deltas, so each regen burned ~6.3 MB of quota for files
+# whose pixels usually did not change at all (PNG encoding alone is
+# nondeterministic). Rebuild with:  python3 bga/img/build_sprites.py
+# The deploy script regenerates them automatically when any is missing.
+# NOTE: riverbankers.css stays TRACKED — it is hand-written CSS with a generated
+# sprite block spliced into it, not a build output.
+/img/cards-material.png
+/img/cards-structure.png
+/img/cards-starter.png
+/img/chits.png
+/img/icons.png
+/img/river-board.png
+/img/sprites.json

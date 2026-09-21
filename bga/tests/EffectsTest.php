@@ -36,6 +36,22 @@ final class EffectsTest extends TestCase
         self::assertSame(0, Effects::auctionDiscount('logs', ['Reed Bed']));
     }
 
+    public function testHeadwatersMoveUnchangedWithoutTwigBridge(): void
+    {
+        // Slots 1..3 cost 2/3/4 by distance.
+        self::assertSame(2, Effects::headwatersMoveForPlayer(2, []));
+        self::assertSame(3, Effects::headwatersMoveForPlayer(3, []));
+        self::assertSame(4, Effects::headwatersMoveForPlayer(4, ['Reed Bed']));
+    }
+
+    public function testTwigBridgeFlattensHeadwatersMove(): void
+    {
+        self::assertSame(2, Effects::headwatersMoveForPlayer(4, ['Twig Bridge']));
+        self::assertSame(2, Effects::headwatersMoveForPlayer(3, ['Twig Bridge']));
+        // Never raises the cost — the nearest slot already sits at the flat rate.
+        self::assertSame(2, Effects::headwatersMoveForPlayer(2, ['Twig Bridge']));
+    }
+
     public function testLodgeFoundationShavesLogsBuild(): void
     {
         self::assertSame(2, Effects::buildFishCost(3, ['logs' => 4], ['Lodge Foundation']));
@@ -79,8 +95,9 @@ final class EffectsTest extends TestCase
     public function testMudWallowMostWorkers(): void
     {
         self::assertSame([6 => 2], Effects::shorelinePenalty('Mud Wallow', [5 => 1, 6 => 3]));
-        // Tie -> nobody.
-        self::assertSame([], Effects::shorelinePenalty('Mud Wallow', [5 => 2, 6 => 2]));
+        // Friendly ties: EVERY tied leader gets the bonus (unlike Cattail Cluster,
+        // where a tie means nobody).
+        self::assertSame([5 => 2, 6 => 2], Effects::shorelinePenalty('Mud Wallow', [5 => 2, 6 => 2]));
     }
 
     public function testCattailClusterBackThree(): void

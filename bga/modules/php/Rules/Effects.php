@@ -25,6 +25,27 @@ final class Effects
     public const HAND_SIZE_CARDS = ['Cache Burrow', 'Beaver Cache'];
 
     /**
+     * Twig Bridge spans out over the Headwaters: its builder pays the
+     * nearest-slot rate whatever slot the card sits in, instead of 2/3/4 by
+     * distance. Mirrors sim.js prerivTriggerCostFor.
+     */
+    public const HEADWATERS_FLAT_CARD = 'Twig Bridge';
+    public const HEADWATERS_FLAT_COST = 2;
+
+    /**
+     * Fish to Pull a Headwaters card, after the owner's passive effects.
+     * Never raises the cost — slot 1 already sits at the flat rate.
+     *
+     * @param list<string> $builtNames
+     */
+    public static function headwatersMoveForPlayer(int $base, array $builtNames): int
+    {
+        return in_array(self::HEADWATERS_FLAT_CARD, $builtNames, true)
+            ? min(self::HEADWATERS_FLAT_COST, $base)
+            : $base;
+    }
+
+    /**
      * Total per-item discount a player gets on cards of $material.
      *
      * @param list<string> $builtNames the player's built-card names

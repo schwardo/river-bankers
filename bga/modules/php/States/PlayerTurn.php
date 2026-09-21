@@ -11,6 +11,7 @@ use Bga\GameFramework\UserException;
 use Bga\Games\RiverBankers\Game;
 use Bga\Games\RiverBankers\Material;
 use Bga\Games\RiverBankers\Rules\Cost;
+use Bga\Games\RiverBankers\Rules\Effects;
 
 /**
  * SelectAction — the active player takes exactly one action.
@@ -183,7 +184,11 @@ class PlayerTurn extends GameState
 
         $row = $this->game->getCardRow($cardId);
         $slot = (int) $row['card_location_arg'];
-        $this->game->advanceFish($activePlayerId, Cost::headwatersMove($slot));
+        // Per-player reduction (Twig Bridge) layers on top of the pure slot cost.
+        $this->game->advanceFish($activePlayerId, Effects::headwatersMoveForPlayer(
+            Cost::headwatersMove($slot),
+            $this->game->getBuiltNames($activePlayerId)
+        ));
         $this->game->startAuction($cardId, $activePlayerId); // rate derives from 'headwaters' (1/item)
 
         $matDef = Material::$MATERIAL[(int) $row['card_type_arg']] ?? [];

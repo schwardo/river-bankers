@@ -1951,6 +1951,7 @@ const STRUCTURE_TEMPLATES = [
   { name: 'Spring Cascade', cost: { logs: 2, mud: 1 },               time: 1, vp: 3, effect: 'Once per game (flip card): ready one of your other spent once-per-game cards.' },
   { name: 'Trading Post',     cost: { clay: 2, reeds: 2 },             time: 3, vp: 5, effect: 'As an action: pay 1🐟 to recall 1 worker each from 3 different-material cards (drops 3 blanks), then place 2 free workers from supply onto uncovered icons of one card.' },
   { name: 'Confluence',       cost: { reeds: 2, stones: 2 },           time: 3, vp: 5, effect: 'As an action: pool two cards that share a material symbol into one combined auction, merging their uncovered icons. You pay the lower of the two trigger 🐟 costs to start it, and everyone bids at the lower of the two 🐟/item rates. Both cards then float downriver.' },
+  { name: 'Twig Bridge',      cost: { vines: 4 },                      time: 3, vp: 5, effect: 'Headwaters auctions you trigger cost 2🐟, whatever the slot.' },
 
   // Species starter structures (asymmetric play). Each player
   // drafts 1 of their 3 species cards at setup; picked card is pre-built in
@@ -2458,6 +2459,15 @@ const RIVER_SLOTS = 4;
 function prerivTriggerCost(idx) {
   // Slot 0 = farthest upstream = 4t. Slot PRERIV_SLOTS-1 = closest to river = 2t.
   return PRERIV_SLOTS - idx + 1;
+}
+// Twig Bridge spans out over the Headwaters: its builder pays the nearest-slot
+// rate (2🐟) whichever slot the card sits in, instead of 4/3/2 by distance.
+// `p` is null at call sites that price a Headwaters auction generically (nobody
+// is initiating yet), where the undiscounted rate is the right answer.
+function prerivTriggerCostFor(p, idx) {
+  const base = prerivTriggerCost(idx);
+  if (!p) return base;
+  return hasEffect(p, 'Twig Bridge') ? Math.min(2, base) : base;
 }
 // Per-item cost for a card sitting on a river slot. Slot 0 → 2t/item, slot 3 → 5t/item.
 // Upstream (pre-river) auctions resolve at a flat 1t/item before the card enters the river.
@@ -3424,7 +3434,8 @@ function renderRiver() {
   let prerivTiles = '';
   for (let i = 0; i < state.prerivCards.length; i++) {
     const card = state.prerivCards[i];
-    const cost = prerivTriggerCost(i);
+    // Show what the human will actually pay — Twig Bridge flattens this to 2🐟.
+    const cost = prerivTriggerCostFor(state.players.find(p => p.isHuman), i);
     const cls = ['slot-tile', 'preriv-tile'];
     if (card && prerivSlotSelectable(i)) cls.push('selectable');
     const slotNum = PRERIV_SLOTS - i;  // existing label convention: nearest-river is 1
@@ -4732,11 +4743,11 @@ function combinedConfig() {
 function hasCombinedAuctionAbility(p) { return DOUBLE_VISION_ACTIVE || hasEffect(p, 'Confluence'); }
 // 🐟 cost to initiate a single-card auction on `card` (river = 1, Headwaters =
 // slot-based). The combined trigger is the min/max of its two cards' triggers.
-function singleAuctionTriggerCost(card) {
-  return card.slot === 'pre' ? prerivTriggerCost(prerivIndexOf(card)) : 1;
+function singleAuctionTriggerCost(card, p = null) {
+  return card.slot === 'pre' ? prerivTriggerCostFor(p, prerivIndexOf(card)) : 1;
 }
-function combinedTriggerCost(cardA, cardB) {
-  const a = singleAuctionTriggerCost(cardA), b = singleAuctionTriggerCost(cardB);
+function combinedTriggerCost(cardA, cardB, p = null) {
+  const a = singleAuctionTriggerCost(cardA, p), b = singleAuctionTriggerCost(cardB, p);
   return combinedConfig().trigger === 'max' ? Math.max(a, b) : Math.min(a, b);
 }
 // Virtual pooled card: combined uncovered icons, billed at the cheaper ('min')
@@ -4954,7 +4965,7 @@ function findCombinedAuctionTarget(playerIdx, needs, triggerPool) {
     const A = cards[0], B = cards[1];
     const got = Math.min(uncoveredIcons(A) + uncoveredIcons(B), triggerPool, need);
     const perItem = Math.min(playerCardCost(A, playerIdx), playerCardCost(B, playerIdx));
-    const score = need * got - perItem * got * 0.4 - combinedTriggerCost(A, B) * 0.6;
+    const score = need * got - perItem * got * 0.4 - combinedTriggerCost(A, B, state.players[playerIdx]) * 0.6;
     if (!best || score > best.score) best = { A, B, score };
   }
   return best;
@@ -4978,7 +4989,7 @@ function findCombinedAuctionTargetAny(playerIdx, needs, triggerPool) {
     combined += needs[c.material] * g - playerCardCost(c, playerIdx) * g * 0.4;
     remNeed[c.material] -= g; pool -= g;
   }
-  return { A, B, score: combined - combinedTriggerCost(A, B) * 0.6 };
+  return { A, B, score: combined - combinedTriggerCost(A, B, state.players[playerIdx]) * 0.6 };
 }
 // Pick the finder matching the active pairing rule.
 function findCombinedTarget(playerIdx, needs, triggerPool) {
@@ -5317,6 +5328,7 @@ const EFFECT_VP_FIXED = {
   'Tow Line': 1.2,
   'Portage': 0.5,
   'Salmon Run': 1,
+  'Twig Bridge': 0.5,
   'Stone Pool': 0,
   'Flush Channel': 0,
   'Salt Lick': 0,
@@ -5528,7 +5540,7 @@ function aiChooseAction(playerIdx) {
     if (need === 0) continue;
     const got = Math.min(uncoveredIcons(c), triggerPool, need);
     if (got === 0) continue;
-    const trigger = prerivTriggerCost(i);
+    const trigger = prerivTriggerCostFor(state.players[playerIdx], i);
     const score = need * got - 1 * got * 0.4 - trigger * 0.6;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'preriv'; bestPrerivIdx = i; }
   }
@@ -5544,7 +5556,7 @@ function aiChooseAction(playerIdx) {
   }
   if (hasCombinedAuctionAbility(p)) {
     const ct = findCombinedTarget(playerIdx, needs, triggerPool);
-    if (ct && canAffordTimeCost(p, combinedTriggerCost(ct.A, ct.B))) {
+    if (ct && canAffordTimeCost(p, combinedTriggerCost(ct.A, ct.B, p))) {
       candidates.push({ score: ct.score, needsTrigger: true, make: () => ({ type: 'confluenceAuction', aId: ct.A.id, bId: ct.B.id }) });
     }
   }
@@ -6991,7 +7003,7 @@ function humanSelectCombinedCard(cardId) {
   }
   // Valid pair — run the pooled auction.
   const src = DOUBLE_VISION_ACTIVE ? 'Double Vision' : 'Confluence';
-  const trig = combinedTriggerCost(cardA, card);
+  const trig = combinedTriggerCost(cardA, card, human);
   state.lastHumanActionType = 'confluence';
   state.combinedPick = null;
   state.phase = 'idle';
@@ -7110,7 +7122,7 @@ function humanSelectPrerivCard(slotIdx) {
   const human = state.players.find(p => p.isHuman);
   // Need at least one worker available anywhere (supply or recallable) to trigger.
   if (human.supply + totalPlacedWorkers(state, human.idx) === 0) return;
-  const moveCost = prerivTriggerCost(slotIdx);
+  const moveCost = prerivTriggerCostFor(human, slotIdx);
   advancePlayer(human.idx, moveCost);
   log(`🎬 ${speciesLabel(human)} spends ${moveCost}🐟 to auction Headwaters ${PRERIV_SLOTS - slotIdx} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}🐟/item).`);
   state.phase = 'idle';
@@ -8788,7 +8800,7 @@ async function executeAIAction(playerIdx, action) {
     const find = id => state.riverCards.find(c => c.id === id) || state.prerivCards.find(c => c && c.id === id);
     const A = find(action.aId), B = find(action.bId);
     if (A && B && A !== B) {
-      const trig = combinedTriggerCost(A, B);
+      const trig = combinedTriggerCost(A, B, p);
       advancePlayer(playerIdx, trig);
       log(`🎬 ${speciesLabel(p)} spends ${trig}🐟 (Confluence) to pool-auction two ${MATERIALS[A.material].name} cards.`);
       render();
@@ -8800,7 +8812,7 @@ async function executeAIAction(playerIdx, action) {
   if (action.type === 'preriv') {
     const card = state.prerivCards[action.slotIdx];
     if (!card) return;
-    const moveCost = prerivTriggerCost(action.slotIdx);
+    const moveCost = prerivTriggerCostFor(p, action.slotIdx);
     advancePlayer(playerIdx, moveCost);
     log(`🎬 ${speciesLabel(p)} spends ${moveCost}🐟 to auction Headwaters ${PRERIV_SLOTS - action.slotIdx} ${MATERIALS[card.material].name} (${UPSTREAM_AUCTION_COST}🐟/item).`);
     render();

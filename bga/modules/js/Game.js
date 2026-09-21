@@ -82,6 +82,14 @@ function rbBuildFishCost(card, builtNames) {
     return Math.max(1, time - discount);
 }
 
+// The 🐟 a Headwaters Pull costs, mirroring Effects::headwatersMoveForPlayer:
+// the positional rate (slot + 1 = 2/3/4), flattened to 2 for a Twig Bridge
+// builder. `builtNames` is the list of the puller's built-structure names.
+function rbHeadwatersMoveCost(slot, builtNames) {
+    const base = (Number(slot) || 0) + 1;
+    return builtNames.includes('Twig Bridge') ? Math.min(2, base) : base;
+}
+
 // Per-material "have" count after greedily assigning wild-pool workers to the
 // material with the largest remaining deficit (same order the real build uses).
 function rbEffectiveCoverage(targetCost, wbm) {
@@ -389,7 +397,8 @@ class PlayerTurn {
     // Client-side confirmation for a direct card-click Pull (headwaters) or Swim
     // (river). Spells out the lot's name, material(s), open items, trigger cost,
     // and per-item rate before committing. Costs mirror the server: Pull pays the
-    // headwaters move cost (slot+1) and auctions at 1/item; Swim pays a flat 1 🐟
+    // headwaters move cost (slot+1, flattened to 2 by Twig Bridge) and auctions
+    // at 1/item; Swim pays a flat 1 🐟
     // and auctions at the river rate (slot+1). Per-item is the printed positional
     // rate — before any per-player discounts, which the server applies on resolve.
     confirmDirectAuction(cardId, kind) {
@@ -397,7 +406,8 @@ class PlayerTurn {
         if (!c) return;
         const slot = Number(c.slot) || 0;
         const mat = matIcon(c.material) + (c.wildAlt ? '/' + matIcon(c.wildAlt) : ''); // wilds show both icons
-        const triggerCost = kind === 'pull' ? (slot + 1) : 1;
+        const myBuilt = ((this.game.built || {})[this.game.myId()] || []).map(b => b.name);
+        const triggerCost = kind === 'pull' ? rbHeadwatersMoveCost(slot, myBuilt) : 1;
         const perItem = kind === 'pull' ? 1 : (slot + 1);
         const verb = kind === 'pull' ? _('Pull') : _('Swim to');
         const msg = `${verb} <b>${c.name}</b> (${mat})?<br>`
