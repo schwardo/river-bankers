@@ -45,12 +45,23 @@ class RaftLastCall extends GameState
         $targets = $this->game->raftFerryTargets();
         while (count($queue) > 0) {
             $head = (int) $queue[0];
-            if ($this->game->raftWorkersAboard($cardId, $head) > 0 && count($targets) > 0) {
+            $aboard = $this->game->raftWorkersAboard($cardId, $head);
+            if ($aboard > 0 && count($targets) > 0) {
                 $this->globals->set('raft_call_queue', $queue);
                 $this->gamestate->changeActivePlayer($head);
                 $this->game->giveExtraTime($head);
                 $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
                 return null;
+            }
+            if ($aboard > 0) {
+                // Skipped with workers still aboard: say why, so the "return to
+                // supply as the raft breaks up" line that follows isn't a surprise.
+                $this->notify->all('abilityUsed',
+                    clienttranslate('${player_name} has no open river icon to ferry to'),
+                    [
+                        'player_id'   => $head,
+                        'player_name' => $this->game->getPlayerNameById($head),
+                    ]);
             }
             array_shift($queue);
         }

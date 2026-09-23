@@ -144,7 +144,10 @@ class Auction extends GameState
     public function actRecall(int $cardId, int $currentPlayerId)
     {
         $auction = $this->game->getOpenAuction();
-        if ($cardId === (int) $auction['lot_card_id']) {
+        // Neither lot of the auction may be recalled from (a Confluence
+        // combined auction has two).
+        if ($cardId === (int) $auction['lot_card_id']
+            || ($auction['lot_card_id2'] !== null && $cardId === (int) $auction['lot_card_id2'])) {
             throw new UserException(clienttranslate('You cannot recall from the card being auctioned.'));
         }
         $here = (int) $this->game->getUniqueValueFromDB(

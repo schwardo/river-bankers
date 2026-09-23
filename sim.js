@@ -345,59 +345,84 @@ function neighborIdxs(state, playerIdx) {
   const right = (playerIdx + 1) % n;
   return left === right ? [left] : [left, right];
 }
-function tryMillWheel(state, playerIdx) {
+// "As an action" abilities (Heron Roost, Driftwood Snag, Portage, Trading
+// Post, and Mill Wheel's copy of those) replace the turn's action (rulebook
+// p.7, BGA PlayerTurn::actUseAbility). Until 2026-09-22 the sim fired them as
+// free start-of-turn extras on top of a normal action; aiChooseAction now
+// offers them as the action when no build or worthwhile auction exists. Salmon
+// Run is once-per-game and no longer Mill-Wheel-copyable (2026-07-26).
+const ASACTION_ORDER = ['Trading Post', 'Portage', 'Heron Roost', 'Driftwood Snag'];
+function abilityActionFor(state, playerIdx, name, viaMillWheel) {
   const p = state.players[playerIdx];
-  if (!hasEffect(p, 'Mill Wheel')) return;
-  // Which copyable abilities do my neighbours have built (and still active)?
-  const avail = new Set();
-  for (const nIdx of neighborIdxs(state, playerIdx)) {
-    for (const s of state.players[nIdx].built) {
-      if (effectActive(s.name)) avail.add(s.name);
-    }
-  }
-  // Try the most valuable applicable ability first; fire one per turn.
-  const wbm = playerWorkersByMaterial(state, playerIdx);
-  const needs = {};
-  for (const m of MAT_KEYS) needs[m] = 0;
-  for (const s of p.hand) for (const m in s.cost) needs[m] = Math.max(needs[m], Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0)));
   const myMats = new Set();
   for (const s of p.hand) for (const m in s.cost) myMats.add(m);
-  if (avail.has('Salmon Run') && !p.salmonRunUsed && p.supply > 0 && p.timePos + 2 < SIM_FINISH_LINE) {
-    const t = findSalmonRunTarget(state, playerIdx, needs);
-    if (t && p.timePos + salmonRunCost(t.n) < SIM_FINISH_LINE) {
-      doSalmonRun(state, playerIdx, t.card.id, t.n); noteEffectUse(state, 'Mill Wheel'); return;
-    }
+  if (name === 'Trading Post') {
+    if (p.timePos >= SIM_FINISH_LINE - 1 || p.supply < 2) return null;
+    const tp = findTradingPostAction(state, playerIdx);
+    return tp ? { type: 'ability', name, viaMillWheel, tradingPost: tp } : null;
   }
-  if (avail.has('Trading Post') && p.timePos < SIM_FINISH_LINE - 1 && p.supply >= 2) {
-    const action = findTradingPostAction(state, playerIdx);
-    if (action) { doTradingPost(state, playerIdx, action); noteEffectUse(state, 'Mill Wheel'); return; }
-  }
-  if (avail.has('Portage') && p.timePos < SIM_FINISH_LINE - 5) {
+  if (name === 'Portage') {
+    if (p.timePos >= SIM_FINISH_LINE - 5) return null;
     const t = findOtterTrailTarget(state, playerIdx);
-    if (t && p.timePos + cardCost(t.cardA) < SIM_FINISH_LINE) {
-      doOtterTrail(state, playerIdx, t.cardA.id, t.cardB.id, t.otherIdx); noteEffectUse(state, 'Mill Wheel'); return;
-    }
+    return t && p.timePos + cardCost(t.cardA) < SIM_FINISH_LINE ? { type: 'ability', name, viaMillWheel, portage: t } : null;
   }
-  if (avail.has('Heron Roost') && state.matDeck.length > 0 && p.timePos < SIM_FINISH_LINE - 1) {
-    const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
-    if (target !== -1) {
-      heronReplacePreriv(state, target);
-      p.timePos += 1;
-      noteEffectUse(state, 'Mill Wheel');
-      return;
-    }
+  if (name === 'Heron Roost') {
+    if (state.matDeck.length === 0 || p.timePos >= SIM_FINISH_LINE - 1) return null;
+    const i = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
+    return i !== -1 ? { type: 'ability', name, viaMillWheel, slotIdx: i } : null;
   }
-  if (avail.has('Driftwood Snag') && p.timePos < SIM_FINISH_LINE - 1) {
+  if (name === 'Driftwood Snag') {
+    if (p.timePos >= SIM_FINISH_LINE - 1) return null;
     const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
       .filter(c => uncoveredIcons(c) >= 4 && !myMats.has(c.material));
-    if (cands.length > 0) {
-      const target = cands.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b);
-      target.blanks += 1;
-      noteBlanks(state);
-      p.timePos += 1;
-      noteEffectUse(state, 'Mill Wheel');
+    if (cands.length === 0) return null;
+    const t = cands.reduce((x, y) => uncoveredIcons(x) >= uncoveredIcons(y) ? x : y);
+    return { type: 'ability', name, viaMillWheel, cardId: t.id };
+  }
+  return null;
+}
+function aiPickAbilityAction(state, playerIdx) {
+  const p = state.players[playerIdx];
+  for (const name of ASACTION_ORDER) {
+    if (!hasEffect(p, name)) continue;
+    const a = abilityActionFor(state, playerIdx, name, false);
+    if (a) return a;
+  }
+  if (hasEffect(p, 'Mill Wheel')) {
+    const avail = new Set();
+    for (const nIdx of neighborIdxs(state, playerIdx))
+      for (const s of state.players[nIdx].built) if (effectActive(s.name)) avail.add(s.name);
+    for (const name of ASACTION_ORDER) {
+      if (!avail.has(name)) continue;
+      const a = abilityActionFor(state, playerIdx, name, true);
+      if (a) return a;
     }
   }
+  return null;
+}
+function executeAbilityAction(state, playerIdx, action) {
+  const p = state.players[playerIdx];
+  const { name } = action;
+  if (name === 'Trading Post') {
+    doTradingPost(state, playerIdx, action.tradingPost);
+  } else if (name === 'Portage') {
+    const t = action.portage;
+    doOtterTrail(state, playerIdx, t.cardA.id, t.cardB.id, t.otherIdx);
+  } else if (name === 'Heron Roost') {
+    heronReplacePreriv(state, action.slotIdx);
+    p.timePos += 1; // 1 fish cost
+    noteEffectUse(state, 'Heron Roost');
+  } else if (name === 'Driftwood Snag') {
+    const target = state.riverCards.find(c => c.id === action.cardId)
+      || state.prerivCards.find(c => c && c.id === action.cardId);
+    if (target) {
+      target.blanks += 1;
+      noteBlanks(state);
+      p.timePos += 1; // 1 fish cost
+      noteEffectUse(state, 'Driftwood Snag');
+    }
+  }
+  if (action.viaMillWheel) noteEffectUse(state, 'Mill Wheel');
 }
 
 let STRUCTURE_TEMPLATES = BASE_STRUCTURE_TEMPLATES.slice();
@@ -2997,6 +3022,12 @@ function aiChooseAction(state, playerIdx) {
     if (cand.needsTrigger && triggerPool <= 0) continue;
     return cand.make();
   }
+  // No build or worthwhile auction: an "as an action" ability spends the turn
+  // instead of Inventing / flushing / passing.
+  {
+    const ab = aiPickAbilityAction(state, playerIdx);
+    if (ab) return ab;
+  }
   // Endgame pair-VP cash-out check: if the rule is live, we're in endgame,
   // and our leftover workers already pair up to ≥1 VP, prefer passing over
   // any Invent / flush / no-op continuation — the cash-out beats the gamble.
@@ -3374,7 +3405,8 @@ function findTowLineTarget(state, playerIdx, needs, triggerPool) {
     if (typeof c.slot !== 'number' || c.slot === 0) continue; // already at R1 → nothing to yank
     const need = needs[c.material] || 0;
     if (need === 0) continue;
-    const got = Math.min(need, uncoveredIcons(c), triggerPool);
+    // Towing only moves the card: its own workers still can't fund the bid.
+    const got = Math.min(need, uncoveredIcons(c), Math.max(0, triggerPool - workersOnCard(c, playerIdx)));
     if (got === 0) continue;
     // Hold the one-shot flip for a genuinely impactful yank: the per-item drop
     // to the River-1 rate plus the waived flat must save a real chunk of 🐟.
@@ -3388,54 +3420,21 @@ function findTowLineTarget(state, playerIdx, needs, triggerPool) {
   return best;
 }
 
-// Heron Roost / Driftwood Snag / Tribute Stone: optional start-of-turn abilities.
-// Auto-fire for AI when conditions are met. Heron Roost / Driftwood Snag each
-// cost 1 fish; Tribute Stone is free (once per game).
+// Free start-of-turn abilities: once-per-game cards (Tribute Stone, Snare Set,
+// Rolling Float, ...) and the species "at the start of your turn" starters.
 function aiStartOfTurnAbilities(state, playerIdx) {
   const p = state.players[playerIdx];
-  // Reworked once-per-game abilities + Mill Wheel's neighbour-copy (as an action).
+  // Once-per-game abilities. The "as an action" abilities are not here —
+  // they are the turn's action (see aiPickAbilityAction).
   tryWoodPile(state, playerIdx);
   tryHollowedLog(state, playerIdx);
   tryPackRat(state, playerIdx);
   trySpringCascade(state, playerIdx);
-  tryMillWheel(state, playerIdx);
-  // Heron Roost: replace a pre-river card whose material isn't in this AI's hand.
-  if (hasEffect(p, 'Heron Roost') && state.matDeck.length > 0 && p.timePos < SIM_FINISH_LINE - 1) {
-    const myMats = new Set();
-    for (const s of p.hand) for (const m in s.cost) myMats.add(m);
-    const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
-    if (target !== -1) {
-      heronReplacePreriv(state, target);
-      p.timePos += 1; // 1 fish cost
-      noteEffectUse(state, 'Heron Roost');
-    }
-  }
-  // Driftwood Snag: drop a blank on a card with the most uncovered icons (disruption).
-  if (hasEffect(p, 'Driftwood Snag') && p.timePos < SIM_FINISH_LINE - 1) {
-    const myMats = new Set();
-    for (const s of p.hand) for (const m in s.cost) myMats.add(m);
-    const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
-      .filter(c => uncoveredIcons(c) >= 4 && !myMats.has(c.material));
-    if (cands.length > 0) {
-      const target = cands.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b);
-      target.blanks += 1;
-      noteBlanks(state);
-      p.timePos += 1; // 1 fish cost
-      noteEffectUse(state, 'Driftwood Snag');
-    }
-  }
   // Tribute Stone: fire when there's a high-value opponent worker (per-item cost ≥ 3)
   // and we're not too deep into endgame (compensation is useless if the victim is already retired).
   if (hasEffect(p, 'Tribute Stone') && !p.tributeStoneUsed && p.timePos < SIM_FINISH_LINE - 10) {
     const target = findTributeStoneTarget(state, playerIdx);
     if (target && target.value >= 3) doTributeStone(state, playerIdx, target.victimIdx, target.card);
-  }
-  // Portage: swap to pry an opponent off a useful material card.
-  if (hasEffect(p, 'Portage') && p.timePos < SIM_FINISH_LINE - 5) {
-    const target = findOtterTrailTarget(state, playerIdx);
-    if (target && p.timePos + cardCost(target.cardA) < SIM_FINISH_LINE) {
-      doOtterTrail(state, playerIdx, target.cardA.id, target.cardB.id, target.otherIdx);
-    }
   }
   // Snare Set (mink species starter): mirrors Tribute Stone but with its own
   // once-per-game flag, so a mink with both can use each independently.
@@ -3447,16 +3446,6 @@ function aiStartOfTurnAbilities(state, playerIdx) {
   if (hasEffect(p, 'Rolling Float') && !p.rollingFloatUsed) {
     const target = findRollingFloatTarget(state, playerIdx);
     if (target) doRollingFloat(state, playerIdx, target.cardA, target.cardB, target.otherIdx);
-  }
-  // Trading Post: pay 1 fish to recall 1 worker each from 3 different-material
-  // cards (drops 3 blanks by default; toggle TRADE_POST_DROPS_BLANKS = false
-  // for the variant that doesn't drop blanks), then place 2 free workers
-  // from supply onto uncovered icons of one card. AI fires when the swap
-  // is net-useful: target card material is in our hand-need and we have
-  // 3+ disposable distinct-material workers parked on lower-priority cards.
-  if (hasEffect(p, 'Trading Post') && p.timePos < SIM_FINISH_LINE - 1 && p.supply >= 2) {
-    const action = findTradingPostAction(state, playerIdx);
-    if (action) doTradingPost(state, playerIdx, action);
   }
   // Tail Slap (beaver species starter): drop a blank on a R1 card whose
   // material we don't need (deny opponents who do). Costs 1 fish.
@@ -4010,7 +3999,7 @@ function millWheelCopyScore(state, playerIdx, name) {
 }
 
 // Ablation hook: RB_NO_MILLWHEEL_WB=1 disables only Mill Wheel's "when built"
-// copy half (the as-an-action copy in tryMillWheel still works), so the
+// copy half (the as-an-action copy in aiPickAbilityAction still works), so the
 // when-built clause's marginal balance impact can be measured in isolation.
 let MILL_WHEEL_WB_OFF = process.env.RB_NO_MILLWHEEL_WB === '1';
 
@@ -4021,7 +4010,7 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     if (MILL_WHEEL_WB_OFF) return;
     // When built: copy the MOST BENEFICIAL "when built" effect from a left/right
     // neighbour's built structure, resolved for us. (The repeatable as-an-action
-    // copy lives in tryMillWheel.)
+    // copy lives in aiPickAbilityAction.)
     const neighborHas = new Set();
     for (const nIdx of neighborIdxs(state, playerIdx))
       for (const s of state.players[nIdx].built)
@@ -4223,6 +4212,10 @@ function executeAction(state, playerIdx, action) {
   }
   if (action.type === 'salmonRun') {
     doSalmonRun(state, playerIdx, action.cardId, action.workerCount);
+    return;
+  }
+  if (action.type === 'ability') {
+    executeAbilityAction(state, playerIdx, action);
     return;
   }
   if (action.type === 'stagingMove') {

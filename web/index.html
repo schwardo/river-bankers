@@ -195,6 +195,11 @@
     gap: 1px;
     align-items: center;
   }
+  /* Stacked pawns overlap (9px step) so a full 4-pawn stack — e.g. everyone
+     on space 0 at the start — stays inside the 44px track row instead of
+     climbing over the "Fish Track" title. Later pawns paint on top, so the
+     stack order still reads. */
+  .fish-cell .pawn-stack > .pawn + .pawn { margin-bottom: -15px; }
   .pawn {
     width: 24px; height: 24px;
     border-radius: 50%;
@@ -861,6 +866,9 @@
        border = ~35px) so the pill never crosses into the next card or the
        neighbouring panel. */
     grid-template-columns: repeat(3, 1fr);
+    /* ...but not without limit: when the action panel hides (game over) the
+       hand area spans the full row and 1fr cards ballooned to ~370px wide. */
+    grid-auto-columns: minmax(0, 220px);
     column-gap: 45px;
     row-gap: 14px;
     padding-right: 40px;
@@ -872,7 +880,7 @@
      so the indicator can hang off the right edge — the parent .struct-card
      sets overflow:hidden to clip its PNG to its rounded corners, but has-art
      cards have border-radius:0 and no corners to worry about. */
-  .hand-cards .struct-card { position: relative; isolation: isolate; }
+  .hand-cards .struct-card { position: relative; isolation: isolate; max-width: 220px; width: 100%; justify-self: center; }
   .hand-cards .struct-card.has-art { overflow: visible; }
   .struct-card {
     background: linear-gradient(180deg, #f7e8c5 0%, #e8d2a0 100%);
@@ -920,12 +928,14 @@
     align-items: center;
     gap: 8px;
     position: absolute;
-    top: 48%;
+    top: 46%;
     right: 0;
     /* translateX(50%) centers each pill horizontally on the right border
-       (half over the card, half off). translateY(-50%) anchors the stack
-       so its center sits at the 48% line. */
-    transform: translate(50%, -50%);
+       (half over the card, half off). The stack hangs DOWN from the 46% line
+       — just under the printed cost labels — into the card's blank middle.
+       (It used to be centred on 48%, which put the first pill over the
+       last cost label, e.g. "Stones ×2".) */
+    transform: translateX(50%);
     margin: 0;
     z-index: 5;
     pointer-events: none;
@@ -1289,6 +1299,9 @@
   /* Horizontal variant — used by the species-starter draft so all 3 card
      images line up side-by-side instead of stacking. */
   .picker-list.horizontal { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  /* Starter draft: 3 card images (195px + padding) need more than the default
+     580px modal to sit in one row; still wraps on narrow screens. */
+  .modal:has(.picker-list.horizontal) { max-width: min(720px, calc(100vw - 32px)); }
   .picker-btn {
     padding: 8px 10px; text-align: left; border-radius: 6px;
     background: var(--shore-light); border: 2px solid var(--bank);
@@ -2921,7 +2934,7 @@ async function runHumanSpeciesDraft() {
     while (human.hand.length < maxHandSize(human) && structAvailable(state) > 0) {
       human.hand.push(popStructDeck(state));
     }
-    log(`${human.species.emoji} ${speciesLabel(human)} drafts <b>${picked.name}</b>.`);
+    log(`${speciesLabel(human)} drafts <b>${picked.name}</b>.`);
     render();
   }
 }
@@ -3782,7 +3795,7 @@ function renderActionPanel() {
         const ahead = Math.max(0, human.timePos - cur.timePos);
         trackLine = ahead === 0
           ? `You're tied with ${cur.species.name} in turn order.`
-          : `You are ${ahead}🐟 ahead in turn order.`;
+          : `You're ${ahead}🐟 further along the track — ${cur.species.name} acts first.`;
       }
       // No Undo button while it's an AI's turn — once the AI has started
       // acting we can't safely rewind without a race against its in-flight
@@ -3804,11 +3817,11 @@ function renderActionPanel() {
     const hasPreriv = state.prerivCards.some(c => c !== null);
     const abilityBtns = [];
     if (hasEffect(cur, 'Heron Roost') && state.matDeck.length > 0 && canAffordTimeCost(cur, 1) && hasPreriv) {
-      abilityBtns.push(`<button class="ability-btn" onclick="humanUseHeronRoost()">🦩 Heron Roost (1🐟): replace Headwaters card</button>`);
+      abilityBtns.push(`<button class="ability-btn" onclick="humanUseHeronRoost()">🦩 Heron Roost (1🐟): replace Headwaters card — your action</button>`);
     }
     if (hasEffect(cur, 'Driftwood Snag') && canAffordTimeCost(cur, 1)) {
       const anyOpen = [...state.riverCards, ...state.prerivCards.filter(c => c)].some(c => uncoveredIcons(c) > 0);
-      if (anyOpen) abilityBtns.push(`<button class="ability-btn" onclick="humanUseDriftwoodSnag()">${MATERIALS.logs.icon} Driftwood Snag (1🐟): drop blank</button>`);
+      if (anyOpen) abilityBtns.push(`<button class="ability-btn" onclick="humanUseDriftwoodSnag()">${MATERIALS.logs.icon} Driftwood Snag (1🐟): drop blank — your action</button>`);
     }
     if (hasEffect(cur, 'Tribute Stone') && !cur.tributeStoneUsed) {
       const anyOpponentWorker = state.riverCards.some(c =>
@@ -3820,7 +3833,7 @@ function renderActionPanel() {
       const haveOther = state.riverCards.some(c =>
         typeof c.slot === 'number' && Object.keys(c.workers).some(k => c.workers[k] > 0 && (parseInt(k) !== cur.idx || workersOnCard(c, cur.idx) > 1)));
       if (haveMine && haveOther && canAffordTimeCost(cur, 2)) {
-        abilityBtns.push(`<button class="ability-btn" onclick="humanUseOtterTrail()">🦦 Portage (pay source 🐟): swap a river worker</button>`);
+        abilityBtns.push(`<button class="ability-btn" onclick="humanUseOtterTrail()">🦦 Portage (pay source 🐟): swap a river worker — your action</button>`);
       }
     }
     // Trading Post: 3-for-2 material consolidation. Costs 1🐟. Needs workers on
@@ -3838,7 +3851,7 @@ function renderActionPanel() {
       // distinct, and at least one target candidate exists. (Source-vs-target
       // material disjointness is checked at pick time.)
       if (myCardMats.size >= 3 && anyTarget) {
-        abilityBtns.push(`<button class="ability-btn" onclick="humanUseTradingPost()">🏪 Trading Post (1🐟): 3-for-2 material swap</button>`);
+        abilityBtns.push(`<button class="ability-btn" onclick="humanUseTradingPost()">🏪 Trading Post (1🐟): 3-for-2 material swap — your action</button>`);
       }
     }
     // Snare Set (mink species starter, same shape as Tribute Stone w/ its own once-per-game flag).
@@ -3894,7 +3907,7 @@ function renderActionPanel() {
       for (const nIdx of neighborIdxs(cur.idx))
         for (const s of state.players[nIdx].built) if (effectActive(s.name)) nAvail.add(s.name);
       if (MILL_WHEEL_ASACTION.some(n => nAvail.has(n)))
-        abilityBtns.push(`<button class="ability-btn" onclick="humanUseMillWheel()">⚙ Mill Wheel: copy a neighbour's "as an action" ability</button>`);
+        abilityBtns.push(`<button class="ability-btn" onclick="humanUseMillWheel()">⚙ Mill Wheel: copy a neighbour's "as an action" ability — your action</button>`);
     }
     const abilityRow = abilityBtns.length
       ? `<div class="ability-row"><span class="ability-label">Optional abilities:</span>${abilityBtns.join('')}</div>`
@@ -3903,9 +3916,9 @@ function renderActionPanel() {
     const triggerPool = cur.supply + placed;
     const towLineAvail = hasEffect(cur, 'Tow Line')
       && !cur.towLineUsed
-      && triggerPool > 0
-      && canAffordTimeCost(cur, 1)
-      && state.riverCards.some(c => typeof c.slot === 'number' && c.slot > 0 && uncoveredIcons(c) > 0);
+      && state.riverCards.some(c => typeof c.slot === 'number' && c.slot > 0 && uncoveredIcons(c) > 0
+        && biddablePoolFor(cur.idx, [c.id]) > 0)
+      && canAffordTimeCost(cur, 1);
     const salmonRunAvail = hasEffect(cur, 'Salmon Run') && !cur.salmonRunUsed
       && cur.supply > 0
       && canAffordTimeCost(cur, 2)
@@ -4049,7 +4062,7 @@ function renderActionPanel() {
           const blankNote = river ? '(drops a blank)' : '(no blank)';
           const v = humanBidRecallState.plan[c.id] || 0;
           return `<div class="bidder-row">
-            <span class="bidder-name">${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} <span class="small-note">${where} ${blankNote}</span></span>
+            <span class="bidder-name">${cardMatIcons(c)} ${c.name} <span class="small-note">(${cardMatLabel(c)}) · ${where} ${blankNote}</span></span>
             <span style="display:inline-flex; align-items:center; gap:6px;">
               <button type="button" onclick="adjustBidRecall('${c.id}', -1)" style="width:24px;">−</button>
               <span id="bid-recall-${c.id}" style="min-width:22px; text-align:center;"><b>${v}</b></span>
@@ -4164,7 +4177,7 @@ function renderActionPanel() {
           ? `<p>🎁 <b>No one clinched an icon</b>, so ${speciesLabel(state.players[result.consolation])} — who triggered the auction — claims <b>1 item</b> as the initiator's consolation.</p>`
           : '';
         outcomeBox = `<div class="result-box jam">
-          <p><b>🌊 River jams.</b> Total bid (${result.totalBid}) exceeded ${result.openBefore} open icons. Each bidder took <code>max(0, ${result.openBefore} − others' bids)</code>, capped at their own bid. <b>Every worker you bid still costs you fish</b> even if it didn't clinch an icon — workers that didn't win return to your supply.</p>
+          <p><b>🌊 River jams.</b> Total bid (${result.totalBid}) exceeded ${result.openBefore} open icons. The <b>overbid</b> is ${result.totalBid - result.openBefore}, so each bidder took their own bid minus ${result.totalBid - result.openBefore} (never below 0). <b>Every worker you bid still costs you fish</b> even if it didn't clinch an icon — workers that didn't win return to your supply.</p>
           ${consolationLine}
           ${fateLine}
         </div>`;
@@ -4304,7 +4317,7 @@ function refillPreriv(emptiedIdx) {
     const c = state.matDeck.pop();
     c.slot = 'pre';
     state.prerivCards[0] = c;
-    log(`⬇ ${MATERIALS[c.material].icon} ${c.name} (${MATERIALS[c.material].name}) refills Headwaters 3.`);
+    log(`⬇ ${cardMatIcons(c)} ${c.name} (${cardMatLabel(c)}) refills Headwaters 3.`);
   }
 }
 
@@ -5133,14 +5146,16 @@ function aiApplyOverbid(target, pool, open, minBid, overbid) {
 function aiDecideBid(playerIdx, card, minBid) {
   const p = state.players[playerIdx];
   const open = uncoveredIcons(card);
-  const { safe, fallback } = aiRecallBudget(playerIdx, card.id);
+  const { safe, fallback } = aiRecallBudget(playerIdx, lotCardIds(card));
   const safeCount = safe.reduce((s, x) => s + x.count, 0);
   const fallbackCount = fallback.reduce((s, x) => s + x.count, 0);
   // For non-trigger bids: only consider supply + safe-recallable. For trigger
   // bids: also dip into fallback (at-cap workers) to satisfy the min-bid.
   const safePool = p.supply + safeCount;
   const totalPool = safePool + fallbackCount;
-  if (totalPool === 0) return Math.min(0, minBid);
+  // An empty pool can't meet a trigger's min bid; aiChooseAction only
+  // triggers where aiTriggerPoolFor(lot) > 0, so this is a non-trigger pass.
+  if (totalPool === 0) return 0;
   if (open === 0) return Math.min(totalPool, minBid);
 
   // How many of this material does the AI need overall (across hand structures)?
@@ -5524,7 +5539,8 @@ function aiChooseAction(playerIdx) {
       need = Math.max(0, Math.max(...MAT_KEYS.map(m => needs[m])) - 1);
     }
     if (need === 0) continue;
-    const got = Math.min(uncoveredIcons(c), triggerPool, need);
+    const got = Math.min(uncoveredIcons(c), aiTriggerPoolFor(playerIdx, [c.id]), need);
+    if (got === 0) continue;
     // playerCardCost picks up Reed Bed's per-item discount.
     const score = need * got - playerCardCost(c, playerIdx) * got * 0.4;
     if (score > bestScore) { bestScore = score; bestCard = c; bestKind = 'river'; }
@@ -5556,7 +5572,8 @@ function aiChooseAction(playerIdx) {
   }
   if (hasCombinedAuctionAbility(p)) {
     const ct = findCombinedTarget(playerIdx, needs, triggerPool);
-    if (ct && canAffordTimeCost(p, combinedTriggerCost(ct.A, ct.B, p))) {
+    if (ct && canAffordTimeCost(p, combinedTriggerCost(ct.A, ct.B, p))
+        && aiTriggerPoolFor(playerIdx, [ct.A.id, ct.B.id]) > 0) {
       candidates.push({ score: ct.score, needsTrigger: true, make: () => ({ type: 'confluenceAuction', aId: ct.A.id, bId: ct.B.id }) });
     }
   }
@@ -5580,6 +5597,14 @@ function aiChooseAction(playerIdx) {
   for (const cand of candidates) {
     if (cand.needsTrigger && triggerPool <= 0) continue;
     return cand.make();
+  }
+
+  // 2.5) No build or worthwhile auction: an "as an action" ability (Trading
+  // Post, Portage, Heron Roost, Driftwood Snag, or a Mill Wheel copy) spends
+  // the turn instead of Inventing / flushing / passing.
+  {
+    const ab = aiPickAbilityAction(playerIdx);
+    if (ab) return ab;
   }
 
   // Endgame pair-VP cash-out: if we're in endgame and our leftover workers
@@ -5795,7 +5820,8 @@ function findTowLineTarget(playerIdx, needs, triggerPool) {
     if (typeof c.slot !== 'number' || c.slot === 0) continue; // already at R1 → nothing to yank
     const need = needs[c.material] || 0;
     if (need === 0) continue;
-    const got = Math.min(need, uncoveredIcons(c), triggerPool);
+    // Towing only moves the card, so the lot's own workers still can't fund the bid.
+    const got = Math.min(need, uncoveredIcons(c), aiTriggerPoolFor(playerIdx, [c.id]));
     if (got === 0) continue;
     // Hold the one-shot flip for a genuinely impactful yank: the per-item drop
     // to the River-1 rate plus the waived flat must save a real chunk of 🐟.
@@ -5875,55 +5901,23 @@ function findTributeStoneTarget(playerIdx) {
   return best;
 }
 
-// Heron Roost / Driftwood Snag / Tribute Stone: optional start-of-turn abilities.
-// Auto-fire for AI; each Heron Roost / Driftwood Snag costs 1🐟 (Tribute Stone is free).
-//
-// TODO(human-ui): a human owner of Heron Roost or Driftwood Snag currently has NO way to
-// trigger these — this helper only runs in the AI branch. Add start-of-turn prompt buttons
-// (e.g., "Use Heron Roost to replace Upstream X for 1🐟?") so the human can choose target
-// + whether to fire.
+// Free start-of-turn abilities for the AI: once-per-game cards, Tribute Stone /
+// Snare Set, and the species "at the start of your turn" starters. The "as an
+// action" abilities (Heron Roost, Driftwood Snag, Portage, Trading Post, Mill
+// Wheel's copy) are NOT here — they replace the turn's action (rulebook p.7),
+// so aiChooseAction offers them as an action via aiPickAbilityAction.
 function aiStartOfTurnAbilities(playerIdx) {
   const p = state.players[playerIdx];
   aiTryWoodPile(playerIdx);
   aiTryHollowedLog(playerIdx);
   aiTryPackRat(playerIdx);
   aiTrySpringCascade(playerIdx);
-  aiTryMillWheel(playerIdx);
-  if (hasEffect(p, 'Heron Roost') && state.matDeck.length > 0 && canAffordTimeCost(p, 1)) {
-    const myMats = new Set();
-    for (const s of p.hand) for (const m in s.cost) myMats.add(m);
-    const target = state.prerivCards.findIndex(c => c && !myMats.has(c.material));
-    if (target !== -1) {
-      heronReplacePreriv(target);
-      p.timePos += 1;
-      log(`🦩 Heron Roost: ${speciesLabel(p)} replaces a Headwaters card (+1🐟).`);
-    }
-  }
-  if (hasEffect(p, 'Driftwood Snag') && canAffordTimeCost(p, 1)) {
-    const myMats = new Set();
-    for (const s of p.hand) for (const m in s.cost) myMats.add(m);
-    const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
-      .filter(c => uncoveredIcons(c) >= 4 && !myMats.has(c.material));
-    if (cands.length > 0) {
-      const target = cands.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b);
-      target.blanks += 1;
-      p.timePos += 1;
-      log(`${MATERIALS.logs.icon} Driftwood Snag: ${speciesLabel(p)} drops a blank on ${MATERIALS[target.material].name} (+1🐟).`);
-    }
-  }
   // Tribute Stone: fire when there's a high-value opponent worker (per-item cost ≥ 3)
   // and we're not too deep into endgame (slide-back is useless if the victim is already past us).
   if (hasEffect(p, 'Tribute Stone') && !p.tributeStoneUsed && canAffordTimeCost(p, 10)) {
     const target = findTributeStoneTarget(playerIdx);
     if (target && target.value >= 3) {
       doTributeStone(playerIdx, target.victimIdx, target.card);
-    }
-  }
-  // Portage: swap to pry an opponent off a useful material card.
-  if (hasEffect(p, 'Portage') && canAffordTimeCost(p, 5)) {
-    const target = findOtterTrailTarget(playerIdx);
-    if (target && canAffordTimeCost(p, cardCost(target.cardA))) {
-      doOtterTrail(playerIdx, target.cardA.id, target.cardB.id, target.otherIdx);
     }
   }
   // Snare Set (mink species starter): Tribute Stone variant w/ its own flag.
@@ -5941,13 +5935,6 @@ function aiStartOfTurnAbilities(playerIdx) {
       p.snareSetUsed = true;
       log(`🪤 Snare Set: ${speciesLabel(p)} forces ${speciesLabel(victim)} to recall 1 worker; ${speciesLabel(victim)} slides back ${snareBefore - victim.timePos}🐟.`);
     }
-  }
-  // Trading Post: pay 1🐟 to recall 1 worker each from 3 different-material
-  // cards (drops 3 blanks) and place 2 free workers on one card. Bot AI
-  // only — human players will get a click-based prompt (TODO: hook UI).
-  if (hasEffect(p, 'Trading Post') && !p.isHuman && canAffordTimeCost(p, 1) && p.supply >= 2) {
-    const action = findTradingPostAction(playerIdx);
-    if (action) doTradingPost(playerIdx, action);
   }
   // Tail Slap (beaver species starter): pay 1🐟 to drop a blank on a R1 card
   // whose material we don't need (denies opponents).
@@ -6093,28 +6080,91 @@ function aiTrySpringCascade(playerIdx) {
     }
   }
 }
-function aiTryMillWheel(playerIdx) {
+// "As an action" abilities, offered by aiChooseAction as the turn's action when
+// no build or worthwhile auction is available. Each returns an executable
+// action or null; the conditions are the ones these cards used to fire on as
+// free start-of-turn extras (before 2026-09-22, when web + sim were aligned
+// with the rulebook and BGA).
+function aiHeronRoostTarget(p) {
+  if (state.matDeck.length === 0 || !canAffordTimeCost(p, 1)) return -1;
+  const myMats = new Set();
+  for (const s of p.hand) for (const m in s.cost) myMats.add(m);
+  return state.prerivCards.findIndex(c => c && !myMats.has(c.material));
+}
+function aiDriftwoodSnagTarget(p) {
+  if (!canAffordTimeCost(p, 1)) return null;
+  const myMats = new Set();
+  for (const s of p.hand) for (const m in s.cost) myMats.add(m);
+  const cands = [...state.riverCards, ...state.prerivCards.filter(c => c)]
+    .filter(c => uncoveredIcons(c) >= 4 && !myMats.has(c.material));
+  if (cands.length === 0) return null;
+  return cands.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b);
+}
+// The ability itself (own card or a Mill Wheel copy) → action object, or null.
+function aiAbilityAction(playerIdx, name, viaMillWheel) {
   const p = state.players[playerIdx];
-  if (!hasEffect(p, 'Mill Wheel')) return;
-  const avail = new Set();
-  for (const nIdx of neighborIdxs(playerIdx))
-    for (const s of state.players[nIdx].built) if (effectActive(s.name)) avail.add(s.name);
-  const wbm = playerWorkersByMaterial(state, playerIdx);
-  const needs = {};
-  for (const m of MAT_KEYS) needs[m] = 0;
-  for (const s of p.hand) for (const m in s.cost) needs[m] = Math.max(needs[m], Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0)));
-  if (avail.has('Salmon Run') && !p.salmonRunUsed && p.supply > 0) {
-    const t = findSalmonRunTarget(playerIdx, needs);
-    if (t && canAffordTimeCost(p, salmonRunCost(t.n))) { doSalmonRun(playerIdx, t.card.id, t.n); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Salmon Run.`); return; }
-  }
-  if (avail.has('Trading Post') && canAffordTimeCost(p, 1) && p.supply >= 2) {
+  if (name === 'Trading Post') {
+    if (!canAffordTimeCost(p, 1) || p.supply < 2) return null;
     const a = findTradingPostAction(playerIdx);
-    if (a) { doTradingPost(playerIdx, a); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Trading Post.`); return; }
+    return a ? { type: 'ability', name, viaMillWheel, tradingPost: a } : null;
   }
-  if (avail.has('Portage')) {
+  if (name === 'Portage') {
+    if (!canAffordTimeCost(p, 5)) return null;
     const t = findOtterTrailTarget(playerIdx);
-    if (t && canAffordTimeCost(p, cardCost(t.cardA))) { doOtterTrail(playerIdx, t.cardA.id, t.cardB.id, t.otherIdx); log(`⚙ Mill Wheel: ${speciesLabel(p)} copies Portage.`); return; }
+    return t && canAffordTimeCost(p, cardCost(t.cardA)) ? { type: 'ability', name, viaMillWheel, portage: t } : null;
   }
+  if (name === 'Heron Roost') {
+    const i = aiHeronRoostTarget(p);
+    return i !== -1 ? { type: 'ability', name, viaMillWheel, slotIdx: i } : null;
+  }
+  if (name === 'Driftwood Snag') {
+    const c = aiDriftwoodSnagTarget(p);
+    return c ? { type: 'ability', name, viaMillWheel, cardId: c.id } : null;
+  }
+  return null;
+}
+function aiPickAbilityAction(playerIdx) {
+  const p = state.players[playerIdx];
+  // Material-gaining abilities first, then disruption.
+  const order = ['Trading Post', 'Portage', 'Heron Roost', 'Driftwood Snag'];
+  for (const name of order) {
+    if (!hasEffect(p, name)) continue;
+    const a = aiAbilityAction(playerIdx, name, false);
+    if (a) return a;
+  }
+  if (hasEffect(p, 'Mill Wheel')) {
+    const avail = new Set();
+    for (const nIdx of neighborIdxs(playerIdx))
+      for (const s of state.players[nIdx].built) if (effectActive(s.name)) avail.add(s.name);
+    for (const name of order) {
+      if (!MILL_WHEEL_ASACTION.includes(name) || !avail.has(name)) continue;
+      const a = aiAbilityAction(playerIdx, name, true);
+      if (a) return a;
+    }
+  }
+  return null;
+}
+function executeAIAbility(playerIdx, action) {
+  const p = state.players[playerIdx];
+  const { name } = action;
+  if (name === 'Trading Post') {
+    doTradingPost(playerIdx, action.tradingPost);
+  } else if (name === 'Portage') {
+    const t = action.portage;
+    doOtterTrail(playerIdx, t.cardA.id, t.cardB.id, t.otherIdx);
+  } else if (name === 'Heron Roost') {
+    heronReplacePreriv(action.slotIdx);
+    p.timePos += 1;
+    log(`🦩 Heron Roost: ${speciesLabel(p)} replaces a Headwaters card (+1🐟).`);
+  } else if (name === 'Driftwood Snag') {
+    const target = findBoardCard(action.cardId);
+    if (target) {
+      target.blanks += 1;
+      p.timePos += 1;
+      log(`${MATERIALS.logs.icon} Driftwood Snag: ${speciesLabel(p)} drops a blank on ${MATERIALS[target.material].name} (+1🐟).`);
+    }
+  }
+  if (action.viaMillWheel) log(`⚙ Mill Wheel: ${speciesLabel(p)} copies ${name}.`);
 }
 
 // Returns {safe, fallback}: ordered lists of {cardId, count} for pre-auction recall.
@@ -6148,6 +6198,7 @@ function aiTryMillWheel(playerIdx) {
 // 5.6 (z=-0.16), and jam/turn error drops at 3P and 4P too.
 function noRecallThawed(playerIdx, excludeCardId) {
   if (excludeCardId === undefined) return false;   // trigger path stays frozen
+  if (Array.isArray(excludeCardId)) excludeCardId = excludeCardId[0];
   const p = state.players[playerIdx];
   if (p.supply !== 0) return false;
   // The lot may be a river card or a Headwaters card (Pull / Flush auctions).
@@ -6172,6 +6223,8 @@ function noRecallThawed(playerIdx, excludeCardId) {
 // would shrink the very lot being bid on (and bids are capped by open icons).
 // Rulebook "Pre-auction recall" and BGA Auction::actRecall both forbid it.
 function aiRecallBudget(playerIdx, excludeCardId) {
+  // excludeCardId: one lot card id, or an array (a Confluence lot's two cards).
+  const excludeIds = new Set(excludeCardId === undefined ? [] : [].concat(excludeCardId));
   // The `greedy` profile never voluntarily recalls, so the pool the trigger and
   // bid layers see is supply-only. Returning empty here (rather than blocking at
   // the recall call sites) is what makes the AI *aware* of the constraint rather
@@ -6192,7 +6245,7 @@ function aiRecallBudget(playerIdx, excludeCardId) {
     ...state.riverCards.slice().sort((a, b) => cardCost(b) - cardCost(a)).map(c => ({ c, river: true })),
   ];
   for (const { c, river } of cards) {
-    if (excludeCardId !== undefined && c.id === excludeCardId) continue;
+    if (excludeIds.has(c.id)) continue;
     // Staged raft workers are sunk options: 'staging' never appears in a hand
     // cost, so the "not useful" branch below used to mark them ALL safe —
     // recalling one burns the slip (the icon blanks) for a plain supply
@@ -6218,9 +6271,17 @@ function aiRecallBudget(playerIdx, excludeCardId) {
   return { safe, fallback };
 }
 
-function aiTotalRecallable(playerIdx) {
+function aiTotalRecallable(playerIdx, excludeIds = []) {
   const { safe, fallback } = aiRecallBudget(playerIdx);
-  return safe.reduce((s, x) => s + x.count, 0) + fallback.reduce((s, x) => s + x.count, 0);
+  const ex = new Set(excludeIds);
+  return [...safe, ...fallback].filter(x => !ex.has(x.cardId)).reduce((s, x) => s + x.count, 0);
+}
+// Workers this AI could bid when triggering an auction on the given lot:
+// supply + recallable from every card except the lot itself. Without the
+// exclusion the AI counted workers sitting on the lot, triggered, then found
+// it could only bid 0 (2026-09-22 playtest: 7 dead "no bids" auctions).
+function aiTriggerPoolFor(playerIdx, excludeIds) {
+  return state.players[playerIdx].supply + aiTotalRecallable(playerIdx, excludeIds);
 }
 
 // Recall up to `count` workers from the given ordered list. Returns # actually recalled.
@@ -6361,11 +6422,19 @@ async function processRaftDepartures() {
   for (const raft of queue) {
     // cardCost must see the departing slot during the last call.
     raft.slot = raft.lastSlot;
+    // Fish-track order: lowest fish first, ties broken by the stack (top first).
     const order = state.players.map(p => p.idx)
-      .sort((a, b) => state.players[a].timePos - state.players[b].timePos);
+      .sort((a, b) => state.players[a].timePos - state.players[b].timePos
+        || state.stackOrder.indexOf(a) - state.stackOrder.indexOf(b));
     for (const idx of order) {
       if (workersOnCard(raft, idx) <= 0) continue;
       const pl = state.players[idx];
+      // Nothing left to ferry onto (earlier players may have filled the last
+      // open icons): say so rather than silently sending the workers home.
+      if (!state.riverCards.some(c => c !== raft && c.effect !== 'staging' && uncoveredIcons(c) > 0)) {
+        log(`🛟 ${speciesLabel(pl)} has no open river icon to ferry to.`);
+        continue;
+      }
       if (pl.isHuman) {
         await humanRaftLastCall(raft);
       } else {
@@ -6481,6 +6550,16 @@ function awaitHuman() {
   return new Promise(r => { humanResolver = r; });
 }
 
+// "As an action" abilities (Heron Roost, Driftwood Snag, Portage, Trading
+// Post, Mill Wheel's copy) replace the turn's one action (rulebook p.7), so a
+// resolved ability ends the human's turn exactly like Pull / Swim / Build.
+function endHumanTurnWithAbility() {
+  state.lastHumanActionType = 'ability';
+  state.phase = 'idle';
+  render();
+  if (humanResolver) humanResolver();
+}
+
 async function humanUseHeronRoost() {
   const human = state.players.find(p => p.isHuman);
   if (!human || !hasEffect(human, 'Heron Roost') || state.matDeck.length === 0) return;
@@ -6499,7 +6578,7 @@ async function humanUseHeronRoost() {
   const newCard = heronReplacePreriv(pick.idx);
   human.timePos += 1;
   log(`🦩 Heron Roost: ${speciesLabel(human)} replaces Headwaters ${PRERIV_SLOTS - pick.idx} with ${MATERIALS[newCard.material].name} (+1🐟).`);
-  render();
+  endHumanTurnWithAbility();
 }
 
 // --- Reworked once-per-game cards + Mill Wheel (human ability buttons) ---
@@ -6590,8 +6669,7 @@ async function humanUseMillWheel() {
   for (const m of MAT_KEYS) needs[m] = 0;
   for (const s of h.hand) for (const m in s.cost) needs[m] = Math.max(needs[m], Math.max(0, (s.cost[m] || 0) - (wbm[m] || 0)));
   let fired = false;
-  if (pick === 'Salmon Run' && h.supply > 0) { const t = findSalmonRunTarget(h.idx, needs); if (t) { doSalmonRun(h.idx, t.card.id, t.n); fired = true; } }
-  else if (pick === 'Trading Post' && h.supply >= 2) { const a = findTradingPostAction(h.idx); if (a) { doTradingPost(h.idx, a); fired = true; } }
+  if (pick === 'Trading Post' && h.supply >= 2) { const a = findTradingPostAction(h.idx); if (a) { doTradingPost(h.idx, a); fired = true; } }
   else if (pick === 'Portage') { const t = findOtterTrailTarget(h.idx); if (t) { doOtterTrail(h.idx, t.cardA.id, t.cardB.id, t.otherIdx); fired = true; } }
   else if (pick === 'Heron Roost' && state.matDeck.length > 0) {
     const myMats = new Set();
@@ -6603,8 +6681,14 @@ async function humanUseMillWheel() {
     const c2 = [...state.riverCards, ...state.prerivCards.filter(c => c)].filter(c => uncoveredIcons(c) > 0);
     if (c2.length) { const t = c2.reduce((a, b) => uncoveredIcons(a) >= uncoveredIcons(b) ? a : b); t.blanks += 1; h.timePos += 1; fired = true; }
   }
-  log(fired ? `⚙ Mill Wheel: ${speciesLabel(h)} copies ${pick}.` : `⚙ Mill Wheel: ${pick} had no valid target.`);
-  render();
+  if (!fired) {
+    // No target: nothing happened, so the turn is not spent.
+    log(`⚙ Mill Wheel: ${pick} had no valid target.`);
+    render();
+    return;
+  }
+  log(`⚙ Mill Wheel: ${speciesLabel(h)} copies ${pick}.`);
+  endHumanTurnWithAbility();
 }
 
 async function humanUseDriftwoodSnag() {
@@ -6626,7 +6710,7 @@ async function humanUseDriftwoodSnag() {
   pick.card.blanks += 1;
   human.timePos += 1;
   log(`${MATERIALS.logs.icon} Driftwood Snag: ${speciesLabel(human)} drops a blank on ${MATERIALS[pick.card.material].name} (+1🐟).`);
-  render();
+  endHumanTurnWithAbility();
 }
 
 async function humanUseOtterTrail() {
@@ -6664,7 +6748,7 @@ async function humanUseOtterTrail() {
   );
   if (!targetPick) return;
   doOtterTrail(human.idx, sourcePick.card.id, targetPick.card.id, targetPick.otherIdx);
-  render();
+  endHumanTurnWithAbility();
 }
 
 async function humanUseTributeStone() {
@@ -6733,7 +6817,7 @@ async function humanUseTradingPost() {
   }
 
   doTradingPost(human.idx, { sources, target });
-  render();
+  endHumanTurnWithAbility();
 }
 
 // Species-starter human handlers (Snare Set, Tail Slap, Channel Clearer, Rolling Float).
@@ -6956,7 +7040,9 @@ async function humanStagingFerry() {
 async function humanTowLine() {
   const human = state.players.find(p => p.isHuman);
   if (!human || !hasEffect(human, 'Tow Line') || human.towLineUsed) return;
-  const cands = state.riverCards.filter(c => typeof c.slot === 'number' && c.slot > 0 && uncoveredIcons(c) > 0);
+  // Towing only moves the card: its own workers still can't fund the >= 1 bid.
+  const cands = state.riverCards.filter(c => typeof c.slot === 'number' && c.slot > 0 && uncoveredIcons(c) > 0
+    && biddablePoolFor(human.idx, [c.id]) > 0);
   if (cands.length === 0) return;
   state.lastHumanActionType = 'towLine';
   const pick = await pickFromList(
@@ -6973,6 +7059,30 @@ async function humanTowLine() {
   render();
 }
 
+// Ids of the board card(s) an auction lot covers — a Confluence / Double
+// Vision lot is a virtual card over two real ones. Pre-auction recall may not
+// pull workers off any of them (rulebook "Pre-auction recall"; BGA actRecall).
+function lotCardIds(lot) {
+  return lot.combinedPair ? lot.combinedPair.map(c => c.id) : [lot.id];
+}
+// Workers a player could put into an auction on the given lot card ids:
+// supply plus workers on every OTHER river / shoreline card. The trigger must
+// bid >= 1, so a player whose only workers sit on the lot itself can't start it.
+function biddablePoolFor(playerIdx, excludeIds) {
+  const p = state.players[playerIdx];
+  const ex = new Set(excludeIds);
+  let n = p.supply;
+  for (const c of [...state.shorelineCards, ...state.riverCards]) {
+    if (!ex.has(c.id)) n += workersOnCard(c, playerIdx);
+  }
+  return n;
+}
+function humanCanTriggerOn(excludeIds, what) {
+  const human = state.players.find(p => p.isHuman);
+  if (biddablePoolFor(human.idx, excludeIds) > 0) return true;
+  alert(`You can't start an auction on ${what}: the trigger must bid at least 1 worker, and your only workers are on the card being auctioned (recall can't take them from it).`);
+  return false;
+}
 // Board-based combined-auction selection. Look up a card (river or Headwaters).
 function findBoardCard(cardId) {
   return state.riverCards.find(c => c.id === cardId) || state.prerivCards.find(c => c && c.id === cardId) || null;
@@ -7002,6 +7112,11 @@ function humanSelectCombinedCard(cardId) {
     return;
   }
   // Valid pair — run the pooled auction.
+  if (!humanCanTriggerOn([cardA.id, card.id], `${cardA.name} + ${card.name}`)) {
+    state.combinedPick = { first: null };
+    render();
+    return;
+  }
   const src = DOUBLE_VISION_ACTIVE ? 'Double Vision' : 'Confluence';
   const trig = combinedTriggerCost(cardA, card, human);
   state.lastHumanActionType = 'confluence';
@@ -7103,6 +7218,7 @@ function humanSelectAuctionCard(cardId) {
   state.lastHumanActionType = 'auction';
   const card = state.riverCards.find(c => c.id === cardId);
   if (!card || uncoveredIcons(card) === 0) return;
+  if (!humanCanTriggerOn([card.id], card.name)) return;
   const human = state.players.find(p => p.isHuman);
   advancePlayer(human.idx, 1);
   log(`🎬 ${speciesLabel(human)} spends 1🐟 to auction ${MATERIALS[card.material].name} at River ${card.slot + 1}.`);
@@ -8255,7 +8371,9 @@ function updateBidPreview() {
   const cur = document.getElementById('bid-current');
   if (cur) cur.textContent = v;
   const supplyAfterLbl = document.getElementById('bid-workers-after');
-  if (supplyAfterLbl) supplyAfterLbl.textContent = effSupply - v;
+  // Before the recalls are picked the bid can exceed supply; show the
+  // shortfall instead of a negative worker count.
+  if (supplyAfterLbl) supplyAfterLbl.textContent = effSupply - v >= 0 ? effSupply - v : `0 (${v - effSupply} short)`;
   const wDelta = document.getElementById('bid-workers-delta');
   if (wDelta) {
     const parts = [];
@@ -8283,7 +8401,12 @@ function updateBidPreview() {
       recallHeader.innerHTML = `⚠️ Bid is ${needRecall} above your supply — recall <b>${deficit}</b> more worker${deficit === 1 ? '' : 's'} from the cards below, or lower your bid.`;
       recallHeader.style.color = 'var(--warning, #c87a2d)';
     } else if (needRecall > 0) {
-      recallHeader.innerHTML = `✅ Recalling <b>${recall}</b> worker${recall === 1 ? '' : 's'} to fund this bid (drops ${recall} blank${recall === 1 ? '' : 's'} on river cards).`;
+      // Only river recalls drop a blank; shoreline recalls don't.
+      const blanks = Object.entries(st.plan)
+        .filter(([id]) => st.riverIds.has(id)).reduce((n, [, k]) => n + k, 0);
+      const blankNote = blanks === 0 ? 'no blanks dropped'
+        : `drops ${blanks} blank${blanks === 1 ? '' : 's'} on river cards`;
+      recallHeader.innerHTML = `✅ Recalling <b>${recall}</b> worker${recall === 1 ? '' : 's'} to fund this bid (${blankNote}).`;
       recallHeader.style.color = '';
     }
   }
@@ -8323,7 +8446,7 @@ async function humanBidForAuction(card, human, minBid, opts = {}) {
     const recallCards = [
       ...state.shorelineCards.map(c => ({ c, river: false })),
       ...state.riverCards.slice().map(c => ({ c, river: true })),
-    ].filter(({ c }) => c.id !== card.id && workersOnCard(c, human.idx) > 0);
+    ].filter(({ c }) => !lotCardIds(card).includes(c.id) && workersOnCard(c, human.idx) > 0);
     const maxByCard = {};
     for (const { c } of recallCards) maxByCard[c.id] = workersOnCard(c, human.idx);
     const totalRecallable = Object.values(maxByCard).reduce((s, v) => s + v, 0);
@@ -8349,7 +8472,8 @@ async function humanBidForAuction(card, human, minBid, opts = {}) {
     // themselves — same flow riders already get.
     const plan = {};
 
-    humanBidRecallState = { baseSupply, baseTime, cost, open, minBid, plan, maxByCard };
+    const riverIds = new Set(recallCards.filter(x => x.river).map(x => x.c.id));
+    humanBidRecallState = { baseSupply, baseTime, cost, open, minBid, plan, maxByCard, riverIds };
     const initRecall = humanBidRecallTotal();
     // Default bid: minBid (which equals 0 for non-trigger; trigger has prefilled recalls).
     const initBid = Math.min(Math.max(minBid, 0), sliderMax);
@@ -8509,7 +8633,7 @@ async function runOneTurn() {
   const p = state.players[state.currentPlayer];
   p.ccUsedThisTurn = false; // Channel Clearer is once per turn
   const space = p.timePos;
-  log(`— ${speciesLabel(p)} advances to ${space}🐟 on the fish track.`);
+  log(`— ${speciesLabel(p)}'s turn (at ${space}🐟).`);
   render();
   scrollTimeTrackToLeftmost();
 
@@ -8782,6 +8906,11 @@ async function executeAIAction(playerIdx, action) {
     render();
     return;
   }
+  if (action.type === 'ability') {
+    executeAIAbility(playerIdx, action);
+    render();
+    return;
+  }
   if (action.type === 'build') {
     await performBuild(playerIdx, action.handIdx);
     render();
@@ -8923,7 +9052,9 @@ function showGameOver() {
       <span>${i + 1}. ${p.species.emoji} ${p.species.name}${p.isHuman ? ' (you)' : ''}</span>
       <span><b>${bd.total}★</b> · ${p.timePos}🐟 · ${p.built.length} structure${p.built.length === 1 ? '' : 's'}</span>
     </div>`;
-    if (bd.bonuses.length > 0) {
+    // Always show the breakdown — a printed-VP-only score used to get no
+    // lines at all, which read as a missing breakdown next to the others.
+    {
       const bonusLines = bd.bonuses.map(b =>
         `<div style="display:flex; justify-content:space-between; padding:2px 14px; font-size:12px; color:var(--ink-soft);">
           <span>${b.name}: ${b.detail}</span>

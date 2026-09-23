@@ -110,4 +110,36 @@ final class AuctionTest extends TestCase
         }
         return $cases;
     }
+
+    public function testCanTriggerWithSupply(): void
+    {
+        self::assertTrue(Auction::canTriggerOn(1, [], [7]));
+        self::assertTrue(Auction::canTriggerOn(2, [7 => 3], [7]));
+    }
+
+    public function testCannotTriggerWithNothingAnywhere(): void
+    {
+        self::assertFalse(Auction::canTriggerOn(0, [], []));
+        self::assertFalse(Auction::canTriggerOn(0, [5 => 0], [7]));
+    }
+
+    public function testWorkersOnTheLotDoNotCount(): void
+    {
+        // Softlock regression: 0 supply, only workers sit on the lot itself —
+        // they can't be recalled mid-auction, so the trigger could never bid.
+        self::assertFalse(Auction::canTriggerOn(0, [7 => 2], [7]));
+    }
+
+    public function testWorkersElsewhereCount(): void
+    {
+        self::assertTrue(Auction::canTriggerOn(0, [7 => 2, 9 => 1], [7]));
+        // Headwaters lot (no workers can be on it): any placed worker counts.
+        self::assertTrue(Auction::canTriggerOn(0, [7 => 2], []));
+    }
+
+    public function testConfluenceExcludesBothLots(): void
+    {
+        self::assertFalse(Auction::canTriggerOn(0, [7 => 1, 9 => 1], [7, 9]));
+        self::assertTrue(Auction::canTriggerOn(0, [7 => 1, 9 => 1, 11 => 1], [7, 9]));
+    }
 }

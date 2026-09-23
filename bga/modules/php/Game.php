@@ -16,6 +16,7 @@ namespace Bga\Games\RiverBankers;
 
 use Bga\Games\RiverBankers\States\NextPlayer;
 use Bga\Games\RiverBankers\States\StarterDraft;
+use Bga\Games\RiverBankers\Rules\Auction as AuctionRules;
 use Bga\Games\RiverBankers\Rules\Build;
 use Bga\Games\RiverBankers\Rules\BuildCost;
 use Bga\Games\RiverBankers\Rules\CardMovement;
@@ -467,10 +468,43 @@ class Game extends \Bga\GameFramework\Table
         );
     }
 
-    /** A player can start an auction only with a worker available or recallable. */
+    /**
+     * A player can start an auction only with a worker available or recallable.
+     * This is the lot-agnostic check — exact for Headwaters lots (Pull / Flush /
+     * Snag Pile: no workers can sit on a Headwaters card). For a lot that is
+     * already on the river use canTriggerAuctionOn(), since workers on the lot
+     * itself can't be recalled before its auction.
+     */
     public function canTriggerAuction(int $playerId): bool
     {
-        return $this->getPlayerSupply($playerId) > 0 || $this->recallableWorkerCount($playerId) > 0;
+        return $this->canTriggerAuctionOn($playerId, []);
+    }
+
+    /**
+     * Whether $playerId could bid >= 1 as the trigger of an auction on the given
+     * lot card(s): supply > 0, or a recallable worker on a river/shoreline card
+     * other than the lot(s) (Auction::actRecall forbids recalling off the lot).
+     *
+     * @param list<int> $lotCardIds
+     */
+    public function canTriggerAuctionOn(int $playerId, array $lotCardIds): bool
+    {
+        $supply = $this->getPlayerSupply($playerId);
+        if ($supply > 0) {
+            return true;
+        }
+        return AuctionRules::canTriggerOn($supply, $this->recallableWorkersByCard($playerId), $lotCardIds);
+    }
+
+    /** @return array<int,int> card_id => the player's workers on that river/shoreline card */
+    public function recallableWorkersByCard(int $playerId): array
+    {
+        return array_map('intval', $this->getCollectionFromDB(
+            "SELECT w.`card_id`, SUM(w.`workers`) FROM `worker` w JOIN `card` c ON c.`card_id` = w.`card_id`
+             WHERE w.`player_id` = $playerId AND c.`card_location` IN ('river', 'shoreline')
+             GROUP BY w.`card_id`",
+            true
+        ));
     }
 
     /**
@@ -516,6 +550,18 @@ class Game extends \Bga\GameFramework\Table
             }
         }
         return $out;
+    }
+
+    /**
+     * Swim targets for $playerId: auctionable river cards on which they could
+     * actually bid as the trigger (see canTriggerAuctionOn). @return list<int>
+     */
+    public function getSwimTargets(int $playerId): array
+    {
+        return array_values(array_filter(
+            $this->getAuctionableRiverCards(),
+            fn(int $id): bool => $this->canTriggerAuctionOn($playerId, [$id])
+        ));
     }
 
     // --- auction lifecycle ---
@@ -2312,7 +2358,7 @@ class Game extends \Bga\GameFramework\Table
             case 'portage':       // swap your worker with another worker on a different river card
                 return count($this->portageSources($playerId)) > 0;
             case 'towline':       // tow any river card to River 1, then auction it
-                return $this->canTriggerAuction($playerId) && count($this->getAuctionableRiverCards()) > 0;
+                return count($this->abilityTargets('towline', $playerId)) > 0; // per-lot trigger check
             case 'tailslap':      // drop a blank on a River-1 card (pay 1 on use)
                 return count($this->riverOneUncovered()) > 0;
             case 'channelclearer': // discard an opponent's Reed worker
@@ -2321,7 +2367,7 @@ class Game extends \Bga\GameFramework\Table
                 return count($this->tradingPostSourceMaterials($playerId)) >= 3
                     && count($this->getAuctionableRiverCards()) > 0;
             case 'confluence':    // combined two-card auction (same material)
-                return $this->canTriggerAuction($playerId) && count($this->confluenceFirstCards()) > 0;
+                return count($this->confluenceFirstCards($playerId)) > 0; // per-pair trigger check
             case 'millwheel':     // copy a neighbour's as-an-action ability
                 return count($this->millWheelOptions($playerId)) > 0;
             default:
@@ -2564,8 +2610,13 @@ class Game extends \Bga\GameFramework\Table
 
     // --- Confluence (combined two-card auction over same-material river cards) ---
 
-    /** River cards (uncovered icons) that have a same-material partner to pair with. @return list<int> */
-    public function confluenceFirstCards(): array
+    /**
+     * River cards (uncovered icons) that have a same-material partner to pair
+     * with. With $playerId, only cards with at least one partner such that the
+     * player could bid >= 1 as the trigger on the pair (workers on either lot
+     * can't be recalled for the combined auction). @return list<int>
+     */
+    public function confluenceFirstCards(?int $playerId = null): array
     {
         $byMat = [];
         foreach ($this->getObjectListFromDB(
@@ -2583,15 +2634,21 @@ class Game extends \Bga\GameFramework\Table
         foreach ($byMat as $ids) {
             if (count($ids) >= 2) {
                 foreach ($ids as $id) {
-                    $out[] = $id;
+                    if ($playerId === null || count($this->confluenceSecondCards($id, $playerId)) > 0) {
+                        $out[] = $id;
+                    }
                 }
             }
         }
         return $out;
     }
 
-    /** River cards that can pair with $firstId (same material, uncovered, different card). @return list<int> */
-    public function confluenceSecondCards(int $firstId): array
+    /**
+     * River cards that can pair with $firstId (same material, uncovered, different
+     * card). With $playerId, only partners on which the player could bid >= 1 as
+     * the trigger of the combined auction. @return list<int>
+     */
+    public function confluenceSecondCards(int $firstId, ?int $playerId = null): array
     {
         $def = Material::$MATERIAL[(int) $this->getCardRow($firstId)['card_type_arg']] ?? null;
         $mat = $def !== null ? (string) $def['material'] : '';
@@ -2600,7 +2657,8 @@ class Game extends \Bga\GameFramework\Table
             "SELECT `card_id`, `card_type_arg` FROM `card` WHERE `card_location` = 'river' AND `card_id` <> $firstId"
         ) as $r) {
             $d = Material::$MATERIAL[(int) $r['card_type_arg']] ?? null;
-            if ($d !== null && (string) $d['material'] === $mat && $this->uncoveredIcons((int) $r['card_id']) > 0) {
+            if ($d !== null && (string) $d['material'] === $mat && $this->uncoveredIcons((int) $r['card_id']) > 0
+                && ($playerId === null || $this->canTriggerAuctionOn($playerId, [$firstId, (int) $r['card_id']]))) {
                 $out[] = (int) $r['card_id'];
             }
         }
@@ -2802,8 +2860,10 @@ class Game extends \Bga\GameFramework\Table
             return $this->getAuctionableRiverCards(); // river cards with an uncovered icon
         }
         if ($key === 'towline') {
-            // Any auctionable river card can be towed to River 1 and auctioned.
-            return $this->getAuctionableRiverCards();
+            // Any auctionable river card can be towed to River 1 and auctioned —
+            // as long as the player can bid >= 1 on it (workers on the towed
+            // card itself can't be recalled for its auction).
+            return $this->getSwimTargets($playerId);
         }
         if ($key === 'heronroost') {
             return $this->getMaterialDeckCount() > 0 ? $this->getHeadwatersCards() : [];

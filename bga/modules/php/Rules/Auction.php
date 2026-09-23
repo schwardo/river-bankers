@@ -91,4 +91,33 @@ final class Auction
         }
         return $out;
     }
+
+    /**
+     * Whether a player may trigger an auction on the given lot card(s): the
+     * trigger must bid >= 1 worker (rulebook), and pre-auction recall may NOT
+     * take workers off a card being auctioned. So the player needs at least one
+     * worker in supply, or one recallable worker on a river/shoreline card that
+     * is NOT one of the lots. (Counting workers on the lot itself used to let a
+     * 0-supply player Swim to the only card holding their workers and then be
+     * softlocked in the Auction state with no legal bid.)
+     *
+     * @param int            $supply           workers in the player's supply
+     * @param array<int,int> $recallableByCard card_id => the player's workers on
+     *                                         that river/shoreline card
+     * @param list<int>      $lotCardIds       the card(s) being auctioned (empty
+     *                                         for a Headwaters lot, which can't
+     *                                         hold workers)
+     */
+    public static function canTriggerOn(int $supply, array $recallableByCard, array $lotCardIds): bool
+    {
+        if ($supply > 0) {
+            return true;
+        }
+        foreach ($recallableByCard as $cardId => $workers) {
+            if ($workers > 0 && !in_array((int) $cardId, $lotCardIds, true)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

@@ -35,7 +35,11 @@ class PlayerTurn extends GameState
     {
         $playerId = (int) $this->game->getActivePlayerId();
         return [
-            "auctionableRiverCards" => $this->game->getAuctionableRiverCards(),
+            // Swim targets for THIS player: river cards they could actually bid
+            // >= 1 on as the trigger. Workers on the lot itself can't be recalled
+            // for its auction, so a 0-supply player whose only placed workers sit
+            // on card X must not be offered X (softlock: no legal bid, no Undo).
+            "auctionableRiverCards" => $this->game->getSwimTargets($playerId),
             "headwatersCards" => $this->game->getHeadwatersCards(),
             "handStructureIds" => $this->game->getPlayerHand($playerId),
             "canFlush" => $this->game->getMaterialDeckCount() > 0,
@@ -219,8 +223,10 @@ class PlayerTurn extends GameState
         if (!in_array($cardId, $args['auctionableRiverCards'], true)) {
             throw new UserException(clienttranslate('That card cannot be auctioned.'));
         }
-        if (!$args['canTriggerAuction']) {
-            throw new UserException(clienttranslate('You have no worker available or recallable to bid.'));
+        // Re-check per lot (getArgs already filters, but keep the invariant here):
+        // the trigger must be able to bid >= 1 without recalling off this card.
+        if (!$this->game->canTriggerAuctionOn($activePlayerId, [$cardId])) {
+            throw new UserException(clienttranslate('You have no worker available or recallable to bid on that card.'));
         }
 
         $this->game->advanceFish($activePlayerId, 1); // flat trigger cost

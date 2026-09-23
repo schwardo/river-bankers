@@ -41,9 +41,12 @@ class Confluence extends GameState
     public function getArgs(): array
     {
         $a = (int) $this->globals->get('conf_a', 0);
+        // Per-player: only pairs the trigger can bid >= 1 on (workers on either
+        // lot can't be recalled for the combined auction).
+        $playerId = (int) $this->game->getActivePlayerId();
         return $a === 0
-            ? ["step" => "cardA", "cardA" => 0, "targets" => $this->game->confluenceFirstCards()]
-            : ["step" => "cardB", "cardA" => $a, "targets" => $this->game->confluenceSecondCards($a)];
+            ? ["step" => "cardA", "cardA" => 0, "targets" => $this->game->confluenceFirstCards($playerId)]
+            : ["step" => "cardB", "cardA" => $a, "targets" => $this->game->confluenceSecondCards($a, $playerId)];
     }
 
     /**
