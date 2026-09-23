@@ -5777,6 +5777,10 @@ function doOtterTrail(playerIdx, cardAId, cardBId, otherPlayerIdx) {
   advancePlayer(playerIdx, cost);
   const other = state.players[otherPlayerIdx];
   other.timePos = Math.max(0, other.timePos - 2);
+  // Remember the swap until the victim's turn ends, so its AI won't simply
+  // undo it (see findOtterTrailTarget).
+  state.portagedAgainst = state.portagedAgainst || {};
+  state.portagedAgainst[otherPlayerIdx] = { by: playerIdx, cards: [cardA.id, cardB.id] };
   log(`🛶 Portage: ${speciesLabel(p)} pays ${cost}🐟 and swaps a worker on ${cardMatLabel(cardA)} with ${speciesLabel(other)}'s worker on ${cardMatLabel(cardB)} — ${speciesLabel(other)} slides back 2🐟 in compensation.`);
   return true;
 }
@@ -5804,6 +5808,12 @@ function findOtterTrailTarget(playerIdx) {
     return short;
   };
   const shortNow = handShort({});
+  // Anti ping-pong: never reverse a Portage aimed at this AI since its last
+  // turn. Two players who both want the same material would otherwise swap the
+  // same pair forever — at River 1 the 2🐟 cost equals the 2🐟 compensation, so
+  // nobody ever advances (sim: ~1 in 1,500 3P games hit the turn cap; a web
+  // game would hang). Humans choose their own targets and aren't limited.
+  const hit = !p.isHuman && state.portagedAgainst && state.portagedAgainst[playerIdx];
   let bestB = null, bestBOther = -1, bestBNeed = 0;
   for (const c of state.riverCards) {
     if (typeof c.slot !== 'number') continue;
@@ -5812,6 +5822,7 @@ function findOtterTrailTarget(playerIdx) {
     for (const k in c.workers) {
       const opIdx = parseInt(k);
       if (opIdx === playerIdx) continue;
+      if (hit && opIdx === hit.by && hit.cards.includes(c.id)) continue;
       if (c.workers[k] <= 0) continue;
       if (needs[c.material] > bestBNeed) {
         bestBNeed = needs[c.material];
@@ -8653,11 +8664,21 @@ function humanUndoLastMove() {
   scheduleTurn();
 }
 
+const WEB_MAX_TURNS = 600;
 async function runOneTurn() {
   if (state.gameOver) return;
   // Coda: each player takes one final build (in fish-track order), then end.
   if (state.coda) { await runCodaTurn(); return; }
   const myEpoch = ++turnEpoch;
+  // Safety net: a real game takes ~35-80 turns. If something loops (an AI
+  // cycle nobody anticipated), end the game rather than hang the page.
+  state.turnsTaken = (state.turnsTaken || 0) + 1;
+  if (state.turnsTaken > WEB_MAX_TURNS) {
+    log(`⚠ Safety stop: ${WEB_MAX_TURNS} turns without reaching the finish line — everyone retires where they stand.`);
+    for (const pl of state.players) if (!pl.out) { pl.out = true; settleFinishSpot(pl); }
+    await enterCoda();
+    return;
+  }
   // Fish-line endgame (b): a player retires the moment their pawn passes the
   // finish line. The material deck emptying does NOT end the game — players
   // keep auctioning the river/Headwaters cards still on the board until all
@@ -8713,6 +8734,10 @@ async function runOneTurn() {
     }
     addAiTurnTime();
   }
+
+  // This player's turn is over: a Portage aimed at them is no longer "since
+  // their last turn".
+  if (state.portagedAgainst) delete state.portagedAgainst[p.idx];
 
   cleanupShoreline();
 

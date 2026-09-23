@@ -336,7 +336,10 @@ function draw(entry,t=1){
   const maxC=Math.max(...m.bins.map(b=>b.c),1),baseY=padT+ph;
   g.strokeStyle=css("--line");g.lineWidth=1;g.beginPath();g.moveTo(padL,baseY+.5);g.lineTo(W-padR,baseY+.5);g.stroke();
   g.fillStyle=css("--sim");
-  for(const b of m.bins){if(!b.c)continue;const x0=X(b.x0)+1,x1=X(b.x1)-1,w=Math.max(1,x1-x0),h=(b.c/maxC)*ph*t,y=baseY-h,r=Math.min(3,w/2,h);
+  // Clamp: the easing curve dips below 0 on its first frame, and a negative
+  // arcTo radius throws, which killed the animation loop and left the charts
+  // with no bars at all.
+  for(const b of m.bins){if(!b.c)continue;const x0=X(b.x0)+1,x1=Math.max(X(b.x1)-1,x0+1),w=x1-x0,h=Math.max(0,(b.c/maxC)*ph*t),y=baseY-h,r=Math.max(0,Math.min(3,w/2,h));if(h<=0)continue;
     g.beginPath();g.moveTo(x0,baseY);g.lineTo(x0,y+r);g.arcTo(x0,y,x0+r,y,r);g.lineTo(x1-r,y);g.arcTo(x1,y,x1,y+r,r);g.lineTo(x1,baseY);g.closePath();g.fill();}
   g.strokeStyle=css("--sim");g.globalAlpha=.5;g.lineWidth=1;g.setLineDash([3,3]);
   g.beginPath();g.moveTo(X(m.simMean),padT-4);g.lineTo(X(m.simMean),baseY);g.stroke();g.setLineDash([]);g.globalAlpha=1;

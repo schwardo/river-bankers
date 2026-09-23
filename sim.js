@@ -3213,6 +3213,9 @@ function doOtterTrail(state, playerIdx, cardAId, cardBId, otherPlayerIdx) {
   if (comp > 0) victim.timePos = Math.max(0, victim.timePos - comp);
   advancePlayer(state, playerIdx, cost);
   noteEffectUse(state, 'Portage');
+  // Remembered until the victim's turn ends (see findOtterTrailTarget).
+  state.portagedAgainst = state.portagedAgainst || {};
+  state.portagedAgainst[otherPlayerIdx] = { by: playerIdx, cards: [cardA.id, cardB.id] };
   return true;
 }
 
@@ -3308,6 +3311,12 @@ function findOtterTrailTarget(state, playerIdx) {
     return short;
   };
   const shortNow = handShort({});
+  // Anti ping-pong: never reverse a Portage aimed at me since my last turn.
+  // Two players wanting the same material (one with Portage, one copying it
+  // via Mill Wheel) otherwise swap the same pair forever — at River 1 the 2🐟
+  // cost equals the 2🐟 compensation, so neither advances and the game hits
+  // MAX_TURNS (~1 in 1,500 greedy 3P games). Mirrors web findOtterTrailTarget.
+  const hit = state.portagedAgainst && state.portagedAgainst[playerIdx];
   let bestB = null, bestBOther = -1, bestBNeed = 0;
   for (const c of state.riverCards) {
     if (typeof c.slot !== 'number') continue;
@@ -3316,6 +3325,7 @@ function findOtterTrailTarget(state, playerIdx) {
     for (const k in c.workers) {
       const opIdx = parseInt(k);
       if (opIdx === playerIdx) continue;
+      if (hit && opIdx === hit.by && hit.cards.includes(c.id)) continue;
       if (c.workers[k] <= 0) continue;
       if (needs[c.material] > bestBNeed) {
         bestBNeed = needs[c.material];
@@ -7452,6 +7462,7 @@ function egPlayOut(state, trigger, vpLimit, fishLimit, proc) {
       aiStartOfTurnAbilities(state, p.idx);
       const action = aiChooseAction(state, p.idx);
       executeAction(state, p.idx, action);
+      if (state.portagedAgainst) delete state.portagedAgainst[p.idx];   // my turn is over
       cleanupShoreline(state);
       maybeFireSlipstream(state, p.idx);
       // Deck-empty auto-advance (live rule): nudge the active player toward the
@@ -8414,6 +8425,7 @@ function instrFishPlayout(state, fishLimit, proc, autoAdvanceEmpty = false) {
       const action = aiChooseAction(state, p.idx);
       if (action.type === 'pass') passes++;
       executeAction(state, p.idx, action);
+      if (state.portagedAgainst) delete state.portagedAgainst[p.idx];   // my turn is over
       cleanupShoreline(state);
       maybeFireSlipstream(state, p.idx);
       // Proposed endgame-speedup rule: once the material deck is empty, the
