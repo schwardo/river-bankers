@@ -47,7 +47,7 @@ class Material
         // Shoal (arg 5) + Trailing Vine (arg 17); at 3P+ it is left out of the
         // deck and the two vanilla 5s are used instead (see Game::setupNewGame).
         24 => ['name' => 'Bramble Shoal', 'material' => 'stones', 'icons' => 5, 'wildAlt' => 'vines', 'effect' => 'Wild: each claimed icon yields Stones OR Vines (chosen at build time).'],
-        25 => ['name' => 'Flotsam Raft', 'material' => 'staging', 'icons' => 6, 'effect' => 'Cannot be spent. Move workers to open river icons as an action (drop a blank), or when it leaves the river: slide back this card\'s cost, advance the destination\'s.'],
+        25 => ['name' => 'Flotsam Raft', 'material' => 'staging', 'icons' => 6, 'effect' => 'Cannot be spent. As an action, move workers to open river icons (drop a blank): slide back this card\'s cost, advance the destination\'s. Never enters shoreline.'],
     ];
 
     // 48 shared structure-deck cards (excludes species starters). NOTE: Slipstream

@@ -62,13 +62,32 @@ final class Effects
     }
 
     /**
-     * A player's effective per-item fish cost on a card of $material (min 1).
+     * Per-item discount a player gets on one card. A wildcard (a card with a
+     * $wildAlt second material) counts as BOTH of its materials [rule
+     * 2026-09-23], so a discount on either half applies; if both halves are
+     * discounted the LARGER total is used (halves never stack). Mirrors sim.js
+     * playerCardCost / web perItemDiscount.
      *
      * @param list<string> $builtNames
      */
-    public static function perItemForPlayer(int $base, string $material, array $builtNames): int
+    public static function cardAuctionDiscount(string $material, ?string $wildAlt, array $builtNames): int
     {
-        return max(1, $base - self::auctionDiscount($material, $builtNames));
+        $best = self::auctionDiscount($material, $builtNames);
+        if ($wildAlt !== null && $wildAlt !== '') {
+            $best = max($best, self::auctionDiscount($wildAlt, $builtNames));
+        }
+        return $best;
+    }
+
+    /**
+     * A player's effective per-item fish cost on a card of $material (min 1).
+     * Pass the card's $wildAlt for a wildcard so either half's discount counts.
+     *
+     * @param list<string> $builtNames
+     */
+    public static function perItemForPlayer(int $base, string $material, array $builtNames, ?string $wildAlt = null): int
+    {
+        return max(1, $base - self::cardAuctionDiscount($material, $wildAlt, $builtNames));
     }
 
     /**

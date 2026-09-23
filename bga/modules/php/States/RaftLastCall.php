@@ -11,6 +11,11 @@ use Bga\GameFramework\UserException;
 use Bga\Games\RiverBankers\Game;
 
 /**
+ * LEGACY ONLY [2026-09-23]: the last call was retired — the raft now stays on
+ * the river until it is empty (see Game::raftStaysOnRiver). NextPlayer only
+ * routes here for a non-zero legacy `pending_raft_call` global left by an
+ * in-progress Alpha game, so that game can finish. Nothing sets it any more.
+ *
  * Flotsam Raft last call: when the raft would move to the shoreline, players
  * in fish-track order (furthest back first) may move their workers off it one
  * final time, paying exactly as the ferry action (the raft's cost is the slot
@@ -18,7 +23,7 @@ use Bga\Games\RiverBankers\Game;
  * owners' supplies and the card is discarded — it never reaches the shoreline.
  *
  * Entered from NextPlayer whenever `pending_raft_call` is set (see
- * Game::raftDivertToLastCall). The queue of players is built on first entry
+ * the retired Game::raftDivertToLastCall). The queue of players is built on first entry
  * and re-checked every re-entry; a player leaves the queue by ferrying their
  * last worker, clicking Done, or zombie-ing out.
  */

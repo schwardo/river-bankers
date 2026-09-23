@@ -221,15 +221,23 @@ const MATERIAL_DISCOUNT_CARDS = {
   mud:   { 'Mud Burrow': 1 },
   clay:  { 'Clay Den': 2 },
 };
+// A wildcard counts as both of its materials [rule 2026-09-23]: either half's
+// discount applies, the larger one if both do (halves never stack). Mirrors
+// web perItemDiscount.
 function playerCardCost(state, card, playerIdx) {
   const base = cardCost(card);
   const p = state.players[playerIdx];
-  const discounters = MATERIAL_DISCOUNT_CARDS[card.material] || {};
-  let total = 0;
-  for (const name in discounters) {
-    if (hasEffect(p, name)) total += discounters[name];
+  const mats = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
+  let best = 0;
+  for (const m of mats) {
+    const discounters = MATERIAL_DISCOUNT_CARDS[m] || {};
+    let total = 0;
+    for (const name in discounters) {
+      if (hasEffect(p, name)) total += discounters[name];
+    }
+    best = Math.max(best, total);
   }
-  return Math.max(1, base - total);
+  return Math.max(1, base - best);
 }
 
 // Pass-0 (lap-crossing) effects. Wood Pile / Hollowed-out Log / Pack Rat Burrow
@@ -1493,7 +1501,7 @@ function newGame(numPlayers, workersPerPlayer = null) {
       ogTrap: [],                 // per player caught by Old Growth retiring from R3/R4 with their workers aboard: {playerIdx, workers, slot}
       stagingMoves: 0,            // staging-card (Flotsam Raft) ferry moves executed
       stagingMovesBy: {},         // playerIdx → ferry moves (staging experiment)
-      stagingLastCallMoves: 0,    // subset of stagingMoves made in the leaves-the-river last call
+      stagingLastCallMoves: 0,    // retired 2026-09-23 with the last call; always 0
       stagingReturned: 0,         // staged workers returned to supply when the raft was discarded
       mwResolved: 0,              // most-workers cards (Mud Wallow, Cattail Cluster) reaching shoreline with workers aboard
       mwTies: 0,                  // ...of those, top spot tied (live rule: bonus whiffs)
@@ -1629,116 +1637,42 @@ function advancePlayer(state, playerIdx, byTime) {
   }
 }
 
-// Hand-deficit needs for a player (the same shape aiChooseAction computes).
-function handNeeds(state, playerIdx) {
-  const wbm = playerWorkersByMaterial(state, playerIdx);
-  const p = state.players[playerIdx];
-  const needs = {};
-  for (const m of MAT_KEYS) needs[m] = 0;
-  for (const st of p.hand) {
-    for (const m in st.cost) {
-      needs[m] = Math.max(needs[m], Math.max(0, st.cost[m] - (wbm[m] || 0)));
-    }
-  }
-  return needs;
+// Flotsam Raft [rule change 2026-09-23, replacing the 2026-09-19 last call]:
+// the raft never reaches the shoreline. It slides downstream after every
+// auction on it (even when full) and moors at River 4, staying on the river
+// while any worker is aboard; it is discarded the moment it is empty. Workers
+// still aboard at game end strand for zero. Mirrors web raftStaysOnRiver.
+function raftWorkerCount(card) {
+  return Object.values(card.workers).reduce((s, n) => s + n, 0);
 }
-
-// Flotsam Raft last call [Don's rule, 2026-09-19]: when the card would move
-// to the shoreline, players in fish-track order may ferry their workers off
-// it, paying the same two-step as the action (this card's cost at the slot it
-// is leaving, then the destination's). Any workers still aboard return to
-// their owners' supplies and the card is DISCARDED — it never reaches the
-// shoreline, so there is no ashore state at all.
-function stagingLastCall(state, card) {
-  const srcCost = cardCost(card);
-  const order = state.players.map(p => p.idx)
-    .sort((a, b) => state.players[a].timePos - state.players[b].timePos);
-  for (const idx of order) {
-    if (workersOnCard(card, idx) <= 0) continue;
-    const p = state.players[idx];
-    const needs = handNeeds(state, idx);
-    const dests = state.riverCards
-      .filter(c => c !== card && c.effect !== 'staging' && typeof c.slot === 'number' &&
-        uncoveredIcons(c) > 0 && (needs[c.material] || 0) > 0)
-      .sort((a, b) => needs[b.material] - needs[a.material]);
-    for (const d of dests) {
-      while (workersOnCard(card, idx) > 0 && uncoveredIcons(d) > 0 && (needs[d.material] || 0) > 0) {
-        const destCost = playerCardCost(state, d, idx);
-        // Fee matches the condition's action fee mode; the adopted rule
-        // ('credit') is the printed two-step.
-        const fee = STAGING_MODE === 'dest' ? destCost
-          : STAGING_MODE === 'diff' ? Math.max(0, destCost - srcCost)
-          : STAGING_MODE === 'credit' ? destCost - srcCost
-          : 1;
-        if ((needs[d.material] || 0) - fee * 0.4 <= 0) break;
-        if (p.timePos + Math.max(0, fee) >= SIM_FINISH_LINE) break;
-        card.workers[idx] -= 1;
-        if (card.workers[idx] === 0) delete card.workers[idx];
-        d.workers[idx] = (d.workers[idx] || 0) + 1;
-        if (STAGING_MODE === 'credit') {
-          moveBackward(state, idx, srcCost);
-          advancePlayer(state, idx, destCost);
-        } else if (fee > 0) {
-          advancePlayer(state, idx, fee);
-        }
-        needs[d.material] -= 1;
-        state.metrics.stagingMoves += 1;
-        state.metrics.stagingLastCallMoves += 1;
-        state.metrics.stagingMovesBy[idx] = (state.metrics.stagingMovesBy[idx] || 0) + 1;
-      }
-    }
-    // Second pass — it's the LAST call: anything left aboard strands for
-    // zero. Take free-or-better parking on any open material icon (fee ≤ 0
-    // in credit mode), needed or not: a real material at worst pairs at
-    // end-game, a stranded slip never scores. Mirrors web planLastCallFromRaft.
-    if (STAGING_MODE === 'credit' && workersOnCard(card, idx) > 0) {
-      const parkDests = state.riverCards
-        .filter(c => c !== card && c.effect !== 'staging' && typeof c.slot === 'number' &&
-          uncoveredIcons(c) > 0 && playerCardCost(state, c, idx) - srcCost <= 0)
-        .sort((a, b) => playerCardCost(state, a, idx) - playerCardCost(state, b, idx));
-      for (const d of parkDests) {
-        while (workersOnCard(card, idx) > 0 && uncoveredIcons(d) > 0) {
-          const destCost = playerCardCost(state, d, idx);
-          card.workers[idx] -= 1;
-          if (card.workers[idx] === 0) delete card.workers[idx];
-          d.workers[idx] = (d.workers[idx] || 0) + 1;
-          moveBackward(state, idx, srcCost);
-          advancePlayer(state, idx, destCost);
-          state.metrics.stagingMoves += 1;
-          state.metrics.stagingLastCallMoves += 1;
-          state.metrics.stagingMovesBy[idx] = (state.metrics.stagingMovesBy[idx] || 0) + 1;
-        }
-      }
-    }
-  }
-  // Whoever remains wades home: workers return to supply, no compensation.
-  for (const k in card.workers) {
-    const idx = parseInt(k);
-    if (card.workers[k] > 0) {
-      state.metrics.stagingReturned += card.workers[k];
-      state.players[idx].supply += card.workers[k];
-    }
+function discardRaft(state, card) {
+  if (card.slot === 'pre') {
+    const idx = prerivIndexOf(state, card);
+    if (idx !== -1) refillPreriv(state, idx);
+  } else {
+    state.riverCards = state.riverCards.filter(c => c !== card);
   }
   card.workers = {};
+  card.blanks = 0;
+  card.slot = 'discarded';
+}
+function raftStaysOnRiver(state, card) {
+  if (raftWorkerCount(card) === 0) { discardRaft(state, card); return; }
+  if (card.slot === 'pre') jamCardDownriver(state, card);
+}
+function discardEmptyRafts(state) {
+  for (const c of [...state.riverCards]) {
+    if (c.effect === 'staging' && raftWorkerCount(c) === 0) discardRaft(state, c);
+  }
 }
 
 // =============================================================================
 // CARD MOVEMENT
 // =============================================================================
 function moveCardToShoreline(state, card) {
-  // Flotsam Raft: last-call ferry window, then discard — never reaches the
-  // shoreline (see stagingLastCall).
+  // Flotsam Raft never reaches the shoreline (see raftStaysOnRiver).
   if (card.effect === 'staging') {
-    stagingLastCall(state, card);
-    state.metrics.iconsWastedToShore += uncoveredIcons(card);
-    if (card.slot === 'pre') {
-      const idx = prerivIndexOf(state, card);
-      if (idx !== -1) refillPreriv(state, idx);
-    } else {
-      state.metrics.riverExitSlots.push(card.slot);
-      state.riverCards = state.riverCards.filter(c => c !== card);
-    }
-    card.slot = 'discarded';
+    raftStaysOnRiver(state, card);
     return;
   }
   // Fire card-exit effects before counting wasted icons / changing slot.
@@ -1822,7 +1756,12 @@ function jamCardDownriver(state, card) {
     return;
   }
   const newSlot = card.slot + 1;
-  if (newSlot > RIVER_SLOTS - 1) { moveCardToShoreline(state, card); return; }
+  if (newSlot > RIVER_SLOTS - 1) {
+    // A raft with workers aboard moors at River 4.
+    if (card.effect === 'staging' && raftWorkerCount(card) > 0) return;
+    moveCardToShoreline(state, card);
+    return;
+  }
   card.slot = newSlot;
 }
 
@@ -1872,7 +1811,9 @@ function prerivIndexOf(state, card) { return state.prerivCards.indexOf(card); }
 // on the shoreline); a worker-less card then falls out in the shoreline filter
 // below, so a dead, fully-blanked card is removed entirely.
 function sweepFullyCoveredRiver(state) {
+  discardEmptyRafts(state);
   for (const card of [...state.riverCards]) {
+    if (card.effect === 'staging') continue;   // stays while workers are aboard
     if (uncoveredIcons(card) <= 0) moveCardToShoreline(state, card);
   }
 }
@@ -2087,6 +2028,9 @@ function resolveAuction(state, card, bids, triggerPlayerIdx) {
       } else {
         jamCardDownriver(state, card);
       }
+    } else if (card.effect === 'staging') {
+      // Full raft: still slides one space (Headwaters → River 1), moors at R4.
+      jamCardDownriver(state, card);
     } else {
       moveCardToShoreline(state, card);
     }
@@ -2350,6 +2294,24 @@ function findStagingMove(state, playerIdx, needs) {
       score += gain + 0.5;
       if ((remNeed[d.material] || 0) > 0) remNeed[d.material] -= 1;
       avail -= 1; open -= 1;
+    }
+  }
+  // No last call any more: a slip still aboard at game end strands for zero.
+  // Late in the game, park leftovers on any open icon that costs nothing net
+  // (a real material at worst pairs at end-game). Mirrors web findStagingMove.
+  const late = state.matDeck.length === 0 || state.players[playerIdx].timePos >= SIM_FINISH_LINE - 12;
+  if (STAGING_MODE === 'credit' && late && avail > 0) {
+    const parkDests = state.riverCards
+      .filter(c => c.effect !== 'staging' && uncoveredIcons(c) > 0 && playerCardCost(state, c, playerIdx) - srcCredit <= 0)
+      .sort((a, b) => playerCardCost(state, a, playerIdx) - playerCardCost(state, b, playerIdx));
+    for (const d of parkDests) {
+      let open = uncoveredIcons(d) - moves.filter(mv => mv.toId === d.id).length;
+      while (open > 0 && avail > 0) {
+        const destCost = playerCardCost(state, d, playerIdx);
+        moves.push({ toId: d.id, fee: destCost - srcCredit, destCost });
+        score += 0.5 - (destCost - srcCredit) * 0.4;
+        avail -= 1; open -= 1;
+      }
     }
   }
   if (moves.length === 0) return null;
@@ -3234,6 +3196,8 @@ function doOtterTrail(state, playerIdx, cardAId, cardBId, otherPlayerIdx) {
   if (!cardA || !cardB || cardA.id === cardB.id) return false;
   if (otherPlayerIdx === playerIdx) return false; // card text: another PLAYER's worker
   if (typeof cardA.slot !== 'number' || typeof cardB.slot !== 'number') return false;
+  // Rule [2026-09-23]: only ferry and recall move workers off the Flotsam Raft.
+  if (cardA.effect === 'staging' || cardB.effect === 'staging') return false;
   if (workersOnCard(cardA, playerIdx) <= 0) return false;
   if (workersOnCard(cardB, otherPlayerIdx) <= 0) return false;
   cardA.workers[playerIdx] -= 1;
@@ -3278,6 +3242,8 @@ function doRollingFloat(state, playerIdx, cardA, cardB, otherIdx) {
   const p = state.players[playerIdx];
   if (p.rollingFloatUsed) return false;
   if (cardA.slot !== cardB.slot || typeof cardA.slot !== 'number') return false;
+  // Rule [2026-09-23]: only ferry and recall move workers off the Flotsam Raft.
+  if (cardA.effect === 'staging' || cardB.effect === 'staging') return false;
   if (workersOnCard(cardA, playerIdx) <= 0) return false;
   if (workersOnCard(cardB, otherIdx) <= 0) return false;
   cardA.workers[playerIdx] -= 1;
@@ -3302,11 +3268,11 @@ function findRollingFloatTarget(state, playerIdx) {
   }
   let best = null, bestScore = 0;
   for (const cardA of state.riverCards) {
-    if (typeof cardA.slot !== 'number') continue;
+    if (typeof cardA.slot !== 'number' || cardA.effect === 'staging') continue;
     if (workersOnCard(cardA, playerIdx) <= 0) continue;
     for (const cardB of state.riverCards) {
       if (cardB.id === cardA.id) continue;
-      if (cardB.slot !== cardA.slot) continue;
+      if (cardB.slot !== cardA.slot || cardB.effect === 'staging') continue;
       for (const k in cardB.workers) {
         const opIdx = parseInt(k);
         if (opIdx === playerIdx) continue;
@@ -3345,6 +3311,7 @@ function findOtterTrailTarget(state, playerIdx) {
   let bestB = null, bestBOther = -1, bestBNeed = 0;
   for (const c of state.riverCards) {
     if (typeof c.slot !== 'number') continue;
+    if (c.effect === 'staging') continue;   // only ferry/recall move workers off the raft
     if ((needs[c.material] || 0) === 0) continue;
     for (const k in c.workers) {
       const opIdx = parseInt(k);
@@ -3362,6 +3329,7 @@ function findOtterTrailTarget(state, playerIdx) {
   for (const c of state.riverCards) {
     if (c.id === bestB.id) continue;
     if (typeof c.slot !== 'number') continue;
+    if (c.effect === 'staging') continue;   // only ferry/recall move workers off the raft
     if (workersOnCard(c, playerIdx) <= 0) continue;
     // The swap must strictly cut the hand's total shortfall. Giving away a
     // material the hand needs just as much only moves the deficit, and next
@@ -3969,7 +3937,8 @@ function aiBurrowNetworkMove(state, playerIdx) {
   const p = state.players[playerIdx];
   const wbm = playerWorkersByMaterial(state, playerIdx);
   const need = m => Math.max(0, ...p.hand.map(s => (s.cost[m] || 0) - (wbm[m] || 0)));
-  const mine = state.riverCards.filter(c => workersOnCard(c, playerIdx) > 0);
+  // The raft is off-limits: only ferry and recall move workers off it.
+  const mine = state.riverCards.filter(c => c.effect !== 'staging' && workersOnCard(c, playerIdx) > 0);
   if (mine.length < 2) return;
   let best = null, bestScore = 0;
   for (const src of mine) {
@@ -4125,7 +4094,8 @@ function fireOnBuildEffect(state, playerIdx, struct) {
     return;
   }
   if (struct.name === 'Spillway') {
-    const r1 = state.riverCards.filter(c => c.slot === 0);
+    // The raft never reaches the shoreline, so Spillway can't wash it.
+    const r1 = state.riverCards.filter(c => c.slot === 0 && c.effect !== 'staging');
     if (r1.length === 0) return;
     // Pick the R1 card that's best to wash for the BUILDER:
     //   + own workers: they carry to shoreline (no-blank recall later, count

@@ -410,17 +410,20 @@ class Game extends \Bga\GameFramework\Table
         $row = $this->getCardRow($cardId);
         $name = (string) (Material::$MATERIAL[(int) $row['card_type_arg']]['name'] ?? '');
 
+        // Flotsam Raft [2026-09-23]: after ANY auction it slides one space (even
+        // when full), moors at River 4, never reaches the shoreline; discarded
+        // if nobody is aboard. No shoreline-arrival penalty can apply.
+        if ($this->isRaftRow($row)) {
+            $dest = CardMovement::raftAfterAuction(
+                (string) $row['card_location'], (int) $row['card_location_arg'], $this->cardWorkerTotal($cardId));
+            $this->placeRaft($cardId, $row, $dest);
+            return [];
+        }
+
         if ($name === 'Slipping Sandbar') {
             $dest = $this->slippingSandbarDestination((string) $row['card_location'], (int) $row['card_location_arg'], $uncoveredAfter, $placed);
         } else {
             $dest = CardMovement::destination((string) $row['card_location'], (int) $row['card_location_arg'], $uncoveredAfter);
-        }
-        // Flotsam Raft never reaches the shoreline: divert to the last-call
-        // window instead (resolved via RaftLastCall before the next turn).
-        if ($dest['location'] === 'shoreline'
-            && (Material::$MATERIAL[(int) $row['card_type_arg']]['material'] ?? '') === 'staging') {
-            $this->raftDivertToLastCall($cardId, (string) $row['card_location'], (int) $row['card_location_arg']);
-            return [];
         }
         $this->DbQuery(
             "UPDATE `card` SET `card_location` = '{$dest['location']}', `card_location_arg` = {$dest['slot']}
@@ -526,6 +529,10 @@ class Game extends \Bga\GameFramework\Table
         if ($dropBlank && $loc === 'river') {
             $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + 1 WHERE `card_id` = $cardId");
             $this->graduateIfFullyCovered($cardId);
+        }
+        if ($loc === 'river') {
+            // Recalling the last worker off the Flotsam Raft discards it.
+            $this->discardEmptyRafts();
         } elseif ($loc === 'shoreline') {
             // Recalling the last worker off a shoreline card removes it from the
             // game (rulebook: "Once the last worker leaves a shoreline card, the
@@ -1290,13 +1297,15 @@ class Game extends \Bga\GameFramework\Table
     }
 
     // =====================================================================
-    // FLOTSAM RAFT (staging card) — ferry action + leaves-the-river last call
-    // [2026-09-19]. The raft's icons hold no material; a worker there can
-    // ferry onto any open item icon on a river card, paying the printed
-    // two-step (slide back the raft's cost, then advance the destination's).
-    // The raft never reaches the shoreline: when it would, RaftLastCall runs
-    // a final ferry round in fish-track order, remaining workers return to
-    // their owners' supplies, and the card is discarded.
+    // FLOTSAM RAFT (staging card) — ferry action [2026-09-19]; stays on the
+    // river until empty [2026-09-23, replacing the last call]. The raft's icons
+    // hold no material; a worker there can ferry onto any open item icon on a
+    // river card, paying the printed two-step (slide back the raft's cost, then
+    // advance the destination's). The raft never reaches the shoreline: after
+    // every auction on it it slides one space (even when full) and moors at
+    // River 4; wherever a card would go ashore it stays on the river while any
+    // worker is aboard, and it is discarded the moment none is. Workers still
+    // aboard at game end score nothing. Mirrors sim.js/web raftStaysOnRiver.
     // =====================================================================
 
     /** River raft card carrying this player's workers, or 0. */
@@ -1335,13 +1344,12 @@ class Game extends \Bga\GameFramework\Table
         $dest = $this->getCardRow($destId);
         $destDef = Material::$MATERIAL[(int) $dest['card_type_arg']] ?? null;
         $base = Cost::perItem((string) $dest['card_location'], (int) $dest['card_location_arg']);
-        $fwd = Effects::perItemForPlayer($base, (string) ($destDef['material'] ?? ''), $this->builtNamesFor($playerId));
+        $fwd = Effects::perItemForPlayer($base, (string) ($destDef['material'] ?? ''), $this->builtNamesFor($playerId),
+            isset($destDef['wildAlt']) ? (string) $destDef['wildAlt'] : null);
         // Worker off the raft…
         $this->DbQuery("UPDATE `worker` SET `workers` = `workers` - 1 WHERE `player_id` = $playerId AND `card_id` = $raftId");
         $this->DbQuery("DELETE FROM `worker` WHERE `player_id` = $playerId AND `card_id` = $raftId AND `workers` <= 0");
-        // …its flotsam icon is spent (blank; may retire the raft itself while
-        // it is still on the river — graduateIfFullyCovered then queues the
-        // last call via the staging intercept)…
+        // …its flotsam icon is spent (blank)…
         $this->DbQuery("UPDATE `card` SET `card_blanks` = `card_blanks` + 1 WHERE `card_id` = $raftId");
         // …and it lands on the destination icon.
         $this->DbQuery(
@@ -1359,9 +1367,10 @@ class Game extends \Bga\GameFramework\Table
                 'back'        => $backCost,
                 'fwd'         => $fwd,
             ]);
-        // Raft retirement check (only fires while the raft is on the river;
-        // graduateIfFullyCovered no-ops for any other location, e.g. 'raftcall').
-        $this->graduateIfFullyCovered($raftId);
+        // The raft is discarded the moment its last worker leaves (only while
+        // it is on the river — a legacy 'raftcall' raft is finalized by
+        // RaftLastCall instead).
+        $this->discardEmptyRafts();
         // The destination card deliberately does NOT graduate on a non-auction
         // placement — matches Salmon Run / Sap Drip precedent.
     }
@@ -1383,20 +1392,101 @@ class Game extends \Bga\GameFramework\Table
         return $names;
     }
 
-    /** Pull the raft out of play flow into the last-call window. */
-    public function raftDivertToLastCall(int $cardId, string $fromLocation, int $fromSlot): void
+    /** Whether a card row is the Flotsam Raft (the material-less staging card). */
+    public function isRaftRow(array $row): bool
     {
-        $cost = Cost::perItem($fromLocation === 'river' ? 'river' : 'headwaters', $fromSlot);
-        $this->DbQuery("UPDATE `card` SET `card_location` = 'raftcall', `card_location_arg` = 0 WHERE `card_id` = $cardId");
-        $this->globals->set('pending_raft_call', $cardId);
-        $this->globals->set('raft_call_cost', $cost);
-        $this->globals->set('raft_call_queue', null);
-        $this->notify->all('abilityUsed',
-            clienttranslate('🛟 The Flotsam Raft is about to leave the river — last call to move workers off it!'),
-            []);
+        return $row['card_type'] === 'material'
+            && (Material::$MATERIAL[(int) $row['card_type_arg']]['material'] ?? '') === 'staging';
     }
 
-    /** Workers still aboard return to supply; the raft is discarded. */
+    /** Total workers (all players) on a card. */
+    public function cardWorkerTotal(int $cardId): int
+    {
+        return (int) $this->getUniqueValueFromDB(
+            "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $cardId"
+        );
+    }
+
+    /**
+     * Persist a raft destination from CardMovement::raftAfterAuction /
+     * raftInsteadOfShoreline: a river slot, or 'discard' (out of the game).
+     * A Headwaters raft leaving its slot does NOT refill here — every caller
+     * that can move a Headwaters card already refills (ResolveAuction).
+     *
+     * @param array<string,?string> $row the raft's row BEFORE the move
+     * @param array{location:string, slot:int} $dest
+     */
+    private function placeRaft(int $cardId, array $row, array $dest): void
+    {
+        if ($dest['location'] === 'discard') {
+            $this->discardRaft($cardId);
+            return;
+        }
+        $from = (string) $row['card_location'];
+        $fromSlot = (int) $row['card_location_arg'];
+        $this->DbQuery(
+            "UPDATE `card` SET `card_location` = 'river', `card_location_arg` = {$dest['slot']} WHERE `card_id` = $cardId"
+        );
+        if ($from === 'river' && $fromSlot === 4 && $dest['slot'] === 4) {
+            $this->notify->all('abilityUsed',
+                clienttranslate('🛟 The Flotsam Raft stays moored at River 4 (it never reaches the shoreline)'), []);
+        }
+    }
+
+    /**
+     * Raft stand-in for "move this card to the shoreline" (fully covered,
+     * Spillway wash, …): stays on the river while any worker is aboard,
+     * otherwise is discarded. Mirrors sim.js/web raftStaysOnRiver.
+     */
+    public function raftStaysOnRiver(int $cardId): void
+    {
+        $row = $this->getCardRow($cardId);
+        $dest = CardMovement::raftInsteadOfShoreline(
+            (string) $row['card_location'], (int) $row['card_location_arg'], $this->cardWorkerTotal($cardId));
+        $this->placeRaft($cardId, $row, $dest);
+    }
+
+    /** Take the raft out of the game (no workers are aboard by the time this runs). */
+    private function discardRaft(int $cardId): void
+    {
+        // Defensive: nothing should be aboard, but never strand worker rows on a
+        // discarded card (they would be lost from supply and scoring alike).
+        foreach ($this->getObjectListFromDB(
+            "SELECT `player_id`, `workers` FROM `worker` WHERE `card_id` = $cardId AND `workers` > 0"
+        ) as $r) {
+            $n = (int) $r['workers'];
+            $this->DbQuery("UPDATE `player` SET `player_worker_supply` = `player_worker_supply` + $n WHERE `player_id` = " . (int) $r['player_id']);
+        }
+        $this->DbQuery("DELETE FROM `worker` WHERE `card_id` = $cardId");
+        $this->DbQuery("UPDATE `card` SET `card_location` = 'discard', `card_location_arg` = 0, `card_blanks` = 0 WHERE `card_id` = $cardId");
+        $this->notify->all('abilityUsed',
+            clienttranslate('🛟 The Flotsam Raft has no workers aboard — it drifts off and is discarded'), []);
+    }
+
+    /**
+     * Discard any river raft that has emptied (last worker ferried, recalled or
+     * moved away). Headwaters rafts are untouched — they have never had workers.
+     * Mirrors sim.js/web discardEmptyRafts. Cheap; safe to call at any point.
+     */
+    public function discardEmptyRafts(): void
+    {
+        $raftArg = Material::FLOTSAM_RAFT_ARG;
+        $ids = array_map('intval', $this->getObjectListFromDB(
+            "SELECT `card_id` FROM `card`
+             WHERE `card_type` = 'material' AND `card_type_arg` = $raftArg AND `card_location` = 'river'",
+            true
+        ));
+        foreach ($ids as $id) {
+            if ($this->cardWorkerTotal($id) === 0) {
+                $this->discardRaft($id);
+            }
+        }
+    }
+
+    /**
+     * LEGACY ONLY (last call retired 2026-09-23): finalizes a raft that an
+     * in-progress Alpha game had already diverted to the old last call.
+     */
     public function finalizeRaftDeparture(int $cardId): void
     {
         $rows = $this->getObjectListFromDB(
@@ -1422,7 +1512,7 @@ class Game extends \Bga\GameFramework\Table
         $this->notify->all('abilityUsed', clienttranslate('🛟 The Flotsam Raft breaks apart and is discarded'), []);
     }
 
-    /** Players with workers on the raft, in acting order (furthest back first). @return list<int> */
+    /** LEGACY ONLY (RaftLastCall): players with workers on the raft, furthest back first. @return list<int> */
     public function raftCallOrder(int $cardId): array
     {
         $rows = $this->getTurnOrderRows();
@@ -2191,11 +2281,19 @@ class Game extends \Bga\GameFramework\Table
     // --- Burrow Network (move a worker to another river card) ---
 
     /** River cards where the player has a worker (move sources). @return list<int> */
+    /**
+     * SQL guard (table alias `c`) excluding the Flotsam Raft. Rule [2026-09-23]:
+     * only ferry and recall move workers off the raft — Burrow Network, Portage
+     * and Rolling Float can't use it as a source or destination.
+     */
+    private const NOT_RAFT_SQL = "NOT (c.`card_type` = 'material' AND c.`card_type_arg` = " . Material::FLOTSAM_RAFT_ARG . ")";
+
     public function burrowSources(int $playerId): array
     {
         return array_map('intval', $this->getObjectListFromDB(
             "SELECT c.`card_id` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
-             WHERE c.`card_location` = 'river' AND w.`player_id` = $playerId AND w.`workers` > 0",
+             WHERE c.`card_location` = 'river' AND w.`player_id` = $playerId AND w.`workers` > 0
+               AND " . self::NOT_RAFT_SQL,
             true
         ));
     }
@@ -2211,7 +2309,7 @@ class Game extends \Bga\GameFramework\Table
     {
         $out = [];
         foreach ($this->getObjectListFromDB(
-            "SELECT `card_id`, `card_blanks` FROM `card` WHERE `card_location` = 'river'"
+            "SELECT c.`card_id`, c.`card_blanks` FROM `card` c WHERE c.`card_location` = 'river' AND " . self::NOT_RAFT_SQL
         ) as $r) {
             $id = (int) $r['card_id'];
             if ($id === $sourceCardId) {
@@ -2242,6 +2340,7 @@ class Game extends \Bga\GameFramework\Table
             "INSERT INTO `worker` (`player_id`, `card_id`, `workers`) VALUES ($playerId, $dst, 1)
              ON DUPLICATE KEY UPDATE `workers` = `workers` + 1"
         );
+        $this->discardEmptyRafts(); // moving the last worker off the raft discards it
     }
 
     /** Springwater Pool: un-flip all of a player's spent once-per-game cards. */
@@ -2256,9 +2355,12 @@ class Game extends \Bga\GameFramework\Table
     public function whenBuiltTargets(string $effect): array
     {
         if ($effect === 'spillway') {
-            // Any River-1 card.
+            // Any River-1 card except the Flotsam Raft, which never reaches the
+            // shoreline so can't be washed there [2026-09-23].
+            $raftArg = Material::FLOTSAM_RAFT_ARG;
             return array_map('intval', $this->getObjectListFromDB(
-                "SELECT `card_id` FROM `card` WHERE `card_location` = 'river' AND `card_location_arg` = 1", true
+                "SELECT `card_id` FROM `card` WHERE `card_location` = 'river' AND `card_location_arg` = 1
+                 AND NOT (`card_type` = 'material' AND `card_type_arg` = $raftArg)", true
             ));
         }
         // sapdrip / mudlevee: any river card that still has uncovered icons.
@@ -2269,9 +2371,9 @@ class Game extends \Bga\GameFramework\Table
     public function washToShoreline(int $cardId): array
     {
         $row = $this->getCardRow($cardId);
-        if ((Material::$MATERIAL[(int) $row['card_type_arg']]['material'] ?? '') === 'staging') {
-            // Flotsam Raft: last call instead of the shoreline.
-            $this->raftDivertToLastCall($cardId, (string) $row['card_location'], (int) $row['card_location_arg']);
+        if ($this->isRaftRow($row)) {
+            // Defensive (Spillway excludes the raft): it never reaches the shoreline.
+            $this->raftStaysOnRiver($cardId);
             return [];
         }
         $this->DbQuery("UPDATE `card` SET `card_location` = 'shoreline', `card_location_arg` = 0 WHERE `card_id` = $cardId");
@@ -2508,7 +2610,7 @@ class Game extends \Bga\GameFramework\Table
         return array_map('intval', $this->getObjectListFromDB(
             "SELECT DISTINCT c.`card_id` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
              WHERE c.`card_location` = 'river' AND c.`card_location_arg` = $slot AND c.`card_id` <> $srcId
-               AND w.`player_id` <> $playerId AND w.`workers` > 0",
+               AND w.`player_id` <> $playerId AND w.`workers` > 0 AND " . self::NOT_RAFT_SQL,
             true
         ));
     }
@@ -2952,7 +3054,8 @@ class Game extends \Bga\GameFramework\Table
     {
         return array_map('intval', $this->getObjectListFromDB(
             "SELECT DISTINCT c.`card_id` FROM `card` c JOIN `worker` w ON w.`card_id` = c.`card_id`
-             WHERE c.`card_location` = 'river' AND c.`card_id` <> $srcId AND w.`player_id` <> $playerId AND w.`workers` > 0",
+             WHERE c.`card_location` = 'river' AND c.`card_id` <> $srcId AND w.`player_id` <> $playerId AND w.`workers` > 0
+               AND " . self::NOT_RAFT_SQL,
             true
         ));
     }
@@ -3113,18 +3216,22 @@ class Game extends \Bga\GameFramework\Table
     public function graduateIfFullyCovered(int $cardId): void
     {
         $row = $this->getCardRow($cardId);
-        if ($row['card_location'] !== 'river' || $this->uncoveredIcons($cardId) > 0) {
+        if ($row['card_location'] !== 'river') {
+            return;
+        }
+        if ($this->isRaftRow($row)) {
+            // A fully covered raft with workers aboard is NOT swept ashore; an
+            // empty one is discarded however many icons remain [2026-09-23].
+            $this->discardEmptyRafts();
+            return;
+        }
+        if ($this->uncoveredIcons($cardId) > 0) {
             return;
         }
         $onCard = (int) $this->getUniqueValueFromDB(
             "SELECT COALESCE(SUM(`workers`), 0) FROM `worker` WHERE `card_id` = $cardId"
         );
         if (CardMovement::shorelineResting($onCard) === 'shoreline') {
-            if ((Material::$MATERIAL[(int) $row['card_type_arg']]['material'] ?? '') === 'staging') {
-                // Flotsam Raft with workers aboard: last call, never the shoreline.
-                $this->raftDivertToLastCall($cardId, (string) $row['card_location'], (int) $row['card_location_arg']);
-                return;
-            }
             $this->DbQuery("UPDATE `card` SET `card_location` = 'shoreline', `card_location_arg` = 0, `card_blanks` = 0 WHERE `card_id` = $cardId");
             $this->applyShorelineArrival($cardId);
         } else {

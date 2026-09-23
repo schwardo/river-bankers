@@ -186,4 +186,56 @@ final class EffectsTest extends TestCase
             Effects::reactiveBuildEffects($cost, $built)
         );
     }
+    // --- Wildcard per-item discounts [rule 2026-09-23] ---
+
+    public function testWildcardTakesDiscountOnSecondHalf(): void
+    {
+        // Driftwood Tangle (logs/reeds): Reed Bed now discounts it via the reeds half.
+        self::assertSame(1, Effects::cardAuctionDiscount('logs', 'reeds', ['Reed Bed']));
+        self::assertSame(2, Effects::perItemForPlayer(3, 'logs', ['Reed Bed'], 'reeds'));
+        // Without the wildAlt, the primary (logs) has no discounter — unchanged.
+        self::assertSame(3, Effects::perItemForPlayer(3, 'logs', ['Reed Bed']));
+    }
+
+    public function testWildcardTakesDiscountOnPrimaryHalf(): void
+    {
+        // Mud Slick (clay/mud): Clay Den applies via the primary half.
+        self::assertSame(2, Effects::perItemForPlayer(4, 'clay', ['Clay Den'], 'mud'));
+    }
+
+    public function testWildcardHalvesNeverStackLargerWins(): void
+    {
+        // Mud Slick with Clay Den (2) AND Mud Burrow (1): larger (2), not 3.
+        self::assertSame(2, Effects::cardAuctionDiscount('clay', 'mud', ['Clay Den', 'Mud Burrow']));
+        self::assertSame(3, Effects::perItemForPlayer(5, 'clay', ['Clay Den', 'Mud Burrow'], 'mud'));
+        // Driftwood Tangle: Reed Bed + Kelp Bed stack WITHIN the reeds half (2).
+        self::assertSame(2, Effects::cardAuctionDiscount('logs', 'reeds', ['Reed Bed', 'Kelp Bed']));
+    }
+
+    public function testWildcardDiscountStillFloorsAtOne(): void
+    {
+        self::assertSame(1, Effects::perItemForPlayer(2, 'clay', ['Clay Den'], 'mud'));
+        self::assertSame(1, Effects::perItemForPlayer(1, 'logs', ['Reed Bed', 'Kelp Bed'], 'reeds'));
+    }
+
+    public function testWildcardWithUndiscountedHalvesUnchanged(): void
+    {
+        // Bramble Shoal (stones/vines): no discounter covers either half.
+        self::assertSame(4, Effects::perItemForPlayer(4, 'stones', ['Reed Bed', 'Clay Den', 'Mud Burrow'], 'vines'));
+    }
+
+    /** Cross-check against the sim.js playerCardCost oracle (tests/oracle/gen_peritem_vectors.js). */
+    public function testPerItemMatchesSimOracle(): void
+    {
+        $data = json_decode((string) file_get_contents(__DIR__ . '/fixtures/peritem_vectors.json'), true);
+        self::assertIsArray($data);
+        self::assertNotEmpty($data);
+        foreach ($data as $v) {
+            self::assertSame(
+                $v['expected'],
+                Effects::perItemForPlayer($v['base'], $v['material'], $v['built'], $v['wildAlt']),
+                json_encode($v) ?: ''
+            );
+        }
+    }
 }

@@ -892,6 +892,9 @@ class RaftFerry {
     onLeavingState() { this.game.clearClickable(); }
 }
 
+// LEGACY ONLY [2026-09-23]: the raft last call was retired (the raft now stays
+// on the river until empty). Kept so an in-progress Alpha game already sitting
+// in RaftLastCall can finish; the server never enters it for new departures.
 class RaftLastCall {
     constructor(game, bga) { this.game = game; this.bga = bga; }
     onEnteringState(args, isActive) {
@@ -1769,12 +1772,15 @@ export class Game {
     mySupply() { const p = this.players[this.myId()]; return p ? Number(p.supply) : 0; }
     myFish() { const p = this.players[this.myId()]; return p ? Number(p.fish) || 0 : 0; }
     amRetired() { const p = this.players[this.myId()]; return p ? !!Number(p.retired) : false; }
-    // Per-item auction discount my built cards grant on a given material, mirroring
-    // Effects::auctionDiscount / MATERIAL_DISCOUNTS.
-    auctionDiscount(material) {
+    // Per-item auction discount my built cards grant on a card, mirroring
+    // Effects::cardAuctionDiscount / MATERIAL_DISCOUNTS. A wildcard counts as
+    // both of its materials [rule 2026-09-23]: either half's discount applies,
+    // the larger one if both do (halves never stack).
+    auctionDiscount(material, wildAlt = null) {
         const D = { reeds: { 'Reed Bed': 1, 'Kelp Bed': 1 }, mud: { 'Mud Burrow': 1 }, clay: { 'Clay Den': 2 } };
         const names = ((this.built || {})[this.myId()] || []).map(b => b.name);
-        return Object.entries(D[material] || {}).reduce((t, [n, a]) => t + (names.includes(n) ? a : 0), 0);
+        const one = (m) => Object.entries(D[m] || {}).reduce((t, [n, a]) => t + (names.includes(n) ? a : 0), 0);
+        return wildAlt ? Math.max(one(material), one(wildAlt)) : one(material);
     }
     // Exact per-worker fish cost for a bid on the current lot: the server-sent
     // base per-item rate (args.baseRate — river slot / Headwaters 1 / forced Snag
@@ -1785,7 +1791,7 @@ export class Game {
     myBidRate(args) {
         const lot = this.cardById(args.lotCardId);
         const base = Number(args.baseRate) || 1;
-        return Math.max(1, base - this.auctionDiscount(lot ? lot.material : ''));
+        return Math.max(1, base - this.auctionDiscount(lot ? lot.material : '', lot ? lot.wildAlt : null));
     }
     // Fish-line guard. If an action's fish cost would move me to or past the
     // finish line (retiring my beaver — no more turns), confirm before committing.

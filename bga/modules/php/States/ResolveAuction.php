@@ -62,7 +62,7 @@ class ResolveAuction extends GameState
         $billable = AuctionRules::billableWorkers($open, $bids, $pontoon, $clinched);
         $base = Cost::perItem((string) $cardRow['card_location'], (int) $cardRow['card_location_arg'], $forcedRate);
         $matDef = Material::$MATERIAL[(int) $cardRow['card_type_arg']] ?? [];
-        $material = (string) ($matDef['material'] ?? '');               // primary, for the discount lookup
+        $material = (string) ($matDef['material'] ?? '');               // primary (+ wildAlt) for the discount lookup
         $wildAlt = $matDef['wildAlt'] ?? null;
         $matLabel = $wildAlt !== null ? "$material/$wildAlt" : $material; // display (wilds show both)
 
@@ -78,7 +78,7 @@ class ResolveAuction extends GameState
         $paid = [];
         $placed = 0;
         foreach ($bids as $pid => $bid) {
-            $rate = Effects::perItemForPlayer($base, (string) $material, $this->game->getBuiltNames($pid));
+            $rate = Effects::perItemForPlayer($base, (string) $material, $this->game->getBuiltNames($pid), $wildAlt === null ? null : (string) $wildAlt);
             $paid[$pid] = $billable[$pid] * $rate;
             $this->game->advanceFish($pid, $paid[$pid]);
             if ($clinched[$pid] > 0) {
@@ -184,6 +184,7 @@ class ResolveAuction extends GameState
 
         $matDef = Material::$MATERIAL[(int) $rowA['card_type_arg']] ?? [];
         $material = (string) ($matDef['material'] ?? '');
+        $wildAltA = isset($matDef['wildAlt']) ? (string) $matDef['wildAlt'] : null;
 
         // Trigger first, then the remaining bidders by id (jam-overflow fill order).
         $order = array_keys($bids);
@@ -193,7 +194,7 @@ class ResolveAuction extends GameState
         $placedA = 0;
         $placedB = 0;
         foreach ($order as $pid) {
-            $rateP = Effects::perItemForPlayer($rate, $material, $this->game->getBuiltNames($pid));
+            $rateP = Effects::perItemForPlayer($rate, $material, $this->game->getBuiltNames($pid), $wildAltA);
             $paid[$pid] = $billable[$pid] * $rateP;
             // Placement is trigger-first, but the trigger PAYS last (below) so
             // its pawn stacks on top of any tie (rulebook "Pay fish first").

@@ -28,12 +28,15 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
 
     function onEnteringState()
     {
-        // Flotsam Raft last call: if the raft left the river during the action
-        // that just resolved, run the final ferry window before anything else
-        // (drift, retirement, and the next turn wait until it is settled).
+        // LEGACY ONLY: the Flotsam Raft last call was retired 2026-09-23 and
+        // nothing sets `pending_raft_call` any more. An in-progress Alpha game
+        // diverted before the change may still carry it — finish that window.
         if ((int) $this->globals->get('pending_raft_call', 0) > 0) {
             return RaftLastCall::class;
         }
+        // End-of-action sweep: a raft whose last worker left by any route
+        // (ferry, recall, Burrow Network, …) is discarded [2026-09-23].
+        $this->game->discardEmptyRafts();
         // Deck-empty drift: the player whose turn just ended drifts +1 fish once
         // the material deck is exhausted, so the endgame can't grind on forever.
         $turnPlayer = (int) $this->globals->get('turn_player', 0);

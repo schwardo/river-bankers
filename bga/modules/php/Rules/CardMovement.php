@@ -43,6 +43,50 @@ final class CardMovement
     }
 
     /**
+     * Flotsam Raft after ANY auction on it [rule 2026-09-23, replacing the
+     * 2026-09-19 last call]. The raft never reaches the shoreline: it slides one
+     * space downstream as usual EVEN IF every icon was claimed (Headwaters ->
+     * River 1, River N -> River N+1) and moors at River 4 instead of graduating.
+     * With no worker aboard it is discarded. Mirrors sim.js/web resolveAuction
+     * (full raft -> jamCardDownriver) + raftStaysOnRiver.
+     *
+     * @param string $location 'headwaters' | 'river'
+     * @param int    $slot     river space 1..4 (ignored for 'headwaters')
+     * @param int    $workersAboard workers on the raft after placement
+     * @return array{location:string, slot:int} 'discard' carries slot 0
+     */
+    public static function raftAfterAuction(string $location, int $slot, int $workersAboard): array
+    {
+        if ($workersAboard <= 0) {
+            return ['location' => 'discard', 'slot' => 0];
+        }
+        if ($location === 'headwaters') {
+            return ['location' => 'river', 'slot' => 1];
+        }
+        return ['location' => 'river', 'slot' => min(4, $slot + 1)];
+    }
+
+    /**
+     * Where the Flotsam Raft goes when any effect would send a card to the
+     * shoreline (fully covered, Spillway wash, sliding off River 4, ...): with a
+     * worker aboard it stays on the river (a Headwaters raft enters River 1; a
+     * river raft keeps its slot); with none it is discarded. Mirrors sim.js/web
+     * raftStaysOnRiver.
+     *
+     * @return array{location:string, slot:int}
+     */
+    public static function raftInsteadOfShoreline(string $location, int $slot, int $workersAboard): array
+    {
+        if ($workersAboard <= 0) {
+            return ['location' => 'discard', 'slot' => 0];
+        }
+        if ($location === 'headwaters') {
+            return ['location' => 'river', 'slot' => 1];
+        }
+        return ['location' => 'river', 'slot' => $slot];
+    }
+
+    /**
      * Shoreline invariant: a card may sit on the shoreline only while it holds at
      * least one worker. A card that arrives (auction graduation, all-blanks cover,
      * Spillway wash) or is left (last worker recalled/spent) with none leaves the
