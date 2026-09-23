@@ -1016,7 +1016,7 @@ function playerWorkersByMaterial(state, playerIdx, opts) {
 // Greedy check: can the wild pools cover the remaining material deficits?
 // Each pool serves one of its two materials; we assign each pool to its
 // largest-remaining-deficit option first. Sufficient for our 2-material wilds.
-function canCoverWithWild(deficits, pools) {
+function wildRemainder(deficits, pools) {
   const rem = { ...deficits };
   for (const pool of pools) {
     let avail = pool.count;
@@ -1031,8 +1031,40 @@ function canCoverWithWild(deficits, pools) {
       avail -= take;
     }
   }
+  return rem;
+}
+function canCoverWithWild(deficits, pools) {
+  const rem = wildRemainder(deficits, pools);
   for (const m in rem) if (rem[m] > 0) return false;
   return true;
+}
+// Units of `eff` still uncovered once fixed-material workers AND the wild pools
+// are applied (same greedy fill as canCoverWithWild).
+function wildShortfall(eff, wbm) {
+  const deficits = {};
+  for (const m in eff) {
+    const d = Math.max(0, eff[m] - (wbm[m] || 0));
+    if (d > 0) deficits[m] = d;
+  }
+  const rem = wildRemainder(deficits, wbm._wildPools || []);
+  let short = 0;
+  for (const m in rem) short += Math.max(0, rem[m]);
+  return short;
+}
+// Where a build-cost substitution should land: of the candidate adjusted costs
+// in `trials`, the one that most reduces the real (post-wildcard) shortfall, or
+// null if none helps. A raw `wbm[m] < eff[m]` test also counts deficits a
+// wildcard already covers, and used to spend Stone Tool / Charcoal Pit / Treaty
+// Stone / Granary there, leaving the real gap open (2026-09-23 2P playtest:
+// Stone Tool took the wild-covered logs, Salt Lick's clay stayed short, and a
+// legal build was refused).
+function bestSubstitution(eff, wbm, trials) {
+  let best = null, bestShort = wildShortfall(eff, wbm);
+  for (const t of trials) {
+    const s = wildShortfall(t, wbm);
+    if (s < bestShort) { bestShort = s; best = t; }
+  }
+  return best;
 }
 function canBuild(structure, workersByMat, p = null) {
   const targetCost = p
@@ -1059,14 +1091,10 @@ function effectiveBuildCost(struct, p, wbm) {
   if (hasEffect(p, 'Charcoal Pit')) {
     const claySlack = (wbm.clay || 0) - (eff.clay || 0);
     if (claySlack >= 1) {
-      for (const m of Object.keys(struct.cost)) {
-        if (m === 'clay') continue;
-        if ((wbm[m] || 0) < eff[m]) {
-          eff[m] -= 1;
-          eff.clay = (eff.clay || 0) + 1;
-          break;
-        }
-      }
+      const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
+        .filter(m => m !== 'clay' && eff[m] > 0)
+        .map(m => ({ ...eff, [m]: eff[m] - 1, clay: (eff.clay || 0) + 1 })));
+      if (pick) Object.assign(eff, pick);
     }
   }
   // Stone Tool (otter species starter): once-per-game Charcoal-Pit variant —
@@ -1075,44 +1103,41 @@ function effectiveBuildCost(struct, p, wbm) {
   if (hasEffect(p, 'Stone Tool') && !p.stoneToolUsed) {
     const stoneSlack = (wbm.stones || 0) - (eff.stones || 0);
     if (stoneSlack >= 1) {
-      for (const m of Object.keys(struct.cost)) {
-        if (m === 'stones') continue;
-        if ((wbm[m] || 0) < eff[m]) {
-          eff[m] -= 1;
-          eff.stones = (eff.stones || 0) + 1;
-          stoneToolUsed = true;
-          break;
-        }
-      }
+      const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
+        .filter(m => m !== 'stones' && eff[m] > 0)
+        .map(m => ({ ...eff, [m]: eff[m] - 1, stones: (eff.stones || 0) + 1 })));
+      if (pick) { Object.assign(eff, pick); stoneToolUsed = true; }
     }
   }
   // Treaty Stone: once per build, cover 1 missing of one material by paying
   // 2 of a surplus material (any-to-any). Applied after free 1:1 saves
   // (Charcoal Pit) so it only fires when a real deficit remains.
   if (hasEffect(p, 'Treaty Stone')) {
+    const trials = [];
     for (const target of MAT_KEYS) {
-      if ((wbm[target] || 0) >= (eff[target] || 0)) continue;
-      let found = false;
+      if (!(eff[target] > 0)) continue;
       for (const source of MAT_KEYS) {
         if (source === target) continue;
         if ((wbm[source] || 0) - (eff[source] || 0) < 2) continue;
-        eff[target] -= 1;
-        eff[source] = (eff[source] || 0) + 2;
-        found = true;
-        break;
+        trials.push({ ...eff, [target]: eff[target] - 1, [source]: (eff[source] || 0) + 2 });
       }
-      if (found) break;
     }
+    const pick = bestSubstitution(eff, wbm, trials);
+    if (pick) Object.assign(eff, pick);
   }
   let granaryUsed = false;
   if (hasEffect(p, 'Granary') && !p.granaryUsed) {
-    for (const m of Object.keys(eff)) {
-      if ((wbm[m] || 0) < eff[m]) {
-        eff[m] -= 1;
-        granaryUsed = true;
-        break;
-      }
+    // Aim at a real (post-wildcard) shortfall first. With none, keep the old
+    // first-fixed-deficit pick: there Granary saves a wild worker the build
+    // would otherwise spend (the web asks a human first — see performBuild).
+    let pick = bestSubstitution(eff, wbm, Object.keys(eff)
+      .filter(m => eff[m] > 0)
+      .map(m => ({ ...eff, [m]: eff[m] - 1 })));
+    if (!pick) {
+      const m = Object.keys(eff).find(k => (wbm[k] || 0) < eff[k]);
+      if (m) pick = { ...eff, [m]: eff[m] - 1 };
     }
+    if (pick) { Object.assign(eff, pick); granaryUsed = true; }
   }
   return { eff, granaryUsed, stoneToolUsed };
 }
@@ -2021,9 +2046,12 @@ function resolveAuction(state, card, bids, triggerPlayerIdx) {
     state.metrics.noBidAuctions++;
     return;
   }
+  // The triggering player pays last, so when pawns land on the same space
+  // the trigger's pawn stacks on top (rulebook "Pay fish first").
   const playerBidPairs = Object.entries(bids)
     .filter(([_, b]) => b > 0)
-    .map(([idx, b]) => ({ idx: parseInt(idx), bid: b }));
+    .map(([idx, b]) => ({ idx: parseInt(idx), bid: b }))
+    .sort((a, b) => (a.idx === triggerPlayerIdx) - (b.idx === triggerPlayerIdx));
   for (const { idx } of playerBidPairs) markEngage(state, idx);
 
   if (totalBid <= open) {
@@ -2221,6 +2249,13 @@ function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing, tri
     .map(([idx, b]) => ({ idx: parseInt(idx), bid: b }))
     .sort((a, b) => cwDist(a.idx) - cwDist(b.idx));
   for (const { idx } of playerBidPairs) markEngage(state, idx);
+  // Placement walks clockwise from the trigger, but the trigger PAYS last so
+  // its pawn stacks on top of any tie (rulebook "Pay fish first").
+  let triggerBill = 0;
+  const payLater = (idx, fish) => {
+    if (idx === triggerPlayerIdx) triggerBill = fish;
+    else advancePlayer(state, idx, fish);
+  };
   const isJam = totalBid > open;
   if (!isJam) {
     state.metrics.plentyAuctions++;
@@ -2228,7 +2263,7 @@ function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing, tri
       const p = state.players[idx];
       const placed = place(idx, bid); // == bid in the plenty case
       p.supply -= placed;
-      advancePlayer(state, idx, placed * playerCardCost(state, virtual, idx));
+      payLater(idx, placed * playerCardCost(state, virtual, idx));
       state.metrics.iconsClaimed += placed;
       state.metrics.nonZeroBidders++;
     }
@@ -2243,7 +2278,7 @@ function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing, tri
       if (placed > 0) p.supply -= placed;
       let billable = bid;
       if (placed < bid && hasEffect(p, 'Pontoon')) billable = Math.max(0, bid - 1);
-      advancePlayer(state, idx, billable * playerCardCost(state, virtual, idx));
+      payLater(idx, billable * playerCardCost(state, virtual, idx));
       state.metrics.iconsClaimed += placed;
       state.metrics.nonZeroBidders++;
       if (placed === 0) state.metrics.zeroClinchBidders++;
@@ -2251,6 +2286,7 @@ function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing, tri
     }
     if (totalClinched === 0) state.metrics.zeroClinchAuctions++;
   }
+  if (triggerBill > 0) advancePlayer(state, triggerPlayerIdx, triggerBill);
   finalizeCombinedCard(state, cardA, isJam);
   finalizeCombinedCard(state, cardB, isJam);
 }
@@ -3297,6 +3333,15 @@ function findOtterTrailTarget(state, playerIdx) {
       needs[m] = Math.max(needs[m], Math.max(0, s.cost[m] - (wbm[m] || 0)));
     }
   }
+  // Total shortfall across the hand, after shifting holdings by `delta`.
+  const handShort = (delta) => {
+    let short = 0;
+    for (const s of p.hand) {
+      for (const m in s.cost) short += Math.max(0, s.cost[m] - ((wbm[m] || 0) + (delta[m] || 0)));
+    }
+    return short;
+  };
+  const shortNow = handShort({});
   let bestB = null, bestBOther = -1, bestBNeed = 0;
   for (const c of state.riverCards) {
     if (typeof c.slot !== 'number') continue;
@@ -3318,6 +3363,14 @@ function findOtterTrailTarget(state, playerIdx) {
     if (c.id === bestB.id) continue;
     if (typeof c.slot !== 'number') continue;
     if (workersOnCard(c, playerIdx) <= 0) continue;
+    // The swap must strictly cut the hand's total shortfall. Giving away a
+    // material the hand needs just as much only moves the deficit, and next
+    // turn the swap ran in reverse (2026-09-23 2P playtest: Muskrat Portaged
+    // clay<->mud 3 times in a row, paying 2-3 fish each and handing the victim
+    // 2 fish). A strictly falling total can't cycle.
+    const delta = { [c.material]: -1 };
+    delta[bestB.material] = (delta[bestB.material] || 0) + 1;
+    if (handShort(delta) >= shortNow) continue;
     const cost = cardCost(c);
     const uselessBonus = (needs[c.material] || 0) === 0 ? -1 : 0;
     if (cost + uselessBonus < bestACost) { bestACost = cost + uselessBonus; bestA = c; }
@@ -3691,14 +3744,14 @@ function performBuild(state, playerIdx, handIdx) {
   // Helper: consume up to `need` material from `card` for the building player.
   // Returns { take, yielded } where take is workers pulled (returned to supply)
   // and yielded is material units produced (≥ take when Old Growth doubles).
-  const consume = (c, need) => {
+  const consume = (c, need, maxTake = Infinity) => {
     const have = workersOnCard(c, playerIdx);
     if (have === 0 || need === 0) return { take: 0, yielded: 0 };
     // Crowd bonus: the FIRST worker taken this build yields N (distinct
     // players aboard, spender included, counted before removal); the rest 1.
     if (c.effect === 'crowd-bonus' && !CROWD_DISABLED && !PLAIN_RIVER) {
       const N = crowdCount(c);
-      let take = 0, yielded = 0, left = have;
+      let take = 0, yielded = 0, left = Math.min(have, maxTake);
       while (left > 0 && yielded < need) {
         yielded += (take === 0 ? N : 1);
         take++; left--;
@@ -3714,7 +3767,7 @@ function performBuild(state, playerIdx, handIdx) {
     }
     const mult = cardYieldMultiplier(c);
     const wantWorkers = Math.ceil(need / mult);
-    const take = Math.min(have, wantWorkers);
+    const take = Math.min(have, wantWorkers, maxTake);
     if (CROWD_TRACK && !c.wildAlt && take > 0 && `${c.material}-${c.totalIcons}` === CROWD_TRACK) {
       state.metrics.crowdSpends += 1;
       state.metrics.crowdNSum += crowdCount(c);
@@ -3727,41 +3780,53 @@ function performBuild(state, playerIdx, handIdx) {
     return { take, yielded: take * mult };
   };
 
+  // Spending order. Shoreline first by default (no blanks to drop). A Pier
+  // owner scores each shoreline card still holding one of their workers, so
+  // they instead spend a shoreline card down to its last worker, then river
+  // cards, and a shoreline card's last worker only when nothing else covers
+  // the cost (2026-09-23 2P playtest: Cattail Patch took the lone Reed Stand
+  // worker while a river reed sat unused, costing Pier +2).
+  const pierKeep = hasEffect(p, 'Pier');
+  const spendOrder = (shore, river) => pierKeep
+    ? [...shore.map(c => [c, workersOnCard(c, playerIdx) - 1]),
+       ...river.map(c => [c, Infinity]),
+       ...shore.map(c => [c, Infinity])]
+    : [...shore.map(c => [c, Infinity]), ...river.map(c => [c, Infinity])];
+
   // Pass A: vanilla (non-wild) cards first — preserves wild capacity for
   // materials that have no vanilla source.
   for (const m of Object.keys(remainingNeed)) {
     if (remainingNeed[m] === 0) continue;
-    for (const c of state.shorelineCards) {
-      if (remainingNeed[m] === 0) break;
-      if (c.material !== m || c.wildAlt) continue;
-      const { take, yielded } = consume(c, remainingNeed[m]);
-      remainingNeed[m] = Math.max(0, remainingNeed[m] - yielded);
-      workersReturned += take;
-    }
+    const shoreVanilla = state.shorelineCards
+      .filter(c => c.material === m && !c.wildAlt && workersOnCard(c, playerIdx) > 0);
     const riverVanilla = state.riverCards
       .filter(c => c.material === m && !c.wildAlt && workersOnCard(c, playerIdx) > 0)
       .sort((a, b) => cardCost(a) - cardCost(b));
-    for (const c of riverVanilla) {
+    for (const [c, cap] of spendOrder(shoreVanilla, riverVanilla)) {
       if (remainingNeed[m] === 0) break;
-      const { take, yielded } = consume(c, remainingNeed[m]);
+      if (cap <= 0) continue;
+      const { take, yielded } = consume(c, remainingNeed[m], cap);
       remainingNeed[m] = Math.max(0, remainingNeed[m] - yielded);
       workersReturned += take;
     }
   }
 
   // Pass B: wild cards cover any leftover deficits (greedy — same shape as
-  // canCoverWithWild).  Visit pools in deck order; each pool fulfills its
-  // largest-remaining-deficit material first.
-  const wildCards = []
-    .concat(state.shorelineCards.filter(c => c.wildAlt && workersOnCard(c, playerIdx) > 0))
-    .concat(state.riverCards.filter(c => c.wildAlt && workersOnCard(c, playerIdx) > 0)
+  // canCoverWithWild); each card fills its largest-remaining-deficit material first.
+  const wildOrder = spendOrder(
+    state.shorelineCards.filter(c => c.wildAlt && workersOnCard(c, playerIdx) > 0),
+    state.riverCards.filter(c => c.wildAlt && workersOnCard(c, playerIdx) > 0)
       .sort((a, b) => cardCost(a) - cardCost(b)));
-  for (const c of wildCards) {
-    const options = [c.material, c.wildAlt].sort((a, b) => (remainingNeed[b] || 0) - (remainingNeed[a] || 0));
+  for (const [c, cap] of wildOrder) {
+    let left = cap;
+    const options = [c.material, c.wildAlt].sort(
+      (a, b) => (remainingNeed[b] || 0) - (remainingNeed[a] || 0)
+    );
     for (const m of options) {
       if ((remainingNeed[m] || 0) === 0) continue;
-      if (workersOnCard(c, playerIdx) === 0) break;
-      const { take, yielded } = consume(c, remainingNeed[m]);
+      if (workersOnCard(c, playerIdx) === 0 || left <= 0) break;
+      const { take, yielded } = consume(c, remainingNeed[m], left);
+      left -= take;
       remainingNeed[m] = Math.max(0, (remainingNeed[m] || 0) - yielded);
       workersReturned += take;
     }
@@ -7421,7 +7486,9 @@ function egPlayOut(state, trigger, vpLimit, fishLimit, proc) {
       maybeFireSlipstream(state, p.idx);
       // Deck-empty auto-advance (live rule): nudge the active player toward the
       // line once the material deck is dry, so the tail can't drag.
-      if (AUTO_ADVANCE_DECK_EMPTY && trigger === 'fish' && state.matDeck.length === 0 && !p.out) {
+      // A pawn whose own action already reached the line doesn't drift (it
+      // retires where it landed).
+      if (AUTO_ADVANCE_DECK_EMPTY && trigger === 'fish' && state.matDeck.length === 0 && !p.out && p.timePos < fishLimit) {
         advancePlayer(state, p.idx, 1);
       }
       if (checkGameEnd(state)) break;
@@ -8382,7 +8449,7 @@ function instrFishPlayout(state, fishLimit, proc, autoAdvanceEmpty = false) {
       // Proposed endgame-speedup rule: once the material deck is empty, the
       // active player advances 1 extra fish at the end of their turn, pushing
       // pawns toward the line so the dead-board tail doesn't drag.
-      if (autoAdvanceEmpty && state.matDeck.length === 0 && !p.out) advancePlayer(state, p.idx, 1);
+      if (autoAdvanceEmpty && state.matDeck.length === 0 && !p.out && p.timePos < fishLimit) advancePlayer(state, p.idx, 1);
       if (checkGameEnd(state)) { endReason = 'backstop'; break; }
     }
     // Board life remaining at the moment the main phase ended (pre-coda).

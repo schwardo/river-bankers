@@ -22,49 +22,64 @@ const MAT_KEYS = ['logs', 'stones', 'reeds', 'mud', 'vines', 'clay'];
 // re-sending the private hand. `wbm` is the builder's worker holdings:
 // { <material>: fixedCount, _wildPools: [{materials:[a,b], count}] }.
 // `flags` are the build-cost modifiers the player's built cards grant.
+// Units of `eff` still uncovered after fixed workers AND the wild pools.
+function rbWildShortfall(eff, wbm) {
+    const have = rbEffectiveCoverage(eff, wbm);
+    let short = 0;
+    for (const m in eff) short += Math.max(0, eff[m] - (have[m] || 0));
+    return short;
+}
+// Of the candidate adjusted costs, the one that most reduces the real
+// (post-wildcard) shortfall, or null. A raw fixed-count deficit test also counts
+// gaps a wildcard already covers and spent the substitution there (web/sim
+// effectiveBuildCost has the same fix).
+function rbBestSubstitution(eff, wbm, trials) {
+    let best = null, bestShort = rbWildShortfall(eff, wbm);
+    for (const t of trials) {
+        const s = rbWildShortfall(t, wbm);
+        if (s < bestShort) { bestShort = s; best = t; }
+    }
+    return best;
+}
 function rbEffectiveBuildCost(cost, flags, wbm) {
     const eff = {};
     for (const m in cost) eff[m] = cost[m];
     // Cattail Marsh: each reed worker counts as 2 reeds.
     if (flags.cattailMarsh && eff.reeds) eff.reeds = Math.ceil(eff.reeds / 2);
     // Charcoal Pit: 1 clay may substitute for 1 of any deficient other material.
-    if (flags.charcoalPit) {
-        const claySlack = (wbm.clay || 0) - (eff.clay || 0);
-        if (claySlack >= 1) {
-            for (const m of Object.keys(cost)) {
-                if (m === 'clay') continue;
-                if ((wbm[m] || 0) < eff[m]) { eff[m] -= 1; eff.clay = (eff.clay || 0) + 1; break; }
-            }
-        }
+    if (flags.charcoalPit && (wbm.clay || 0) - (eff.clay || 0) >= 1) {
+        const pick = rbBestSubstitution(eff, wbm, Object.keys(cost)
+            .filter(m => m !== 'clay' && eff[m] > 0)
+            .map(m => ({ ...eff, [m]: eff[m] - 1, clay: (eff.clay || 0) + 1 })));
+        if (pick) Object.assign(eff, pick);
     }
     // Stone Tool (otter starter): once-per-game Charcoal-Pit variant on Stones.
-    if (flags.stoneTool && !flags.stoneToolUsed) {
-        const stoneSlack = (wbm.stones || 0) - (eff.stones || 0);
-        if (stoneSlack >= 1) {
-            for (const m of Object.keys(cost)) {
-                if (m === 'stones') continue;
-                if ((wbm[m] || 0) < eff[m]) { eff[m] -= 1; eff.stones = (eff.stones || 0) + 1; break; }
-            }
-        }
+    if (flags.stoneTool && !flags.stoneToolUsed && (wbm.stones || 0) - (eff.stones || 0) >= 1) {
+        const pick = rbBestSubstitution(eff, wbm, Object.keys(cost)
+            .filter(m => m !== 'stones' && eff[m] > 0)
+            .map(m => ({ ...eff, [m]: eff[m] - 1, stones: (eff.stones || 0) + 1 })));
+        if (pick) Object.assign(eff, pick);
     }
     // Treaty Stone: cover 1 missing of one material by paying 2 of a surplus one.
     if (flags.treatyStone) {
+        const trials = [];
         for (const target of MAT_KEYS) {
-            if ((wbm[target] || 0) >= (eff[target] || 0)) continue;
-            let found = false;
+            if (!(eff[target] > 0)) continue;
             for (const source of MAT_KEYS) {
                 if (source === target) continue;
                 if ((wbm[source] || 0) - (eff[source] || 0) < 2) continue;
-                eff[target] -= 1; eff[source] = (eff[source] || 0) + 2; found = true; break;
+                trials.push({ ...eff, [target]: eff[target] - 1, [source]: (eff[source] || 0) + 2 });
             }
-            if (found) break;
         }
+        const pick = rbBestSubstitution(eff, wbm, trials);
+        if (pick) Object.assign(eff, pick);
     }
     // Granary: once-per-game, drop 1 from a remaining deficient material.
     if (flags.granary && !flags.granaryUsed) {
-        for (const m of Object.keys(eff)) {
-            if ((wbm[m] || 0) < eff[m]) { eff[m] -= 1; break; }
-        }
+        const pick = rbBestSubstitution(eff, wbm, Object.keys(eff)
+            .filter(m => eff[m] > 0)
+            .map(m => ({ ...eff, [m]: eff[m] - 1 })));
+        if (pick) Object.assign(eff, pick);
     }
     return eff;
 }
@@ -205,9 +220,12 @@ class BuildChoiceFlow {
         // Leave the action bar as-is: the framework disables it while the action
         // is in flight and restores the state's buttons if the build is rejected
         // (e.g. still short materials) — clearing here would strand an empty bar.
+        // `explicit` marks the picks as the player's decisions even when they
+        // declined every modifier: an empty choices object would put the server
+        // in heuristic mode, which auto-fires (and spends) them all anyway.
         this.bga.actions.performAction(this.actionName, {
             cardId: this.cardId,
-            choices: JSON.stringify(this.choices),
+            choices: JSON.stringify({ ...this.choices, explicit: true }),
         });
     }
 

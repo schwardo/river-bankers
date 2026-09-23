@@ -67,6 +67,14 @@ class ResolveAuction extends GameState
         $matLabel = $wildAlt !== null ? "$material/$wildAlt" : $material; // display (wilds show both)
 
         // Per-item cost is per-player (material discounts: Reed Bed, Clay Den…).
+        // The trigger pays last, so if pawns land on the same space the
+        // trigger's pawn stacks on top (rulebook "Pay fish first"). Moving its
+        // entry to the end of $bids sets the payment (advanceFish) order.
+        if (isset($bids[$trigger])) {
+            $triggerBid = $bids[$trigger];
+            unset($bids[$trigger]);
+            $bids[$trigger] = $triggerBid;
+        }
         $paid = [];
         $placed = 0;
         foreach ($bids as $pid => $bid) {
@@ -187,7 +195,11 @@ class ResolveAuction extends GameState
         foreach ($order as $pid) {
             $rateP = Effects::perItemForPlayer($rate, $material, $this->game->getBuiltNames($pid));
             $paid[$pid] = $billable[$pid] * $rateP;
-            $this->game->advanceFish($pid, $paid[$pid]);
+            // Placement is trigger-first, but the trigger PAYS last (below) so
+            // its pawn stacks on top of any tie (rulebook "Pay fish first").
+            if ($pid !== $trigger) {
+                $this->game->advanceFish($pid, $paid[$pid]);
+            }
             $toPlace = $clinched[$pid];
             if ($toPlace > 0) {
                 $fa = min($toPlace, $openA - $placedA);
@@ -202,6 +214,9 @@ class ResolveAuction extends GameState
                     $placedB += $fb;
                 }
             }
+        }
+        if (isset($paid[$trigger])) {
+            $this->game->advanceFish($trigger, $paid[$trigger]);
         }
 
         // Both moves apply their fish penalties immediately; merge (sum) only for

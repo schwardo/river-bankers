@@ -92,6 +92,24 @@ final class BuildCostTest extends TestCase
         self::assertFalse($r['granaryUsed']);
     }
 
+    public function testExplicitMarkerAloneDeclinesEverything(): void
+    {
+        // The client flow sends {explicit:true} when the player declined every
+        // modifier. That must fire nothing, not fall back to heuristic mode
+        // (which would spend Stone Tool here).
+        $r = BuildCost::effective(['logs' => 3], ['logs' => 1, 'stones' => 4], ['stoneTool' => true], ['explicit' => true]);
+        self::assertSame(['logs' => 3], $r['eff']);
+        self::assertFalse($r['stoneToolUsed']);
+    }
+
+    public function testEmptyChoicesStillAutoFire(): void
+    {
+        // Contrast with the marker case above: a truly empty payload (no client
+        // flow, e.g. an old client) keeps the heuristic auto-fire.
+        $heuristic = BuildCost::effective(['logs' => 3], ['logs' => 1, 'stones' => 4], ['stoneTool' => true], []);
+        self::assertTrue($heuristic['stoneToolUsed']);
+    }
+
     public function testExplicitTreatyStoneHonorsPair(): void
     {
         // Cover reeds by paying 2 mud (both are legal surplus sources; player picks mud).

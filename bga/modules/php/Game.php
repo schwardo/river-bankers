@@ -1043,10 +1043,12 @@ class Game extends \Bga\GameFramework\Table
      * Parse the client's build-cost `choices` payload (a JSON object) into the
      * whitelisted shape Rules\BuildCost::effective() expects. Unknown keys and
      * ill-typed values are dropped; a null/absent modifier means "don't use it".
-     * An empty result ({} or malformed JSON) falls back to the auto-heuristic.
+     * An empty result ({} or malformed JSON) falls back to the auto-heuristic;
+     * `explicit: true` (sent by the client build flow) keeps an all-declined
+     * build explicit.
      *
      * @return array{
-     *     charcoalPit?:string, stoneTool?:string, granary?:string,
+     *     explicit?:true, charcoalPit?:string, stoneTool?:string, granary?:string,
      *     treatyStone?:array{target:string,source:string}
      * }
      */
@@ -1057,6 +1059,12 @@ class Game extends \Bga\GameFramework\Table
             return [];
         }
         $out = [];
+        // The client's build flow sends explicit=true, so declining every
+        // modifier still counts as explicit (fire nothing) rather than falling
+        // back to heuristic mode, which auto-fires them all.
+        if (($raw['explicit'] ?? false) === true) {
+            $out['explicit'] = true;
+        }
         foreach (['charcoalPit', 'stoneTool', 'granary'] as $key) {
             $v = $raw[$key] ?? null;
             if (is_string($v) && in_array($v, BuildCost::MAT_KEYS, true)) {

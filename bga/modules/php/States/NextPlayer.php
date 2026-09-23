@@ -39,7 +39,20 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
         $turnPlayer = (int) $this->globals->get('turn_player', 0);
         if ($turnPlayer > 0) {
             $this->playerStats->inc('turns', 1, $turnPlayer, true); // count the turn that just ended
-            if ($this->game->getMaterialDeckCount() === 0) {
+            // No drift for a pawn that is already done: one that retired this turn
+            // (a voluntary Retire already sits on its assigned finish space) or
+            // whose own action reached the line (it retires on the space it
+            // landed on — drifting it first pushed it off that space and could
+            // hand the lower tiebreak spot to a later retiree).
+            $turnRow = null;
+            foreach ($this->game->getTurnOrderRows() as $r) {
+                if ((int) $r['id'] === $turnPlayer) {
+                    $turnRow = $r;
+                }
+            }
+            $pawnDone = $turnRow !== null
+                && ($turnRow['retired'] || (int) $turnRow['fish'] >= $this->game->getFishLine());
+            if ($this->game->getMaterialDeckCount() === 0 && !$pawnDone) {
                 // Announce the deck running dry once (guarded so it fires a single
                 // time), then log each per-turn drift so the +1🐟 isn't a silent jump.
                 if ((int) $this->globals->get('deck_empty_announced', 0) === 0) {

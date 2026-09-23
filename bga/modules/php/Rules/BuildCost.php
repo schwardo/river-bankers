@@ -46,7 +46,7 @@ final class BuildCost
      *     treatyStone?:bool, granary?:bool, granaryUsed?:bool
      * } $flags  which build modifiers the player controls + their used-state
      * @param array{
-     *     charcoalPit?:string|null, stoneTool?:string|null, granary?:string|null,
+     *     explicit?:true, charcoalPit?:string|null, stoneTool?:string|null, granary?:string|null,
      *     treatyStone?:array{target:string,source:string}|null
      * } $choices  explicit player decisions; empty array = auto-fire heuristic
      * @return array{eff:array<string,int>, granaryUsed:bool, stoneToolUsed:bool}
