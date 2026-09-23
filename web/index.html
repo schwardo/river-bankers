@@ -960,7 +960,7 @@
     border-color: #fff;
   }
   .struct-card.has-art.buildable .reqs::before {
-    content: 'READY ✓';
+    content: attr(data-ready);
     background: var(--forest);
     color: #fff;
     font-size: 10px;
@@ -1302,7 +1302,7 @@
   .picker-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
   /* Horizontal variant — used by the species-starter draft so all 3 card
      images line up side-by-side instead of stacking. */
-  .picker-list.horizontal { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  .picker-list.horizontal { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 10px; max-height: 70vh; overflow-y: auto; }
   /* Starter draft: 3 card images (195px + padding) need more than the default
      580px modal to sit in one row; still wraps on narrow screens. */
   .modal:has(.picker-list.horizontal) { max-width: min(720px, calc(100vw - 32px)); }
@@ -1677,7 +1677,7 @@
       </div>
       <div class="struct-pile-row">
         <div class="struct-pile-label">Discard</div>
-        <div id="struct-discard-count" class="struct-pile-count">0</div>
+        <div id="struct-discard-count" class="struct-pile-count" onclick="showStructDiscard()" title="Show the discard pile" style="cursor:pointer;text-decoration:underline dotted;">0</div>
       </div>
     </div>
   </div>
@@ -2018,18 +2018,12 @@ const VARIABLE_VP_CARDS = new Set([
 const STRUCTURE_EFFECT_DISABLED = {};
 function effectActive(name) { return STRUCTURE_EFFECT_DISABLED[name] !== true; }
 function hasEffect(p, name) { return effectActive(name) && p.built.some(s => s.name === name); }
+// Reads the same flag table the AI's once-per-game logic uses, so the two can't
+// drift apart (the hand-kept list here once missed Stone Tool, Rolling Float,
+// Slipstream and Snare Set, so their "spent" overlay never showed).
 function oncePerGameUsed(p, name) {
-  if (name === 'Granary'       && p.granaryUsed)       return true;
-  if (name === 'Floodgate'     && p.floodgateUsed)     return true;
-  if (name === 'Tow Line'      && p.towLineUsed)       return true;
-  if (name === 'Salmon Run'    && p.salmonRunUsed)     return true;
-  if (name === 'Spy Mound'     && p.spyMoundUsed)      return true;
-  if (name === 'Tribute Stone' && p.tributeStoneUsed)  return true;
-  if (name === 'Wood Pile'        && p.woodPileUsed)      return true;
-  if (name === 'Hollowed-out Log' && p.hollowedLogUsed)   return true;
-  if (name === 'Pack Rat Burrow'  && p.packRatUsed)       return true;
-  if (name === 'Spring Cascade'   && p.springCascadeUsed) return true;
-  return false;
+  const entry = ONCE_PER_GAME_FLAGS.find(([n]) => n === name);
+  return !!(entry && p[entry[1]]);
 }
 // Hand-size cards stack: +1 per built copy. The main-deck "Cache Burrow" and
 // the beaver starter "Beaver Cache" both carry the bonus and stack with each
@@ -3750,6 +3744,14 @@ function renderHand() {
     const reqs = affordabilityPills(s, wbm, human);
     const cls = ['struct-card', 'has-art'];
     if (buildable) cls.push('buildable');
+    // A build that only works by spending a once-per-game saver says so on the
+    // READY stamp (2026-09-23 3P playtest: Stone Tool fired with no warning).
+    let readyLabel = 'READY ✓';
+    if (buildable) {
+      const ec = effectiveBuildCost(s, human, wbm);
+      if (ec.stoneToolUsed) readyLabel = 'READY ✓ · USES STONE TOOL';
+      else if (ec.granaryUsed) readyLabel = 'READY ✓ · USES GRANARY';
+    }
     const isHumanTurn = state.currentPlayer === human.idx;
     // Click on a buildable structure builds it directly — works in both the explicit
     // select-build phase and as a shortcut from choose-action.
@@ -3783,7 +3785,7 @@ function renderHand() {
         <span class="name">${s.name}</span>
         <span class="vp">${vpDisplay(s)}★</span>
       </div>
-      <div class="reqs">${reqs}</div>
+      <div class="reqs" data-ready="${readyLabel}">${reqs}</div>
       ${effectLine}
     </div>`;
   });
@@ -3857,7 +3859,7 @@ function renderActionPanel() {
         // is "behind in turn order".
         const ahead = Math.max(0, human.timePos - cur.timePos);
         trackLine = ahead === 0
-          ? `You're tied with ${cur.species.name} in turn order.`
+          ? `You're both on ${cur.timePos}🐟 — ${cur.species.name} is on top of the stack, so acts first.`
           : `You're ${ahead}🐟 further along the track — ${cur.species.name} acts first.`;
       }
       // No Undo button while it's an AI's turn — once the AI has started
@@ -4195,7 +4197,7 @@ function renderActionPanel() {
         const dim = bid === 0 ? ' style="opacity:0.5"' : '';
         let outcomeStr;
         if (bid === 0) outcomeStr = `<span class="small-note">passed</span>`;
-        else if (took === 0) outcomeStr = `bid <b>${bid}</b> → <span style="color:#a33">won 0</span>`;
+        else if (took === 0) outcomeStr = `bid <b>${bid}</b> → <span style="color:#a33">won 0</span> (+${time}🐟)`;
         else if (took === bid) outcomeStr = `bid <b>${bid}</b> → <span style="color:var(--forest)">won <b>${took}</b></span> (+${time}🐟)`;
         else outcomeStr = `bid <b>${bid}</b> → won <b>${took}</b> (+${time}🐟)`;
         rows += `<div class="bidder-row"${dim}>
@@ -4279,8 +4281,6 @@ function moveCardToShoreline(card, opts = {}) {
     raftStaysOnRiver(card);
     return;
   }
-  // Fire end-of-river effects (solo / most-workers bonuses) before clearing slot.
-  fireOnShoreline(card);
   card.blanks = 0;
   if (card.slot === 'pre') {
     const idx = prerivIndexOf(card);
@@ -4291,6 +4291,10 @@ function moveCardToShoreline(card, opts = {}) {
   card.slot = 'shore';
   state.shorelineCards.push(card);
   if (!opts.quiet) log(`📍 ${MATERIALS[card.material].icon} ${card.name} drifts to the shoreline.`);
+  // End-of-river effects (solo / most-workers bonuses) fire once the card has
+  // landed, so the log reads "drifts to the shoreline" → "bonus" in order
+  // rather than showing the bonus while the card still sits on the river.
+  fireOnShoreline(card);
 }
 
 // End-of-life effect dispatcher: fires when a card moves from river → shoreline.
@@ -4309,7 +4313,7 @@ function fireOnShoreline(card) {
     const count = entries[0][1];
     const spaces = count * (spec.bonusPerWorker || 1);
     moveBackward(state, idx, spaces);
-    log(`🐟 ${spec.name}: P${idx + 1} solo bonus — back ${spaces} on fish track (${count} worker${count === 1 ? '' : 's'}).`);
+    log(`🐟 ${spec.name}: ${speciesLabel(state.players[idx])} solo bonus — back ${spaces} on fish track (${count} worker${count === 1 ? '' : 's'}).`);
     return;
   }
   if (card.effect === 'most-workers') {
@@ -4432,7 +4436,7 @@ function cleanupShoreline() {
   state.shorelineCards = state.shorelineCards.filter(c => {
     const totalWorkers = Object.values(c.workers).reduce((s, n) => s + n, 0);
     if (totalWorkers === 0) {
-      log(`🌊 empty ${cardMatLabel(c)} card removed from shoreline.`);
+      log(`🌊 ${c.name} (${cardMatLabel(c)}) has no workers left — removed from the shoreline.`);
       return false;
     }
     return true;
@@ -4497,7 +4501,7 @@ async function runAuction(card, triggerPlayerIdx, minBidTrigger) {
   state.phase = 'auction-bidding';
   const m = MATERIALS[card.material];
   const slotLbl = card.slot === 'pre' ? 'Headwaters' : `River ${card.slot + 1}`;
-  log(`🎲 Auction begins on ${cardMatIcons(card)} ${card.name} (${cardMatLabel(card)}) at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icons open).`);
+  log(`🎲 Auction begins on ${cardMatIcons(card)} ${card.name} (${cardMatLabel(card)}) at ${slotLbl} (${cardCost(card)}🐟/item, ${uncoveredIcons(card)} icon${uncoveredIcons(card) === 1 ? '' : 's'} open).`);
 
   // Spy Mound / Quick Strike: holders can defer their bid until after others
   // reveal. AIs auto-defer if eligible AND the card's material matches at
@@ -6526,7 +6530,7 @@ function doStagingFerry(playerIdx, moves) {
     moveBackward(state, playerIdx, back);
     p.timePos += fwd;
     moved += 1;
-    log(`🛟 Flotsam Raft: ${speciesLabel(p)} ferries a worker to ${MATERIALS[dest.material].icon} ${cardMatLabel(dest)} (back ${back}🐟, forward ${fwd}🐟).`);
+    log(`🛟 Flotsam Raft: ${speciesLabel(p)} ferries a worker to ${MATERIALS[dest.material].icon} ${dest.name} (${cardMatLabel(dest)}) at River ${dest.slot + 1} (back ${back}🐟, forward ${fwd}🐟).`);
   }
   if (moved > 0) { discardEmptyRafts(); sweepFullyCoveredRiver(); }
   return moved;
@@ -6648,11 +6652,11 @@ async function humanUsePackRat() {
   if (h.hand.length === 0 || state.structDiscard.length === 0) return;
   const drop = await pickFromList('🐀 Pack Rat Burrow — discard a hand card',
     'Choose a structure from your hand to discard. (Once per game.)', h.hand,
-    s => `${s.name} (${s.time}🐟, ${vpDisplay(s)}★)`, { cancelable: true });
+    s => structPickerImg(s), { cancelable: true, horizontal: true });
   if (!drop) return;
   const take = await pickFromList('🐀 Pack Rat Burrow — take from the discard',
     'Choose any card of your choice from the discard pile to take.', state.structDiscard,
-    s => `${s.name} (${s.time}🐟, ${vpDisplay(s)}★)`, { cancelable: true });
+    s => structPickerImg(s), { cancelable: true, horizontal: true });
   if (!take) return;
   h.hand.splice(h.hand.indexOf(drop), 1);
   state.structDiscard.splice(state.structDiscard.indexOf(take), 1);
@@ -7050,7 +7054,7 @@ async function humanStagingFerry() {
         const back = cardCost(raft), fwd = playerCardCost(x.card, human.idx);
         const net = fwd - back;
         const netTxt = net > 0 ? `pay ${net}🐟` : net < 0 ? `gain ${-net}🐟` : 'even';
-        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${uncoveredIcons(x.card)} open) — back ${back}🐟, forward ${fwd}🐟 (${netTxt})`;
+        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${x.card.name} (${cardMatLabel(x.card)}, ${uncoveredIcons(x.card)} open) — back ${back}🐟, forward ${fwd}🐟 (${netTxt})`;
       },
       moved === 0
         ? { cancelLabel: 'Never mind' }
@@ -7330,6 +7334,19 @@ async function humanSelectBuild(handIdx) {
   const struct = human.hand[handIdx];
   const wbm = playerWorkersByMaterial(state, human.idx);
   if (!canBuild(struct, wbm, human)) return;
+  // Stone Tool only fires when the build can't be paid without it, but it's a
+  // once-per-game card, so ask before spending it rather than burning it
+  // silently (2026-09-23 3P playtest). Declining leaves you on your turn.
+  if (hasEffect(human, 'Stone Tool') && !human.stoneToolUsed
+      && effectiveBuildCost(struct, human, wbm).stoneToolUsed) {
+    const onBasking = [...state.riverCards, ...state.shorelineCards].some(c =>
+      c.effect === 'crowd-bonus' && !PLAIN_RIVER_ACTIVE && workersOnCard(c, human.idx) > 0 && crowdCount(c) > 1);
+    const ok = await confirmModal('🦪 Use Stone Tool?',
+      `${struct.name} is short one material, so this build spends your once-per-game Stone Tool: 1 Stones worker stands in for it.`
+      + (onBasking ? ' A Basking Rocks worker spent this way counts as just 1 item, not its crowd bonus.' : ''),
+      'Use it and build', 'Not now');
+    if (!ok) { render(); return; }
+  }
   // Auto-recall: prefer shoreline first, then river by lowest cost
   await performBuild(human.idx, handIdx);
   state.phase = 'idle';
@@ -8310,6 +8327,29 @@ function confirmModal(title, msg, yesLabel = 'Use it', noLabel = 'Skip') {
 let _pickerSeq = 0;
 // Sentinel returned when the user clicks the optional "Decline" button.
 const PICKER_DECLINE = '__decline__';
+// Card-art tile for a structure picker. The art carries the cost row, VP and
+// effect text, which a bare "Name (3🐟, ?★)" label hid — choosing between
+// three ?★ cards from the discard was guesswork (2026-09-23 3P playtest).
+function structPickerImg(s, width = 150) {
+  const dir = s.species ? 'starter-deck' : 'structure-deck';
+  const url = `../${dir}/${s.name.replace(/[^A-Za-z0-9]/g, '')}.png`;
+  return `<img src="${url}" alt="${s.name}" title="${s.name}" data-card-img="${url}" style="width:${width}px;height:auto;display:block;">`;
+}
+
+// The structure discard is a face-up public pile (rulebook p.6); clicking its
+// count opens it.
+function showStructDiscard() {
+  const pile = (state && state.structDiscard) || [];
+  showModal({
+    title: `📚 Structure discard (${pile.length})`,
+    body: () => pile.length === 0
+      ? '<p class="small-note">The discard pile is empty.</p>'
+      : `<p class="small-note">Newest last. Hover a card to enlarge it.</p>
+         <div class="picker-list horizontal">${pile.map(s => `<div class="picker-btn">${structPickerImg(s, 120)}</div>`).join('')}</div>`,
+    actions: [{ label: 'Close', primary: true, onClick: () => closeModal() }],
+  });
+}
+
 function pickFromList(title, intro, items, renderItem, opts = {}) {
   return new Promise(resolve => {
     const fnName = '_picker_' + (++_pickerSeq);
