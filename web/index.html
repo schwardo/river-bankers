@@ -2945,6 +2945,13 @@ function startGame() {
   document.getElementById('game-screen').classList.remove('hidden');
   document.body.classList.add('in-game');
   log(`Game starts. ${players.length} players. ${humanPlays ? 'You are ' + players[humanIdx].species.name + '.' : 'All AI.'}`);
+  if (useStarters) {
+    for (const p of players) {
+      if (p.isHuman) continue;
+      const starter = p.built.find(b => b.species === p.species.id);
+      if (starter) log(`${speciesLabel(p)} drafts <b>${starter.name}</b>.`);
+    }
+  }
 
   render();
   startSimTimeTicker();
@@ -3076,7 +3083,9 @@ function fishFinishLine() {
 function humanCrossWarnHTML(addedCost) {
   const h = state.players.find(p => p.isHuman);
   if (!h || h.out) return '';
-  if (h.timePos + addedCost < fishFinishLine()) return '';
+  // Once the material deck is empty, the end-of-turn drift adds 1 more fish.
+  const drift = state.matDeck.length === 0 ? 1 : 0;
+  if (h.timePos + addedCost + drift < fishFinishLine()) return '';
   return state.retireUnlocked
     ? `<div class="cross-warn last">🏁 This crosses the finish line — it would be your <b>last turn</b> (you'll still get one final build).</div>`
     : `<div class="cross-warn trigger">🏁 This crosses the finish line — it would <b>trigger the endgame</b>.</div>`;
@@ -4223,7 +4232,7 @@ function renderActionPanel() {
         } else if (result.cardFate === 'shoreline-graduated') {
           fateLine = `<p>${leftover} icon${leftover === 1 ? '' : 's'} went unbid. The card was already on the last river space, so it <b>graduates to the shoreline</b> with its workers.</p>`;
         } else if (result.cardFate === 'raft-full') {
-          fateLine = `<p>Every icon was claimed. The raft never reaches the shoreline: it <b>slides to River ${result.cardNewSlot + 1}</b> (${result.cardNewCost}🐟 per item, moored there at the deepest) and stays on the river until its last worker leaves.</p>`;
+          fateLine = `<p>Every icon was claimed. The raft never reaches the shoreline: it <b>slides to River ${result.cardNewSlot + 1}</b> (${result.cardNewCost}🐟 per item) and <b>freezes there</b> — with every icon taken nobody can auction it again, so it stays put until its last worker leaves.</p>`;
         } else {
           fateLine = `<p>Every open icon was claimed — the card has nothing left to auction and <b>drifts to the shoreline</b>.</p>`;
         }
@@ -6619,13 +6628,13 @@ async function humanUseWoodPile() {
   if (!cands.length) return;
   const pick = await pickFromList('🪵 Wood Pile — claim a Log icon',
     'Place 1 worker on a Log river card for 1🐟. (Once per game.)', cands,
-    c => `River ${c.slot + 1}: ${MATERIALS.logs.icon} Logs (${uncoveredIcons(c)} open)`, { cancelable: true });
+    c => `River ${c.slot + 1}: ${MATERIALS.logs.icon} ${c.name} (Logs, ${uncoveredIcons(c)} open)`, { cancelable: true });
   if (!pick) return;
   h.supply -= 1;
   pick.workers[h.idx] = (pick.workers[h.idx] || 0) + 1;
   h.timePos += 1;
   h.woodPileUsed = true;
-  log(`${MATERIALS.logs.icon} Wood Pile: ${speciesLabel(h)} claims 1 Log icon (+1🐟).`);
+  log(`${MATERIALS.logs.icon} Wood Pile: ${speciesLabel(h)} claims 1 Log icon on ${pick.name} at River ${pick.slot + 1} (+1🐟).`);
   render();
 }
 
@@ -8021,6 +8030,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
   }
   if (struct.name === 'Mud Levee') {
     let dropped = 0;
+    const hit = [];
     if (isHuman) {
       for (let drop = 0; drop < 2; drop++) {
         // Card text: "drop 2 blanks on uncovered icons in the river" — Headwaters
@@ -8038,6 +8048,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         if (!pick) break;
         pick.card.blanks++;
         dropped++;
+        hit.push(pick.card);
         render();
       }
     } else {
@@ -8045,11 +8056,15 @@ async function fireOnBuildEffect(playerIdx, struct) {
         .filter(c => uncoveredIcons(c) > 0)
         .sort((a, b) => uncoveredIcons(b) - uncoveredIcons(a));
       for (const c of cands) {
-        while (dropped < 2 && uncoveredIcons(c) > 0) { c.blanks++; dropped++; }
+        while (dropped < 2 && uncoveredIcons(c) > 0) { c.blanks++; dropped++; hit.push(c); }
         if (dropped >= 2) break;
       }
     }
-    log(`${MATERIALS.mud.icon} Mud Levee drops ${dropped} blank${dropped === 1 ? '' : 's'}.`);
+    const where = [...new Set(hit)].map(c => {
+      const n = hit.filter(x => x === c).length;
+      return `${c.name} (${cardMatLabel(c)}, River ${c.slot + 1})${n > 1 ? ' ×' + n : ''}`;
+    }).join(', ');
+    log(`${MATERIALS.mud.icon} Mud Levee drops ${dropped} blank${dropped === 1 ? '' : 's'}${where ? ' on ' + where : ''}.`);
     return;
   }
   if (struct.name === 'Flush Channel') {
@@ -8816,8 +8831,11 @@ async function runOneTurn() {
   // bonus turn (overriding fish-track position once per game).
   await maybeFireSlipstream(p.idx);
 
-  const next = pickNextPlayer();
-  if (next === p.idx) {
+  // pickNextPlayer() consumes state.bonusTurnPlayer, so only peek when no bonus
+  // is pending — calling it unconditionally here swallowed every Slipstream /
+  // Royal Lodge bonus turn before runOneTurn could honour it (playtest
+  // 2026-09-23 #5). A pending bonus already logged its own line.
+  if (state.bonusTurnPlayer == null && pickNextPlayer() === p.idx) {
     log(`↩ ${speciesLabel(p)} still on top of the lowest space — takes another turn.`);
   }
   scheduleTurn();
