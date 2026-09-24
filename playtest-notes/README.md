@@ -28,6 +28,12 @@ itself, not from the game. **Check this list before reporting a UI bug.**
   awaits it, and a single-threaded driver deadlocks. Fire actions
   asynchronously instead: `setTimeout(() => { humanSelectBuild(0) }, 0)`.
   Then poll for `.modal` and click its buttons.
+- **Call the dispatcher, not the inner `human*` function, for Flush.** The
+  Flush button runs `humanFlushUpstream().then(() => humanResolver())`.
+  Calling `humanFlushUpstream()` directly skips the resolver, and after the
+  flush auction the game sits at `phase=idle` with nobody acting. It looks
+  like a stall bug, but it isn't. Recover with
+  `setTimeout(() => humanResolver(), 0)` (2026-09-23 3P #6).
 - **The setup-screen radios are hidden inputs styled by their labels.** Set
   `.checked = true` and dispatch `change`; clicking `#role-<species>-you`
   directly fails.

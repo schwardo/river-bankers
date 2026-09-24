@@ -1009,24 +1009,6 @@ class Game extends \Bga\GameFramework\Table
     }
 
     /**
-     * Fixed-material worker counts (Old-Growth yield folded in), for the build-cost
-     * modifier engine. Wild holdings are excluded — they're resolved at allocation.
-     *
-     * @param list<array{material:string, wildAlt:?string, workers:int, yield:int}> $holdings
-     * @return array<string,int>
-     */
-    private function fixedMaterialCounts(array $holdings): array
-    {
-        $counts = [];
-        foreach ($holdings as $h) {
-            if ($h['wildAlt'] === null) {
-                $counts[$h['material']] = ($counts[$h['material']] ?? 0) + $h['workers'] * $h['yield'];
-            }
-        }
-        return $counts;
-    }
-
-    /**
      * Which build-cost modifiers a player controls + the used-state of the
      * once-per-game ones (Stone Tool / Granary), for Rules\BuildCost::effective().
      *
@@ -1876,7 +1858,8 @@ class Game extends \Bga\GameFramework\Table
     {
         $def = Material::$STRUCTURE[(int) $this->getCardRow($structureCardId)['card_type_arg']];
         $holdings = $this->getPlayerHoldings($playerId);
-        $bc = BuildCost::effective($def['cost'], $this->fixedMaterialCounts($holdings), $this->buildFlags($playerId), $choices);
+        $held = $this->leftoverFromHoldings($holdings);
+        $bc = BuildCost::effective($def['cost'], $held['fixed'], $this->buildFlags($playerId), $choices, $held['wild']);
         return Build::shortfall($bc['eff'], $holdings);
     }
 
@@ -1910,7 +1893,8 @@ class Game extends \Bga\GameFramework\Table
         // Stone Tool / Treaty Stone / Granary) to the printed material cost. In
         // heuristic mode ($choices empty) they auto-fire; when the player made
         // explicit picks in the build UI, $choices drives which fire and where.
-        $bc = BuildCost::effective($def['cost'], $this->fixedMaterialCounts($holdings), $this->buildFlags($playerId), $choices);
+        $held = $this->leftoverFromHoldings($holdings);
+        $bc = BuildCost::effective($def['cost'], $held['fixed'], $this->buildFlags($playerId), $choices, $held['wild']);
         $alloc = Build::allocate($bc['eff'], $holdings);
         if ($alloc === null) {
             return false;

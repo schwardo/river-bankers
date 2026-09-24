@@ -47,14 +47,16 @@ function rbEffectiveBuildCost(cost, flags, wbm) {
     // Cattail Marsh: each reed worker counts as 2 reeds.
     if (flags.cattailMarsh && eff.reeds) eff.reeds = Math.ceil(eff.reeds / 2);
     // Charcoal Pit: 1 clay may substitute for 1 of any deficient other material.
-    if (flags.charcoalPit && (wbm.clay || 0) - (eff.clay || 0) >= 1) {
+    // The clay may be on a wildcard (Mud Slick) — rbBestSubstitution's
+    // wild-aware shortfall decides, so there is no fixed-clay surplus gate.
+    if (flags.charcoalPit) {
         const pick = rbBestSubstitution(eff, wbm, Object.keys(cost)
             .filter(m => m !== 'clay' && eff[m] > 0)
             .map(m => ({ ...eff, [m]: eff[m] - 1, clay: (eff.clay || 0) + 1 })));
         if (pick) Object.assign(eff, pick);
     }
     // Stone Tool (otter starter): once-per-game Charcoal-Pit variant on Stones.
-    if (flags.stoneTool && !flags.stoneToolUsed && (wbm.stones || 0) - (eff.stones || 0) >= 1) {
+    if (flags.stoneTool && !flags.stoneToolUsed) {
         const pick = rbBestSubstitution(eff, wbm, Object.keys(cost)
             .filter(m => m !== 'stones' && eff[m] > 0)
             .map(m => ({ ...eff, [m]: eff[m] - 1, stones: (eff.stones || 0) + 1 })));
@@ -67,7 +69,6 @@ function rbEffectiveBuildCost(cost, flags, wbm) {
             if (!(eff[target] > 0)) continue;
             for (const source of MAT_KEYS) {
                 if (source === target) continue;
-                if ((wbm[source] || 0) - (eff[source] || 0) < 2) continue;
                 trials.push({ ...eff, [target]: eff[target] - 1, [source]: (eff[source] || 0) + 2 });
             }
         }
@@ -239,21 +240,34 @@ class BuildChoiceFlow {
         this.finish();
     }
 
-    // Fixed-material deficit? (wild pools are resolved later, server-side, so the
-    // modifier maths reads fixed counts only — matching effective().)
+    // Fixed-material deficit?
     isDeficit(m) { return (this.wbm[m] || 0) < this.eff[m]; }
+    // Does the adjusted cost `trial` leave less unpaid than the running eff,
+    // counting wild pools? A pick is legal if it's a fixed deficit with fixed
+    // surplus (the old rule) OR it improves this — mirrors BuildCost.php, so a
+    // Mud Slick worker can be Charcoal Pit's clay.
+    improves(trial) { return rbWildShortfall(trial, this.wbm) < rbWildShortfall(this.eff, this.wbm); }
+    swapOne(target, src, n = 1) {
+        return { ...this.eff, [target]: this.eff[target] - 1, [src]: (this.eff[src] || 0) + n };
+    }
 
     // Describe modifier $key for the current running eff, or null if it can't help.
     evaluate(key) {
         const f = this.flags;
+        // 1 `src` worker covers 1 other material (Charcoal Pit / Stone Tool).
+        const coverTargets = src => {
+            const slack = (this.wbm[src] || 0) - (this.eff[src] || 0) >= 1;
+            return Object.keys(this.cost).filter(m => m !== src && (this.eff[m] || 0) > 0
+                && ((slack && this.isDeficit(m)) || this.improves(this.swapOne(m, src))));
+        };
         if (key === 'charcoalPit') {
-            if (!f.charcoalPit || (this.wbm.clay || 0) - (this.eff.clay || 0) < 1) return null;
-            const targets = Object.keys(this.cost).filter(m => m !== 'clay' && this.isDeficit(m));
+            if (!f.charcoalPit) return null;
+            const targets = coverTargets('clay');
             return targets.length ? { name: _('Charcoal Pit'), targets } : null;
         }
         if (key === 'stoneTool') {
-            if (!f.stoneTool || f.stoneToolUsed || (this.wbm.stones || 0) - (this.eff.stones || 0) < 1) return null;
-            const targets = Object.keys(this.cost).filter(m => m !== 'stones' && this.isDeficit(m));
+            if (!f.stoneTool || f.stoneToolUsed) return null;
+            const targets = coverTargets('stones');
             return targets.length ? { name: _('Stone Tool'), targets, once: true } : null;
         }
         if (key === 'granary') {
@@ -263,8 +277,10 @@ class BuildChoiceFlow {
         }
         if (key === 'treatyStone') {
             if (!f.treatyStone) return null;
-            const sourcesFor = t => MAT_KEYS.filter(s => s !== t && (this.wbm[s] || 0) - (this.eff[s] || 0) >= 2);
-            const targets = MAT_KEYS.filter(t => (this.wbm[t] || 0) < (this.eff[t] || 0) && sourcesFor(t).length);
+            const sourcesFor = t => MAT_KEYS.filter(s => s !== t
+                && ((this.isDeficit(t) && (this.wbm[s] || 0) - (this.eff[s] || 0) >= 2)
+                    || this.improves(this.swapOne(t, s, 2))));
+            const targets = MAT_KEYS.filter(t => (this.eff[t] || 0) > 0 && sourcesFor(t).length);
             return targets.length ? { name: _('Treaty Stone'), targets, treaty: true, sourcesFor } : null;
         }
         return null;
@@ -322,9 +338,8 @@ class BuildChoiceFlow {
 }
 
 // Launch the build-cost-choice flow for a hand card, then fire $actionName.
-// `wbm` is fixed-material counts only (wild pools are resolved server-side after
-// the modifiers, so effective() reads fixed surplus) — the same holdings the
-// hand affordability pills use.
+// `wbm` is the same holdings the hand affordability pills use: fixed counts plus
+// `_wildPools`, which the modifiers may draw on (server BuildCost gets the same).
 function launchBuildFlow(game, bga, cardId, actionName, onCancel) {
     const card = (game.lastHand || []).find(c => Number(c.id) === Number(cardId));
     const held = (game.materials || {})[game.myId()] || { fixed: {}, wild: [] };
@@ -333,7 +348,7 @@ function launchBuildFlow(game, bga, cardId, actionName, onCancel) {
         cardName: card ? card.name : '',
         cost: (card && card.cost) || {},
         flags: game.myBuildFlags(),
-        wbm: { ...(held.fixed || {}) },
+        wbm: { ...(held.fixed || {}), _wildPools: held.wild || [] },
         onCancel,
     }).start();
 }

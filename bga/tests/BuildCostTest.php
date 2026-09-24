@@ -6,7 +6,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for the pure build-cost modifier engine, plus 600 randomized
- * vectors cross-checked against sim.js effectiveBuildCost
+ * vectors (about half with wild pools) cross-checked against sim.js effectiveBuildCost
  * (tests/oracle/gen_buildcost_vectors.js).
  */
 final class BuildCostTest extends TestCase
@@ -146,10 +146,51 @@ final class BuildCostTest extends TestCase
             ['treatyStone' => ['target' => 'reeds', 'source' => 'mud']]);
     }
 
-    /** @dataProvider simVectors */
-    public function testMatchesSim(array $cost, array $wbm, array $flags, array $eff, bool $granaryUsed, bool $stoneToolUsed): void
+    // --- Wild pools (2026-09-23 3P web playtest #6) ---------------------------
+
+    public function testCharcoalPitUsesMudSlickClay(): void
     {
-        $r = BuildCost::effective($cost, $wbm, $flags);
+        // Flush Channel (3 mud + 1 reed) with 5 Mud Slick workers and nothing
+        // else: a Mud Slick worker spent as clay stands in for the reed.
+        $pools = [['materials' => ['clay', 'mud'], 'count' => 5]];
+        $r = BuildCost::effective(['mud' => 3, 'reeds' => 1], [], ['charcoalPit' => true], [], $pools);
+        self::assertSame(['mud' => 3, 'reeds' => 0, 'clay' => 1], $r['eff']);
+        // Explicit pick is legal too (no fixed clay surplus needed).
+        $e = BuildCost::effective(['mud' => 3, 'reeds' => 1], [], ['charcoalPit' => true],
+            ['charcoalPit' => 'reeds'], $pools);
+        self::assertSame(['mud' => 3, 'reeds' => 0, 'clay' => 1], $e['eff']);
+    }
+
+    public function testCharcoalPitStaysOffWhenPoolsCannotPay(): void
+    {
+        // Only 3 Mud Slick workers: all go to mud, none left to be the clay.
+        $pools = [['materials' => ['clay', 'mud'], 'count' => 3]];
+        $r = BuildCost::effective(['mud' => 3, 'reeds' => 1], [], ['charcoalPit' => true], [], $pools);
+        self::assertSame(['mud' => 3, 'reeds' => 1], $r['eff']);
+        $this->expectException(\InvalidArgumentException::class);
+        BuildCost::effective(['mud' => 3, 'reeds' => 1], [], ['charcoalPit' => true], ['charcoalPit' => 'reeds'], $pools);
+    }
+
+    public function testStoneToolUsesBrambleShoalStones(): void
+    {
+        $pools = [['materials' => ['stones', 'vines'], 'count' => 1]];
+        $r = BuildCost::effective(['logs' => 3], ['logs' => 2], ['stoneTool' => true], [], $pools);
+        self::assertSame(['logs' => 2, 'stones' => 1], $r['eff']);
+        self::assertTrue($r['stoneToolUsed']);
+    }
+
+    public function testTreatyStonePaysFromWildSurplus(): void
+    {
+        // Clay short by 1, two Driftwood Tangle workers pay 2 logs for it.
+        $pools = [['materials' => ['logs', 'reeds'], 'count' => 2]];
+        $r = BuildCost::effective(['clay' => 1], [], ['treatyStone' => true], [], $pools);
+        self::assertSame(['clay' => 0, 'logs' => 2], $r['eff']);
+    }
+
+    /** @dataProvider simVectors */
+    public function testMatchesSim(array $cost, array $wbm, array $pools, array $flags, array $eff, bool $granaryUsed, bool $stoneToolUsed): void
+    {
+        $r = BuildCost::effective($cost, $wbm, $flags, [], $pools);
         self::assertSame($eff, $r['eff']);
         self::assertSame($granaryUsed, $r['granaryUsed']);
         self::assertSame($stoneToolUsed, $r['stoneToolUsed']);
@@ -160,7 +201,7 @@ final class BuildCostTest extends TestCase
         $data = json_decode((string) file_get_contents(__DIR__ . '/fixtures/buildcost_vectors.json'), true);
         $cases = [];
         foreach ($data as $i => $v) {
-            $cases["vec$i"] = [$v['cost'], $v['wbm'], $v['flags'], $v['eff'], $v['granaryUsed'], $v['stoneToolUsed']];
+            $cases["vec$i"] = [$v['cost'], $v['wbm'], $v['pools'] ?? [], $v['flags'], $v['eff'], $v['granaryUsed'], $v['stoneToolUsed']];
         }
         return $cases;
     }

@@ -1097,25 +1097,24 @@ function effectiveBuildCost(struct, p, wbm) {
     eff.reeds = Math.ceil(eff.reeds / 2);
   }
   if (hasEffect(p, 'Charcoal Pit')) {
-    const claySlack = (wbm.clay || 0) - (eff.clay || 0);
-    if (claySlack >= 1) {
-      const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
-        .filter(m => m !== 'clay' && eff[m] > 0)
-        .map(m => ({ ...eff, [m]: eff[m] - 1, clay: (eff.clay || 0) + 1 })));
-      if (pick) Object.assign(eff, pick);
-    }
+    // No fixed-clay slack gate: clay held on a wildcard (Mud Slick) counts
+    // too, and bestSubstitution's wild-aware shortfall already rejects a trial
+    // the pools can't pay (2026-09-23 3P playtest #6: 5 Mud Slick workers +
+    // Charcoal Pit couldn't build Flush Channel).
+    const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
+      .filter(m => m !== 'clay' && eff[m] > 0)
+      .map(m => ({ ...eff, [m]: eff[m] - 1, clay: (eff.clay || 0) + 1 })));
+    if (pick) Object.assign(eff, pick);
   }
   // Stone Tool (otter species starter): once-per-game Charcoal-Pit variant —
   // 1 Stones worker may substitute for any other material on a build.
   let stoneToolUsed = false;
   if (hasEffect(p, 'Stone Tool') && !p.stoneToolUsed) {
-    const stoneSlack = (wbm.stones || 0) - (eff.stones || 0);
-    if (stoneSlack >= 1) {
-      const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
-        .filter(m => m !== 'stones' && eff[m] > 0)
-        .map(m => ({ ...eff, [m]: eff[m] - 1, stones: (eff.stones || 0) + 1 })));
-      if (pick) { Object.assign(eff, pick); stoneToolUsed = true; }
-    }
+    // Wild stones (Bramble Shoal) count too — see Charcoal Pit.
+    const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
+      .filter(m => m !== 'stones' && eff[m] > 0)
+      .map(m => ({ ...eff, [m]: eff[m] - 1, stones: (eff.stones || 0) + 1 })));
+    if (pick) { Object.assign(eff, pick); stoneToolUsed = true; }
   }
   // Treaty Stone: once per build, cover 1 missing of one material by paying
   // 2 of a surplus material (any-to-any). Applied after free 1:1 saves
@@ -1124,9 +1123,10 @@ function effectiveBuildCost(struct, p, wbm) {
     const trials = [];
     for (const target of MAT_KEYS) {
       if (!(eff[target] > 0)) continue;
+      // Any source: bestSubstitution only takes a trial the fixed + wild
+      // holdings can actually pay (wild surplus counts, as for Charcoal Pit).
       for (const source of MAT_KEYS) {
         if (source === target) continue;
-        if ((wbm[source] || 0) - (eff[source] || 0) < 2) continue;
         trials.push({ ...eff, [target]: eff[target] - 1, [source]: (eff[source] || 0) + 2 });
       }
     }

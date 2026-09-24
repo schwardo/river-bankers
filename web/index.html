@@ -2353,6 +2353,14 @@ function aiVineCurtainRearrange(playerIdx) {
   }
 }
 
+// One Headwaters slot in a pick-a-card modal (Flush Channel, Snag Pile, Heron
+// Roost). Names the card: two same-material cards (Rocky Shoal vs Basking
+// Rocks) play very differently and were indistinguishable by material alone
+// (2026-09-23 3P playtest #6).
+function prerivPickLabel(x) {
+  return `Headwaters ${PRERIV_SLOTS - x.idx}: ${cardMatIcons(x.card)} ${x.card.name} (${cardMatLabel(x.card)}) · ${uncoveredIcons(x.card)} open`;
+}
+
 // One material-deck card in a peek/reorder modal: its name and material, plus
 // its effect text, since an effect card (Hidden Inlet, Mud Wallow…) is worth
 // ordering for in its own right.
@@ -2624,26 +2632,30 @@ function effectiveBuildCost(struct, p, wbm) {
     eff.reeds = Math.ceil(eff.reeds / 2);
   }
   // Charcoal Pit: 1 clay can substitute for 1 of any deficient other material.
+  // charcoalFor = the material the clay stood in for (logged by performBuild).
+  let charcoalFor = null;
   if (hasEffect(p, 'Charcoal Pit')) {
-    const claySlack = (wbm.clay || 0) - (eff.clay || 0);
-    if (claySlack >= 1) {
-      const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
-        .filter(m => m !== 'clay' && eff[m] > 0)
-        .map(m => ({ ...eff, [m]: eff[m] - 1, clay: (eff.clay || 0) + 1 })));
-      if (pick) Object.assign(eff, pick);
+    // No fixed-clay slack gate: clay held on a wildcard (Mud Slick) counts
+    // too, and bestSubstitution's wild-aware shortfall already rejects a trial
+    // the pools can't pay (2026-09-23 3P playtest #6: 5 Mud Slick workers +
+    // Charcoal Pit couldn't build Flush Channel).
+    const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
+      .filter(m => m !== 'clay' && eff[m] > 0)
+      .map(m => ({ ...eff, [m]: eff[m] - 1, clay: (eff.clay || 0) + 1 })));
+    if (pick) {
+      charcoalFor = Object.keys(struct.cost).find(m => m !== 'clay' && pick[m] < eff[m]) || null;
+      Object.assign(eff, pick);
     }
   }
   // Stone Tool (otter species starter): once-per-game Charcoal-Pit variant
   // — 1 Stones worker may substitute for any other material on a build.
   let stoneToolUsed = false;
   if (hasEffect(p, 'Stone Tool') && !p.stoneToolUsed) {
-    const stoneSlack = (wbm.stones || 0) - (eff.stones || 0);
-    if (stoneSlack >= 1) {
-      const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
-        .filter(m => m !== 'stones' && eff[m] > 0)
-        .map(m => ({ ...eff, [m]: eff[m] - 1, stones: (eff.stones || 0) + 1 })));
-      if (pick) { Object.assign(eff, pick); stoneToolUsed = true; }
-    }
+    // Wild stones (Bramble Shoal) count too — see Charcoal Pit.
+    const pick = bestSubstitution(eff, wbm, Object.keys(struct.cost)
+      .filter(m => m !== 'stones' && eff[m] > 0)
+      .map(m => ({ ...eff, [m]: eff[m] - 1, stones: (eff.stones || 0) + 1 })));
+    if (pick) { Object.assign(eff, pick); stoneToolUsed = true; }
   }
   // Treaty Stone: once per build, cover 1 missing of one material by paying
   // 2 of a surplus material (any-to-any). Applied after free 1:1 saves so it
@@ -2652,9 +2664,10 @@ function effectiveBuildCost(struct, p, wbm) {
     const trials = [];
     for (const target of MAT_KEYS) {
       if (!(eff[target] > 0)) continue;
+      // Any source: bestSubstitution only takes a trial the fixed + wild
+      // holdings can actually pay (wild surplus counts, as for Charcoal Pit).
       for (const source of MAT_KEYS) {
         if (source === target) continue;
-        if ((wbm[source] || 0) - (eff[source] || 0) < 2) continue;
         trials.push({ ...eff, [target]: eff[target] - 1, [source]: (eff[source] || 0) + 2 });
       }
     }
@@ -2679,7 +2692,7 @@ function effectiveBuildCost(struct, p, wbm) {
     }
     if (pick) { Object.assign(eff, pick); granaryUsed = true; }
   }
-  return { eff, granaryUsed, stoneToolUsed };
+  return { eff, granaryUsed, stoneToolUsed, charcoalFor };
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -3777,6 +3790,15 @@ function renderHand() {
     }
     let onClick = '';
     if (buildClickable) onClick = `onclick="humanSelectBuild(${i})"`;
+    // Unbuildable cards aren't clickable; say what's missing on hover.
+    let shortTitle = '';
+    if (!buildable && state.phase !== 'browse-keep') {
+      const eff = effectiveBuildCost(s, human, wbm).eff;
+      const have = effectiveCoverage(eff, wbm);
+      const short = Object.keys(eff).filter(m => (have[m] || 0) < eff[m])
+        .map(m => `${eff[m] - (have[m] || 0)} ${MATERIALS[m].name}`);
+      if (short.length) shortTitle = ` title="Can't build yet — short ${short.join(', ')}"`;
+    }
     if (state.phase === 'browse-keep') onClick = `onclick="toggleBrowseSelect('h${i}')"`;
     const effectLine = s.effect ? `<div class="small-note" style="font-style:italic;font-size:11px;margin-top:2px;">${s.effect}</div>` : '';
     const slug = s.name.replace(/[^A-Za-z0-9]/g, '');
@@ -3787,7 +3809,7 @@ function renderHand() {
       const trig = !state.retireUnlocked;
       crossBadge = `<div class="card-cross-badge ${trig ? 'trigger' : 'last'}" title="${trig ? 'Building this crosses the finish line and triggers the endgame.' : 'Building this crosses the finish line — your last turn (you still get one final build).'}">🏁 ${trig ? 'triggers end' : 'last turn'}</div>`;
     }
-    html += `<div class="${cls.join(' ')}" ${bgStyle} data-card-img="${imgUrl}" ${onClick}>
+    html += `<div class="${cls.join(' ')}" ${bgStyle} data-card-img="${imgUrl}" ${onClick}${shortTitle}>
       ${crossBadge}
       <div class="header">
         <span class="cost">${s.time}🐟</span>
@@ -4459,6 +4481,7 @@ function callWorkersHome(playerIdx, recallSpec) {
   // recallSpec: array of {cardId, count}
   const p = state.players[playerIdx];
   let total = 0;
+  const parts = [];
   for (const r of recallSpec) {
     const card = state.riverCards.find(c => c.id === r.cardId) || state.shorelineCards.find(c => c.id === r.cardId);
     if (!card) continue;
@@ -4471,9 +4494,14 @@ function callWorkersHome(playerIdx, recallSpec) {
     if (typeof card.slot === 'number') card.blanks += take;
     p.supply += take;
     total += take;
+    const where = typeof card.slot === 'number' ? `River ${card.slot + 1}` : 'shoreline';
+    parts.push(`${take > 1 ? take + '× ' : ''}${card.name} (${cardMatLabel(card)}, ${where})`);
   }
   if (total > 0) {
-    log(`🏠 ${speciesLabel(p)} calls ${total} worker${total === 1 ? '' : 's'} home.`);
+    // Name the source cards: recalls are public and river recalls drop blanks,
+    // so "calls 3 workers home" alone hid what changed on the board
+    // (2026-09-23 3P playtest #6).
+    log(`🏠 ${speciesLabel(p)} calls ${total} worker${total === 1 ? '' : 's'} home from ${parts.join(', ')}.`);
     // Streambank Hollow: slide back 1 fish per worker recalled.
     if (hasEffect(p, 'Streambank Hollow')) {
       const before = p.timePos;
@@ -6286,9 +6314,10 @@ function executeAIAbility(playerIdx, action) {
     const t = action.portage;
     doOtterTrail(playerIdx, t.cardA.id, t.cardB.id, t.otherIdx);
   } else if (name === 'Heron Roost') {
-    heronReplacePreriv(action.slotIdx);
+    const old = state.prerivCards[action.slotIdx];
+    const newCard = heronReplacePreriv(action.slotIdx);
     p.timePos += 1;
-    log(`🦩 Heron Roost: ${speciesLabel(p)} replaces a Headwaters card (+1🐟).`);
+    log(`🦩 Heron Roost: ${speciesLabel(p)} replaces ${old ? old.name : 'a card'} in Headwaters ${PRERIV_SLOTS - action.slotIdx}${newCard ? ` with ${newCard.name} (${cardMatLabel(newCard)})` : ''} (+1🐟).`);
   } else if (name === 'Driftwood Snag') {
     const target = findBoardCard(action.cardId);
     if (target) {
@@ -6611,12 +6640,13 @@ async function humanUseHeronRoost() {
     '🦩 Heron Roost — replace Headwaters card',
     'Pick which Headwaters card to discard. The top of the material deck replaces it. Costs 1🐟.',
     cands,
-    x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} (${x.card.totalIcons} icons)`
+    prerivPickLabel
   );
   if (!pick) return;
+  const oldName = pick.card.name;
   const newCard = heronReplacePreriv(pick.idx);
   human.timePos += 1;
-  log(`🦩 Heron Roost: ${speciesLabel(human)} replaces Headwaters ${PRERIV_SLOTS - pick.idx} with ${cardMatLabel(newCard)} (+1🐟).`);
+  log(`🦩 Heron Roost: ${speciesLabel(human)} replaces ${oldName} in Headwaters ${PRERIV_SLOTS - pick.idx} with ${newCard.name} (${cardMatLabel(newCard)}) (+1🐟).`);
   endHumanTurnWithAbility();
 }
 
@@ -7392,11 +7422,14 @@ async function performBuild(playerIdx, handIdx) {
     }
   }
   if (suppressGranary) p.granaryUsed = true;
-  const { eff: effCost, granaryUsed, stoneToolUsed } = effectiveBuildCost(struct, p, wbm);
+  const { eff: effCost, granaryUsed, stoneToolUsed, charcoalFor } = effectiveBuildCost(struct, p, wbm);
   if (suppressGranary) p.granaryUsed = false;
   if (granaryUsed) {
     p.granaryUsed = true;
     log(`${MATERIALS.reeds.icon} ${speciesLabel(p)} uses Granary to save 1 worker on this build.`);
+  }
+  if (charcoalFor) {
+    log(`🔥 ${speciesLabel(p)} — Charcoal Pit: 1 Clay worker stands in for 1 ${MATERIALS[charcoalFor].name}.`);
   }
   if (stoneToolUsed) {
     p.stoneToolUsed = true;
@@ -7503,13 +7536,6 @@ async function performBuild(playerIdx, handIdx) {
   }
 
   p.supply += workersReturned;
-  // Vine Curtain (Vines-4 effect card): when a worker is retrieved from it
-  // during this build, the building player gets to peek + rearrange the top 2
-  // of the material deck. Human gets a modal; AI rearranges greedily.
-  if (vineCurtainHit && !state.coda && !PLAIN_RIVER_ACTIVE) {
-    if (p.isHuman) await humanVineCurtainRearrange(playerIdx);
-    else aiVineCurtainRearrange(playerIdx);
-  }
   // Build cost in time — Log Flume reduces by 3, floored at 1. Lodge Foundation
   // (beaver species starter) takes 1 more off Logs-using builds and, unlike Log
   // Flume, MAY reach 0. Order matters: Log Flume applies first against its own
@@ -7524,6 +7550,15 @@ async function performBuild(playerIdx, handIdx) {
   p.hand.splice(handIdx, 1);
   p.built.push(struct);
   log(`🏗 ${speciesLabel(p)} builds <b>${struct.name}</b> (${timeCost}🐟, ${struct.vp}★).`);
+  // Vine Curtain (Vines-4 effect card): when a worker is retrieved from it
+  // during this build, the building player gets to peek + rearrange the top 2
+  // of the material deck. Human gets a modal; AI rearranges greedily. Runs
+  // after the "builds" line so the log reads in trigger order (2026-09-23 3P
+  // #6), but still before on-build effects that draw from the deck.
+  if (vineCurtainHit && !state.coda && !PLAIN_RIVER_ACTIVE) {
+    if (p.isHuman) await humanVineCurtainRearrange(playerIdx);
+    else aiVineCurtainRearrange(playerIdx);
+  }
   // Fire on-build effect (one-time triggers) — SKIPPED in the final-build round
   // (state.coda): a final build just consumes workers and places the structure,
   // with no "when built" effect, so the simultaneous round has no timing races.
@@ -8081,7 +8116,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         '🌀 Flush Channel — discard 1 Headwaters card',
         'Pick a Headwaters card to discard out of game. Its slot refills from the top of the deck. No auction.',
         cands,
-        x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
+        prerivPickLabel,
         { cancelable: false }
       );
     } else {
@@ -8098,7 +8133,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
       });
       pick = sorted[0];
     }
-    log(`🌀 Flush Channel: ${speciesLabel(p)} discards Headwaters ${PRERIV_SLOTS - pick.idx} ${cardMatLabel(pick.card)}.`);
+    log(`🌀 Flush Channel: ${speciesLabel(p)} discards ${pick.card.name} (${cardMatLabel(pick.card)}) from Headwaters ${PRERIV_SLOTS - pick.idx}.`);
     state.prerivCards[pick.idx] = null;
     refillPreriv(pick.idx);
     return;
@@ -8165,7 +8200,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         '🪤 Snag Pile — pull Headwaters card',
         'Pick which Headwaters card to pull. An auction immediately runs on it at 1🐟/item; you must bid at least 1 worker.',
         cands,
-        x => `Headwaters ${PRERIV_SLOTS - x.idx}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} · ${uncoveredIcons(x.card)} icons`,
+        prerivPickLabel,
         { cancelable: false }
       );
     } else {
@@ -8173,7 +8208,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
       if (aiIdx === -1) return;
       pick = { card: state.prerivCards[aiIdx], idx: aiIdx };
     }
-    log(`🪤 Snag Pile: ${speciesLabel(p)} pulls Headwaters ${PRERIV_SLOTS - pick.idx} ${cardMatLabel(pick.card)} (1🐟/item).`);
+    log(`🪤 Snag Pile: ${speciesLabel(p)} pulls ${pick.card.name} (${cardMatLabel(pick.card)}) from Headwaters ${PRERIV_SLOTS - pick.idx} (1🐟/item).`);
     await runAuction(pick.card, playerIdx, 1);
     return;
   }
