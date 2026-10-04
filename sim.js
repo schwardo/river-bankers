@@ -1228,18 +1228,35 @@ function crowdCount(card) {
   return n;
 }
 
+// 2P material-deck variants (org TODO "Measure (and maybe fix) 2P logs/stones
+// scarcity", and the `scarcity` sweep). RB_2P_DECK, 2P only:
+//   live         — the printed deck (Bramble Shoal merges stones-5 + vines-5)
+//   nobramble    — pre-SV-wild deck: plain stones-5 and vines-5, no Bramble
+//   logs5        — live + a 2P-only plain logs-5
+//   stones5      — live + a 2P-only plain stones-5
+//   logs5stones5 — live + both
+//   oldgrowth    — live + Old Growth (logs-8) at 2P
+//   rvwild       — Bramble merges reeds-5 + vines-5 instead; stones keep plain 5
+let DECK_2P = process.env.RB_2P_DECK || 'live';
+function setDeck2P(v) { DECK_2P = v || 'live'; }
+
 function makeCardSpecs(numPlayers) {
   const specs = [];
-  const svWild = numPlayers < 3;
+  const v2 = numPlayers === 2 ? DECK_2P : 'live';
+  const svWild = numPlayers < 3 && v2 !== 'nobramble';
+  const merged = v2 === 'rvwild' ? ['reeds', 'vines'] : ['stones', 'vines'];
   for (const m of MAT_KEYS) {
     for (const icons of ALWAYS_ICONS) {
-      if (svWild && icons === 5 && (m === 'stones' || m === 'vines')) continue;
+      if (svWild && icons === 5 && merged.includes(m)) continue;
       specs.push({ material: m, icons });
     }
     if (numPlayers >= 3) for (const icons of TIER_3PLUS_ICONS) specs.push({ material: m, icons });
     if (numPlayers >= 4) for (const icons of TIER_4PLUS_ICONS) specs.push({ material: m, icons });
   }
-  if (svWild) specs.push({ material: 'stones', icons: 5, svWild: true });
+  if (svWild) specs.push({ material: merged[0], icons: 5, svWild: true });
+  if (v2 === 'logs5' || v2 === 'logs5stones5') specs.push({ material: 'logs', icons: 5, plain: true });
+  if (v2 === 'stones5' || v2 === 'logs5stones5') specs.push({ material: 'stones', icons: 5, plain: true });
+  if (v2 === 'oldgrowth') specs.push({ material: 'logs', icons: 8 });
   if (STAGING_MODE !== 'off' && !PLAIN_RIVER && numPlayers >= 3) specs.push({ material: 'staging', icons: STAGING_ICONS, staging: true });
   if (numPlayers >= 4) for (const p of PREMIUM_4P) specs.push({ material: p.material, icons: p.icons });
   return specs;
@@ -1304,7 +1321,9 @@ function aiVineCurtainRearrange(state, playerIdx) {
 
 function buildMaterialDeck(numPlayers) {
   const deck = makeCardSpecs(numPlayers).map((spec, id) => {
-    let eff = spec.staging ? STAGING_CARD : spec.svWild ? SV_WILD_CARD : effectSpecFor(spec.material, spec.icons);
+    let eff = spec.staging ? STAGING_CARD
+      : spec.svWild ? (spec.material === SV_WILD_CARD.material ? SV_WILD_CARD : { ...SV_WILD_CARD, material: spec.material, wildAlt: 'vines' })
+      : spec.plain ? null : effectSpecFor(spec.material, spec.icons);
     if (!eff && CROWD_SLOT !== 'off' && CROWD_SLOT === `${spec.material}-${spec.icons}`) {
       eff = { material: spec.material, icons: spec.icons, effect: 'crowd-bonus', name: CROWD_CARD_NAME };
     }
@@ -7459,6 +7478,7 @@ function egPlayOut(state, trigger, vpLimit, fishLimit, proc) {
       state.metrics.turns++;
       if (state._engage) state._engage.ownTurns[cur].push(state.metrics.turns);
       const p = state.players[cur];
+      if (state._preTurn) state._preTurn(state, cur);
       aiStartOfTurnAbilities(state, p.idx);
       const action = aiChooseAction(state, p.idx);
       executeAction(state, p.idx, action);
@@ -8421,6 +8441,7 @@ function instrFishPlayout(state, fishLimit, proc, autoAdvanceEmpty = false) {
       state.currentPlayer = cur;
       state.metrics.turns++;
       const p = state.players[cur];
+      if (state._preTurn) state._preTurn(state, cur);
       aiStartOfTurnAbilities(state, p.idx);
       const action = aiChooseAction(state, p.idx);
       if (action.type === 'pass') passes++;
@@ -8946,6 +8967,144 @@ function sweepWorkers(numGamesArg, numPArg, workersArg) {
   console.log('  avgVP/spread = mean final VP / (winner−last) gap; matDk = material cards left at end.\n');
 }
 
+// 2P logs/stones scarcity (org TODO "Measure (and maybe fix) 2P logs/stones
+// scarcity", from the 2026-09-23 2P web playtest). Per player count, measures:
+//   supply   — icons of each material in the deck (wilds count half to each side)
+//   demand   — cost units of that material across the structure cards in play
+//   ratio    — demand ÷ supply (the playtest's quick-ref table, sim-side)
+//   held→built — of the structure cards that sat in a hand at a turn boundary
+//              and need material m, the share that got built
+//   used     — units of m spent on builds per game ÷ supply
+//   openAtDry — uncovered icons of m on the board when the material deck empties
+//   blocker  — among DEAD hands after the deck is dry, the share of hand cards
+//              that m alone blocks (would be buildable if m were not short)
+// "Dead" = no card in hand can be built even if the player could claim every
+// uncovered icon left on the board (river + Headwaters) on top of what they hold.
+// RB_2P_DECK picks the 2P deck variant (see makeCardSpecs); pass a comma list
+// as the 3rd arg to compare variants at 2P: `node sim.js scarcity 4000 2 live,logs5`.
+function sweepScarcity(numGamesArg, countsArg, variantsArg) {
+  const numGames = parseInt(numGamesArg) || 4000;
+  const counts = (countsArg || '2,3,4').split(',').map(Number);
+  const variants = (variantsArg || DECK_2P).split(',');
+  configureMaterials(6);
+  const M = MAT_KEYS;
+  const f1 = x => (isNaN(x) ? '-' : x.toFixed(1));
+  const f2 = x => (isNaN(x) ? '-' : x.toFixed(2));
+  const pc = x => (isNaN(x) ? '-' : (100 * x).toFixed(0) + '%');
+  const summary = [];
+  for (const numP of counts) {
+    for (const variant of (numP === 2 ? variants : ['live'])) {
+      setDeck2P(variant);
+      const fishLine = simFishLine(numP);
+      const supply = {}; for (const m of M) supply[m] = 0;
+      for (const c of buildMaterialDeck(numP)) {
+        if (c.wildAlt) { supply[c.material] += c.totalIcons / 2; supply[c.wildAlt] += c.totalIcons / 2; }
+        else if (supply[c.material] !== undefined) supply[c.material] += c.totalIcons;
+      }
+      const demand = {}; for (const m of M) demand[m] = 0;
+      for (const s of buildStructureDeck(numP)) for (const m in s.cost) demand[m] += s.cost[m];
+      const held = {}, built = {}, used = {}, openDry = {}, blk = {};
+      for (const m of M) { held[m] = 0; built[m] = 0; used[m] = 0; openDry[m] = 0; blk[m] = 0; }
+      let blkCards = 0, deadTurns = 0, dryTurns = 0, deadAtDry = 0, dryGames = 0, dryFish = 0;
+      let deadForever = 0, builds = 0, invents = 0, turns = 0, jams = 0, auctions = 0;
+      const vps = [], spreads = [];
+      for (let g = 0; g < numGames; g++) {
+        const state = newGame(numP);
+        const seen = new Map();
+        let dry = false;
+        const boardAvail = (idx) => {
+          const a = playerWorkersByMaterial(state, idx);
+          a._wildPools = a._wildPools.slice();
+          for (const c of state.riverCards.concat(state.prerivCards.filter(Boolean))) {
+            const u = uncoveredIcons(c);
+            if (u <= 0 || !M.includes(c.material)) continue;
+            if (c.wildAlt) a._wildPools.push({ materials: [c.material, c.wildAlt], count: u });
+            else a[c.material] += u;
+          }
+          return a;
+        };
+        const isDead = (p, a) => p.hand.length > 0 && !p.hand.some(s => canBuild(s, a, p));
+        const everLive = new Array(numP).fill(false);
+        state._preTurn = (st, cur) => {
+          for (const p of st.players) for (const s of p.hand) seen.set(s.id, s);
+          if (!dry && st.matDeck.length === 0) {
+            dry = true; dryGames++;
+            dryFish += avg(st.players.map(p => p.timePos));
+            for (const c of st.riverCards.concat(st.prerivCards.filter(Boolean))) {
+              const u = uncoveredIcons(c);
+              if (!M.includes(c.material)) continue;
+              if (c.wildAlt) { openDry[c.material] += u / 2; openDry[c.wildAlt] += u / 2; }
+              else openDry[c.material] += u;
+            }
+            for (const p of st.players) if (isDead(p, boardAvail(p.idx))) deadAtDry++;
+          }
+          if (!dry) return;
+          const p = st.players[cur];
+          if (p.out) return;
+          dryTurns++;
+          const a = boardAvail(cur);
+          if (!isDead(p, a)) { everLive[cur] = true; return; }
+          deadTurns++;
+          for (const s of p.hand) {
+            const eff = effectiveBuildCost(s, p, a).eff;
+            const def = {};
+            for (const m in eff) { const d = eff[m] - (a[m] || 0); if (d > 0) def[m] = d; }
+            const rem = wildRemainder(def, a._wildPools);
+            const short = Object.keys(rem).filter(m => rem[m] > 0);
+            blkCards++;
+            if (short.length === 1) blk[short[0]]++;
+          }
+        };
+        egPlayOut(state, 'fish', 0, fishLine, 'd');
+        if (dry) for (let i = 0; i < numP; i++) if (!everLive[i]) deadForever++;
+        const builtIds = new Set();
+        for (const p of state.players) for (const s of p.built) {
+          if (!s.id || s.id[0] !== 's' || s.species) continue;
+          builtIds.add(s.id); seen.set(s.id, s);
+          for (const m in s.cost) used[m] += s.cost[m];
+        }
+        for (const [id, s] of seen) for (const m in s.cost) {
+          if (!(s.cost[m] > 0)) continue;
+          held[m]++; if (builtIds.has(id)) built[m]++;
+        }
+        const v = state.players.map(p => totalVP(p, state));
+        vps.push(avg(v)); spreads.push(Math.max(...v) - Math.min(...v));
+        builds += state.metrics.cardsBuilt; invents += state.metrics.invents;
+        turns += state.metrics.turns; jams += state.metrics.jamAuctions; auctions += state.metrics.auctions;
+        process.stderr.write(`\rscarcity ${numP}P ${variant}: ${g + 1}/${numGames} `);
+      }
+      process.stderr.write('\r' + ' '.repeat(50) + '\r');
+      const label = numP === 2 ? `${numP}P ${variant}` : `${numP}P`;
+      console.log(`\n${label}  (${numGames} games, fishLine ${fishLine}, ${defaultWorkersPerPlayer(numP)} workers)`);
+      console.log(pad('material', 9) + padL('supply', 8) + padL('demand', 8) + padL('ratio', 7) + padL('held→built', 12) + padL('used/game', 11) + padL('used%sup', 10) + padL('openAtDry', 11) + padL('blocker', 9));
+      const blkTot = M.reduce((t, m) => t + blk[m], 0);
+      for (const m of M) {
+        console.log(pad(m, 9) + padL(f1(supply[m]), 8) + padL(demand[m], 8) + padL(f1(demand[m] / supply[m]), 7) +
+          padL(pc(built[m] / held[m]), 12) + padL(f2(used[m] / numGames), 11) + padL(pc(used[m] / numGames / supply[m]), 10) +
+          padL(f2(openDry[m] / Math.max(1, dryGames)), 11) + padL(pc(blk[m] / Math.max(1, blkTot)), 9));
+      }
+      const row = {
+        label, built: builds / numGames / numP, invents: invents / numGames / numP,
+        dry: dryGames / numGames, dryFish: dryFish / Math.max(1, dryGames),
+        deadAtDry: deadAtDry / Math.max(1, dryGames * numP), deadTurn: deadTurns / Math.max(1, dryTurns),
+        deadForever: deadForever / Math.max(1, dryGames * numP), single: blkTot / Math.max(1, blkCards),
+        vp: avg(vps), spread: avg(spreads), turns: turns / numGames, jam: jams / Math.max(1, auctions),
+      };
+      summary.push(row);
+      console.log(`deck dry in ${pc(row.dry)} of games, at mean fish ${f1(row.dryFish)}.  Dead hand: ${pc(row.deadAtDry)} of players at dry, ` +
+        `${pc(row.deadTurn)} of post-dry turns, ${pc(row.deadForever)} of players dead for every post-dry turn.  ` +
+        `${pc(row.single)} of dead-hand cards are blocked by exactly one material (the 'blocker' column).`);
+    }
+  }
+  setDeck2P(process.env.RB_2P_DECK);
+  console.log('\n' + pad('config', 20) + padL('built/P', 8) + padL('inv/P', 7) + padL('dry%', 6) + padL('dryFish', 8) + padL('dead@dry', 9) + padL('deadTurn', 9) + padL('deadAll', 8) + padL('avgVP', 7) + padL('spread', 7) + padL('turns', 7) + padL('jam%', 6));
+  for (const r of summary) {
+    console.log(pad(r.label, 20) + padL(f2(r.built), 8) + padL(f2(r.invents), 7) + padL(pc(r.dry), 6) + padL(f1(r.dryFish), 8) +
+      padL(pc(r.deadAtDry), 9) + padL(pc(r.deadTurn), 9) + padL(pc(r.deadForever), 8) + padL(f1(r.vp), 7) + padL(f1(r.spread), 7) + padL(f1(r.turns), 7) + padL(pc(r.jam), 6));
+  }
+  console.log('');
+}
+
 if (require.main === module) {
   // RB_FORCE_CC=1 forces every muskrat to draft Channel Clearer (measurement
   // tool for the fish-cost experiment; otherwise the AI drafts Mud Burrow).
@@ -9069,6 +9228,7 @@ if (require.main === module) {
   else if (mode === 'tune-dv') sweepTuneDV(process.argv[3], process.argv[4]);
   else if (mode === 'tune-dvcard') sweepTuneDVCard(process.argv[3], process.argv[4]);
   else if (mode === 'tune-invent') sweepTuneInvent(process.argv[3], process.argv[4]);
+  else if (mode === 'scarcity') sweepScarcity(process.argv[3], process.argv[4], process.argv[5]);
   else if (mode === 'matcost') sweepMatcost(process.argv[3], process.argv[4]);
   else if (mode === 'emit') emitGames(process.argv[3], process.argv[4], process.argv[5]);
   else sweep();
