@@ -1312,7 +1312,9 @@
     cursor: pointer; font-size: 13px; color: var(--ink);
     font-family: inherit; line-height: 1.35;
   }
-  .picker-btn:hover { background: #fef6e7; }
+  /* :not(:disabled) matches the global button:hover rule's specificity, which
+     otherwise wins and paints the hovered row dark blue over dark text. */
+  .picker-btn:hover:not(:disabled) { background: #fef6e7; }
   /* Horizontal picker shows full card images — drop the button chrome so
      the cards' rounded corners + bleed border stand on their own. Hover
      still gives a subtle lift cue. */
@@ -1322,7 +1324,7 @@
     border: none;
     border-radius: 0;
   }
-  .picker-list.horizontal .picker-btn:hover {
+  .picker-list.horizontal .picker-btn:hover:not(:disabled) {
     background: transparent;
     transform: translateY(-2px);
   }
@@ -1482,6 +1484,8 @@
   .score-row.winner { background: #d4ecd4; font-weight: 700; }
 
   .small-note { font-size: 11px; color: var(--ink-soft); }
+  /* Card rules text under a name in a pick modal (fxNote). */
+  .fx-note { display: block; font-style: italic; margin-top: 2px; }
   .hidden { display: none !important; }
   .icon-emoji { font-style: normal; }
 
@@ -2175,13 +2179,13 @@ async function resolvePendingPackRatSwaps() {
       const handRows = human.hand.map((s, i) =>
         `<label class="bidder-row" style="cursor:pointer;">
           <input type="radio" name="prb-hand" value="${i}" ${i === 0 ? 'checked' : ''}>
-          <span class="bidder-name">${s.name}</span>
+          <span class="bidder-name">${s.name}${structFx(s)}</span>
           <span class="small-note">${vpDisplay(s)}★ · ${s.time}🐟</span>
         </label>`).join('');
       const discardRows = state.structDiscard.map((s, i) =>
         `<label class="bidder-row" style="cursor:pointer;">
           <input type="radio" name="prb-disc" value="${i}" ${i === 0 ? 'checked' : ''}>
-          <span class="bidder-name">${s.name}</span>
+          <span class="bidder-name">${s.name}${structFx(s)}</span>
           <span class="small-note">${vpDisplay(s)}★ · ${s.time}🐟</span>
         </label>`).join('');
       showModal({
@@ -2353,21 +2357,40 @@ function aiVineCurtainRearrange(playerIdx) {
   }
 }
 
+// Rules text under a card in a pick modal. Players don't know every card's
+// text by name, so any modal that asks them to choose a card shows its effect.
+function fxNote(text) {
+  return text ? `<span class="small-note fx-note">${text.replace(/\n\n/g, '<br>')}</span>` : '';
+}
+// A structure's effect, from the card or its name.
+function structFx(s) {
+  const t = typeof s === 'string' ? STRUCTURE_TEMPLATES.find(x => x.name === s) : s;
+  return fxNote(t && t.effect);
+}
+// A material card's effect (Basking Rocks, Old Growth…). Wild is skipped:
+// cardMatLabel already says "X/Y wild".
+function boardCardFx(c) {
+  return fxNote(c.effect && c.effect !== 'wild' && !PLAIN_RIVER_ACTIVE ? effectDescription(c) : '');
+}
+// A material card's name and material(s), e.g. "🪨 Basking Rocks (Stones)".
+function boardCardTag(c) {
+  return `${cardMatIcons(c)} ${c.name} (${cardMatLabel(c)})`;
+}
+
 // One Headwaters slot in a pick-a-card modal (Flush Channel, Snag Pile, Heron
 // Roost). Names the card: two same-material cards (Rocky Shoal vs Basking
 // Rocks) play very differently and were indistinguishable by material alone
 // (2026-09-23 3P playtest #6).
 function prerivPickLabel(x) {
-  return `Headwaters ${PRERIV_SLOTS - x.idx}: ${cardMatIcons(x.card)} ${x.card.name} (${cardMatLabel(x.card)}) · ${uncoveredIcons(x.card)} open`;
+  return `Headwaters ${PRERIV_SLOTS - x.idx}: ${cardMatIcons(x.card)} ${x.card.name} (${cardMatLabel(x.card)}) · ${uncoveredIcons(x.card)} open${boardCardFx(x.card)}`;
 }
 
 // One material-deck card in a peek/reorder modal: its name and material, plus
 // its effect text, since an effect card (Hidden Inlet, Mud Wallow…) is worth
 // ordering for in its own right.
 function deckCardLabel(c) {
-  const fx = c.effect && c.effect !== 'wild' && !PLAIN_RIVER_ACTIVE ? effectDescription(c) : '';
   return `${cardMatIcons(c)} <b>${c.name}</b> (${cardMatLabel(c)}, ${c.totalIcons} icons)` +
-    (fx ? `<div class="small-note" style="margin-left:1.4em">${fx}</div>` : '');
+    boardCardFx(c).replace('class="small-note fx-note"', 'class="small-note fx-note" style="margin-left:1.4em"');
 }
 
 // Vine Curtain human modal — show top 2 in draw order, let them reorder.
@@ -6658,7 +6681,7 @@ async function humanUseWoodPile() {
   if (!cands.length) return;
   const pick = await pickFromList('🪵 Wood Pile — claim a Log icon',
     'Place 1 worker on a Log river card for 1🐟. (Once per game.)', cands,
-    c => `River ${c.slot + 1}: ${MATERIALS.logs.icon} ${c.name} (Logs, ${uncoveredIcons(c)} open)`, { cancelable: true });
+    c => `River ${c.slot + 1}: ${MATERIALS.logs.icon} ${c.name} (Logs, ${uncoveredIcons(c)} open)${boardCardFx(c)}`, { cancelable: true });
   if (!pick) return;
   h.supply -= 1;
   pick.workers[h.idx] = (pick.workers[h.idx] || 0) + 1;
@@ -6675,7 +6698,7 @@ async function humanUseHollowedLog() {
   if (!cands.length) return;
   const pick = await pickFromList('🪵 Hollowed-out Log — recall a worker',
     'Recall 1 of your workers from a river card (no blank dropped). Once per game.', cands,
-    c => `River ${c.slot + 1}: ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${workersOnCard(c, h.idx)} yours)`, { cancelable: true });
+    c => `River ${c.slot + 1}: ${boardCardTag(c)} (${workersOnCard(c, h.idx)} yours)${boardCardFx(c)}`, { cancelable: true });
   if (!pick) return;
   pick.workers[h.idx] -= 1;
   if (pick.workers[h.idx] === 0) delete pick.workers[h.idx];
@@ -6713,7 +6736,7 @@ async function humanUseSpringCascade() {
   if (!cands.length) return;
   const pick = await pickFromList('💦 Spring Cascade — ready a spent card',
     'Choose one of your spent once-per-game cards to ready (so you can use it again). Once per game.', cands,
-    ([name]) => name, { cancelable: true });
+    ([name]) => `<b>${name}</b>${structFx(name)}`, { cancelable: true });
   if (!pick) return;
   h[pick[1]] = false;
   h.springCascadeUsed = true;
@@ -6731,7 +6754,7 @@ async function humanUseMillWheel() {
   if (!opts.length) return;
   const pick = await pickFromList('⚙ Mill Wheel — copy a neighbour ability',
     'Choose a neighbour\'s "as an action" ability to activate for yourself (the target is auto-chosen).', opts,
-    n => n, { cancelable: true });
+    n => `<b>${n}</b>${structFx(n)}`, { cancelable: true });
   if (!pick) return;
   const wbm = playerWorkersByMaterial(state, h.idx);
   const needs = {};
@@ -6773,7 +6796,7 @@ async function humanUseDriftwoodSnag() {
     `${MATERIALS.logs.icon} Driftwood Snag — drop a blank`,
     'Pick any river or Headwaters card with an uncovered icon. One icon becomes blocked. Costs 1🐟.',
     cands,
-    x => `${x.where}: ${cardMatIcons(x.card)} ${x.card.name} (${cardMatLabel(x.card)}, ${uncoveredIcons(x.card)} open)`
+    x => `${x.where}: ${cardMatIcons(x.card)} ${x.card.name} (${cardMatLabel(x.card)}, ${uncoveredIcons(x.card)} open)${boardCardFx(x.card)}`
   );
   if (!pick) return;
   pick.card.blanks += 1;
@@ -6794,7 +6817,7 @@ async function humanUseOtterTrail() {
     '🛶 Portage — pick YOUR worker to swap out',
     'Pick the river card whose worker you want to move. You will pay this card\'s per-item cost in fish.',
     sourceCands,
-    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${boardCardTag(x.card)}${boardCardFx(x.card)}`
   );
   if (!sourcePick) return;
   // Step 2: pick target worker (any worker on a different river card).
@@ -6814,7 +6837,7 @@ async function humanUseOtterTrail() {
     '🛶 Portage — pick the worker to swap IN',
     `That worker will move to ${MATERIALS[sourcePick.card.material].name}; your worker takes its place. Its owner slides back 2🐟 in compensation.`,
     targetCands,
-    x => `${speciesLabel(state.players[x.otherIdx])} on River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
+    x => `${speciesLabel(state.players[x.otherIdx])} on River ${x.card.slot + 1}: ${boardCardTag(x.card)}${boardCardFx(x.card)}`
   );
   if (!targetPick) return;
   doOtterTrail(human.idx, sourcePick.card.id, targetPick.card.id, targetPick.otherIdx);
@@ -6838,7 +6861,7 @@ async function humanUseTributeStone() {
     `${MATERIALS.stones.icon} Tribute Stone — force an opponent recall`,
     `Pick an opponent's worker on a river card. That worker returns to their supply (blank dropped). The opponent slides back that card's per-item cost in 🐟 as compensation. Once per game.`,
     cands,
-    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${boardCardTag(x.card)}${boardCardFx(x.card)}`
   );
   if (!pick) return;
   doTributeStone(human.idx, pick.victimIdx, pick.card);
@@ -6860,7 +6883,7 @@ async function humanUseTradingPost() {
     '🏪 Trading Post — pick target card',
     `Place 2 free workers from your supply onto uncovered icons of this river card. (You'll then pick 3 different-material cards to recall workers from, each dropping a blank. Costs 1🐟.)`,
     targets,
-    c => `River ${c.slot + 1} (${cardCost(c)}🐟/item): ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${uncoveredIcons(c)} open)`
+    c => `River ${c.slot + 1} (${cardCost(c)}🐟/item): ${boardCardTag(c)} (${uncoveredIcons(c)} open)${boardCardFx(c)}`
   );
   if (!target) return;
 
@@ -6879,7 +6902,7 @@ async function humanUseTradingPost() {
       `🏪 Trading Post — pick source ${i}/3`,
       `Recall 1 of your workers from this card (drops a blank). Source materials must be distinct from the target and each other.`,
       candPool,
-      c => `${c.slot === 'shore' ? 'Shoreline' : 'River ' + (c.slot + 1)}: ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${workersOnCard(c, human.idx)} of your workers)`
+      c => `${c.slot === 'shore' ? 'Shoreline' : 'River ' + (c.slot + 1)}: ${boardCardTag(c)} (${workersOnCard(c, human.idx)} of your workers)${boardCardFx(c)}`
     );
     if (!src) return;
     sources.push(src);
@@ -6907,7 +6930,7 @@ async function humanUseSnareSet() {
     '🪤 Snare Set — force an opponent recall',
     `Pick an opponent's worker on a river card. That worker returns to their supply (blank dropped). The opponent slides back that card's per-item cost in 🐟 as compensation. Once per game.`,
     cands,
-    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${speciesLabel(state.players[x.victimIdx])} on ${boardCardTag(x.card)}${boardCardFx(x.card)}`
   );
   if (!pick) return;
   const victim = state.players[pick.victimIdx];
@@ -6931,7 +6954,7 @@ async function humanUseTailSlap() {
     '🦫 Tail Slap — drop a blank',
     `Pay 1🐟 to drop a blank on any uncovered icon on a River 1 card. May be used once per turn.`,
     cands,
-    c => `${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (River 1, ${uncoveredIcons(c)} open)`
+    c => `${boardCardTag(c)} (River 1, ${uncoveredIcons(c)} open)${boardCardFx(c)}`
   );
   if (!pick) return;
   pick.blanks += 1;
@@ -6957,7 +6980,7 @@ async function humanUseChannelClearer() {
     '🐭 Channel Clearer — discard a Reed worker',
     `Pay 1🐟 to pick 1 opponent's Reed worker on a river card. It returns to their supply (no blank). Once per turn.`,
     cands,
-    x => `River ${x.card.slot + 1}: ${speciesLabel(state.players[x.victimIdx])} on ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name}`
+    x => `River ${x.card.slot + 1}: ${speciesLabel(state.players[x.victimIdx])} on ${boardCardTag(x.card)}${boardCardFx(x.card)}`
   );
   if (!pick) return;
   const victim = state.players[pick.victimIdx];
@@ -6991,7 +7014,7 @@ async function humanUseRollingFloat() {
     '🦦 Rolling Float — swap workers in the same slot',
     `Pick a (your worker, opponent worker) pair from cards sharing a river slot. The two swap. No fish cost. Once per game.`,
     pairs,
-    p => `River ${p.a.slot + 1}: your worker on ${MATERIALS[p.a.material].icon} ${MATERIALS[p.a.material].name} ↔ ${speciesLabel(state.players[p.opIdx])}'s on ${MATERIALS[p.b.material].icon} ${MATERIALS[p.b.material].name}`
+    p => `River ${p.a.slot + 1}: your worker on ${boardCardTag(p.a)} ↔ ${speciesLabel(state.players[p.opIdx])}'s on ${boardCardTag(p.b)}${boardCardFx(p.a)}${boardCardFx(p.b)}`
   );
   if (!pick) return;
   pick.a.workers[human.idx] -= 1;
@@ -7046,7 +7069,7 @@ async function humanSalmonRun() {
     '🐟 Salmon Run — pick a river card',
     'Workers come from your supply. Pay escalating fish cost per worker placed (2/3/5/8/13).',
     cardCands,
-    c => `River ${c.slot + 1}: ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${uncoveredIcons(c)} open)`,
+    c => `River ${c.slot + 1}: ${boardCardTag(c)} (${uncoveredIcons(c)} open)${boardCardFx(c)}`,
     { cancelable: false }
   );
   if (!cardPick) return;
@@ -7093,7 +7116,7 @@ async function humanStagingFerry() {
         const back = cardCost(raft), fwd = playerCardCost(x.card, human.idx);
         const net = fwd - back;
         const netTxt = net > 0 ? `pay ${net}🐟` : net < 0 ? `gain ${-net}🐟` : 'even';
-        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${x.card.name} (${cardMatLabel(x.card)}, ${uncoveredIcons(x.card)} open) — back ${back}🐟, forward ${fwd}🐟 (${netTxt})`;
+        return `River ${x.card.slot + 1}: ${MATERIALS[x.card.material].icon} ${x.card.name} (${cardMatLabel(x.card)}, ${uncoveredIcons(x.card)} open) — back ${back}🐟, forward ${fwd}🐟 (${netTxt})${boardCardFx(x.card)}`;
       },
       moved === 0
         ? { cancelLabel: 'Never mind' }
@@ -7119,7 +7142,7 @@ async function humanTowLine() {
     '🦫 Tow Line — yank a river card to River 1',
     'Once per game: pick a river card to move to River 1, then auction it there (2🐟/item, no flat 🐟). You must bid at least one worker.',
     cands,
-    c => `River ${c.slot + 1} → River 1 (${riverSlotCost(c.slot)}🐟 → ${riverSlotCost(0)}🐟/item): ${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} (${uncoveredIcons(c)} open)`,
+    c => `River ${c.slot + 1} → River 1 (${riverSlotCost(c.slot)}🐟 → ${riverSlotCost(0)}🐟/item): ${boardCardTag(c)} (${uncoveredIcons(c)} open)${boardCardFx(c)}`,
     { cancelable: false }
   );
   if (!pick) return;
@@ -7631,7 +7654,7 @@ async function humanStoneCausewayDraw(playerIdx) {
     `${MATERIALS.stones.icon} Stone Causeway — discard a card`,
     `You drew <b>${drawn.name}</b> on top of your normal refill. Pick one card from your hand to discard.`,
     items,
-    x => `${x.s.name} — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')}`,
+    x => `<b>${x.s.name}</b> — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')}${structFx(x.s)}`,
     { cancelable: false }
   );
   const idx = pick ? pick.i : (p.hand.length - 1); // fallback: discard the drawn card
@@ -7652,7 +7675,7 @@ async function humanReedWalkwayPlace(playerIdx) {
     `${MATERIALS.reeds.icon} Reed Walkway — place a free worker on River 1`,
     'Place 1 worker from your supply onto an uncovered icon on a River 1 card. (Free; you may skip.)',
     items,
-    x => `River 1 (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} — ${uncoveredIcons(x.card)} uncovered`,
+    x => `River 1 (${cardCost(x.card)}🐟/item): ${boardCardTag(x.card)} — ${uncoveredIcons(x.card)} uncovered${boardCardFx(x.card)}`,
     { declineLabel: 'Skip', cancelable: false }
   );
   if (!pick || pick === PICKER_DECLINE) {
@@ -7679,7 +7702,7 @@ async function humanClayVaultSwap(playerIdx) {
   const top = state.structDeck[state.structDeck.length - 1];
   const yes = await confirmModal(
     '🏺 Clay Vault — peek deck top',
-    `Top of the structure deck is <b>${top.name}</b> (${vpDisplay(top)}★ · ${top.time}🐟 · ${Object.entries(top.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')}). Swap it for one card from your hand?`,
+    `Top of the structure deck is <b>${top.name}</b> (${vpDisplay(top)}★ · ${top.time}🐟 · ${Object.entries(top.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')}).${structFx(top)} Swap it for one card from your hand?`,
     'Swap', 'Keep hand'
   );
   if (!yes) {
@@ -7689,9 +7712,9 @@ async function humanClayVaultSwap(playerIdx) {
   const items = p.hand.map((s, i) => ({ s, i }));
   const pick = await pickFromList(
     '🏺 Clay Vault — discard one card from hand',
-    `Discard which card? You'll take <b>${top.name}</b> in exchange.`,
+    `Discard which card? You'll take <b>${top.name}</b> in exchange.${structFx(top)}`,
     items,
-    x => `${x.s.name} — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')}`,
+    x => `<b>${x.s.name}</b> — ${vpDisplay(x.s)}★ · ${x.s.time}🐟 · ${Object.entries(x.s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')}${structFx(x.s)}`,
     { cancelable: false }
   );
   if (!pick) return;
@@ -7723,7 +7746,7 @@ async function humanBurrowNetworkMove(playerIdx) {
     '🕳 Burrow Network — pick source worker',
     'Move 1 of your workers from this card to another card where you already have at least 1 worker. (You may replace a blank.)',
     sourceItems,
-    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} — you have ${workersOnCard(x.card, playerIdx)}`,
+    x => `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${boardCardTag(x.card)} — you have ${workersOnCard(x.card, playerIdx)}${boardCardFx(x.card)}`,
     { declineLabel: 'Skip', cancelable: false }
   );
   if (!sourcePick || sourcePick === PICKER_DECLINE) {
@@ -7745,7 +7768,7 @@ async function humanBurrowNetworkMove(playerIdx) {
       const open = uncoveredIcons(x.card);
       const bl = x.card.blanks;
       const tag = (open > 0 && bl > 0) ? `${open} uncovered, ${bl} blank` : (open > 0 ? `${open} uncovered` : `${bl} blank`);
-      return `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${MATERIALS[x.card.material].icon} ${MATERIALS[x.card.material].name} — ${tag}`;
+      return `River ${x.card.slot + 1} (${cardCost(x.card)}🐟/item): ${boardCardTag(x.card)} — ${tag}${boardCardFx(x.card)}`;
     },
     { cancelable: false }
   );
@@ -7994,8 +8017,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         'Pick one built structure controlled by your left/right neighbour to activate its "when built" effect for you.',
         avail,
         n => {
-          const t = STRUCTURE_TEMPLATES.find(s => s.name === n);
-          return `<b>${n}</b>${t && t.effect ? `<br><i>${t.effect}</i>` : ''}`;
+          return `<b>${n}</b>${structFx(n)}`;
         },
         { cancelable: false }
       );
@@ -8038,7 +8060,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         '🌊 Spillway — wash a River 1 card',
         'Pick one River 1 card to wash to the shoreline (workers carry along).',
         r1,
-        c => `${cardMatIcons(c)} ${c.name} (${cardMatLabel(c)}) · ${uncoveredIcons(c)} open · ${Object.values(c.workers).reduce((s, n) => s + n, 0)} worker${Object.values(c.workers).reduce((s, n) => s + n, 0) === 1 ? '' : 's'}`,
+        c => `${cardMatIcons(c)} ${c.name} (${cardMatLabel(c)}) · ${uncoveredIcons(c)} open · ${Object.values(c.workers).reduce((s, n) => s + n, 0)} worker${Object.values(c.workers).reduce((s, n) => s + n, 0) === 1 ? '' : 's'}${boardCardFx(c)}`,
         { cancelable: false }
       );
     } else {
@@ -8078,7 +8100,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
           `${MATERIALS.mud.icon} Mud Levee — drop blank ${drop + 1}/2`,
           'Pick a river card to block one uncovered icon.',
           cands,
-          x => `${x.where}: ${MATERIALS[x.card.material].icon} ${x.card.name} · ${uncoveredIcons(x.card)} open`
+          x => `${x.where}: ${boardCardTag(x.card)} · ${uncoveredIcons(x.card)} open${boardCardFx(x.card)}`
         );
         if (!pick) break;
         pick.card.blanks++;
@@ -8149,7 +8171,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
           `<b>Decline</b> to keep the structure built but skip placing workers. ` +
           `<b>Cancel</b> to undo the entire Sap Drip build.`,
         cands,
-        c => `${MATERIALS[c.material].icon} ${MATERIALS[c.material].name} · River ${c.slot + 1} · ${uncoveredIcons(c)} open`,
+        c => `${boardCardTag(c)} · River ${c.slot + 1} · ${uncoveredIcons(c)} open${boardCardFx(c)}`,
         { declineLabel: 'Decline (skip placement)', cancelLabel: 'Cancel (undo build)' }
       );
       if (result === PICKER_DECLINE) return;
@@ -8229,8 +8251,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
             const have = wbm[m] || 0;
             return `${MATERIALS[m].icon}${have}/${n}`;
           }).join(' ');
-          const eff = s.effect ? `<br><i>${s.effect}</i>` : '';
-          return `<b>${s.name}</b> · ${s.time}🐟 · ${vpDisplay(s)}★<br>${reqs}${eff}`;
+          return `<b>${s.name}</b> · ${s.time}🐟 · ${vpDisplay(s)}★<br>${reqs}${structFx(s)}`;
         },
         { cancelable: false }
       );
@@ -8297,7 +8318,7 @@ async function fireOnBuildEffect(playerIdx, struct) {
         ${o.hand.length === 0
           ? ' <span class="small-note">(empty hand)</span>'
           : '<ul style="margin:4px 0 0 18px;padding:0;">' + o.hand.map(s =>
-              `<li>${s.name} <span class="small-note">(${Object.entries(s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')} · ${s.time}🐟 · ${vpDisplay(s)}★)</span></li>`
+              `<li>${s.name} <span class="small-note">(${Object.entries(s.cost).map(([m, n]) => MATERIALS[m].icon + n).join(' ')} · ${s.time}🐟 · ${vpDisplay(s)}★)</span>${structFx(s)}</li>`
             ).join('') + '</ul>'}
       </div>`;
 
