@@ -46,7 +46,7 @@ class ReactReedWalkway extends GameState
         if (!in_array($cardId, $args['targets'], true)) {
             throw new UserException(clienttranslate('Choose a River-1 card with an uncovered icon.'));
         }
-        $this->game->placeWorkers($activePlayerId, $cardId, 1);
+        $this->game->placeWorkersFree($activePlayerId, $cardId, 1);
         return $this->finish();
     }
 

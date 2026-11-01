@@ -31,15 +31,32 @@ class AbilityTarget extends GameState
     {
         $this->notify->all('boardUpdate', '', $this->game->boardUpdatePayload());
         $key = (string) $this->globals->get('pending_ability', '');
+        if ((int) $this->globals->get('ability_victim_card', 0) > 0) {
+            return null; // waiting on the opponent pick
+        }
         if ($key === '' || count($this->game->abilityTargets($key, (int) $this->game->getActivePlayerId())) === 0) {
             return $this->finish();
         }
         return null;
     }
 
+    /** Abilities that hit one opponent's worker; the user picks the opponent when several are on the card. */
+    private const VICTIM_ABILITIES = ['tributestone', 'channelclearer'];
+
     public function getArgs(): array
     {
         $key = (string) $this->globals->get('pending_ability', '');
+        $victimCard = (int) $this->globals->get('ability_victim_card', 0);
+        if ($victimCard > 0) {
+            $pid = (int) $this->game->getActivePlayerId();
+            return [
+                "ability"    => $key,
+                "targets"    => [],
+                "victimCard" => $victimCard,
+                "victims"    => array_map(fn(int $id) => ['id' => $id, 'name' => $this->game->getPlayerNameById($id)],
+                    $this->game->abilityVictims($victimCard, $pid)),
+            ];
+        }
         return [
             "ability" => $key,
             "targets" => $this->game->abilityTargets($key, (int) $this->game->getActivePlayerId()),
@@ -55,7 +72,29 @@ class AbilityTarget extends GameState
         if (!in_array($cardId, $args['targets'], true)) {
             throw new UserException(clienttranslate('Choose a valid target.'));
         }
-        $this->game->resolveAbility((string) $this->globals->get('pending_ability', ''), $cardId, $activePlayerId);
+        $key = (string) $this->globals->get('pending_ability', '');
+        if (in_array($key, self::VICTIM_ABILITIES, true) && count($this->game->abilityVictims($cardId, $activePlayerId)) > 1) {
+            // Several opponents on this card: ask whose worker to hit.
+            $this->globals->set('ability_victim_card', $cardId);
+            return AbilityTarget::class;
+        }
+        $this->game->resolveAbility($key, $cardId, $activePlayerId);
+        return $this->finish();
+    }
+
+    /**
+     * Second step for Tribute Stone / Snare Set / Channel Clearer when several
+     * opponents share the chosen card: pick whose worker is hit.
+     * @throws UserException
+     */
+    #[PossibleAction]
+    public function actAbilityVictim(int $victimId, int $activePlayerId, array $args)
+    {
+        $cardId = (int) $this->globals->get('ability_victim_card', 0);
+        if ($cardId <= 0 || !in_array($victimId, array_column($args['victims'] ?? [], 'id'), true)) {
+            throw new UserException(clienttranslate('Choose a valid opponent.'));
+        }
+        $this->game->resolveAbility((string) $this->globals->get('pending_ability', ''), $cardId, $activePlayerId, $victimId);
         return $this->finish();
     }
 
@@ -82,6 +121,7 @@ class AbilityTarget extends GameState
         $this->globals->set('pending_ability', '');
         $this->globals->set('pending_ability_free', 0);
         $this->globals->set('pending_ability_card', 0);
+        $this->globals->set('ability_victim_card', 0);
 
         // Free abilities don't end the turn; the player resumes PlayerTurn.
         return $free ? PlayerTurn::class : NextPlayer::class;

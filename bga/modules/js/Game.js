@@ -538,6 +538,15 @@ class AbilityTarget {
         };
         this.bga.statusBar.setTitle(isActive ? (labels[args.ability] || _('Choose a target')) : _('Resolving ability…'));
         if (!isActive) return;
+        if (args.victims && args.victims.length) {
+            // Several opponents share the chosen card: pick whose worker is hit.
+            this.bga.statusBar.setTitle(_('Whose worker?'));
+            this.game.setHint(_('Several opponents have workers on that card. Choose one.'));
+            args.victims.forEach(v => this.bga.statusBar.addActionButton(v.name,
+                () => this.bga.actions.performAction('actAbilityVictim', { victimId: v.id })));
+            this.bga.statusBar.addActionButton(_('Undo'), () => this.bga.actions.performAction('actUndo'), { color: 'secondary' });
+            return;
+        }
         this.game.setHint(_('Click a highlighted card.'));
         this.game.markClickable('target', args.targets, id => this.bga.actions.performAction('actAbilityTarget', { cardId: id }));
         this.bga.statusBar.addActionButton(_('Undo'), () => this.bga.actions.performAction('actUndo'), { color: 'secondary' });

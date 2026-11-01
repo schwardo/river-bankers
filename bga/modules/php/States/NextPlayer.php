@@ -54,7 +54,8 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
                 }
             }
             $pawnDone = $turnRow !== null
-                && ($turnRow['retired'] || (int) $turnRow['fish'] >= $this->game->getFishLine());
+                && ($turnRow['retired'] || (int) $turnRow['fish'] >= $this->game->getFishLine()
+                    || in_array($turnPlayer, $this->game->crossedLineThisAction(), true));
             if ($this->game->getMaterialDeckCount() === 0 && !$pawnDone) {
                 // Announce the deck running dry once (guarded so it fires a single
                 // time), then log each per-turn drift so the +1🐟 isn't a silent jump.
@@ -70,13 +71,17 @@ class NextPlayer extends \Bga\GameFramework\States\GameState
             }
         }
 
-        // Retire anyone whose pawn reached or crossed the fish line.
+        // Retire anyone whose pawn reached or crossed the fish line at any point
+        // during the action — including a pawn that an effect then slid back
+        // below it. That pawn takes the lowest open space at or past the line.
         $line = $this->game->getFishLine();
+        $crossed = $this->game->crossedLineThisAction();
         foreach ($this->game->getTurnOrderRows() as $r) {
-            if (!$r['retired'] && $r['fish'] >= $line) {
-                $this->game->retirePlayer($r['id'], $r['fish']);
+            if (!$r['retired'] && ($r['fish'] >= $line || in_array($r['id'], $crossed, true))) {
+                $this->game->retirePlayer($r['id'], max($r['fish'], $line));
             }
         }
+        $this->game->clearCrossedLine();
 
         // Keep the official BGA score (VP) current from built structures + leftover
         // material — pushed automatically by the score counter when it changes.

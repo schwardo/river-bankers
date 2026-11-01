@@ -381,6 +381,30 @@ class Game extends \Bga\GameFramework\Table
              WHERE `player_id` = $playerId"
         );
         $this->playerStats->inc('fish_spent', $by, $playerId, true);
+        // Remember a pawn that reached the line at any point in this action: it
+        // retires at the end-of-action sweep even if an effect (Hidden Inlet,
+        // Mud Wallow, Cattail Cluster, Tribute Stone compensation…) slid it back
+        // below the line afterwards. Rulebook: "The moment your pawn reaches or
+        // passes the finish line … finish that action normally, then retire."
+        $pos = (int) $this->getUniqueValueFromDB("SELECT `player_fish_pos` FROM `player` WHERE `player_id` = $playerId");
+        if ($pos >= $this->getFishLine()) {
+            $crossed = array_map('intval', (array) $this->globals->get('crossed_line', []));
+            if (!in_array($playerId, $crossed, true)) {
+                $crossed[] = $playerId;
+                $this->globals->set('crossed_line', $crossed);
+            }
+        }
+    }
+
+    /** Players whose pawn reached the line during the current action (see advanceFish). @return list<int> */
+    public function crossedLineThisAction(): array
+    {
+        return array_map('intval', (array) $this->globals->get('crossed_line', []));
+    }
+
+    public function clearCrossedLine(): void
+    {
+        $this->globals->set('crossed_line', []);
     }
 
     /** Place $n of a player's workers from supply onto a card. */
@@ -396,6 +420,20 @@ class Game extends \Bga\GameFramework\Table
         $this->DbQuery(
             "UPDATE `player` SET `player_worker_supply` = `player_worker_supply` - $n WHERE `player_id` = $playerId"
         );
+    }
+
+    /**
+     * Place workers outside an auction (Sap Drip, Salmon Run, Trading Post,
+     * Wood Pile, Reed Walkway). A placement that covers the last icon sends the
+     * card to the shoreline at once [2026-11-01]. The Flotsam Raft ferry does
+     * not use this: its destination still waits for its next auction.
+     */
+    public function placeWorkersFree(int $playerId, int $cardId, int $n): void
+    {
+        $this->placeWorkers($playerId, $cardId, $n);
+        if ($n > 0) {
+            $this->graduateIfFullyCovered($cardId);
+        }
     }
 
     /**
@@ -1353,8 +1391,9 @@ class Game extends \Bga\GameFramework\Table
         // it is on the river — a legacy 'raftcall' raft is finalized by
         // RaftLastCall instead).
         $this->discardEmptyRafts();
-        // The destination card deliberately does NOT graduate on a non-auction
-        // placement — matches Salmon Run / Sap Drip precedent.
+        // The destination card deliberately does NOT graduate on a ferry — the
+        // one non-auction placement that waits for the card's next auction
+        // (every other placement graduates at once, see placeWorkersFree).
     }
 
     /** Built-structure names for a player (per-item discount input). @return list<string> */
@@ -1799,6 +1838,8 @@ class Game extends \Bga\GameFramework\Table
         $this->globals->set('pending_ability_name', '');
         $this->globals->set('pending_ability_free', 0);
         $this->globals->set('pending_ability_card', 0);
+        $this->globals->set('ability_victim_card', 0);
+        $this->globals->set('crossed_line', []);
         $this->globals->set('portage_src', 0);
         $this->globals->set('rollingfloat_src', 0);
         $this->globals->set('packrat_drop', 0);
@@ -2368,7 +2409,7 @@ class Game extends \Bga\GameFramework\Table
     public function sapDripPlace(int $playerId, int $cardId): int
     {
         $n = min(2, $this->getPlayerSupply($playerId), $this->uncoveredIcons($cardId));
-        $this->placeWorkers($playerId, $cardId, $n);
+        $this->placeWorkersFree($playerId, $cardId, $n);
         return $n;
     }
 
@@ -2517,7 +2558,7 @@ class Game extends \Bga\GameFramework\Table
     public function tradingPostPlace(int $playerId, int $cardId): int
     {
         $n = min(2, $this->getPlayerSupply($playerId), $this->uncoveredIcons($cardId));
-        $this->placeWorkers($playerId, $cardId, $n);
+        $this->placeWorkersFree($playerId, $cardId, $n);
         return $n;
     }
 
@@ -2649,7 +2690,7 @@ class Game extends \Bga\GameFramework\Table
             return 0;
         }
         $this->advanceFish($playerId, Effects::salmonRunCost($n));
-        $this->placeWorkers($playerId, $cardId, $n);
+        $this->placeWorkersFree($playerId, $cardId, $n);
         return $n;
     }
 
@@ -3044,7 +3085,34 @@ class Game extends \Bga\GameFramework\Table
         ));
     }
 
-    public function resolveAbility(string $key, int $cardId, int $playerId): void
+    /**
+     * Opponents with a worker on $cardId, for abilities that hit one opponent's
+     * worker (Tribute Stone / Snare Set, Channel Clearer). When more than one
+     * opponent is there, the user picks whose worker is hit.
+     * @return list<int>
+     */
+    public function abilityVictims(int $cardId, int $playerId): array
+    {
+        return array_map('intval', $this->getObjectListFromDB(
+            "SELECT DISTINCT `player_id` FROM `worker` WHERE `card_id` = $cardId AND `player_id` <> $playerId AND `workers` > 0
+             ORDER BY `player_id`", true
+        ));
+    }
+
+    /** Pick the opponent an ability hits: the chosen victim if valid, else the one with most workers there. */
+    private function abilityVictim(int $cardId, int $playerId, ?int $victimId): ?int
+    {
+        if ($victimId !== null && in_array($victimId, $this->abilityVictims($cardId, $playerId), true)) {
+            return $victimId;
+        }
+        $opp = $this->getObjectListFromDB(
+            "SELECT `player_id` FROM `worker` WHERE `card_id` = $cardId AND `player_id` <> $playerId AND `workers` > 0
+             ORDER BY `workers` DESC LIMIT 1"
+        );
+        return count($opp) > 0 ? (int) $opp[0]['player_id'] : null;
+    }
+
+    public function resolveAbility(string $key, int $cardId, int $playerId, ?int $victimId = null): void
     {
         if ($key === 'driftwoodsnag') {
             $this->dropBlank($cardId);
@@ -3055,16 +3123,12 @@ class Game extends \Bga\GameFramework\Table
             return;
         }
         if ($key === 'woodpile') {
-            $this->placeWorkers($playerId, $cardId, 1); // claim a log icon (the 1 fish was paid upfront)
+            $this->placeWorkersFree($playerId, $cardId, 1); // claim a log icon (the 1 fish was paid upfront)
             return;
         }
         if ($key === 'tributestone') {
-            $opp = $this->getObjectListFromDB(
-                "SELECT `player_id` FROM `worker` WHERE `card_id` = $cardId AND `player_id` <> $playerId AND `workers` > 0
-                 ORDER BY `workers` DESC LIMIT 1"
-            );
-            if (count($opp) > 0) {
-                $oid = (int) $opp[0]['player_id'];
+            $oid = $this->abilityVictim($cardId, $playerId, $victimId);
+            if ($oid !== null) {
                 $def = Material::$MATERIAL[(int) $this->getCardRow($cardId)['card_type_arg']] ?? null;
                 $cardName = (string) ($def['name'] ?? 'a river card');
                 // [2026-09-19] Compensation is the recalled card's CURRENT per-item
@@ -3094,12 +3158,8 @@ class Game extends \Bga\GameFramework\Table
         }
         if ($key === 'channelclearer') {
             // Discard one opponent's Reed worker on this card back to their supply (no blank).
-            $opp = $this->getObjectListFromDB(
-                "SELECT `player_id` FROM `worker` WHERE `card_id` = $cardId AND `player_id` <> $playerId AND `workers` > 0
-                 ORDER BY `workers` DESC LIMIT 1"
-            );
-            if (count($opp) > 0) {
-                $victimId = (int) $opp[0]['player_id'];
+            $victimId = $this->abilityVictim($cardId, $playerId, $victimId);
+            if ($victimId !== null) {
                 $def = Material::$MATERIAL[(int) $this->getCardRow($cardId)['card_type_arg']] ?? null;
                 $cardName = (string) ($def['name'] ?? 'a river card');
                 $this->recallWorker($victimId, $cardId, false); // no blank, no fish
