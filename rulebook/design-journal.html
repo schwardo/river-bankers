@@ -839,6 +839,58 @@ otters on the dock in the cover art, with a black jacket, red waistcoat, white s
 tie. Don is printing both to see which one looks better.</p>
 <div style="clear:both"></div>
 
+<h2>Week of October 26 <span class="wk">— a third table: BoardWeaver</span></h2>
+
+<div class="callout">
+  <strong>Milestone — BoardWeaver.</strong> Over [2026-10-31] and [2026-11-01] River Bankers was
+  ported to <strong>BoardWeaver</strong>, a web platform for building and playing board games online.
+  It is now on the site's beta channel at 2&ndash;4 players, with the species starter draft, every
+  card effect, the BGA sprite art, and two bots to play against. Together with the web prototype
+  and the BGA Alpha, that makes three places to play the game.
+</div>
+
+<p>The port went in two stages, and the order mattered. The first versions were the
+rulebook's <em>plain river</em>, with no species starters and only printed VP: just the auction,
+the flow from Headwaters to the shoreline, and the 90&#128031; finish line. The simulator's AI came
+across as the <strong>Riverhand</strong> bot, joined by an easy greedy builder called
+<strong>Paddler</strong>. Self-play with the plain rules turned up something worth writing down. Before
+Paddler was made deliberately sloppier, the faithful port of the sim's bidder only <em>tied</em> a
+plain greedy bidder. All the AI's tuning was done on the full game, and with the card effects
+stripped out its judgement bought nothing. That's a caution for later: the sim's opponent model
+can't be used to judge the plain-river variant without retuning it first. It's the same lesson
+Flotsam Raft taught in September: the measurement includes the opponent model.</p>
+
+<p>The full game was then ported from the <em>BGA</em> code rather than the simulator, which made
+BoardWeaver an independent second reading of one implementation, and it caught a bug at once.
+<strong>Mill Wheel</strong> says that, as an action, you can use a neighbour's &ldquo;as an
+action&rdquo; ability. BGA had never offered that half: everything behind it was wired up, but it
+never appeared in the list of abilities. So every Alpha game so far has had a Mill Wheel that only
+works when built. Both versions now offer it.</p>
+
+<p>A full 3-player game on the beta channel, Claude playing the Beaver against both bots, finished
+without a stall and with a score breakdown that added up. It also found two places where the code
+hadn't done what the rulebook says. <strong>Tribute Stone</strong> took a worker without asking
+whose: on Basking Rocks, with both opponents aboard, the victim was picked automatically. It now
+asks, and so do Snare Set and Channel Clearer, which shared the same shortcut. The second was a
+fish-line edge case. A bot hit 91 in the middle of an action, Mud Wallow's shoreline slide then
+pulled it back to 89, and it went on playing. The rulebook already says what happens: retire the
+moment your pawn reaches or passes the line. So a pawn that touches the line at any point during
+an action now retires when the action ends. Both fixes went into BoardWeaver and BGA together.
+Neither changes the rules the Hippodice jury has: the printed game always said this, and only the
+code had drifted from it.</p>
+
+<p>The bots still don't use abilities. They play the auction and the builds, take the build options
+that help them, and resolve when-built effects in a simple way, but they never start an ability
+themselves. Teaching them is the next job, and so is a human game against Riverhand.</p>
+
+<h2>Week of November 2 <span class="wk">— arrivals</span></h2>
+
+<p>The prototype mailed on 19 October was delivered to Hippodice in Bochum on
+<strong>[2026-11-02]</strong>, in time for the main round to begin. From here on the jury has the
+game and the only work left is to wait. The other arrival this week was a
+<strong>#river-bankers</strong> channel on the BoardWeaver Discord, the game's first community
+space of its own, for players who find it on the new table.</p>
+
 <div class="footer">
   River Bankers — a design journal · a week-by-week look back at the game's development ·
   entries oldest-first, one heading per calendar week.
