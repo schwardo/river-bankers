@@ -216,6 +216,29 @@ final class Effects
     public const MILL_WHEEL_WHENBUILT = ['Royal Lodge', 'Sap Drip', 'Springwater Pool', 'Vine Lattice',
         'Snag Pile', 'Spillway', 'Mud Levee', 'Flush Channel', 'Stone Pool', 'Burrow Run'];
 
+    /**
+     * Mill Wheel copy candidates from the structures a player's neighbours have
+     * built: the distinct MILL_WHEEL_COPYABLE abilities, first occurrence wins.
+     * Usability right now is the caller's check (Game::millWheelOptions).
+     *
+     * @param list<string> $neighbourBuiltNames
+     * @return list<array{key:string, name:string, cost:int}>
+     */
+    public static function millWheelCopyable(array $neighbourBuiltNames): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ($neighbourBuiltNames as $name) {
+            $aa = self::actionAbility($name);
+            if ($aa === null || !in_array($aa['key'], self::MILL_WHEEL_COPYABLE, true) || isset($seen[$aa['key']])) {
+                continue;
+            }
+            $seen[$aa['key']] = true;
+            $out[] = ['key' => $aa['key'], 'name' => $name, 'cost' => $aa['cost']];
+        }
+        return $out;
+    }
+
     /** @return array{key:string, cost:int}|null */
     public static function actionAbility(string $name): ?array
     {

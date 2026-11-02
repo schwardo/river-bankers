@@ -126,6 +126,21 @@ final class EffectsTest extends TestCase
         self::assertNull(Effects::actionAbility('Spillway'));
     }
 
+    public function testMillWheelCopiesNeighbourDriftwoodSnag(): void
+    {
+        self::assertSame(
+            [['key' => 'driftwoodsnag', 'name' => 'Driftwood Snag', 'cost' => 1]],
+            Effects::millWheelCopyable(['Reed Bed', 'Driftwood Snag', 'Driftwood Snag'])
+        );
+    }
+
+    public function testMillWheelNeverCopiesItselfConfluenceOrOnceAbilities(): void
+    {
+        self::assertSame([], Effects::millWheelCopyable(['Mill Wheel', 'Confluence', 'Tow Line', 'Salmon Run']));
+        self::assertNull(Effects::actionAbility('Mill Wheel'));
+        self::assertNotContains('millwheel', Effects::MILL_WHEEL_COPYABLE);
+    }
+
     public function testOnceAbilityMapping(): void
     {
         self::assertSame(['key' => 'woodpile', 'cost' => 1], Effects::onceAbility('Wood Pile'));

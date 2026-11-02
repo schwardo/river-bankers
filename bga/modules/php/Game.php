@@ -2464,6 +2464,14 @@ class Game extends \Bga\GameFramework\Table
             if ($name === 'Confluence' && $this->abilityUsable('confluence', $playerId)) {
                 $out[] = ['key' => 'confluence', 'name' => $name, 'cost' => 0, 'once' => false, 'repeat' => false, 'cardId' => 0];
             }
+            // Mill Wheel's "as an action" half: copy a neighbour's as-an-action
+            // ability. Kept out of ACTION_ABILITIES (and so out of
+            // MILL_WHEEL_COPYABLE — no copying Mill Wheel itself). Free to start;
+            // it uses the turn, and the copied ability pays its own cost in
+            // MillWheel::actMillPick.
+            if ($name === 'Mill Wheel' && $this->abilityUsable('millwheel', $playerId)) {
+                $out[] = ['key' => 'millwheel', 'name' => $name, 'cost' => 0, 'once' => false, 'repeat' => false, 'cardId' => 0];
+            }
         }
         return $out;
     }
@@ -2849,19 +2857,14 @@ class Game extends \Bga\GameFramework\Table
      */
     public function millWheelOptions(int $playerId): array
     {
-        $seen = [];
         $out = [];
+        $names = [];
         foreach ($this->neighborIds($playerId) as $nid) {
-            foreach ($this->getBuiltNames($nid) as $name) {
-                $aa = Effects::actionAbility($name);
-                if ($aa === null || !in_array($aa['key'], Effects::MILL_WHEEL_COPYABLE, true)) {
-                    continue;
-                }
-                if (isset($seen[$aa['key']]) || !$this->abilityUsable($aa['key'], $playerId)) {
-                    continue;
-                }
-                $seen[$aa['key']] = true;
-                $out[] = ['key' => $aa['key'], 'name' => $name, 'cost' => $aa['cost']];
+            array_push($names, ...$this->getBuiltNames($nid));
+        }
+        foreach (Effects::millWheelCopyable($names) as $o) {
+            if ($this->abilityUsable($o['key'], $playerId)) {
+                $out[] = $o;
             }
         }
         return $out;
