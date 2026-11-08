@@ -1,0 +1,5 @@
+name = "riverbankers"
+defaultTargets = ["RiverBankers"]
+
+[[lean_lib]]
+name = "RiverBankers"
