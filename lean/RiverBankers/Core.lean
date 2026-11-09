@@ -380,7 +380,8 @@ theorem placedTotal_le_open (opn : Nat) (bids : List Nat) (init : Nat)
     · simp only [placedTotal, overbid, ht, hc, ↓reduceIte]; omega
 
 /-- **Progress.** Every auction covers at least one icon. This is exactly what the
-"initiator must bid ≥ 1" rule plus the first-mover consolation buy: without the
+rule that the initiator "must bid at least one worker" plus the first-mover
+consolation buy: without the
 consolation, a full jam would cost everyone fish and change nothing on the board. -/
 theorem placedTotal_pos (opn : Nat) (bids : List Nat) (init : Nat)
     (hl : LegalBids opn bids init) : 1 ≤ placedTotal opn bids := by
@@ -545,7 +546,7 @@ theorem auction_shrinks_open (opn : Nat) (bids : List Nat) (init : Nat)
 
 /-! ## 4. The fish track
 
-"Your fish total is the space your pawn sits on plus 60 while it shows its '+60'
+"Your fish total is the space your pawn sits on plus 60 while it shows its "+60"
 side." "The fish track has a single finish line at 90 fish ... (90 = space 30 on
 the lap-2 side)." Pawns are modeled by their fish total; the board space and the
 flip are derived. -/
