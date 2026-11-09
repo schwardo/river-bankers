@@ -1239,6 +1239,13 @@ function crowdCount(card) {
 //   rvwild       — Bramble merges reeds-5 + vines-5 instead; stones keep plain 5
 let DECK_2P = process.env.RB_2P_DECK || 'live';
 function setDeck2P(v) { DECK_2P = v || 'live'; }
+// 4P material-deck variants (org TODO "Consider adding Bramble Shoal (the
+// 2P-only wildcard) to the 4P deck to reduce jams"). RB_4P_DECK, 4P only:
+//   live    — the printed 4P deck (no Bramble Shoal)
+//   bramble — live + Bramble Shoal (stones/vines wild-5) added alongside
+//             Rocky Shoal and Trailing Vine
+let DECK_4P = process.env.RB_4P_DECK || 'live';
+function setDeck4P(v) { DECK_4P = v || 'live'; }
 
 function makeCardSpecs(numPlayers) {
   const specs = [];
@@ -1253,7 +1260,7 @@ function makeCardSpecs(numPlayers) {
     if (numPlayers >= 3) for (const icons of TIER_3PLUS_ICONS) specs.push({ material: m, icons });
     if (numPlayers >= 4) for (const icons of TIER_4PLUS_ICONS) specs.push({ material: m, icons });
   }
-  if (svWild) specs.push({ material: merged[0], icons: 5, svWild: true });
+  if (svWild || (numPlayers === 4 && DECK_4P === 'bramble')) specs.push({ material: merged[0], icons: 5, svWild: true });
   if (v2 === 'logs5' || v2 === 'logs5stones5') specs.push({ material: 'logs', icons: 5, plain: true });
   if (v2 === 'stones5' || v2 === 'logs5stones5') specs.push({ material: 'stones', icons: 5, plain: true });
   if (v2 === 'oldgrowth') specs.push({ material: 'logs', icons: 8 });
@@ -1485,6 +1492,8 @@ function newGame(numPlayers, workersPerPlayer = null) {
       combinedTriggerFish: 0, // total 🐟 paid to initiate combined auctions
       effectUses: {},      // name → times that card's active ability actually fired
       jamAuctions: 0,
+      jamOverbid: 0,       // sum over jams of (total bid − open icons): the jam's dead weight
+      jamWasteFish: 0,     // 🐟 paid by jam bidders for workers that did not land
       plentyAuctions: 0,
       noBidAuctions: 0,
       iconsSpawned: 0, // sum of totalIcons of cards that entered the river/upstream
@@ -2055,6 +2064,7 @@ function resolveAuction(state, card, bids, triggerPlayerIdx) {
     }
   } else {
     state.metrics.jamAuctions++;
+    state.metrics.jamOverbid += totalBid - open;
     // Per-player clinch, computed first so the initiator-consolation rule can
     // adjust it before any supply/metric is applied.
     const gotByIdx = {};
@@ -2089,6 +2099,7 @@ function resolveAuction(state, card, bids, triggerPlayerIdx) {
       const perItem = playerCardCost(state, card, idx);
       const timeAdvance = billable * perItem;
       advancePlayer(state, idx, timeAdvance);
+      state.metrics.jamWasteFish += Math.max(0, billable - got) * perItem;
       if (got > 0) matcostRecord(card, perItem, got, got * perItem);
       state.metrics.iconsClaimed += got;
       state.metrics.nonZeroBidders++;
@@ -2232,6 +2243,7 @@ function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing, tri
     }
   } else {
     state.metrics.jamAuctions++;
+    state.metrics.jamOverbid += totalBid - open;
     let totalClinched = 0;
     for (const { idx, bid } of playerBidPairs) {
       const p = state.players[idx];
@@ -2242,6 +2254,7 @@ function resolveCombinedAuction(state, cardA, cardB, virtual, bids, pairing, tri
       let billable = bid;
       if (placed < bid && hasEffect(p, 'Pontoon')) billable = Math.max(0, bid - 1);
       payLater(idx, billable * playerCardCost(state, virtual, idx));
+      state.metrics.jamWasteFish += Math.max(0, billable - placed) * playerCardCost(state, virtual, idx);
       state.metrics.iconsClaimed += placed;
       state.metrics.nonZeroBidders++;
       if (placed === 0) state.metrics.zeroClinchBidders++;
@@ -8993,8 +9006,9 @@ function sweepScarcity(numGamesArg, countsArg, variantsArg) {
   const pc = x => (isNaN(x) ? '-' : (100 * x).toFixed(0) + '%');
   const summary = [];
   for (const numP of counts) {
-    for (const variant of (numP === 2 ? variants : ['live'])) {
-      setDeck2P(variant);
+    const vlist = (numP === 2 || numP === 4) ? (variantsArg ? variants : [numP === 2 ? DECK_2P : DECK_4P]) : ['live'];
+    for (const variant of vlist) {
+      if (numP === 2) setDeck2P(variant); else if (numP === 4) setDeck4P(variant);
       const fishLine = simFishLine(numP);
       const supply = {}; for (const m of M) supply[m] = 0;
       for (const c of buildMaterialDeck(numP)) {
@@ -9007,6 +9021,7 @@ function sweepScarcity(numGamesArg, countsArg, variantsArg) {
       for (const m of M) { held[m] = 0; built[m] = 0; used[m] = 0; openDry[m] = 0; blk[m] = 0; }
       let blkCards = 0, deadTurns = 0, dryTurns = 0, deadAtDry = 0, dryGames = 0, dryFish = 0;
       let deadForever = 0, builds = 0, invents = 0, turns = 0, jams = 0, auctions = 0;
+      let overbid = 0, wasteFish = 0, zcFish = 0, gamesWithJam = 0;
       const vps = [], spreads = [];
       for (let g = 0; g < numGames; g++) {
         const state = newGame(numP);
@@ -9071,10 +9086,12 @@ function sweepScarcity(numGamesArg, countsArg, variantsArg) {
         vps.push(avg(v)); spreads.push(Math.max(...v) - Math.min(...v));
         builds += state.metrics.cardsBuilt; invents += state.metrics.invents;
         turns += state.metrics.turns; jams += state.metrics.jamAuctions; auctions += state.metrics.auctions;
+        overbid += state.metrics.jamOverbid; wasteFish += state.metrics.jamWasteFish; zcFish += state.metrics.zeroClinchFish;
+        if (state.metrics.jamAuctions > 0) gamesWithJam++;
         process.stderr.write(`\rscarcity ${numP}P ${variant}: ${g + 1}/${numGames} `);
       }
       process.stderr.write('\r' + ' '.repeat(50) + '\r');
-      const label = numP === 2 ? `${numP}P ${variant}` : `${numP}P`;
+      const label = (numP === 2 || numP === 4) ? `${numP}P ${variant}` : `${numP}P`;
       console.log(`\n${label}  (${numGames} games, fishLine ${fishLine}, ${defaultWorkersPerPlayer(numP)} workers)`);
       console.log(pad('material', 9) + padL('supply', 8) + padL('demand', 8) + padL('ratio', 7) + padL('held→built', 12) + padL('used/game', 11) + padL('used%sup', 10) + padL('openAtDry', 11) + padL('blocker', 9));
       const blkTot = M.reduce((t, m) => t + blk[m], 0);
@@ -9089,6 +9106,9 @@ function sweepScarcity(numGamesArg, countsArg, variantsArg) {
         deadAtDry: deadAtDry / Math.max(1, dryGames * numP), deadTurn: deadTurns / Math.max(1, dryTurns),
         deadForever: deadForever / Math.max(1, dryGames * numP), single: blkTot / Math.max(1, blkCards),
         vp: avg(vps), spread: avg(spreads), turns: turns / numGames, jam: jams / Math.max(1, auctions),
+        auc: auctions / numGames, jamsPerGame: jams / numGames, jamGames: gamesWithJam / numGames,
+        overbid: overbid / Math.max(1, jams), overbidGame: overbid / numGames,
+        waste: wasteFish / numGames, zcFish: zcFish / numGames,
       };
       summary.push(row);
       console.log(`deck dry in ${pc(row.dry)} of games, at mean fish ${f1(row.dryFish)}.  Dead hand: ${pc(row.deadAtDry)} of players at dry, ` +
@@ -9096,7 +9116,13 @@ function sweepScarcity(numGamesArg, countsArg, variantsArg) {
         `${pc(row.single)} of dead-hand cards are blocked by exactly one material (the 'blocker' column).`);
     }
   }
-  setDeck2P(process.env.RB_2P_DECK);
+  setDeck2P(process.env.RB_2P_DECK); setDeck4P(process.env.RB_4P_DECK);
+  console.log('\n' + pad('config', 20) + padL('aucs', 7) + padL('jams/g', 8) + padL('jamGm%', 8) + padL('ob/jam', 8) + padL('ob/g', 7) + padL('waste🐟/g', 10) + padL('zc🐟/g', 8));
+  for (const r of summary) {
+    console.log(pad(r.label, 20) + padL(f1(r.auc), 7) + padL(f2(r.jamsPerGame), 8) + padL(pc(r.jamGames), 8) + padL(f2(r.overbid), 8) +
+      padL(f2(r.overbidGame), 7) + padL(f2(r.waste), 10) + padL(f2(r.zcFish), 8));
+  }
+  console.log('  ob = overbid (total bid − open icons, the jam\'s dead weight); waste🐟 = fish paid for workers that did not land; zc🐟 = fish paid by bidders who clinched nothing.');
   console.log('\n' + pad('config', 20) + padL('built/P', 8) + padL('inv/P', 7) + padL('dry%', 6) + padL('dryFish', 8) + padL('dead@dry', 9) + padL('deadTurn', 9) + padL('deadAll', 8) + padL('avgVP', 7) + padL('spread', 7) + padL('turns', 7) + padL('jam%', 6));
   for (const r of summary) {
     console.log(pad(r.label, 20) + padL(f2(r.built), 8) + padL(f2(r.invents), 7) + padL(pc(r.dry), 6) + padL(f1(r.dryFish), 8) +
