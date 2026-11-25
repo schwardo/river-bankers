@@ -25,7 +25,7 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Hollowed-out Log', cost: { logs: 3, reeds: 1 },           time: 2, vp: 5, effect: 'Once per game (flip card): recall one of your workers from a river card (no blank).' },
   { name: 'Snag Pile',      cost: { reeds: 2, stones: 1 },           time: 2, vp: 3, effect: 'When built: auction a Headwaters card in place at 1🐟/item, free. It then flows to River 1.' },
   { name: 'Heron Watch',    cost: { stones: 4, logs: 2 },            time: 4, vp: 0, effect: 'End of game: +1 VP per shoreline card on the table (max +6).' },
-  { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'Reed icons cost you 1 less 🐟 per item (min 1).' },
+  { name: 'Reed Bed',       cost: { reeds: 3, mud: 1 },              time: 2, vp: 4, effect: 'When you bid on a Reeds card (or a wildcard that can be Reeds), each worker you bid costs you 1 less 🐟 (min 1).' },
   { name: 'Mud Levee',      cost: { mud: 3, stones: 2 },             time: 3, vp: 6, effect: 'When built: drop 2 blanks on uncovered icons in the river.' },
   { name: 'Log Flume',    cost: { mud: 2, logs: 1 },               time: 1, vp: 2, effect: 'When you build: advance 3 fewer 🐟 (min 1; 0🐟 cards stay 0).' },
   { name: 'Cache Burrow',   cost: { mud: 2, reeds: 2 },              time: 2, vp: 4, effect: '+1 to your hand size. When built, draw a structure card.' },
@@ -80,15 +80,15 @@ const BASE_STRUCTURE_TEMPLATES = [
   { name: 'Tail Slap',        cost: { logs: 0 },                       time: 0, vp: 2, species: 'beaver', effect: 'At the start of your turn, you may pay 1 fish to drop a blank on any uncovered icon on a River 1 card.' },
   { name: 'Beaver Cache',     cost: { logs: 0 },                       time: 0, vp: 1, species: 'beaver', effect: '+1 to your hand size. When built, draw a structure card.' },
   // River Otter (Reeds bias)
-  { name: 'Kelp Bed',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Reeds icons cost you 1 less fish per item (min 1).' },
+  { name: 'Kelp Bed',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'When you bid on a Reeds card (or a wildcard that can be Reeds), each worker you bid costs you 1 less fish (min 1).' },
   { name: 'Rolling Float',    cost: { logs: 0 },                       time: 0, vp: 1, species: 'otter',  effect: 'Once per game, swap one of your workers on a river card with another worker on a different card in the same river slot. No fish cost.' },
   { name: 'Stone Tool',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'otter',  effect: 'Once per game, when building, 1 of your Stones workers may substitute for any other material.' },
   // Muskrat (Mud bias)
-  { name: 'Mud Burrow',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'Mud icons cost you 1 less fish per item (min 1).' },
+  { name: 'Mud Burrow',       cost: { logs: 0 },                       time: 0, vp: 0, species: 'muskrat', effect: 'When you bid on a Mud card (or a wildcard that can be Mud), each worker you bid costs you 1 less fish (min 1).' },
   { name: 'Channel Clearer',  cost: { logs: 0 },                       time: 0, vp: 1, species: 'muskrat', effect: 'At the start of your turn, you may pay 1 fish to discard 1 worker from any Reeds river card (not a wild card); it returns to that player\'s supply without a blank.' },
   { name: 'Marsh Lookout',    cost: { logs: 0 },                       time: 0, vp: 2, species: 'muskrat', effect: 'Peek at the top card of the material deck at any time.' },
   // Mink (Clay bias)
-  { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'Clay icons cost you 2 less fish per item (min 1).' },
+  { name: 'Clay Den',         cost: { logs: 0 },                       time: 0, vp: 0, species: 'mink',   effect: 'When you bid on a Clay card (or a wildcard that can be Clay), each worker you bid costs you 2 less fish (min 1).' },
   { name: 'Quick Strike',     cost: { logs: 0 },                       time: 0, vp: 2, species: 'mink',   effect: 'When you trigger an auction, you may declare your bid last (after all other bids are revealed). You must still bid at least 1 worker, as the trigger always does.' },
   { name: 'Snare Set',        cost: { logs: 0 },                       time: 0, vp: 1, species: 'mink',   effect: 'Once per game, force an opponent to recall one of their workers from a river card (drops a blank). The opponent slides back the card\'s per-item cost in fish as compensation.' },
 ];
@@ -219,14 +219,18 @@ function totalVP(p, state) {
 const MATERIAL_DISCOUNT_CARDS = {
   reeds: { 'Reed Bed': 1, 'Kelp Bed': 1 },
   mud:   { 'Mud Burrow': 1 },
-  clay:  { 'Clay Den': 2 },
+  clay:  { 'Clay Den': process.env.RB_CLAYDEN_DISC !== undefined ? Number(process.env.RB_CLAYDEN_DISC) : 2 },
 };
+// Measurement toggle (2026-11-25): RB_WILD_DISC=0 makes per-item discounts
+// skip wildcard cards entirely (effect 'wild'). Live rule = 1 (either half).
+const WILD_DISC = process.env.RB_WILD_DISC !== undefined ? Number(process.env.RB_WILD_DISC) : 1;
 // A wildcard counts as both of its materials [rule 2026-09-23]: either half's
 // discount applies, the larger one if both do (halves never stack). Mirrors
 // web perItemDiscount.
 function playerCardCost(state, card, playerIdx) {
   const base = cardCost(card);
   const p = state.players[playerIdx];
+  if (!WILD_DISC && card.effect === 'wild') return base;
   const mats = card.wildAlt ? [card.material, card.wildAlt] : [card.material];
   let best = 0;
   for (const m of mats) {

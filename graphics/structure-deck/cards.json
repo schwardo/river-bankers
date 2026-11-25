@@ -13,7 +13,7 @@
     { "name": "Hollowed-out Log", "cost": {"logs": 3, "reeds": 1},             "time": 2, "vp": 5,  "effect": "Once per game (flip card): recall one of your workers from a river card (no blank)." },
     { "name": "Snag Pile",        "cost": {"reeds": 2, "stones": 1},           "time": 2, "vp": 3,  "effect": "When built: auction a Headwaters card in place at 1🐟/item, free. It then flows to River 1." },
     { "name": "Heron Watch",      "cost": {"stones": 4, "logs": 2},            "time": 4, "vp": 0,  "effect": "End of game: +1 VP per shoreline card on the table (max +6)." },
-    { "name": "Reed Bed",         "cost": {"reeds": 3, "mud": 1},              "time": 2, "vp": 4,  "effect": "Reed icons cost you 1 less 🐟 per item (min 1)." },
+    { "name": "Reed Bed",         "cost": {"reeds": 3, "mud": 1},              "time": 2, "vp": 4,  "effect": "When you bid on a Reeds card (or a wildcard that can be Reeds), each worker you bid costs you 1 less 🐟 (min 1)." },
     { "name": "Mud Levee",        "cost": {"mud": 3, "stones": 2},             "time": 3, "vp": 6,  "effect": "When built: drop 2 blanks on uncovered icons in the river." },
     { "name": "Log Flume",      "cost": {"mud": 2, "logs": 1},               "time": 1, "vp": 2,  "effect": "When you build: advance 3 fewer 🐟 (min 1; 0🐟 cards stay 0)." },
     { "name": "Cache Burrow",     "cost": {"mud": 2, "reeds": 2},              "time": 2, "vp": 4,  "effect": "+1 to your hand size. When built, draw a structure card." },
